@@ -176,13 +176,13 @@ def _make_sts_tff_continuous(
 def _make_sts_tff_binary(
     sts_features: Dict[int, Dict[str, Union[int, str]]],
     key: str = "",
-    negative_value: int = 1,
-    positive_value: int = 2,
+    negative_value: int = 2,
+    positive_value: int = 1,
 ) -> Callable:
     def tensor_from_file(tm: TensorMap, hd5: h5py.File, dependents: Dict = {}):
         """Parses MRN from the HD5 file name, look up the feature in a dict, and
-        return the feature. Note the default encoding of +/- features in STS is 1/2, but
-        for outcomes it is 0/1.
+        return the feature. Note the default encoding of +/- features in STS is 2/1,
+        # e.g. yes == 1, no == 2, but outcomes are encoded using the usual format of 0/1.
         """
         mrn = id_from_filename(hd5.filename)
         tensor = np.zeros(tm.shape, dtype=np.float32)
