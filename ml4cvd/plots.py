@@ -31,7 +31,7 @@ from tensorflow.keras.optimizers.schedules import LearningRateSchedule
 
 # Imports: first party
 from ml4cvd.metrics import concordance_index, coefficient_of_determination
-from ml4cvd.TensorMap import TensorMap
+from ml4cvd.TensorMap import TensorMap, find_negative_label_and_channel
 from ml4cvd.definitions import (
     PDF_EXT,
     IMAGE_EXT,
@@ -476,15 +476,6 @@ def plot_metric_history(history, training_steps: int, title: str, prefix="./figu
     logging.info(f"Saved learning curves at: {figure_path}")
 
 
-def _find_negative_label_index(labels: Dict[str, int], key_prefix: str = "no_") -> int:
-    """Given a set of labels and their values, return the index of the negative label"""
-    negative_label_index = 0
-    for index, label in enumerate(labels):
-        if label.startswith(key_prefix):
-            negative_label_index = index
-    return negative_label_index
-
-
 def plot_prediction_calibration(
     prediction: np.ndarray,
     truth: np.ndarray,
@@ -512,9 +503,9 @@ def plot_prediction_calibration(
     ax3.plot([0, 1], [0, 1], "k:", label="Perfectly calibrated Brier score: 0.0")
 
     if len(labels) == 2:
-        negative_label_idx = _find_negative_label_index(labels=labels, key_prefix="no_")
+        _, negative_label_idx = find_negative_label_and_channel(labels)
 
-    for idx, label in enumerate(labels):
+    for label, idx in labels.items():
         if len(labels) == 2 and idx == negative_label_idx:
             continue
 
@@ -1669,9 +1660,9 @@ def plot_roc_per_class(
     fpr, tpr, roc_auc = get_fpr_tpr_roc_pred(prediction, truth, labels)
 
     if len(labels) == 2:
-        negative_label_idx = _find_negative_label_index(labels=labels, key_prefix="no_")
+        _, negative_label_idx = find_negative_label_and_channel(labels)
 
-    for idx, label in enumerate(labels):
+    for label, idx in labels.items():
         if len(labels) == 2 and idx == negative_label_idx:
             continue
 
@@ -1721,10 +1712,9 @@ def plot_rocs(predictions, truth, labels, title, prefix="./figures/"):
     for p in predictions:
         fpr, tpr, roc_auc = get_fpr_tpr_roc_pred(predictions[p], truth, labels)
         if len(labels) == 2:
-            negative_label_idx = _find_negative_label_index(
-                labels=labels, key_prefix="no_",
-            )
-        for idx, label in enumerate(labels):
+            _, negative_label_idx = find_negative_label_and_channel(labels)
+
+        for label, idx in labels.items():
             if len(labels) == 2 and idx == negative_label_idx:
                 continue
 
@@ -1778,11 +1768,9 @@ def subplot_rocs(
         fpr, tpr, roc_auc = get_fpr_tpr_roc_pred(predicted, truth, labels)
 
         if len(labels) == 2:
-            negative_label_idx = _find_negative_label_index(
-                labels=labels, key_prefix="no_",
-            )
+            _, negative_label_idx = find_negative_label_and_channel(labels)
 
-        for idx, label in enumerate(labels):
+        for label, idx in labels.items():
             if len(labels) == 2 and idx == negative_label_idx:
                 continue
 
@@ -1838,10 +1826,9 @@ def subplot_comparison_rocs(
         for p in predictions:
             fpr, tpr, roc_auc = get_fpr_tpr_roc_pred(predictions[p], truth, labels)
             if len(labels) == 2:
-                negative_label_idx = _find_negative_label_index(
-                    labels=labels, key_prefix="no_",
-                )
-            for idx, label in enumerate(labels):
+                _, negative_label_idx = find_negative_label_and_channel(labels)
+
+            for label, idx in labels.items():
                 if len(labels) == 2 and idx == negative_label_idx:
                     continue
 
@@ -1890,8 +1877,9 @@ def plot_precision_recall_per_class(
     plt.figure(figsize=(SUBPLOT_SIZE, SUBPLOT_SIZE))
 
     if len(labels) == 2:
-        negative_label_idx = _find_negative_label_index(labels=labels, key_prefix="no_")
-    for idx, label in enumerate(labels):
+        _, negative_label_idx = find_negative_label_and_channel(labels)
+
+    for label, idx in labels.items():
         if len(labels) == 2 and idx == negative_label_idx:
             continue
 
@@ -1936,10 +1924,9 @@ def plot_precision_recalls(predictions, truth, labels, title, prefix="./figures/
 
     for p in predictions:
         if len(labels) == 2:
-            negative_label_idx = _find_negative_label_index(
-                labels=labels, key_prefix="no_",
-            )
-        for idx, label in enumerate(labels):
+            _, negative_label_idx = find_negative_label_and_channel(labels)
+
+        for label, idx in labels.items():
             if len(labels) == 2 and idx == negative_label_idx:
                 continue
 

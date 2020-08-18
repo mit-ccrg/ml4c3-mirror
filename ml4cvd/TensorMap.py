@@ -548,6 +548,22 @@ def outcome_channels(outcome: str):
     return {f"no_{outcome}": 0, f"{outcome}": 1}
 
 
+def find_negative_label_and_channel(
+    labels: Dict[str, int], negative_label_prefix: str = "no_",
+) -> Tuple[str, int]:
+    """
+    Given a set of labels and their channel indices,
+    return the negative label and its channel, defaults to label with the smallest channel index.
+    """
+    labels = sorted(labels.items(), key=lambda cm: cm[1])
+    negative_label, negative_label_index = labels[0]
+    for label, index in labels:
+        if label.startswith(negative_label_prefix):
+            negative_label = label
+            negative_label_index = index
+    return negative_label, negative_label_index
+
+
 def id_from_filename(fpath: str) -> int:
     return int(os.path.basename(fpath).split(".")[0])
 

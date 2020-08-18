@@ -5,7 +5,7 @@ import copy
 import logging
 import datetime
 import multiprocessing as mp
-from typing import Set, Dict, List, Tuple, Union, Optional
+from typing import List, Tuple
 from functools import reduce
 from collections import OrderedDict, defaultdict
 
@@ -16,8 +16,13 @@ import pandas as pd
 import seaborn as sns
 
 # Imports: first party
-from ml4cvd.plots import SUBPLOT_SIZE, _find_negative_label_index
-from ml4cvd.TensorMap import TensorMap, Interpretation, update_tmaps
+from ml4cvd.plots import SUBPLOT_SIZE
+from ml4cvd.TensorMap import (
+    TensorMap,
+    Interpretation,
+    update_tmaps,
+    find_negative_label_and_channel,
+)
 from ml4cvd.definitions import IMAGE_EXT
 from ml4cvd.tensor_generators import TensorGenerator, train_valid_test_tensor_generators
 
@@ -68,15 +73,14 @@ def explore(args):
                 raise ValueError(f"{tmap_name} not found in tmaps")
     if src_time is not None:
         if src_time not in tmaps:
-            raise ValueError(f"{tmap_name} not found in tmaps")
+            raise ValueError(f"{src_time} not found in tmaps")
 
-    # Wipe tmaps dict, iterate through needed tmaps, and modify if necessary
-    updated_tmaps = {}
-    for tm_name, tm in tmaps.items():
+    # iterate through needed tmaps, and modify if necessary
+    tmaps = []
+    for tm in args.tensor_maps_in:
         if _tmap_requires_modification_for_explore(tm):
             tm = _modify_tmap_to_return_mean(tm)
-        updated_tmaps[tm_name] = tm
-    tmaps = updated_tmaps
+        tmaps.append(tm)
 
     df = _tensors_to_df(
         tensor_maps_in=tmaps,
@@ -158,7 +162,10 @@ def explore(args):
 
         # If path to reference tensors is dir, parse HD5 files
         if os.path.isdir(args.reference_tensors):
-            ref_tmaps = [_get_tmap(tm_name, ref_cols) for tm_name in ref_cols]
+            ref_tmaps = {}
+            for tm_name in ref_cols:
+                ref_tmaps = update_tmaps(tm_name, ref_tmaps)
+            ref_tmaps = [ref_tmaps[tm_name] for tm_name in ref_cols]
             df_ref = _tensors_to_df(
                 tensor_maps_in=ref_tmaps,
                 tensor_maps_out=[],
@@ -483,7 +490,7 @@ def explore(args):
     else:
         # No cross-reference
         if args.reference_tensors is None:
-            df.to_csv(fpath)
+            df.to_csv(fpath, index=False)
         # Cross-reference
         else:
             df_cross.set_index(src_join, drop=True).to_csv(fpath)
@@ -505,12 +512,8 @@ def _get_redundant_cols(tmaps: List[TensorMap], df: pd.DataFrame) -> list:
         for tm in [
             tm for tm in tmaps if tm.interpretation is Interpretation.CATEGORICAL
         ]:
-            if tm.channel_map and len(tm.channel_map) == 2:
-                labels = list(tm.channel_map.keys())
-                negative_label_idx = _find_negative_label_index(
-                    labels=labels, key_prefix="no_",
-                )
-                redundant_col = labels[negative_label_idx]
+            if tm.channel_map is not None and len(tm.channel_map) == 2:
+                redundant_col, _ = find_negative_label_and_channel(tm.channel_map)
                 df.drop(f"{tm.name}_{redundant_col}", axis=1, inplace=True)
                 redundant_cols.append(f"{tm.name}_{redundant_col}")
     return redundant_cols
