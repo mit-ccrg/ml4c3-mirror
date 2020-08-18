@@ -93,7 +93,7 @@ def update_tmaps_weighted_loss(
         )
     weight = weight.split("_")[0]
     tmap = copy.deepcopy(tmaps[base_name])
-    new_tmap_name_name = f"{base_name}_weighted_loss_{weight}"
+    new_tmap_name = f"{base_name}_weighted_loss_{weight}"
     tmap.name = new_tmap_name
     tmap.loss = weighted_crossentropy([1.0, float(weight)], new_tmap_name)
     tmaps[new_tmap_name] = tmap
