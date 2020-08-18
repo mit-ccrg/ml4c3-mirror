@@ -2,7 +2,6 @@
 import os
 import sys
 from typing import Dict, List, Tuple
-from unittest import mock as mock
 from itertools import product
 
 # Imports: third party
@@ -11,6 +10,7 @@ import numpy as np
 import pytest
 
 # Imports: first party
+import ml4cvd
 from ml4cvd.arguments import parse_args
 from ml4cvd.TensorMap import TensorMap, Interpretation
 from ml4cvd.definitions import TENSOR_EXT
@@ -112,6 +112,28 @@ class Utils:
 @pytest.fixture(scope="session")
 def utils():
     return Utils
+
+
+# The purpose of this fixture is to always use the fake testing TMaps.
+# The function which retrieves tmaps is update_tmaps from TensorMap.py;
+# However, that function is usually imported directly, i.e.
+#
+#     from ml4cvd.TensorMap import update_tmaps
+#
+# This import creates a new object with the same name in the importing file,
+# and now needs to be mocked too, e.g.
+#
+#     mock ml4cvd.arguments.update_tmaps --> mock_update_tmaps
+#
+# https://stackoverflow.com/a/45466846
+@pytest.fixture(autouse=True)
+def use_testing_tmaps(monkeypatch):
+    def mock_update_tmaps(tmap_name, tmaps):
+        return pytest.MOCK_TMAPS
+
+    monkeypatch.setattr(ml4cvd.TensorMap, "update_tmaps", mock_update_tmaps)
+    monkeypatch.setattr("ml4cvd.arguments.update_tmaps", mock_update_tmaps)
+    monkeypatch.setattr("ml4cvd.hyperparameters.update_tmaps", mock_update_tmaps)
 
 
 @pytest.fixture(scope="function")

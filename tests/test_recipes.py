@@ -7,9 +7,8 @@ import pandas as pd
 import pytest
 
 # Imports: first party
-from ml4cvd.plots import _find_negative_label_index
 from ml4cvd.recipes import infer_multimodal_multitask, train_multimodal_multitask
-from ml4cvd.TensorMap import TensorMap, Interpretation
+from ml4cvd.TensorMap import TensorMap, Interpretation, find_negative_label_and_channel
 from ml4cvd.explorations import (
     explore,
     continuous_explore_header,
@@ -57,7 +56,7 @@ class TestRecipes:
             row = row[1]
             for tm in tmaps:
                 row_expected = explore_expected[(row["fpath"], tm)]
-                if tmap_requires_modification_for_explore(tm):
+                if _tmap_requires_modification_for_explore(tm):
                     actual = getattr(row, continuous_explore_header(tm))
                     assert not np.isnan(actual)
                     continue
@@ -66,7 +65,9 @@ class TestRecipes:
                     assert actual == row_expected
                     continue
                 if tm.is_categorical():
-                    negative_label_idx = _find_negative_label_index(tm.channel_map)
+                    _, negative_label_idx = find_negative_label_and_channel(
+                        tm.channel_map,
+                    )
                     for channel, idx in tm.channel_map.items():
                         if idx == negative_label_idx and len(tm.channel_map) == 2:
                             assert categorical_explore_header(tm, channel) not in row

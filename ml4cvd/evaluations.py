@@ -10,15 +10,9 @@ import pandas as pd
 from tensorflow.keras.models import Model
 
 # Imports: first party
-from ml4cvd.plots import (
-    plot_tsne,
-    subplot_rocs,
-    subplot_scatters,
-    evaluate_predictions,
-    _find_negative_label_index,
-)
+from ml4cvd.plots import plot_tsne, subplot_rocs, subplot_scatters, evaluate_predictions
 from ml4cvd.models import embed_model_predict
-from ml4cvd.TensorMap import TensorMap
+from ml4cvd.TensorMap import TensorMap, find_negative_label_and_channel
 from ml4cvd.definitions import CSV_EXT, Path, Paths, Inputs, Outputs, Predictions
 from ml4cvd.tensor_generators import (
     BATCH_INPUT_INDEX,
@@ -114,8 +108,8 @@ def predict_and_evaluate(
             if tm.channel_map is not None:
                 negative_label_idx = -1
                 if len(tm.channel_map) == 2:
-                    negative_label_idx = _find_negative_label_index(
-                        labels=tm.channel_map,
+                    _, negative_label_idx = find_negative_label_and_channel(
+                        tm.channel_map,
                     )
                 for cm, idx in tm.channel_map.items():
                     if idx == negative_label_idx:
