@@ -590,6 +590,7 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
     # Base tmaps: ECG
     from ml4cvd.tensor_maps_ecg import tmaps as tmaps_ecg  # isort:skip
     tmaps.update(tmaps_ecg)
+
     if tmap_name in tmaps:
         return tmaps
 
