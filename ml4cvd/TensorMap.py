@@ -100,7 +100,7 @@ class TensorMap(object):
         dependent_map: Optional["TensorMap"] = None,
         augmentations: Optional[List[Callable[[np.ndarray], np.ndarray]]] = None,
         normalization: Optional[Normalizer] = None,
-        annotation_units: Optional[int] = 32,
+        annotation_units: Optional[int] = None,
         tensor_from_file: Optional[Callable] = None,
         time_series_limit: Optional[int] = None,
         time_series_order: Optional[TimeSeriesOrder] = TimeSeriesOrder.NEWEST,
@@ -196,6 +196,10 @@ class TensorMap(object):
             # Setting time_series_limit indicates dynamic shaping which is always accompanied by 1st dim of None
             if self.time_series_limit is not None:
                 self.shape = (None,) + self.shape
+
+        # Infer embedded dimensionality
+        if self.annotation_units is None:
+            self.annotation_units = self.flat_size()
 
         if self.channel_map is None and self.is_time_to_event():
             self.channel_map = DEFAULT_TIME_TO_EVENT_CHANNELS

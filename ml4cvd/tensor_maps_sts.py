@@ -1,7 +1,7 @@
 # Imports: standard library
 import logging
 import datetime
-from typing import Set, Dict, List, Tuple, Union, Callable, Optional
+from typing import Dict, List, Tuple, Union, Callable
 
 # Imports: third party
 import h5py
@@ -12,20 +12,11 @@ import pandas as pd
 from ml4cvd.TensorMap import (
     TensorMap,
     Interpretation,
-    TimeSeriesOrder,
-    decompress_data,
     id_from_filename,
     outcome_channels,
 )
 from ml4cvd.normalizer import RobustScaler
-from ml4cvd.validators import (
-    validator_no_nans,
-    validator_no_empty,
-    validator_clean_mrn,
-    validator_no_negative,
-    validator_not_all_zero,
-    validator_voltage_no_zero_padding,
-)
+from ml4cvd.validators import validator_no_nans, validator_not_all_zero
 from ml4cvd.definitions import (
     ECG_PREFIX,
     STS_DATA_CSV,
