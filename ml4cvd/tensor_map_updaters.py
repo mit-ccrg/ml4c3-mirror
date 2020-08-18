@@ -84,19 +84,19 @@ def update_tmaps_weighted_loss(
     tmap_name: str, tmaps: Dict[str, TensorMap],
 ) -> Dict[str, TensorMap]:
     """Make new tmap from base name, modifying loss weight"""
-    if "_weighted_loss_" not in tmaps:
+    if "_weighted_loss_" not in tmap_name:
         return tmaps
     base_name, weight = tmap_name.split("_weighted_loss_")
-    weight, _ = weight.split("_")
     if base_name not in tmaps:
         raise ValueError(
             f"Base tmap {base_name} not in existing tmaps. Cannot modify weighted loss.",
         )
+    weight = weight.split("_")[0]
     tmap = copy.deepcopy(tmaps[base_name])
-    new_tmap = f"{base_name}_weighted_loss_{weight}"
-    tmap.name = new_tmap
-    tmap.loss = weighted_crossentropy([1.0, float(weight)], new_tmap)
-    tmaps[new_tmap] = tmap
+    new_tmap_name_name = f"{base_name}_weighted_loss_{weight}"
+    tmap.name = new_tmap_name
+    tmap.loss = weighted_crossentropy([1.0, float(weight)], new_tmap_name)
+    tmaps[new_tmap_name] = tmap
     return tmaps
 
 
@@ -114,10 +114,10 @@ def update_tmaps_sts_window(
             f"Base tmap {base_name} not in existing tmaps. Cannot modify STS window.",
         )
     tmap = copy.deepcopy(tmaps[base_name])
-    new_tmap = f"{base_name}_sts"
-    tmap.name = new_tmap
+    new_tmap_name = f"{base_name}_sts"
+    tmap.name = new_tmap_name
     tmap.time_series_lookup = date_interval_lookup
-    tmaps[new_tmap] = tmap
+    tmaps[new_tmap_name] = tmap
     return tmaps
 
 
@@ -148,13 +148,13 @@ def update_tmaps_time_series(
             f"Base tmap {base_name} not in existing tmaps. Cannot modify time series.",
         )
     tmap = copy.deepcopy(tmaps[base_name])
-    new_tmap = f"{base_name}{base_split}"
-    tmap.name = new_tmap
+    new_tmap_name = f"{base_name}{base_split}"
+    tmap.name = new_tmap_name
     if time_series_limit is None:
         tmap.shape = tmap.static_shape
     tmap.time_series_limit = time_series_limit
     tmap.time_series_order = time_series_order
     tmap.metrics = None
     tmap.infer_metrics()
-    tmaps[new_tmap] = tmap
+    tmaps[new_tmap_name] = tmap
     return tmaps
