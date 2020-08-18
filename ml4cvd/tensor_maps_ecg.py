@@ -82,30 +82,25 @@ def _make_hd5_path(tm: TensorMap, ecg_date: str, value_key: str) -> str:
     return f"{tm.path_prefix}/{ecg_date}/{value_key}"
 
 
-def _resample_voltage(voltage, desired_samples):
-    length_mismatch = False
+def _resample_voltage(voltage: np.array, desired_samples: float, fs: float) -> np.array:
+    """Resample array of voltage amplitudes (voltage) given desired number of samples
+    (length) and reported sampling frequency (fs) in Hz. Note the reported fs is solely
+    for processing 240 Hz ECGs that have 2500 samples."""
+    if fs == 240:
+        # If voltage array has more than 10 sec of data, truncate to the first 10 sec
+        if len(voltage) == 2500:
+            voltage = voltage[:2400]
+        else:
+            raise ValueError(
+                f"Sampling frequency of 240 Hz reported, but voltage array is not 2500 elements.",
+            )
+    
     if len(voltage) == desired_samples:
         return voltage
-    # Upsample
-    elif len(voltage) < desired_samples:
-        if desired_samples % len(voltage) == 0:
-            x = np.arange(len(voltage))
-            x_interp = np.linspace(0, len(voltage), desired_samples)
-            return np.interp(x_interp, x, voltage)
-        else:
-            length_mismatch = True
-    # Downsample
-    else:  # len(voltage) > desired_samples
-        if len(voltage) % desired_samples == 0:
-            return voltage[:: int(len(voltage) / desired_samples)]
-        else:
-            length_mismatch = True
-
-    if length_mismatch:
-        raise ValueError(
-            f"Cannot cleanly resample voltage length {len(voltage)} to desired samples"
-            f" {desired_samples}",
-        )
+ 
+    x = np.arange(len(voltage))
+    x_interp = np.linspace(0, len(voltage), desired_samples)
+    return np.interp(x_interp, x, voltage)
 
 
 def make_voltage(exact_length=False):
@@ -117,13 +112,27 @@ def make_voltage(exact_length=False):
         for i, ecg_date in enumerate(ecg_dates):
             for cm in tm.channel_map:
                 try:
-                    path = _make_hd5_path(tm, ecg_date, cm)
+                    path = _make_hd5_path(tm=tm, ecg_date=ecg_date, value_key=cm)
                     voltage = decompress_data(
                         data_compressed=hd5[path][()], dtype=hd5[path].attrs["dtype"],
                     )
+                    path_waveform_samplebase = _make_hd5_path(
+                        tm=tm, ecg_date=ecg_date, value_key="waveform_samplebase",
+                    )
+                    try:
+                        fs = float(
+                            decompress_data(
+                                data_compressed=hd5[path_waveform_samplebase][()],
+                                dtype=hd5[path_waveform_samplebase].attrs["dtype"],
+                            ),
+                        )
+                    except:
+                        fs = 250
                     if exact_length:
                         assert len(voltage) == voltage_length
-                    voltage = _resample_voltage(voltage, voltage_length)
+                    voltage = _resample_voltage(
+                        voltage=voltage, desired_samples=voltage_length, fs=fs,
+                    )
                     slices = (
                         (i, ..., tm.channel_map[cm])
                         if dynamic
