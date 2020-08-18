@@ -147,13 +147,19 @@ fi
 
 ################### SCRIPT BODY ##########################################
 
+if [[ -d "/storage/shared" ]] ; then
+    echo "Found /storage/shared folder; will try to mount it."
+    MOUNTS="${MOUNTS} -v /storage/shared/:/storage/shared/"
+fi
+
+
 if [[ -d "/data" ]] ; then
-    echo "Found /data folder will try to mount it."
+    echo "Found /data folder; will try to mount it."
     MOUNTS="${MOUNTS} -v /data/:/data/"
 fi
 
 if [[ -d "/media" ]] ; then
-    echo "Found /media folder will try to mount it."
+    echo "Found /media folder; will try to mount it."
     MOUNTS="${MOUNTS} -v /media/:/media/"
 fi
 
