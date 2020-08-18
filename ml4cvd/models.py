@@ -1,6 +1,5 @@
 # Imports: standard library
 import os
-import time
 import logging
 from enum import Enum, auto
 from typing import (
@@ -11,7 +10,6 @@ from typing import (
     Tuple,
     Union,
     Callable,
-    Iterable,
     Optional,
     Sequence,
     DefaultDict,
@@ -64,7 +62,6 @@ from tensorflow.keras.layers import (
     SpatialDropout3D,
     BatchNormalization,
     LayerNormalization,
-    add,
     concatenate,
 )
 from tensorflow.keras.models import Model, load_model
@@ -83,9 +80,9 @@ from tensorflow.keras.regularizers import l1_l2
 # Imports: first party
 from ml4cvd.plots import plot_metric_history
 from ml4cvd.metrics import get_metric_dict
-from ml4cvd.TensorMap import TensorMap, Interpretation
+from ml4cvd.TensorMap import TensorMap
 from ml4cvd.optimizers import NON_KERAS_OPTIMIZERS, get_optimizer
-from ml4cvd.definitions import IMAGE_EXT, MODEL_EXT, ECG_READ_TEXT
+from ml4cvd.definitions import IMAGE_EXT, MODEL_EXT
 from ml4cvd.tensor_generators import TensorGenerator
 
 CHANNEL_AXIS = -1  # Set to 1 for Theano backend
@@ -1222,6 +1219,7 @@ def make_multimodal_multitask_model(
     pool_z: int = None,
     training_steps: int = None,
     learning_rate_schedule: str = None,
+    directly_embed_and_repeat: int = None,
     **kwargs,
 ) -> Model:
     """Make multi-task, multi-modal feed forward neural network for all kinds of prediction
@@ -1265,6 +1263,7 @@ def make_multimodal_multitask_model(
     :param model_file: HD5 model file to load and return.
     :param model_layers: HD5 model file whose weights will be loaded into this model when layer names match.
     :param freeze_model_layers: Whether to freeze layers from loaded from model_layers
+    :param directly_embed_and_repeat: If set, directly embed input tensors (without passing to a dense layer) into concatenation layer, and repeat each input N times, where N is this argument's value. To directly embed a feature without repetition, set to 1.
     """
     tensor_maps_out = parent_sort(tensor_maps_out)
     u_connect: DefaultDict[TensorMap, Set[TensorMap]] = u_connect or defaultdict(set)
@@ -1326,15 +1325,21 @@ def make_multimodal_multitask_model(
                 pool_z=pool_z,
             )
         else:
-            encoders[tm] = FullyConnectedBlock(
-                widths=[tm.annotation_units],
-                activation=activation,
-                normalization=dense_normalize,
-                regularization=dense_regularize,
-                layer_order=layer_order,
-                regularization_rate=dense_regularize_rate,
-                is_encoder=True,
-            )
+            if directly_embed_and_repeat is not None:
+                encoders[tm] = lambda x: (
+                    RepeatVector(directly_embed_and_repeat)(x),
+                    [],
+                )
+            else:
+                encoders[tm] = FullyConnectedBlock(
+                    widths=[tm.annotation_units],
+                    activation=activation,
+                    normalization=dense_normalize,
+                    regularization=dense_regularize,
+                    layer_order=layer_order,
+                    regularization_rate=dense_regularize_rate,
+                    is_encoder=True,
+                )
 
     pre_decoder_shapes: Dict[TensorMap, Optional[Tuple[int, ...]]] = {}
     for tm in tensor_maps_out:

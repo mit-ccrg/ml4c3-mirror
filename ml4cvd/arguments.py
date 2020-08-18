@@ -289,6 +289,11 @@ def parse_args():
             "Path prefix for a TensorMap to learn language models (eg train_char_model)"
         ),
     )
+    parser.add_argument(
+        "--directly_embed_and_repeat",
+        type=int,
+        help="If set, directly embed input tensors (without passing to a dense layer) into concatenation layer, and repeat each input N times, where N is this argument's value. To directly embed a feature without repetition, set to 1.",
+    )
 
     # Training Parameters
     parser.add_argument(
