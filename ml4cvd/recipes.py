@@ -210,13 +210,14 @@ def _make_tmap_nan_on_fail(tmap):
 
 
 def infer_multimodal_multitask(args):
-    args.valid_ratio = 0
-    args.test_ratio = 1
     _, _, generate_test = train_valid_test_tensor_generators(
         no_empty_paths_allowed=False, **args.__dict__
     )
     model = make_multimodal_multitask_model(**args.__dict__)
     out_path = os.path.join(args.output_folder, args.id + "/")
+    data_split = "test"
+    if args.test_csv is not None:
+        data_split = os.path.splitext(os.path.basename(args.test_csv))[0]
     return predict_and_evaluate(
         model=model,
         data=generate_test,
@@ -224,7 +225,7 @@ def infer_multimodal_multitask(args):
         tensor_maps_in=args.tensor_maps_in,
         tensor_maps_out=args.tensor_maps_out,
         plot_path=out_path,
-        data_split="test",
+        data_split=data_split,
         hidden_layer=args.hidden_layer,
         embed_visualization=args.embed_visualization,
         alpha=args.alpha,
