@@ -50,7 +50,7 @@ from typing import Set, Dict, List, TextIO
 import pandas as pd
 
 JOIN_CHAR = "_"
-TENSOR_FUNC_NAME = "make_ecg_label"
+MAKE_TFF_FUNCTION_NAME = "make_ecg_label_from_read_tff"
 TENSOR_PATH_PREFIX = "partners_ecg_rest"
 NEW_SCRIPT_NAME = "tensor_maps_ecg_labels.py"
 
@@ -97,7 +97,7 @@ def _write_tmap(
         f"    time_series_limit=0,\n"
         f"    path_prefix='{TENSOR_PATH_PREFIX}',\n"
         f"    channel_map={channel_map},\n"
-        f"    tensor_from_file={TENSOR_FUNC_NAME}(\n"
+        f"    tensor_from_file={MAKE_TFF_FUNCTION_NAME}(\n"
         f"        keys={keys},\n"
         f"        channel_terms={channel_terms},\n"
         f"        not_found_channel='{not_found_channel}',\n"
@@ -131,7 +131,9 @@ if __name__ == "__main__":
     with open(path_to_new_script, "w") as py_file:
         py_file.write(f"from typing import Dict\n")
         py_file.write(f"from ml4cvd.TensorMap import TensorMap, Interpretation\n")
-        py_file.write(f"from ml4cvd.tensor_maps_ecg import {TENSOR_FUNC_NAME}\n\n\n")
+        py_file.write(
+            f"from ml4cvd.tensor_maps_ecg import {MAKE_TFF_FUNCTION_NAME}\n\n\n",
+        )
         py_file.write("tmaps: Dict[str, TensorMap] = {}\n")
 
         for file in os.listdir(args.label_maps_dir):

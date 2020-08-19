@@ -17,7 +17,7 @@ from ml4cvd.definitions import (
     ECG_REST_AMP_LEADS,
     ECG_REST_INDEPENDENT_LEADS,
 )
-from ml4cvd.tensor_maps_ecg import make_voltage, name2augmentations
+from ml4cvd.tensor_maps_ecg import make_voltage_tff, name2augmentations
 
 
 def update_tmaps_ecg_voltage(

@@ -94,17 +94,17 @@ def _resample_voltage(voltage: np.array, desired_samples: float, fs: float) -> n
             raise ValueError(
                 f"Sampling frequency of 240 Hz reported, but voltage array is not 2500 elements.",
             )
-    
+
     if len(voltage) == desired_samples:
         return voltage
- 
+
     x = np.arange(len(voltage))
     x_interp = np.linspace(0, len(voltage), desired_samples)
     return np.interp(x_interp, x, voltage)
 
 
-def make_voltage(exact_length=False):
-    def get_voltage_from_file(tm, hd5, dependents={}):
+def make_voltage_tff(exact_length=False):
+    def tensor_from_file(tm, hd5, dependents={}):
         ecg_dates = _get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         voltage_length = shape[1] if dynamic else shape[0]
@@ -146,7 +146,7 @@ def make_voltage(exact_length=False):
                     )
         return tensor
 
-    return get_voltage_from_file
+    return tensor_from_file
 
 
 # ECG augmentations
@@ -225,8 +225,8 @@ tmaps["ecg_voltage_stats"] = TensorMap(
 )
 
 
-def make_voltage_attr(volt_attr: str = ""):
-    def get_voltage_attr_from_file(tm, hd5, dependents={}):
+def make_voltage_attribute_tff(volt_attr: str = ""):
+    def tensor_from_file(tm, hd5, dependents={}):
         ecg_dates = _get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         tensor = np.zeros(shape, dtype=np.float32)
@@ -242,24 +242,24 @@ def make_voltage_attr(volt_attr: str = ""):
                     pass
         return tensor
 
-    return get_voltage_attr_from_file
+    return tensor_from_file
 
 
 tmaps["voltage_len"] = TensorMap(
     "voltage_len",
     interpretation=Interpretation.CONTINUOUS,
     path_prefix=ECG_PREFIX,
-    tensor_from_file=make_voltage_attr(volt_attr="len"),
+    tensor_from_file=make_voltage_attribute_tff(volt_attr="len"),
     shape=(None, 12),
     channel_map=ECG_REST_AMP_LEADS,
     time_series_limit=0,
 )
 
 
-def make_ecg_label(
+def make_ecg_label_from_read_tff(
     keys: List[str], channel_terms: Dict[str, Set[str]], not_found_channel: str,
 ):
-    def get_ecg_label(tm, hd5, dependents={}):
+    def tensor_from_file(tm, hd5, dependents={}):
         ecg_dates = _get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         tensor = np.zeros(shape, dtype=np.float32)
@@ -292,7 +292,7 @@ def make_ecg_label(
                 tensor[slices] = 1
         return tensor
 
-    return get_ecg_label
+    return tensor_from_file
 
 
 def ecg_datetime(tm, hd5, dependents={}):
@@ -316,7 +316,7 @@ tmaps[tmap_name] = TensorMap(
 )
 
 
-def make_voltage_len_categorical_tmap(
+def make_voltage_len_tff(
     lead, channel_prefix="_", channel_unknown="other",
 ):
     def tensor_from_file(tm, hd5, dependents={}):
@@ -362,7 +362,7 @@ for lead in ECG_REST_AMP_LEADS:
         name=tmap_name,
         interpretation=Interpretation.CATEGORICAL,
         path_prefix=ECG_PREFIX,
-        tensor_from_file=make_voltage_len_categorical_tmap(lead=lead),
+        tensor_from_file=make_voltage_len_tff(lead=lead),
         channel_map={"_2500": 0, "_5000": 1, "other": 2},
         time_series_limit=0,
         validator=validator_not_all_zero,
