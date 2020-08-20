@@ -1,15 +1,12 @@
 # Imports: standard library
-import os
 import re
-import copy
 import logging
 import datetime
-from typing import Set, Dict, List, Tuple, Union, Callable, Optional
+from typing import Set, Dict, List, Tuple
 
 # Imports: third party
 import h5py
 import numpy as np
-import pandas as pd
 
 # Imports: first party
 from ml4cvd.metrics import weighted_crossentropy
@@ -27,7 +24,6 @@ from ml4cvd.validators import (
     validator_clean_mrn,
     validator_no_negative,
     validator_not_all_zero,
-    validator_voltage_no_zero_padding,
 )
 from ml4cvd.definitions import (
     STOP_CHAR,
@@ -35,21 +31,26 @@ from ml4cvd.definitions import (
     ECG_PREFIX,
     ECG_DATE_FORMAT,
     ECG_REST_AMP_LEADS,
-    ECG_DATETIME_FORMAT,
-    ECG_REST_INDEPENDENT_LEADS,
 )
 
 tmaps: Dict[str, TensorMap] = {}
 
 
-def _get_ecg_dates(tm, hd5):
-    # preserve state across tensor maps
-    # keyed by the mrn, time series order, tmap shape
-    if not hasattr(_get_ecg_dates, "mrn_lookup"):
-        _get_ecg_dates.mrn_lookup = dict()
+def get_ecg_dates(tm: TensorMap, hd5: h5py.File) -> List[str]:
+    """
+    Given a tensor map, retrieve the ECG dates from an hd5
+    in the order and in the time series defined by the tensor map.
+
+    Once an initial selection of dates is performed for a given hd5,
+    the selection is saved so that other tensor maps may use the same
+    set of dates. This cache enables multiple tensor maps to select data
+    from the same ECG(s) within an hd5. The saved dates are keyed by MRN.
+    """
+    if not hasattr(get_ecg_dates, "mrn_lookup"):
+        get_ecg_dates.mrn_lookup = dict()
     mrn = id_from_filename(hd5.filename)
-    if (mrn, tm.time_series_order, tm.shape) in _get_ecg_dates.mrn_lookup:
-        return _get_ecg_dates.mrn_lookup[(mrn, tm.time_series_order, tm.shape)]
+    if mrn in get_ecg_dates.mrn_lookup:
+        return get_ecg_dates.mrn_lookup[mrn]
     dates = list(hd5[tm.path_prefix])
     if tm.time_series_lookup is not None:
         start, end = tm.time_series_lookup[mrn]
@@ -68,7 +69,7 @@ def _get_ecg_dates(tm, hd5):
     start_idx = tm.time_series_limit if tm.time_series_limit is not None else 1
     dates = dates[-start_idx:]  # If num_tensors is 0, get all tensors
     dates.sort(reverse=True)
-    _get_ecg_dates.mrn_lookup[(mrn, tm.time_series_order, tm.shape)] = dates
+    get_ecg_dates.mrn_lookup[mrn] = dates
     return dates
 
 
@@ -105,7 +106,7 @@ def _resample_voltage(voltage: np.array, desired_samples: float, fs: float) -> n
 
 def make_voltage_tff(exact_length=False):
     def tensor_from_file(tm, hd5, dependents={}):
-        ecg_dates = _get_ecg_dates(tm, hd5)
+        ecg_dates = get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         voltage_length = shape[1] if dynamic else shape[0]
         tensor = np.zeros(shape, dtype=np.float32)
@@ -188,7 +189,7 @@ name2augmentations = {
 
 
 def voltage_stat(tm, hd5, dependents={}):
-    ecg_dates = _get_ecg_dates(tm, hd5)
+    ecg_dates = get_ecg_dates(tm, hd5)
     dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.zeros(shape, dtype=np.float32)
     for i, ecg_date in enumerate(ecg_dates):
@@ -227,7 +228,7 @@ tmaps["ecg_voltage_stats"] = TensorMap(
 
 def make_voltage_attribute_tff(volt_attr: str = ""):
     def tensor_from_file(tm, hd5, dependents={}):
-        ecg_dates = _get_ecg_dates(tm, hd5)
+        ecg_dates = get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         tensor = np.zeros(shape, dtype=np.float32)
         for i, ecg_date in enumerate(ecg_dates):
@@ -260,7 +261,7 @@ def make_ecg_label_from_read_tff(
     keys: List[str], channel_terms: Dict[str, Set[str]], not_found_channel: str,
 ):
     def tensor_from_file(tm, hd5, dependents={}):
-        ecg_dates = _get_ecg_dates(tm, hd5)
+        ecg_dates = get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         tensor = np.zeros(shape, dtype=np.float32)
         for ecg_idx, ecg_date in enumerate(ecg_dates):
@@ -296,7 +297,7 @@ def make_ecg_label_from_read_tff(
 
 
 def ecg_datetime(tm, hd5, dependents={}):
-    ecg_dates = _get_ecg_dates(tm, hd5)
+    ecg_dates = get_ecg_dates(tm, hd5)
     dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.full(shape, "", dtype=f"<U19")
     for i, ecg_date in enumerate(ecg_dates):
@@ -320,7 +321,7 @@ def make_voltage_len_tff(
     lead, channel_prefix="_", channel_unknown="other",
 ):
     def tensor_from_file(tm, hd5, dependents={}):
-        ecg_dates = _get_ecg_dates(tm, hd5)
+        ecg_dates = get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         tensor = np.zeros(shape, dtype=float)
         for i, ecg_date in enumerate(ecg_dates):
@@ -373,7 +374,7 @@ def make_ecg_tensor(
     key: str, fill: float = 0, channel_prefix: str = "", channel_unknown: str = "other",
 ):
     def get_ecg_tensor(tm, hd5, dependents={}):
-        ecg_dates = _get_ecg_dates(tm, hd5)
+        ecg_dates = get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         if tm.interpretation == Interpretation.LANGUAGE:
             tensor = np.full(shape, "", dtype=object)
@@ -603,7 +604,7 @@ def make_sampling_frequency_from_file(
     def sampling_frequency_from_file(
         tm: TensorMap, hd5: h5py.File, dependents: Dict = {},
     ):
-        ecg_dates = _get_ecg_dates(tm, hd5)
+        ecg_dates = get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         if tm.interpretation == Interpretation.CATEGORICAL:
             tensor = np.zeros(shape, dtype=np.float32)
@@ -894,7 +895,7 @@ tmaps[tmap_name] = TensorMap(
 
 
 def get_ecg_age_from_hd5(tm, hd5, dependents={}):
-    ecg_dates = _get_ecg_dates(tm, hd5)
+    ecg_dates = get_ecg_dates(tm, hd5)
     dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.full(shape, fill_value=-1, dtype=float)
     for i, ecg_date in enumerate(ecg_dates):
@@ -949,7 +950,7 @@ tmaps[tmap_name] = TensorMap(
 
 
 def ecg_acquisition_year(tm, hd5, dependents={}):
-    ecg_dates = _get_ecg_dates(tm, hd5)
+    ecg_dates = get_ecg_dates(tm, hd5)
     dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.zeros(shape, dtype=int)
     for i, ecg_date in enumerate(ecg_dates):
@@ -973,7 +974,7 @@ tmaps["ecg_acquisition_year"] = TensorMap(
 
 
 def ecg_bmi(tm, hd5, dependents={}):
-    ecg_dates = _get_ecg_dates(tm, hd5)
+    ecg_dates = get_ecg_dates(tm, hd5)
     dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.zeros(shape, dtype=float)
     for i, ecg_date in enumerate(ecg_dates):
@@ -1006,7 +1007,7 @@ tmaps["ecg_bmi"] = TensorMap(
 
 def ecg_channel_string(hd5_key, race_synonyms={}, unspecified_key=None):
     def tensor_from_string(tm, hd5, dependents={}):
-        ecg_dates = _get_ecg_dates(tm, hd5)
+        ecg_dates = get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         tensor = np.zeros(shape, dtype=np.float32)
         for i, ecg_date in enumerate(ecg_dates):
@@ -1064,7 +1065,7 @@ tmaps["ecg_race"] = TensorMap(
 
 def _ecg_adult(hd5_key, minimum_age=18):
     def tensor_from_string(tm, hd5, dependents={}):
-        ecg_dates = _get_ecg_dates(tm, hd5)
+        ecg_dates = get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         tensor = np.zeros(shape, dtype=np.float32)
         for i, ecg_date in enumerate(ecg_dates):
@@ -1114,7 +1115,7 @@ tmaps["ecg_adult_sex"] = TensorMap(
 
 
 def voltage_zeros(tm, hd5, dependents={}):
-    ecg_dates = _get_ecg_dates(tm, hd5)
+    ecg_dates = get_ecg_dates(tm, hd5)
     dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.zeros(shape, dtype=np.float32)
     for i, ecg_date in enumerate(ecg_dates):
