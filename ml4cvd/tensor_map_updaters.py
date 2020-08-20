@@ -69,7 +69,7 @@ def update_tmaps_ecg_voltage(
         name=match_tmap_name,
         shape=(None, length, len(leads)),
         path_prefix=ECG_PREFIX,
-        tensor_from_file=make_voltage(exact),
+        tensor_from_file=make_voltage_tff(exact_length=exact),
         normalization=normalization,
         channel_map=leads,
         time_series_limit=0,
