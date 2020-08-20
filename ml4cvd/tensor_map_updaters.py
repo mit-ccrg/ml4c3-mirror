@@ -1,23 +1,22 @@
 # Imports: standard library
 import re
 import copy
-from typing import Set, Dict, List, Optional
+from typing import Dict, Optional
+
+# Imports: third party
+import numpy as np
 
 # Imports: first party
 from ml4cvd.metrics import weighted_crossentropy
-from ml4cvd.TensorMap import TensorMap, Interpretation, TimeSeriesOrder
+from ml4cvd.TensorMap import TensorMap, TimeSeriesOrder, id_from_filename
 from ml4cvd.normalizer import Standardize
-from ml4cvd.validators import (
-    RangeValidator,
-    validator_not_all_zero,
-    validator_voltage_no_zero_padding,
-)
+from ml4cvd.validators import validator_voltage_no_zero_padding
 from ml4cvd.definitions import (
     ECG_PREFIX,
     ECG_REST_AMP_LEADS,
     ECG_REST_INDEPENDENT_LEADS,
 )
-from ml4cvd.tensor_maps_ecg import make_voltage_tff, name2augmentations
+from ml4cvd.tensor_maps_ecg import get_ecg_dates, make_voltage_tff, name2augmentations
 
 
 def update_tmaps_ecg_voltage(
@@ -77,6 +76,44 @@ def update_tmaps_ecg_voltage(
         augmentations=augmentations,
     )
     tmaps[match_tmap_name] = tmap
+    return tmaps
+
+
+def update_tmaps_sts_match_ecg(
+    tmap_name: str, tmaps: Dict[str, TensorMap],
+) -> Dict[str, TensorMap]:
+    """
+    Modify STS tensor map's tensor_from_file function to repeat the tensor to match number of ECGs found from ECG tensor map(s).
+
+    An ECG TMap must appear as an earlier argument to input or output tensors
+    than the first "sts_match_ecg" TMap, e.g.
+
+    --input_tensors
+        ecg_age
+        sts_death_match_ecg
+    """
+    if not tmap_name.startswith("sts_"):
+        return tmaps
+    elif "_match_ecg" not in tmap_name:
+        return tmaps
+    base_name = tmap_name.split("_match_ecg")[0]
+    if base_name not in tmaps:
+        raise ValueError(
+            f"Base STS TMap {base_name} not in tmaps, cannot match ECG tmap.",
+        )
+    tmap = copy.deepcopy(tmaps[base_name])
+    new_tmap_name = f"{base_name}_match_ecg"
+    tmap.name = new_tmap_name
+    tmap.shape = (None,) + tmap.shape
+    old_tm = tmaps[base_name]
+
+    def tff(tm, hd5, dependents={}):
+        tensor = old_tm.tensor_from_file(old_tm, hd5, dependents)
+        ecg_dates = get_ecg_dates.mrn_lookup[id_from_filename(hd5.filename)]
+        return np.repeat(tensor[np.newaxis, ...], len(ecg_dates), axis=0)
+
+    tmap.tensor_from_file = tff
+    tmaps[new_tmap_name] = tmap
     return tmaps
 
 

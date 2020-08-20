@@ -107,8 +107,8 @@ class TensorMap(object):
         time_series_lookup: Optional[Dict[int, Tuple]] = None,
         discretization_bounds: Optional[List[float]] = None,
     ):
-        """TensorMap constructor
-
+        """
+        TensorMap constructor
 
         :param name: String name of the tensor mapping
         :param interpretation: Enum specifying semantic interpretation of the tensor: is it a label, a continuous value an embedding...
@@ -609,6 +609,12 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
     # Base tmaps: ECG voltage
     from ml4cvd.tensor_map_updaters import update_tmaps_ecg_voltage  # isort:skip
     tmaps = update_tmaps_ecg_voltage(tmap_name=tmap_name, tmaps=tmaps)
+    if tmap_name in tmaps:
+        return tmaps
+
+    # Modify: sts match ecg tensor dimensions
+    from ml4cvd.tensor_map_updaters import update_tmaps_sts_match_ecg # isort: skip
+    tmaps = update_tmaps_sts_match_ecg(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps
 
