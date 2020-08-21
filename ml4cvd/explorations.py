@@ -580,10 +580,9 @@ def _calculate_summary_stats(df: pd.DataFrame, key: str, interpretation) -> dict
         stats["total"] = len(df[key])
         stats["missing_fraction"] = stats["missing"] / stats["total"]
     elif interpretation is Interpretation.CATEGORICAL:
-        value_counts = df[key].value_counts().to_dict()
-        for val in value_counts:
-            stats[f"count"] = value_counts[val]
-            stats[f"fraction"] = value_counts[val] / len(df[key])
+        num_key = np.count_nonzero(df[key] == 1)
+        stats[f"count"] = num_key
+        stats[f"fraction"] = num_key / len(df[key])
         stats["total"] = len(df[key])
     elif interpretation is Interpretation.LANGUAGE:
         stats["count"] = df[key].count()
