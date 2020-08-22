@@ -10,9 +10,8 @@ import logging
 import argparse
 import datetime
 import subprocess
-import multiprocessing as mp
+from typing import List
 
-q = mp.Queue()
 env = os.environ.copy()
 
 
@@ -26,7 +25,9 @@ def _get_path_to_ecgs() -> str:
         path = "/data/ecg"
     elif "stultzlab" in socket.gethostname():
         path = "/storage/shared/ecg"
-    return os.path.expanduser(path)
+    else:
+        path = ""
+    return path
 
 
 def _get_path_to_bootstraps() -> str:
@@ -39,57 +40,75 @@ def _get_path_to_bootstraps() -> str:
         path = "~/dropbox/sts-data/bootstraps"
     elif "stultzlab" in socket.gethostname():
         path = "/storage/shared/sts-data-deid/bootstraps"
-
-    path = os.path.expanduser(path)
-    if not os.path.isdir(path):
-        raise ValueError(f"{path} is not a valid path to STS data")
     else:
-        return path
+        path = ""
+    return os.path.expanduser(path)
 
 
-def worker(script, bootstrap, gpu):
+def setup_job(script: str, bootstrap: str, gpu: str) -> subprocess.Popen:
+    """
+    Setup environment variables, launch job, and return job object.
+    """
     env["GPU"] = gpu
     env["BOOTSTRAP"] = bootstrap
     env["PATH_TO_ECGS"] = _get_path_to_ecgs()
     env["PATH_TO_BOOTSTRAPS"] = _get_path_to_bootstraps()
 
-    subprocess.run(
-        f"bash {script}".split(),
+    job = subprocess.Popen(
+        f"bash {script}_temp".split(),
         env=env,
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
+    logging.info(f"Dispatched {script} with bootstrap {bootstrap} on gpu {gpu}")
+    return job
 
-    q.put(gpu)
 
-
-def run(args):
+def run(args: argparse.Namespace):
     start = time.time()
 
-    for gpu in args.gpus:
-        q.put(gpu)
+    gpu_jobs = {gpu: None for gpu in args.gpus}
+    num_dispatched = 0
 
-    processes = []
-    for script in args.scripts:
-        for bootstrap in args.bootstraps:
-            gpu = q.get(block=True)
-            process = mp.Process(target=worker, args=(script, bootstrap, gpu))
-            process.start()
-            processes.append(process)
-            logging.info(
-                f"Dispatched {os.path.basename(script)} with bootstrap {bootstrap} on"
-                f" GPU {gpu}",
-            )
-
-    for process in processes:
-        process.join()
+    try:
+        for script in args.scripts:
+            with open(script, "r") as original, open(f"{script}_temp", "w") as temp:
+                temp.write(original.read().replace("-t ", ""))
+            for bootstrap in args.bootstraps:
+                assigned = False
+                while not assigned:
+                    for gpu, job in gpu_jobs.items():
+                        if job is not None and job.poll() is None:
+                            continue
+                        if job is not None:
+                            job.kill()
+                        job = setup_job(script=script, bootstrap=bootstrap, gpu=gpu)
+                        gpu_jobs[gpu] = job
+                        assigned = True
+                        num_dispatched += 1
+                        break
+                    time.sleep(1)
+        for job in gpu_jobs.values():
+            if job is not None:
+                job.wait()
+    finally:
+        for job in gpu_jobs.values():
+            if job is not None:
+                job.kill()
+        for script in args.scripts:
+            try:
+                os.remove(f"{script}_temp")
+            except FileNotFoundError:
+                continue
+        logging.info(f"Cleaned up jobs")
 
     logging.info(
-        f"Dispatched {len(processes)} jobs in {time.time() - start:.0f} seconds",
+        f"Dispatched {num_dispatched} jobs in {time.time() - start:.0f} seconds",
     )
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--gpus",
@@ -131,7 +150,12 @@ def parse_args():
     if args.gpus is None or args.bootstraps is None or args.scripts is None:
         raise ValueError(f"Missing arguments")
 
-    def _parse_index_list(idxs, name):
+    def _parse_index_list(idxs: List[str], name: str) -> List[str]:
+        """
+        Given a list of intervals, return a list of all values within all intervals.
+        For example:
+            _parse_index_list(["0-2", "5"], "bootstraps") -> ["0", "1", "2", "5"]
+        """
         _idxs = set()
         for idx in idxs:
             if idx.isdigit():
@@ -145,8 +169,8 @@ def parse_args():
             _idxs = _idxs.union(set(range(start, end)))
         return list(map(str, _idxs))
 
-    args.gpus = _parse_index_list(args.gpus, "gpu")
-    args.bootstraps = _parse_index_list(args.bootstraps, "bootstrap")
+    args.gpus = _parse_index_list(idxs=args.gpus, name="gpu")
+    args.bootstraps = _parse_index_list(idxs=args.bootstraps, name="bootstrap")
 
     for script in args.scripts:
         if not os.path.isfile(script):
@@ -161,3 +185,7 @@ if __name__ == "__main__":
         run(args)
     except Exception as e:
         logging.exception(e)
+    finally:
+        logging.warning(
+            "If dispatched jobs launched docker containers, containers need to be manually cleaned up",
+        )
