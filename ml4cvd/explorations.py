@@ -976,6 +976,8 @@ def _tensors_to_df(
         valid_csv=valid_csv,
         test_csv=test_csv,
         sample_weight=sample_weight,
+        output_folder=output_folder,
+        id=run_id,
     )
     tmaps = [tm for tm in tensor_maps_in]
     paths = (
