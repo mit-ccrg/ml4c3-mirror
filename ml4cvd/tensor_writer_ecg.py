@@ -16,7 +16,7 @@ import numpy as np
 import numcodecs
 
 # Imports: first party
-from ml4cvd.definitions import XML_EXT, TENSOR_EXT, ECG_REST_INDEPENDENT_LEADS
+from ml4cvd.definitions import XML_EXT, TENSOR_EXT
 
 
 def write_tensors_ecg(xml_folder: str, tensors: str, num_workers: int) -> None:
@@ -48,7 +48,7 @@ def _map_mrn_to_xml(fpath_xml: str) -> Union[Tuple[str, str], None]:
     return None
 
 
-def _get_mrn_xmls_map(xml_folder: str) -> Dict[str, List[str]]:
+def _get_mrn_xmls_map(xml_folder: str, num_workers: int) -> Dict[str, List[str]]:
     fpath_xmls = []
     for root, dirs, files in os.walk(xml_folder):
         for file in files:
