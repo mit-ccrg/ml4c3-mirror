@@ -3,6 +3,7 @@ import os
 import csv
 import copy
 import logging
+import argparse
 import datetime
 import multiprocessing as mp
 from typing import List, Tuple
@@ -34,7 +35,7 @@ from matplotlib import pyplot as plt    # isort:skip
 # fmt: on
 
 
-def explore(args):
+def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
     cohort_counts = OrderedDict()
 
     src_path = args.tensors
@@ -374,15 +375,15 @@ def explore(args):
 
         # If stratified, save label distribution for this window
         if args.explore_stratify_label is not None:
-            _save_label_distribution(
-                df=df_window,
-                src_join=src_join,
-                title=title,
-                window=window,
-                stratify_label=args.explore_stratify_label,
-                output_folder=args.output_folder,
-                output_id=args.id,
-            )
+            if save_output:
+                _save_label_distribution(
+                    df=df_window,
+                    title=title,
+                    window=window,
+                    stratify_label=args.explore_stratify_label,
+                    output_folder=args.output_folder,
+                    output_id=args.id,
+                )
 
         # Calculate cross-referenced cohort counts
         cohort_counts = _update_cohort_counts(
@@ -423,14 +424,15 @@ def explore(args):
                     if (union_or_intersect == "union") and (
                         interpretation is Interpretation.CONTINUOUS
                     ):
-                        _plot_histogram_continuous_tensor(
-                            tmap_name=tm.name,
-                            df=df,
-                            output_folder=args.output_folder,
-                            output_id=args.id,
-                            window=window,
-                            stratify_label=args.explore_stratify_label,
-                        )
+                        if save_output:
+                            _plot_histogram_continuous_tensor(
+                                tmap_name=tm.name,
+                                df=df,
+                                output_folder=args.output_folder,
+                                output_id=args.id,
+                                window=window,
+                                stratify_label=args.explore_stratify_label,
+                            )
 
                     # Iterate over label and isolate those df rows if stratified
                     for label in labels:
@@ -476,25 +478,33 @@ def explore(args):
                     args.id,
                     f"stats_{interpretation}_{window}_{union_or_intersect}.csv",
                 )
-                df_stats.round(3).to_csv(fpath)
-                logging.info(
-                    f"{window} / {union_or_intersect} / {interpretation} tmaps: saved summary stats to {fpath}",
-                )
+                if save_output:
+                    df_stats.round(3).to_csv(fpath)
+                    logging.info(
+                        f"{window} / {union_or_intersect} / {interpretation} tmaps: saved summary stats to {fpath}",
+                    )
 
     # Save tensors, including column with window name
     fpath = os.path.join(args.output_folder, args.id, f"tensors_union.csv")
 
     # Time-windowed
     if use_time:
-        df_aggregated.set_index(src_join, drop=True).to_csv(fpath)
+        if save_output:
+            df_aggregated.set_index(src_join, drop=True).to_csv(fpath)
+        return_df = df_aggregated
     else:
         # No cross-reference
         if args.reference_tensors is None:
-            df.to_csv(fpath, index=False)
+            if save_output:
+                df.to_csv(fpath, index=False)
+            return_df = df
         # Cross-reference
         else:
-            df_cross.set_index(src_join, drop=True).to_csv(fpath)
-    logging.info(f"Saved tensors to {fpath}")
+            if save_output:
+                df_cross.set_index(src_join, drop=True).to_csv(fpath)
+            return_df = df_cross
+    if save_output:
+        logging.info(f"Saved tensors to {fpath}")
 
     # Save cohort counts to CSV
     fpath = os.path.join(args.output_folder, args.id, "cohort_counts.csv")
@@ -502,8 +512,10 @@ def explore(args):
         cohort_counts, orient="index", columns=["count"],
     )
     df_cohort_counts = df_cohort_counts.rename_axis("description")
-    df_cohort_counts.to_csv(fpath)
-    logging.info(f"Saved cohort counts to {fpath}")
+    if save_output:
+        df_cohort_counts.to_csv(fpath)
+        logging.info(f"Saved cohort counts to {fpath}")
+    return return_df
 
 
 def _get_redundant_cols(tmaps: List[TensorMap], df: pd.DataFrame) -> list:
@@ -638,12 +650,11 @@ def _update_cohort_counts(
 
 def _save_label_distribution(
     df: pd.DataFrame,
-    src_join: str,
     title: str,
     window: str,
     stratify_label: str,
-    output_folder=str,
-    output_id=str,
+    output_folder: str,
+    output_id: str,
 ):
     # Get counts for each value of stratify_label in df
     label_counts = df[stratify_label].value_counts(dropna=False).to_dict()
