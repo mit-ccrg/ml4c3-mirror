@@ -21,8 +21,8 @@ import numpy as np
 import pandas as pd
 
 # Imports: first party
-from ml4cvd.TensorMap import TensorMap
-from ml4cvd.definitions import TENSOR_EXT, MRN_COLUMNS, Path, Paths
+from ml4cvd.TensorMap import TensorMap, id_from_filename
+from ml4cvd.definitions import CSV_EXT, TENSOR_EXT, MRN_COLUMNS, Path, Paths
 
 np.set_printoptions(threshold=np.inf)
 
@@ -1046,6 +1046,8 @@ def train_valid_test_tensor_generators(
     siamese: bool = False,
     sample_weight: TensorMap = None,
     no_empty_paths_allowed: bool = True,
+    output_folder: str = None,
+    id: str = None,
     **kwargs,
 ) -> Tuple[TensorGenerator, TensorGenerator, TensorGenerator]:
     """Get 3 tensor generator functions for training, validation and testing data.
@@ -1095,6 +1097,20 @@ def train_valid_test_tensor_generators(
             test_csv=test_csv,
             no_empty_paths_allowed=no_empty_paths_allowed,
         )
+
+        def save_paths(paths: List[str], split: str):
+            fpath = os.path.join(output_folder, id, f"{split}{CSV_EXT}")
+            ids = [id_from_filename(path) for path in paths]
+            df = pd.DataFrame({"sample_id": ids})
+            df.to_csv(fpath, index=False)
+            logging.info(f"{split}_csv was not provided, saved {fpath}")
+
+        if train_csv is None:
+            save_paths(paths=train_paths, split="train")
+        if valid_csv is None:
+            save_paths(paths=valid_paths, split="valid")
+        if test_csv is None:
+            save_paths(paths=test_paths, split="test")
         weights = None
 
     _TensorGenerator = TensorGenerator
