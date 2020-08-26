@@ -53,6 +53,12 @@ phi_keys = {
     "fellowid",
     "hisaccountnumber",
     "referringmdid",
+    "editorfirstname",
+    "editorlastname",
+    "editorid",
+    "overreaderfirstname",
+    "overreaderlastname",
+    "overreaderid",
 }
 
 
