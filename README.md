@@ -9,6 +9,7 @@ Machine Learning for CardioVascular Disease - MGH/MIT edition!
 - [Tests](#tests)
 - [TensorMaps](#tensormaps)
 - [Tensorize ECGs](#tensorize-ecgs)
+- [Organize XMLs](#organize-xmls)
 - [Contribute](#contribute)
 
 ## Setup
@@ -225,6 +226,25 @@ GE documentation is stored in a shared Partners Dropbox folder ([link](https://w
 1. physician's guide to the Marquette 12SL ECG analysis program
 2. guide to MuseDB search
 3. muse v9 XML developer's guide
+
+## Organize XMLs
+After you extract XMLs from MuseVM, organize them into `yyyy-mm` directories:
+
+```
+./scripts/run.sh -c -t -m /media/2tb \
+    $PWD/scripts/organize_xmls.py \
+    --source_xml_folder /path/to/data \
+    --destination_xml_folder /path/to/destination \
+    --bad_xml_folder ~/bad_xmls \
+    --method copy \
+    --verbose
+```
+Be sure to mount necessary storage locations to Docker via `-m /location` after `run.sh`.
+
+If a date cannot be obtained, the XML is considered bad, and will be moved to the `bad_xml_folder`.
+
+You can copy the data, or move it.
+
 
 ## Contribute
 
