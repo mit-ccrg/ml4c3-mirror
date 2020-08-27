@@ -2,7 +2,7 @@
 import os
 import socket
 from enum import Enum, auto
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union
 
 # Imports: third party
 import numpy as np
@@ -28,6 +28,8 @@ Outputs = Inputs
 Path = str
 Paths = List[Path]
 Predictions = List[np.ndarray]
+SampleIntervalData = Dict[int, Dict[Tuple[str, str], Dict[str, Union[str, int, float]]]]
+ChannelMap = Dict[str, int]
 
 YEAR_DAYS = 365.26
 ECG_ZERO_PADDING_THRESHOLD = 0.25
@@ -46,9 +48,6 @@ def _get_sts_data_path() -> str:
     return os.path.expanduser(path)
 
 
-STS_PREOP_ECG_CSV = os.path.join(
-    _get_sts_data_path(), "mgh-preop-ecg-outcome-labels.csv",
-)
 STS_DATA_CSV = os.path.join(_get_sts_data_path(), "mgh-all-features-labels.csv")
 
 ECG_PREFIX = "partners_ecg_rest"
@@ -58,7 +57,15 @@ ECG_TIME_FORMAT = "%H:%M:%S"
 ECG_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
 STS_DATE_FORMAT = "%Y-%m-%d"
 STS_DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
-MRN_COLUMNS = {"mgh_mrn", "sampleid", "medrecn", "mrn", "patient_id", "patientid"}
+MRN_COLUMNS = {
+    "mgh_mrn",
+    "sampleid",
+    "medrecn",
+    "mrn",
+    "patient_id",
+    "patientid",
+    "sample_id",
+}
 
 EPS = 1e-7
 

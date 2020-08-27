@@ -104,7 +104,7 @@ class TensorMap(object):
         tensor_from_file: Optional[Callable] = None,
         time_series_limit: Optional[int] = None,
         time_series_order: Optional[TimeSeriesOrder] = TimeSeriesOrder.NEWEST,
-        time_series_lookup: Optional[Dict[int, Tuple]] = None,
+        time_series_lookup: Optional[Dict[int, List[Tuple[str, str]]]] = None,
         discretization_bounds: Optional[List[float]] = None,
     ):
         """
@@ -133,7 +133,7 @@ class TensorMap(object):
         :param tensor_from_file: Function that returns numpy array from hd5 file for this TensorMap
         :param time_series_limit: If set, indicates dynamic shaping and sets the maximum number of tensors in a time series to use
         :param time_series_order: When selecting tensors in a time series, use newest, oldest, or randomly ordered tensors
-        :param time_series_lookup: Dict of time intervals filtering which tensors are used in a time series
+        :param time_series_lookup: Dict of list of time intervals filtering which tensors are used in a time series
         :param discretization_bounds: List of floats that delineate the boundaries of the bins that will be used
                                           for producing categorical values from continuous values
         """

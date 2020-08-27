@@ -436,6 +436,8 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
 
                     # Iterate over label and isolate those df rows if stratified
                     for label in labels:
+                        if isinstance(label, float) and np.isnan(label):
+                            continue
                         df_label = (
                             df
                             if label == "all"
