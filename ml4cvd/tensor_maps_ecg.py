@@ -53,8 +53,12 @@ def get_ecg_dates(tm: TensorMap, hd5: h5py.File) -> List[str]:
         return get_ecg_dates.mrn_lookup[mrn]
     dates = list(hd5[tm.path_prefix])
     if tm.time_series_lookup is not None:
-        start, end = tm.time_series_lookup[mrn]
-        dates = [date for date in dates if start < date < end]
+        dates = [
+            date
+            for date in dates
+            for start, end in tm.time_series_lookup[mrn]
+            if start < date < end
+        ]
     if tm.time_series_order == TimeSeriesOrder.NEWEST:
         dates.sort()
     elif tm.time_series_order == TimeSeriesOrder.OLDEST:

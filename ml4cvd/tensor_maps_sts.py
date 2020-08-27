@@ -1,7 +1,8 @@
 # Imports: standard library
 import logging
 import datetime
-from typing import Dict, List, Tuple, Union, Callable
+from typing import Dict, Union, Callable
+from collections import defaultdict
 
 # Imports: third party
 import h5py
@@ -21,10 +22,11 @@ from ml4cvd.definitions import (
     ECG_PREFIX,
     STS_DATA_CSV,
     STS_DATE_FORMAT,
-    STS_PREOP_ECG_CSV,
     ECG_DATETIME_FORMAT,
-    STS_DATETIME_FORMAT,
+    ChannelMap,
+    SampleIntervalData,
 )
+from ml4cvd.tensor_maps_ecg import get_ecg_dates
 
 tmaps: Dict[str, TensorMap] = {}
 
@@ -127,33 +129,104 @@ sts_outcomes = {
 # fmt: on
 
 
-def _get_sts_features_dict(
-    patient_column: str = "medrecn", date_column: str = "surgdt",
-) -> Dict[int, Dict[str, float]]:
-    """Get dict of STS features indexed by MRN;
-    only keep last row (surgery) for each MRN"""
-    sts_features = (
-        pd.read_csv(STS_DATA_CSV)
-        .sort_values([patient_column, date_column])
-        .drop_duplicates(patient_column, keep="last")
-        .set_index(patient_column)
-        .to_dict("index")
-    )
-    return sts_features
+def _get_sts_data(
+    data_file: str = STS_DATA_CSV,
+    patient_column: str = "medrecn",
+    start_column: str = "surgdt",
+    start_offset: int = -30,
+    end_column: str = "surgdt",
+    end_offset: int = 0,
+) -> SampleIntervalData:
+    """
+    Load and organize STS data from CSV file into a nested dict keyed by MRN -> preop window (tuple) → surgical data
+    For example, returns:
+    {
+        123: {
+            (6/15/2008, 7/15/2008): {
+                "medrecn": 123,
+                "surgdt": 7/15/2008,
+                "mtopd": 0,
+            },
+            (4/3/2019, 5/3/2019): {
+                "medrecn": 123,
+                "surgdt": 5/3/2019,
+                "mtopd": 1,
+            },
+        },
+    }
+
+    :param data_file: path to STS data file
+    :param patient_column: name of column in data to patient identifier
+    :param start_column: name of column in data to preop window start value
+    :param start_offset: offset in days to add to preop window start value
+    :param end_column: name of column in data to preop window end value
+    :param end_offset: offset in days to add to preop window end value
+    :return: dictionary of MRN to dictionary of intervals to dictionary of surgical features
+    """
+    sts_data = defaultdict(dict)
+    df = pd.read_csv(data_file, low_memory=False)
+    for surgery_data in df.to_dict(orient="records"):
+        mrn = surgery_data[patient_column]
+        start = (
+            str2datetime(
+                input_date=surgery_data[start_column], date_format=STS_DATE_FORMAT,
+            )
+            + datetime.timedelta(days=start_offset)
+        ).strftime(ECG_DATETIME_FORMAT)
+        end = (
+            str2datetime(
+                input_date=surgery_data[end_column], date_format=STS_DATE_FORMAT,
+            )
+            + datetime.timedelta(days=end_offset)
+        ).strftime(ECG_DATETIME_FORMAT)
+        sts_data[mrn][(start, end)] = surgery_data
+    return sts_data
 
 
-def _make_sts_tff_continuous(
-    sts_features: Dict[int, Dict[str, float]], key: str = "",
-) -> Callable:
+def _get_sts_data_for_newest_surgery_with_preop_ecg(
+    sts_data: SampleIntervalData, tm: TensorMap, hd5: h5py.File,
+) -> Dict[str, Union[str, int, float]]:
+    """
+    Given a patient, get surgical features and outcomes for the newest surgery for which a patient has a preop ECG
+    For example, returns:
+    {
+        "medrecn": 123,
+        "surgdt": 5/3/2019,
+        "mtopd": 1,
+    }
+
+    :param sts_data: dictionary of MRN to dictionary of intervals to dictionary of surgical features
+    :param tm: TensorMap with time series selection parameters
+    :param hd5: hd5 file containing patient data
+    :return: dictionary of surgical features
+    """
+    mrn = id_from_filename(hd5.filename)
+    ecg_dates = get_ecg_dates(tm, hd5)
+    ecg_dates.sort()
+    preop_windows = list(sts_data[mrn].keys())
+    preop_windows.sort(key=lambda x: x[1])
+    newest_surgery_data = None
+    for ecg_date in ecg_dates:
+        for start, end in preop_windows:
+            if start < ecg_date < end:
+                newest_surgery_data = sts_data[mrn][(start, end)]
+    if newest_surgery_data is None:
+        raise ValueError(f"No surgery found for patient {mrn} with ECGs {ecg_dates}")
+    return newest_surgery_data
+
+
+def _make_sts_tff_continuous(sts_data: SampleIntervalData, key: str = "") -> Callable:
     def tensor_from_file(tm: TensorMap, hd5: h5py.File, dependents: Dict = {}):
-        mrn = id_from_filename(hd5.filename)
+        newest_surgery_data = _get_sts_data_for_newest_surgery_with_preop_ecg(
+            sts_data=sts_data, tm=tm, hd5=hd5,
+        )
         tensor = np.zeros(tm.shape, dtype=np.float32)
         for feature, idx in tm.channel_map.items():
             try:
                 if key == "":
-                    feature_value = sts_features[mrn][tm.name]
+                    feature_value = newest_surgery_data[tm.name]
                 else:
-                    feature_value = sts_features[mrn][key]
+                    feature_value = newest_surgery_data[key]
                 tensor[idx] = feature_value
             except:
                 logging.debug(
@@ -165,7 +238,7 @@ def _make_sts_tff_continuous(
 
 
 def _make_sts_tff_binary(
-    sts_features: Dict[int, Dict[str, Union[int, str]]],
+    sts_data: SampleIntervalData,
     key: str = "",
     negative_value: int = 2,
     positive_value: int = 1,
@@ -175,12 +248,14 @@ def _make_sts_tff_binary(
         return the feature. Note the default encoding of +/- features in STS is 2/1,
         # e.g. yes == 1, no == 2, but outcomes are encoded using the usual format of 0/1.
         """
-        mrn = id_from_filename(hd5.filename)
+        newest_surgery_data = _get_sts_data_for_newest_surgery_with_preop_ecg(
+            sts_data=sts_data, tm=tm, hd5=hd5,
+        )
         tensor = np.zeros(tm.shape, dtype=np.float32)
         if key == "":
-            feature_value = sts_features[mrn][tm.name]
+            feature_value = newest_surgery_data[tm.name]
         else:
-            feature_value = sts_features[mrn][key]
+            feature_value = newest_surgery_data[key]
         if feature_value == positive_value:
             idx = 1
         elif feature_value == negative_value:
@@ -196,16 +271,16 @@ def _make_sts_tff_binary(
     return tensor_from_file
 
 
-def _make_sts_tff_categorical(
-    sts_features: Dict[int, Dict[str, float]], key: str = "",
-) -> Callable:
+def _make_sts_tff_categorical(sts_data: SampleIntervalData, key: str = "") -> Callable:
     def tensor_from_file(tm: TensorMap, hd5: h5py.File, dependents: Dict = {}):
-        mrn = id_from_filename(hd5.filename)
+        newest_surgery_data = _get_sts_data_for_newest_surgery_with_preop_ecg(
+            sts_data=sts_data, tm=tm, hd5=hd5,
+        )
         tensor = np.zeros(tm.shape, dtype=np.float32)
         if key == "":
-            feature_value = sts_features[mrn][tm.name]
+            feature_value = newest_surgery_data[tm.name]
         else:
-            feature_value = sts_features[mrn][key]
+            feature_value = newest_surgery_data[key]
         for cm in tm.channel_map:
             original_value = cm.split("_")[1]
             if str(feature_value) == str(original_value):
@@ -216,7 +291,7 @@ def _make_sts_tff_categorical(
     return tensor_from_file
 
 
-def _make_sts_categorical_channel_map(feature: str) -> Dict[str, int]:
+def _make_sts_categorical_channel_map(feature: str) -> ChannelMap:
     """Create channel map for categorical STS feature;
     e.g. turns {"classnyh": [1, 2, 3, 4]} into
                {classnyh_1: 0, classnyh_2: 1, classnyh_3: 2, classnyh_4: 3}"""
@@ -225,66 +300,6 @@ def _make_sts_categorical_channel_map(feature: str) -> Dict[str, int]:
     for idx, value in enumerate(values):
         channel_map[f"{feature}_{value}"] = idx
     return channel_map
-
-
-def get_sts_surgery_dates(
-    filename: str = STS_PREOP_ECG_CSV,
-    patient_column: str = "medrecn",
-    date_column: str = "surgdt",
-    additional_columns: List[str] = [],
-) -> Dict[int, Dict[str, Union[int, str]]]:
-    keys = [date_column] + additional_columns
-    sts_surgery_dates = {}
-    df = (
-        pd.read_csv(filename, low_memory=False, usecols=[patient_column] + keys)
-        .sort_values(by=[patient_column, date_column])
-        .drop_duplicates(patient_column, keep="last")
-    )
-
-    list_of_dicts = df.to_dict("records")
-
-    # Iterate over each entry in list of dicts;
-    # each entry is a unique MRN returned by entry[patient_column]
-    sts_surgery_dates = {}
-    for entry in list_of_dicts:
-        sts_surgery_dates[entry[patient_column]] = {
-            k: v for k, v in entry.items() if k != patient_column
-        }
-
-    return sts_surgery_dates
-
-
-def build_date_interval_lookup(
-    sts_features: Dict[int, Dict[str, Union[int, str]]],
-    start_column: str = "surgdt",
-    start_offset: int = -30,
-    end_column: str = "surgdt",
-    end_offset: int = 0,
-) -> Dict[int, Tuple[str, str]]:
-    """
-    Get dict of tuples defining the date interval (start, end), indexed by MRN.
-    This dict can be used for a tmap's time_series_lookup
-    """
-    date_interval_lookup = {}
-
-    for mrn in sts_features:
-        start_date = (
-            str2datetime(
-                input_date=sts_features[mrn][start_column],
-                date_format=STS_DATETIME_FORMAT,
-            )
-            + datetime.timedelta(days=start_offset)
-        ).strftime(ECG_DATETIME_FORMAT)
-
-        end_date = (
-            str2datetime(
-                input_date=sts_features[mrn][end_column],
-                date_format=STS_DATETIME_FORMAT,
-            )
-            + datetime.timedelta(days=end_offset)
-        ).strftime(ECG_DATETIME_FORMAT)
-        date_interval_lookup[mrn] = (start_date, end_date)
-    return date_interval_lookup
 
 
 def str2datetime(
@@ -296,19 +311,16 @@ def str2datetime(
 # Get keys of outcomes in STS features CSV
 outcome_keys = [key for outcome, key in sts_outcomes.items()]
 
-# Get surgery dates and other outcomes, indexed in dict by MRN
-sts_surgery_dates = get_sts_surgery_dates(additional_columns=outcome_keys)
-
-# Build lookup table of date intervals to find pre-op data
-date_interval_lookup = build_date_interval_lookup(sts_features=sts_surgery_dates)
 
 # Get STS features from CSV as dict
-sts_features = _get_sts_features_dict()
+sts_data = _get_sts_data()
+date_interval_lookup = {mrn: list(sts_data[mrn]) for mrn in sts_data}
+
 
 # Categorical (non-binary)
 for tmap_name in sts_features_categorical:
     interpretation = Interpretation.CATEGORICAL
-    tff = _make_sts_tff_categorical(sts_features=sts_features)
+    tff = _make_sts_tff_categorical(sts_data=sts_data)
     channel_map = _make_sts_categorical_channel_map(feature=tmap_name)
     validator = validator_no_nans
 
@@ -319,13 +331,14 @@ for tmap_name in sts_features_categorical:
         tensor_from_file=tff,
         channel_map=channel_map,
         validator=validator,
+        time_series_lookup=date_interval_lookup,
     )
 
 # Binary
 for tmap_name in sts_features_binary:
     interpretation = Interpretation.CATEGORICAL
     tff = _make_sts_tff_binary(
-        sts_features=sts_features, key=tmap_name, negative_value=1, positive_value=2,
+        sts_data=sts_data, key=tmap_name, negative_value=1, positive_value=2,
     )
     channel_map = outcome_channels(tmap_name)
     validator = validator_no_nans
@@ -337,6 +350,7 @@ for tmap_name in sts_features_binary:
         tensor_from_file=tff,
         channel_map=channel_map,
         validator=validator,
+        time_series_lookup=date_interval_lookup,
     )
 
 # Continuous
@@ -345,7 +359,7 @@ for tmap_name in sts_features_continuous:
 
     # Note the need to set the key; otherwise, tff will use the tmap name
     # "foo_scaled" for the key, instead of "foo"
-    tff = _make_sts_tff_continuous(sts_features=sts_features, key=tmap_name)
+    tff = _make_sts_tff_continuous(sts_data, key=tmap_name)
     validator = validator_no_nans
 
     # Make tmaps for both raw and scaled data
@@ -367,13 +381,14 @@ for tmap_name in sts_features_continuous:
             channel_map=channel_map,
             validator=validator,
             normalization=normalizer,
+            time_series_lookup=date_interval_lookup,
         )
 
 # Outcomes
 for tmap_name in sts_outcomes:
     interpretation = Interpretation.CATEGORICAL
     tff = _make_sts_tff_binary(
-        sts_features=sts_features,
+        sts_data=sts_data,
         key=sts_outcomes[tmap_name],
         negative_value=0,
         positive_value=1,
@@ -388,4 +403,5 @@ for tmap_name in sts_outcomes:
         tensor_from_file=tff,
         channel_map=channel_map,
         validator=validator,
+        time_series_lookup=date_interval_lookup,
     )
