@@ -3,6 +3,7 @@ pydot==1.2.4
 hyperopt==0.1.2
 seaborn==0.10.1
 scikit-image
+ipympl
 ipywidgets==7.5.1
 bokeh
 tensorflow==2.1.0
