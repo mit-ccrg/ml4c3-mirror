@@ -185,7 +185,7 @@ The generated script is not initially formatted with `Black`. However, `pre-comm
 `ingest/ecg/remove_xml_duplicates.py` finds and removes exact duplicate XML files, as defined by every bit of two files being identical, determined via SHA-256 hashing.
 
 ### Tensorize XMLs to HD5
-`tensorize_partners` mode in `recipes.py` extracts data from all XML files and saves as [HD5 files](https://www.hdfgroup.org). Tensorization also removes duplicates that contain nearly the same information, except for minor differences, for example minor version changes in acquisition software. This duplicate detection is done by matching patient-date-time fields.
+`tensorize` mode in `recipes.py` extracts ECG data from XML files and saves as [HD5 files](https://www.hdfgroup.org). Tensorization also removes duplicates that contain nearly the same information, except for minor differences, for example minor version changes in acquisition software. This duplicate detection is done by matching patient-date-time fields.
 
 This mode is called with the following arguments:
 `--xml_folder` to specify the directory containing ECG XMLs.
