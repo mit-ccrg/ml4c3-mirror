@@ -1,19 +1,28 @@
 # Imports: standard library
+import os
 import re
 import copy
 from typing import Dict, Optional
 
 # Imports: third party
 import numpy as np
+import pandas as pd
 
 # Imports: first party
 from ml4cvd.metrics import weighted_crossentropy
-from ml4cvd.TensorMap import TensorMap, TimeSeriesOrder, id_from_filename
+from ml4cvd.TensorMap import (
+    TensorMap,
+    Interpretation,
+    TimeSeriesOrder,
+    id_from_filename,
+    find_negative_label_and_channel,
+)
 from ml4cvd.normalizer import Standardize
 from ml4cvd.validators import validator_voltage_no_zero_padding
 from ml4cvd.definitions import (
     ECG_PREFIX,
     ECG_REST_AMP_LEADS,
+    STS_PREDICTION_DIR,
     ECG_REST_INDEPENDENT_LEADS,
 )
 from ml4cvd.tensor_maps_ecg import get_ecg_dates, make_voltage_tff, name2augmentations
@@ -114,6 +123,73 @@ def update_tmaps_sts_match_ecg(
 
     tmap.tensor_from_file = tff
     tmaps[new_tmap_name] = tmap
+    return tmaps
+
+
+def update_tmaps_model_predictions(
+    tmap_name: str, tmaps: Dict[str, TensorMap],
+) -> Dict[str, TensorMap]:
+    """
+    Create tensor maps to load predictions saved by model inference.
+    Predictions should be generated using infer mode.
+
+    For example, to load the death predictions from model v14 on bootstrap 0, use the tensor map:
+        sts_death_predictions_v14_bootstrap_0
+    """
+    if "_predictions_" not in tmap_name:
+        return tmaps
+
+    base_name, model_name = tmap_name.split("_predictions_")
+    model_name, bootstrap = model_name.split("_bootstrap_")
+    bootstrap = bootstrap.split("_")[0]
+
+    if base_name not in tmaps:
+        raise ValueError(
+            f"Base tmap {base_name} not in existing tmaps, cannot interpret predictions.",
+        )
+
+    base_tmap = tmaps[base_name]
+    original_name = base_tmap.name
+    if base_tmap.interpretation != Interpretation.CATEGORICAL:
+        raise NotImplementedError(
+            f"{base_tmap.interpretation} predictions cannot yet be loaded via a tmap.",
+        )
+    elif len(base_tmap.channel_map) != 2:
+        raise NotImplementedError(f"Cannot load predictions for non binary task.")
+
+    prediction_dir = os.path.join(STS_PREDICTION_DIR, model_name, bootstrap)
+
+    prediction_files = [
+        os.path.join(prediction_dir, prediction_file)
+        for prediction_file in os.listdir(prediction_dir)
+        if prediction_file.endswith(".csv") and "prediction" in prediction_file
+    ]
+    prediction_dfs = [
+        pd.read_csv(os.path.join(prediction_dir, prediction_file))
+        for prediction_file in prediction_files
+    ]
+    prediction_df = pd.concat(prediction_dfs).set_index("sample_id")
+    predictions = prediction_df.to_dict(orient="index")
+
+    negative_label, _ = find_negative_label_and_channel(base_tmap.channel_map)
+    positive_label = [
+        channel for channel in base_tmap.channel_map if channel != negative_label
+    ][0]
+
+    def tff(tm, hd5, dependents={}):
+        mrn = id_from_filename(hd5.filename)
+        tensor = np.array(
+            [predictions[mrn][f"{original_name}_{positive_label}_predicted"]],
+        )
+        return tensor
+
+    new_name = f"{base_name}_predictions_{model_name}_bootstrap_{bootstrap}"
+    tmaps[new_name] = TensorMap(
+        new_name,
+        interpretation=Interpretation.CONTINUOUS,
+        tensor_from_file=tff,
+        shape=(1,),
+    )
     return tmaps
 
 
