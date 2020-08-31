@@ -65,26 +65,23 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
     ):
         ref_cols.append(args.explore_stratify_label)
 
-    tmaps = {tm.name: tm for tm in args.tensor_maps_in}
+    # Ensure all required tmaps are parsed and modified as needed
+    tmap_names_to_get = []
+    tmap_names_to_get += [] if src_join is None else src_join
+    tmap_names_to_get += [] if src_time is None else [src_time]
 
-    # Ensure cross reference tensor maps are included in input_tensors
-    if src_join is not None:
-        for tmap_name in src_join:
-            if tmap_name not in tmaps:
-                raise ValueError(f"{tmap_name} not found in tmaps")
-    if src_time is not None:
-        if src_time not in tmaps:
-            raise ValueError(f"{src_time} not found in tmaps")
-
-    # iterate through needed tmaps, and modify if necessary
-    tmaps = []
-    for tm in args.tensor_maps_in:
-        if _tmap_requires_modification_for_explore(tm):
-            tm = _modify_tmap_to_return_mean(tm)
-        tmaps.append(tm)
+    tmaps = {}
+    for tmap_name in tmap_names_to_get:
+        tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
+    tmaps = args.tensor_maps_in + [tmaps[tmap_name] for tmap_name in tmap_names_to_get]
+    required_tmaps = []
+    for tmap in tmaps:
+        if _tmap_requires_modification_for_explore(tmap=tmap):
+            tmap = _modify_tmap_to_return_mean(tmap=tmap)
+        required_tmaps.append(tmap)
 
     df = _tensors_to_df(
-        tensor_maps_in=tmaps,
+        tensor_maps_in=required_tmaps,
         tensor_maps_out=[],
         tensors=args.tensors,
         batch_size=args.batch_size,
@@ -109,7 +106,7 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
     )
 
     # Remove redundant columns for binary labels, but save them for later
-    redundant_cols = _get_redundant_cols(tmaps=tmaps, df=df)
+    redundant_cols = _get_redundant_cols(tmaps=required_tmaps, df=df)
 
     # If time windows are specified, extend reference columns
     use_time = not any(arg is None for arg in [src_time, ref_start, ref_end])
@@ -417,8 +414,10 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
                 stats_all = []
                 stats_keys = []
 
-                # Iterate over input tmaps for that interpretation
-                for tm in [tm for tm in tmaps if tm.interpretation is interpretation]:
+                # Iterate over required tmaps for that interpretation
+                for tm in [
+                    tm for tm in required_tmaps if tm.interpretation is interpretation
+                ]:
 
                     # Plot continuous histograms of tensors for union
                     if (union_or_intersect == "union") and (
@@ -1065,13 +1064,13 @@ def _modify_tmap_to_return_mean(tmap: TensorMap) -> TensorMap:
     return new_tm
 
 
-def _tmap_requires_modification_for_explore(tm: TensorMap) -> bool:
+def _tmap_requires_modification_for_explore(tmap: TensorMap) -> bool:
     """Whether a tmap has to be modified to be used in explore"""
-    if tm.is_continuous():
-        return tm.static_shape != (1,)
-    if tm.is_categorical():
-        return tm.static_axes() > 1
-    if tm.is_language():
+    if tmap.is_continuous():
+        return tmap.static_shape != (1,)
+    if tmap.is_categorical():
+        return tmap.static_axes() > 1
+    if tmap.is_language():
         return False
     return True
 
