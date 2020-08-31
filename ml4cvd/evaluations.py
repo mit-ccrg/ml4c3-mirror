@@ -120,7 +120,7 @@ def predict_and_evaluate(
                 save_data[f"{tm.name}_actual"] = y_actual.flatten()
                 save_data[f"{tm.name}_predicted"] = y_prediction.flatten()
         path = os.path.join(plot_path, f"predictions_{data_split}{CSV_EXT}")
-        pd.DataFrame(save_data).round(3).to_csv(path, index=False)
+        pd.DataFrame(save_data).round(6).to_csv(path, index=False)
         logging.info(f"Saved predictions at: {path}")
 
     for y, tm in zip(y_predictions, tensor_maps_out):
