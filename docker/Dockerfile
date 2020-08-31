@@ -1,6 +1,8 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
+ARG SETUPTOOLS_USE_DISTUTILS=stdlib
+
 LABEL maintainer="Steven Song <ssong20@mgh.harvard.edu>"
 
 # Setup time zone (or else docker build hangs)

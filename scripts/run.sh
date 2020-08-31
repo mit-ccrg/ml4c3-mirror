@@ -48,7 +48,7 @@ SETUP_USER="
         usermod -aG \${GROUP_NAMES_ARR[i]} ${USER}
     done;
 "
-CALL_AS_USER="sudo -H -u ${USER}"
+CALL_AS_USER="sudo SETUPTOOLS_USE_DISTUTILS=stdlib -H -u ${USER}"
 
 ################### HELP TEXT ############################################
 
