@@ -68,7 +68,7 @@ def run(args):
         elif "tensorize" == args.mode:
             write_tensors_ecg(args.xml_folder, args.tensors, args.num_workers)
         elif "explore" == args.mode:
-            explore(args)
+            explore(args=args, save_output=args.explore_save_output)
         elif "compare" == args.mode:
             compare_multimodal_multitask_models(args)
         elif "infer" == args.mode:
