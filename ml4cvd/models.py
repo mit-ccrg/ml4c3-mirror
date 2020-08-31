@@ -1426,7 +1426,6 @@ def make_multimodal_multitask_model(
         loaded = 0
         freeze = kwargs.get("freeze_model_layers", False)
         layer_map = kwargs.get("remap_layer", dict()) or dict()
-        m.load_weights(model_layers, by_name=True)
         try:
             m_other = load_model(
                 model_layers, custom_objects=custom_dict, compile=False,

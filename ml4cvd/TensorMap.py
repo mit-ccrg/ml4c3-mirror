@@ -636,6 +636,12 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
     if tmap_name in tmaps:
         return tmaps
 
+    # Modify: load predictions
+    from ml4cvd.tensor_map_updaters import update_tmaps_model_predictions  # isort:skip
+    tmaps = update_tmaps_model_predictions(tmap_name=tmap_name, tmaps=tmaps)
+    if tmap_name in tmaps:
+        return tmaps
+
     # fmt: on
 
     raise ValueError(
