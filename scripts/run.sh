@@ -14,7 +14,7 @@ PORT="8888"
 PORT_FLAG=""
 PYTHON_COMMAND="python"
 TEST_COMMAND="python -m pytest"
-JUPYTER_COMMAND="jupyter lab"
+JUPYTER_COMMAND="jupyter lab --allow-root"
 SCRIPT_NAME=$( echo $0 | sed 's#.*/##g' )
 CONTAINER_NAME=""
 
@@ -120,7 +120,7 @@ while getopts ":i:d:m:p:cjtrhT" opt ; do
             ;;
         r) # Output owned by root
             SETUP_USER=""
-            CALL_AS_USER=""
+            CALL_AS_USER="SETUPTOOLS_USE_DISTUTILS=stdlib"
             ;;
         T)
             PYTHON_COMMAND=${TEST_COMMAND}
