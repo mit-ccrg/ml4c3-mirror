@@ -187,9 +187,9 @@ The generated script is not initially formatted with `Black`. However, `pre-comm
 ### Tensorize XMLs to HD5
 `tensorize` mode in `recipes.py` extracts ECG data from XML files and saves as [HD5 files](https://www.hdfgroup.org). Tensorization also removes duplicates that contain nearly the same information, except for minor differences, for example minor version changes in acquisition software. This duplicate detection is done by matching patient-date-time fields.
 
-This mode is called with the following arguments:  
-`--xml_folder` to specify the directory containing ECG XMLs.  
-`--tensors` to specify the directory where tensorized HD5 files should be saved.  
+This mode is called with the following arguments:
+`--xml_folder` to specify the directory containing ECG XMLs.
+`--tensors` to specify the directory where tensorized HD5 files should be saved.
 
 ```python
 ./scripts/run.sh -c $PWD/ml4cvd/recipes.py \
