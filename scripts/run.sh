@@ -4,8 +4,8 @@
 
 ################### VARIABLES ############################################
 
-DOCKER_IMAGE_GPU="ml4cvd:latest-gpu"
-DOCKER_IMAGE_NO_GPU="ml4cvd:latest-cpu"
+DOCKER_IMAGE_GPU="ghcr.io/aguirre-lab/ml:latest-gpu"
+DOCKER_IMAGE_NO_GPU="ghcr.io/aguirre-lab/ml:latest-cpu"
 DOCKER_IMAGE=${DOCKER_IMAGE_GPU}
 GPU_DEVICE="--gpus all"
 INTERACTIVE=""
@@ -147,19 +147,23 @@ fi
 
 ################### SCRIPT BODY ##########################################
 
+if ! docker pull ${DOCKER_IMAGE}; then
+    echo "Could not pull the image ${DOCKER_IMAGE}."
+fi
+
 if [[ -d "/storage/shared" ]] ; then
-    echo "Found /storage/shared folder; will try to mount it."
+    echo "Found /storage/shared; will try to mount it."
     MOUNTS="${MOUNTS} -v /storage/shared/:/storage/shared/"
 fi
 
 
 if [[ -d "/data" ]] ; then
-    echo "Found /data folder; will try to mount it."
+    echo "Found /data; will try to mount it."
     MOUNTS="${MOUNTS} -v /data/:/data/"
 fi
 
 if [[ -d "/media" ]] ; then
-    echo "Found /media folder; will try to mount it."
+    echo "Found /media; will try to mount it."
     MOUNTS="${MOUNTS} -v /media/:/media/"
 fi
 
