@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 
-# This script can be used to build and tag a 'ml4cvd' image and to tag the image as 'latest_<gpu|cpu>'.
+# Build and tag a Docker image and tag it 'latest_<gpu|cpu>'.
 
 # Stop the execution if any of the commands fails
 set -e
 
 ################### VARIABLES ############################################
 
-REPO="ml4cvd"
-TAG=$( git rev-parse --short HEAD )
+REPO="ghcr.io/aguirre-lab/ml"
 CONTEXT="docker/"
 CPU_ONLY="false"
 
@@ -38,8 +37,6 @@ usage()
 
         -d      <path>      Path to directory where Dockerfile is located. Default: '${CONTEXT}'
 
-        -t      <tag>       String used to tag the Docker image. Default: short version of the latest commit hash
-
         -c                  Build off of the cpu-only base image and tag image also as '${LATEST_TAG_CPU}'.
                             Default: Build image to run on GPU-enabled machines and tag image also as '${LATEST_TAG_GPU}'.
 
@@ -50,7 +47,7 @@ USAGE_MESSAGE
 
 ################### OPTION PARSING #######################################
 
-while getopts ":d:t:ch" opt ; do
+while getopts ":d:t:chp" opt ; do
     case ${opt} in
         h)
             usage
@@ -59,12 +56,12 @@ while getopts ":d:t:ch" opt ; do
         d)
             CONTEXT=$OPTARG
             ;;
-        t)
-            TAG=$OPTARG
-            ;;
         c)
             CPU_ONLY="true"
             ;;
+		p)
+			PUSH_TO_GHCR="true"
+			;;
         :)
             echo -e "${RED}ERROR: Option -${OPTARG} requires an argument.${NC}" 1>&2
             usage
@@ -84,17 +81,20 @@ shift $((OPTIND - 1))
 if [[ ${CPU_ONLY} == "true" ]]; then
     BASE_IMAGE=${BASE_IMAGE_CPU}
     LATEST_TAG=${LATEST_TAG_CPU}
-    TAG=${TAG}-cpu
 else
     BASE_IMAGE=${BASE_IMAGE_GPU}
     LATEST_TAG=${LATEST_TAG_GPU}
-    TAG=${TAG}-gpu
 fi
 
-echo -e "${BLUE}Building Docker image '${REPO}:${TAG}' from base image '${BASE_IMAGE}', and also tagging it as '${LATEST_TAG}'...${NC}"
+echo -e "${BLUE}Building Docker image '${REPO}:${LATEST_TAG}' from base image '${BASE_IMAGE}'...${NC}"
+
 # --network host allows for the container's network stack to use the Docker host's network
 docker build ${CONTEXT} \
     --build-arg BASE_IMAGE=${BASE_IMAGE} \
-    --tag "${REPO}:${TAG}" \
     --tag "${REPO}:${LATEST_TAG}" \
     --network host \
+
+if [[ ${PUSH_TO_GHCR} == "true" ]]; then
+    echo -e "${BLUE}Pushing Docker image '${REPO}:${LATEST_TAG}' to GitHub Container Registry...${NC}"
+    docker push ${REPO}:${LATEST_TAG}
+fi
