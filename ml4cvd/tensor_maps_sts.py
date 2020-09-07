@@ -338,7 +338,7 @@ for tmap_name in sts_features_categorical:
 for tmap_name in sts_features_binary:
     interpretation = Interpretation.CATEGORICAL
     tff = _make_sts_tff_binary(
-        sts_data=sts_data, key=tmap_name, negative_value=1, positive_value=2,
+        sts_data=sts_data, key=tmap_name, negative_value=2, positive_value=1,
     )
     channel_map = outcome_channels(tmap_name)
     validator = validator_no_nans
