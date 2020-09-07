@@ -125,11 +125,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--scripts", nargs="+", required=True, help="list of paths to scripts to run",
     )
-    parser.add_argument(
-        "--log_file",
-        default=f"dispatch-{datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.log",
-        help="name of log file to write dispatcher logs to",
-    )
     args = parser.parse_args()
 
     log_formatter = logging.Formatter(
@@ -137,10 +132,6 @@ def parse_args() -> argparse.Namespace:
     )
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-
-    file_handler = logging.FileHandler(args.log_file)
-    file_handler.setFormatter(log_formatter)
-    logger.addHandler(file_handler)
 
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setFormatter(log_formatter)
