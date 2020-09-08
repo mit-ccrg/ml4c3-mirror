@@ -732,6 +732,8 @@ def _process_args(args):
     )
     args.u_connect = _process_u_connect_args(args.u_connect)
 
+    ml4cvd.definitions.STS_DATA_CSV = args.sts_csv
+
     # Create list of names of all needed TMaps
     needed_tmaps_names = (
         args.input_tensors + args.output_tensors + [args.sample_weight]
@@ -786,5 +788,3 @@ def _process_args(args):
             pretrained_layer: new_layer
             for pretrained_layer, new_layer in args.remap_layer
         }
-
-    ml4cvd.definitions.STS_DATA_CSV = args.sts_csv
