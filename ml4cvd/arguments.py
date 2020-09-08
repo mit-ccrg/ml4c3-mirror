@@ -13,9 +13,11 @@ from collections import defaultdict
 import numpy as np
 
 # Imports: first party
+import ml4cvd.definitions
 from ml4cvd.logger import load_config
 from ml4cvd.models import BottleneckType, parent_sort, check_no_bottleneck
 from ml4cvd.TensorMap import TensorMap, update_tmaps
+from ml4cvd.definitions import STS_DATA_CSV
 
 BOTTLENECK_STR_TO_ENUM = {
     "flatten_restructure": BottleneckType.FlattenRestructure,
@@ -678,6 +680,11 @@ def parse_args():
             " labels to report."
         ),
     )
+
+    parser.add_argument(
+        "--sts_csv", default=STS_DATA_CSV, help="Path to STS data csv file.",
+    )
+
     args = parser.parse_args()
     _process_args(args)
     return args
@@ -779,3 +786,5 @@ def _process_args(args):
             pretrained_layer: new_layer
             for pretrained_layer, new_layer in args.remap_layer
         }
+
+    ml4cvd.definitions.STS_DATA_CSV = args.sts_csv
