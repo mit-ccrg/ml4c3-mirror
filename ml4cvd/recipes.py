@@ -66,7 +66,12 @@ def run(args):
         if "train" == args.mode:
             train_multimodal_multitask(args)
         elif "tensorize" == args.mode:
-            write_tensors_ecg(args.xml_folder, args.tensors, args.num_workers)
+            write_tensors_ecg(
+                xml_folder=args.xml_folder,
+                tensors=args.tensors,
+                num_workers=args.num_workers,
+                bad_files_dir=args.bad_files_dir,
+            )
         elif "explore" == args.mode:
             explore(args=args, save_output=args.explore_save_output)
         elif "compare" == args.mode:
