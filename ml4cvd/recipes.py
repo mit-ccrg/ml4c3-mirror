@@ -359,7 +359,7 @@ def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
                 learning_rate_schedule=args.learning_rate_schedule,
                 training_steps=args.training_steps,
                 model_file=args.model_file,
-                model_layers=args.model_layers,
+                donor_layers=args.donor_layers,
                 l1=l1,
                 l2=l2,
             )
@@ -452,7 +452,7 @@ def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
             learning_rate_schedule=args.learning_rate_schedule,
             training_steps=args.training_steps,
             model_file=args.model_file,
-            model_layers=args.model_layers,
+            donor_layers=args.donor_layers,
         )
         model = train_model_from_generators(
             model=model,

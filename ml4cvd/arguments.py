@@ -93,7 +93,7 @@ def parse_args():
         help="List of paths to saved model architectures and weights (hd5).",
     )
     parser.add_argument(
-        "--model_layers",
+        "--donor_layers",
         help=(
             "Path to a model file (hd5) which will be loaded by layer, useful for"
             " transfer learning."
@@ -108,10 +108,10 @@ def parse_args():
         "Layers are remapped using this argument one at a time, repeat for multiple layers.",
     )
     parser.add_argument(
-        "--freeze_model_layers",
+        "--freeze_donor_layers",
         default=False,
         action="store_true",
-        help="Whether to freeze the layers from model_layers.",
+        help="Whether to freeze the layers from donor_layers.",
     )
 
     # Model Architecture Parameters
