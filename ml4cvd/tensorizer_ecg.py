@@ -356,25 +356,27 @@ def _convert_xml_to_hd5(fpath_xml: str, fpath_hd5: str, hd5: h5py.Group) -> int:
     )
     ecg_dt = dt.isoformat()
 
+    # If XML is empty, remove the XML file and do not convert
     if os.stat(fpath_xml).st_size == 0 or not ecg_data:
-        # If XML is empty, remove the XML file and do not convert
         os.remove(fpath_xml)
         convert = 0
         logging.warning(f"Conversion of {fpath_xml} failed! XML is empty.")
+
+    # If patient already has an ECG at given date and time, skip duplicate
     elif ecg_dt in hd5.keys():
-        # If patient already has an ECG at given date and time, skip duplicate
         logging.warning(
             f"Conversion of {fpath_xml} skipped. Converted XML already exists in HD5.",
         )
         convert = -1
+
+    # If we could not get voltage, do not convert (see _get_voltage_from_lead_tags)
     elif "voltage" not in ecg_data:
-        # If we could not get voltage, do not convert (see _get_voltage_from_lead_tags)
         logging.warning(
             f"Conversion of {fpath_xml} failed! Voltage is empty or badly formatted.",
         )
         convert = 0
+    # If the max voltage value is 0, do not convert
     elif _get_max_voltage(ecg_data["voltage"]) == 0:
-        # If the max voltage value is 0, do not convert
         logging.warning(f"Conversion of {fpath_xml} failed! Maximum voltage is 0.")
         convert = 0
 
