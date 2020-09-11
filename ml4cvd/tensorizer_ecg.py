@@ -21,7 +21,7 @@ from ml4cvd.definitions import XML_EXT, TENSOR_EXT
 
 
 def write_tensors_ecg(
-    xml_folder: str, tensors: str, num_workers: int, bad_files_dir: str,
+    xml_folder: str, tensors: str, num_workers: int, bad_xml_dir: str, bad_hd5_dir: str,
 ):
     """Convert data from GE Muse XMLs into HD5 files
     One HD5 is generated per patient. One HD5 may contain multiple ECGs.
@@ -32,9 +32,12 @@ def write_tensors_ecg(
 
     :return: None
     """
-    if not os.path.exists(bad_files_dir):
-        os.mkdir(bad_files_dir)
-        logging.info(f"Created {bad_files_dir}")
+    if not os.path.exists(bad_xml_dir):
+        os.mkdir(bad_xml_dir)
+        logging.info(f"Created {bad_xml_dir}")
+    if not os.path.exists(bad_hd5_dir):
+        os.mkdir(bad_hd5_dir)
+        logging.info(f"Created {bad_hd5_dir}")
 
     logging.info("Mapping XMLs to MRNs")
     mrn_xmls_map = _get_mrn_xmls_map(xml_folder=xml_folder, num_workers=num_workers)
@@ -44,7 +47,8 @@ def write_tensors_ecg(
         mrn_xmls_map=mrn_xmls_map,
         dir_hd5=tensors,
         num_workers=num_workers,
-        bad_files_dir=bad_files_dir,
+        bad_xml_dir=bad_xml_dir,
+        bad_hd5_dir=bad_hd5_dir,
     )
 
 
@@ -435,23 +439,30 @@ def _convert_xml_to_hd5(fpath_xml: str, fpath_hd5: str, hd5: h5py.Group) -> int:
     return convert
 
 
-def _move_bad_files(fpath_xmls: List[str], fpath_hd5: str, bad_files_dir: str):
+def _move_bad_files(
+    fpath_xmls: List[str], fpath_hd5: str, bad_xml_dir: str, bad_hd5_dir: str,
+):
     # Move XMLs
     for fpath_xml in fpath_xmls:
         basename = os.path.basename(fpath_xml)
-        newpath = os.path.join(bad_files_dir, "xml", basename)
+        newpath = os.path.join(bad_xml_dir, "xml", basename)
         shutil.move(src=fpath_xml, dst=newpath)
         logging.info(f"Moved bad XML to {newpath}")
 
     # Move HD5
     basename = os.path.basename(fpath_hd5)
-    newpath = os.path.join(bad_files_dir, "hd5", basename)
+    newpath = os.path.join(bad_hd5_dir, "hd5", basename)
     shutil.move(src=fpath_hd5, dst=newpath)
     logging.info(f"Moved bad HD5 to {newpath}")
 
 
 def _convert_mrn_xmls_to_hd5(
-    mrn: str, fpath_xmls: List[str], dir_hd5: str, hd5_prefix: str, bad_files_dir: str,
+    mrn: str,
+    fpath_xmls: List[str],
+    dir_hd5: str,
+    hd5_prefix: str,
+    bad_xml_dir: str,
+    bad_hd5_dir: str,
 ) -> Tuple[int, int, int]:
     fpath_hd5 = os.path.join(dir_hd5, f"{mrn}{TENSOR_EXT}")
     num_xml_converted = 0
@@ -492,7 +503,10 @@ def _convert_mrn_xmls_to_hd5(
         num_hd5_written = 1 if num_xml_converted else 0
     except:
         _move_bad_files(
-            fpath_xmls=fpath_xmls, fpath_hd5=fpath_hd5, bad_files_dir=bad_files_dir,
+            fpath_xmls=fpath_xmls,
+            fpath_hd5=fpath_hd5,
+            bad_xml_dir=bad_xml_dir,
+            bad_hd5_dir=bad_hd5_dir,
         )
         num_hd5_written = 0
         hd5_failure = 1
@@ -504,7 +518,8 @@ def _convert_mrn_xmls_to_hd5_wrapper(
     mrn_xmls_map: Dict[str, List[str]],
     dir_hd5: str,
     num_workers: int,
-    bad_files_dir: str,
+    bad_xml_dir: str,
+    bad_hd5_dir: str,
     hd5_prefix: str = "partners_ecg_rest",
 ):
     tot_xml = sum([len(v) for k, v in mrn_xmls_map.items()])
@@ -514,7 +529,7 @@ def _convert_mrn_xmls_to_hd5_wrapper(
         counts = pool.starmap(
             _convert_mrn_xmls_to_hd5,
             [
-                (mrn, fpath_xmls, dir_hd5, hd5_prefix, bad_files_dir)
+                (mrn, fpath_xmls, dir_hd5, hd5_prefix, bad_xml_dir, bad_hd5_dir)
                 for mrn, fpath_xmls in mrn_xmls_map.items()
             ],
         )
@@ -526,6 +541,4 @@ def _convert_mrn_xmls_to_hd5_wrapper(
     logging.info(f"Converted {num_xml} XMLs to {num_hd5} HD5s at {dir_hd5}")
     logging.info(f"Skipped {num_dup} duplicate XMLs")
     logging.info(f"Skipped {tot_xml - num_dup - num_xml} malformed XMLs")
-    logging.info(
-        f"Moved {num_hd5_failures} bad HD5 files and all associated XMLs to {bad_files_dir}",
-    )
+    logging.info(f"Moved {num_hd5_failures} bad HD5 files to {bad_hd5_dir}")

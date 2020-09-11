@@ -70,7 +70,8 @@ def run(args):
                 xml_folder=args.xml_folder,
                 tensors=args.tensors,
                 num_workers=args.num_workers,
-                bad_files_dir=args.bad_files_dir,
+                bad_xml_dir=args.bad_xml_dir,
+                bad_hd5_dir=args.bad_hd5_dir,
             )
         elif "explore" == args.mode:
             explore(args=args, save_output=args.explore_save_output)
