@@ -123,7 +123,6 @@ sts_outcomes = {
     "sts_prolonged_ventilation": "cpvntlng",
     "sts_dsw_infection":         "deepsterninf",
     "sts_reoperation":           "reop",
-    "sts_any_morbidity":         "anymorbidity",
     "sts_long_stay":             "llos",
 }
 # fmt: on

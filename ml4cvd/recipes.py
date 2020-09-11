@@ -47,6 +47,7 @@ from ml4cvd.arguments import parse_args
 from ml4cvd.definitions import IMAGE_EXT, MODEL_EXT, TENSOR_EXT
 from ml4cvd.evaluations import predict_and_evaluate
 from ml4cvd.explorations import explore
+from ml4cvd.tensorizer_ecg import write_tensors_ecg
 from ml4cvd.hyperparameters import hyperoptimize, sample_random_hyperparameter
 from ml4cvd.tensor_generators import (
     BATCH_INPUT_INDEX,
@@ -57,7 +58,6 @@ from ml4cvd.tensor_generators import (
     big_batch_from_minibatch_generator,
     train_valid_test_tensor_generators,
 )
-from ml4cvd.tensor_writer_ecg import write_tensors_ecg
 
 
 def run(args):
