@@ -67,9 +67,14 @@ def parse_args():
 
     # Input and Output files and directories
     parser.add_argument(
-        "--bad_files_dir",
-        default="/data/failed-tensorization",
-        help="Path to directory to store XMLs and HD5s that fail tensorization.",
+        "--bad_xml_dir",
+        default="/data/bad-xml",
+        help="Path to directory to store XML files that fail tensorization.",
+    )
+    parser.add_argument(
+        "--bad_hd5_dir",
+        default="/data/bad-hd5",
+        help="Path to directory to store HD5 files that fail tensorization.",
     )
     parser.add_argument(
         "--xml_folder",
