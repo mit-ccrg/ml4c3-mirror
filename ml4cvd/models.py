@@ -111,7 +111,7 @@ def make_shallow_model(
     learning_rate_schedule: str,
     training_steps: int,
     model_file: str = None,
-    model_layers: str = None,
+    donor_layers: str = None,
     l1: float = None,
     l2: float = None,
     **kwargs,
@@ -125,7 +125,7 @@ def make_shallow_model(
     :param learning_rate_schedule: learning rate schedule to train with, e.g. triangular
     :param training_steps: How many training steps to train the model. Only needed if learning_rate_schedule given
     :param model_file: Optional HD5 model file to load and return.
-    :param model_layers: Optional HD5 model file whose weights will be loaded into this model when layer names match.
+    :param donor_layers: Optional HD5 model file whose weights will be loaded into this model when layer names match.
     :param l1: Optional float value to use for L1 regularization. If L2 is given as well, L1_L2 regularization is used.
     :param l2: Optional float value to use for L2 regularization. If L1 is given as well, L1_L2 regularization is used.
     :return: a compiled keras model
@@ -179,9 +179,9 @@ def make_shallow_model(
         optimizer=opt, loss=losses, loss_weights=loss_weights, metrics=my_metrics,
     )
     model.summary()
-    if model_layers is not None:
-        model.load_weights(model_layers, by_name=True)
-        logging.info("Loaded model weights from:{}".format(model_layers))
+    if donor_layers is not None:
+        model.load_weights(donor_layers, by_name=True)
+        logging.info("Loaded model weights from:{}".format(donor_layers))
 
     return model
 
@@ -191,7 +191,7 @@ def make_waveform_model_unet(
     tensor_maps_out: List[TensorMap],
     learning_rate: float,
     model_file: str = None,
-    model_layers: str = None,
+    donor_layers: str = None,
 ) -> Model:
     """Make a waveform predicting model
 
@@ -203,7 +203,7 @@ def make_waveform_model_unet(
     :param tensor_maps_out: List of output TensorMaps
     :param learning_rate: Size of learning steps in SGD optimization
     :param model_file: Optional HD5 model file to load and return.
-    :param model_layers: Optional HD5 model file whose weights will be loaded into this model when layer names match.
+    :param donor_layers: Optional HD5 model file whose weights will be loaded into this model when layer names match.
     :return: a compiled keras model
     """
     if model_file is not None:
@@ -251,9 +251,9 @@ def make_waveform_model_unet(
         optimizer=opt, loss=tensor_maps_out[0].loss, metrics=tensor_maps_out[0].metrics,
     )
 
-    if model_layers is not None:
-        m.load_weights(model_layers, by_name=True)
-        logging.info("Loaded model weights from:{}".format(model_layers))
+    if donor_layers is not None:
+        m.load_weights(donor_layers, by_name=True)
+        logging.info("Loaded model weights from:{}".format(donor_layers))
 
     return m
 
@@ -265,7 +265,7 @@ def make_character_model_plus(
     base_model: Model,
     language_layer: str,
     language_prefix: str,
-    model_layers: str = None,
+    donor_layers: str = None,
 ) -> Tuple[Model, Model]:
     """Make a ECG captioning model from an ECG embedding model
 
@@ -280,7 +280,7 @@ def make_character_model_plus(
     :param base_model: The model the computes the ECG embedding
     :param language_layer: The name of TensorMap for the language string to learn
     :param language_prefix: The path prefix of the TensorMap of the language to learn
-    :param model_layers: Optional HD5 model file whose weights will be loaded into this model when layer names match.
+    :param donor_layers: Optional HD5 model file whose weights will be loaded into this model when layer names match.
     :return: a tuple of the compiled keras model and the character emitting sub-model
     """
     char_maps_in, char_maps_out = _get_tensor_maps_for_characters(
@@ -293,7 +293,7 @@ def make_character_model_plus(
         tensor_maps_out,
         learning_rate,
         language_layer,
-        model_layers=model_layers,
+        donor_layers=donor_layers,
     )
     losses = []
     my_metrics = {}
@@ -316,13 +316,13 @@ def make_character_model_plus(
     opt = Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.0)
     m.compile(optimizer=opt, loss=losses, loss_weights=loss_weights, metrics=my_metrics)
 
-    if model_layers is not None:
-        m.load_weights(model_layers, by_name=True)
+    if donor_layers is not None:
+        m.load_weights(donor_layers, by_name=True)
         _save_architecture_diagram(
             model_to_dot(m, show_shapes=True, expand_nested=True),
-            model_layers.replace(MODEL_EXT, IMAGE_EXT),
+            donor_layers.replace(MODEL_EXT, IMAGE_EXT),
         )
-        logging.info(f"Loaded and plotted model weights from:{model_layers}")
+        logging.info(f"Loaded and plotted model weights from:{donor_layers}")
 
     return m, char_model
 
@@ -333,7 +333,7 @@ def make_character_model(
     learning_rate: float,
     language_layer: str,
     model_file: str = None,
-    model_layers: str = None,
+    donor_layers: str = None,
 ) -> Model:
     """Make a ECG captioning model
 
@@ -344,7 +344,7 @@ def make_character_model(
     :param learning_rate: Size of learning steps in SGD optimization
     :param language_layer: The name of TensorMap for the language string to learn
     :param model_file: Optional HD5 model file to load and return.
-    :param model_layers: Optional HD5 model file whose weights will be loaded into this model when layer names match.
+    :param donor_layers: Optional HD5 model file whose weights will be loaded into this model when layer names match.
     :return: a compiled keras model
     """
     if model_file is not None:
@@ -389,9 +389,9 @@ def make_character_model(
     opt = Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.0)
     m.compile(optimizer=opt, loss="categorical_crossentropy")
 
-    if model_layers is not None:
-        m.load_weights(model_layers, by_name=True)
-        logging.info(f"Loaded model weights from:{model_layers}")
+    if donor_layers is not None:
+        m.load_weights(donor_layers, by_name=True)
+        logging.info(f"Loaded model weights from:{donor_layers}")
 
     return m
 
@@ -427,9 +427,9 @@ def make_siamese_model(
     opt = get_optimizer(optimizer, learning_rate, kwargs.get("optimizer_kwargs"))
     m.compile(optimizer=opt, loss="binary_crossentropy")
 
-    if kwargs["model_layers"] is not None:
-        m.load_weights(kwargs["model_layers"], by_name=True)
-        logging.info(f"Loaded model weights from:{kwargs['model_layers']}")
+    if kwargs["donor_layers"] is not None:
+        m.load_weights(kwargs["donor_layers"], by_name=True)
+        logging.info(f"Loaded model weights from:{kwargs['donor_layers']}")
 
     return m
 
@@ -1261,8 +1261,8 @@ def make_multimodal_multitask_model(
     :param learning_rate_schedule: learning rate schedule to train with, e.g. triangular
     :param training_steps: How many training steps to train the model. Only needed if learning_rate_schedule given
     :param model_file: HD5 model file to load and return.
-    :param model_layers: HD5 model file whose weights will be loaded into this model when layer names match.
-    :param freeze_model_layers: Whether to freeze layers from loaded from model_layers
+    :param donor_layers: HD5 model file whose weights will be loaded into this model when layer names match.
+    :param freeze_donor_layers: Whether to freeze layers from loaded from donor_layers
     :param directly_embed_and_repeat: If set, directly embed input tensors (without passing to a dense layer) into concatenation layer, and repeat each input N times, where N is this argument's value. To directly embed a feature without repetition, set to 1.
     """
     tensor_maps_out = parent_sort(tensor_maps_out)
@@ -1421,14 +1421,14 @@ def make_multimodal_multitask_model(
     m = _make_multimodal_multitask_model(encoders, bottleneck, decoders)
 
     # load layers for transfer learning
-    model_layers = kwargs.get("model_layers", False)
-    if model_layers:
+    donor_layers = kwargs.get("donor_layers", False)
+    if donor_layers:
         loaded = 0
-        freeze = kwargs.get("freeze_model_layers", False)
+        freeze = kwargs.get("freeze_donor_layers", False)
         layer_map = kwargs.get("remap_layer", dict()) or dict()
         try:
             m_other = load_model(
-                model_layers, custom_objects=custom_dict, compile=False,
+                donor_layers, custom_objects=custom_dict, compile=False,
             )
             for other_layer in m_other.layers:
                 try:
@@ -1443,7 +1443,7 @@ def make_multimodal_multitask_model(
                 except (ValueError, KeyError):
                     logging.warning(
                         f"Error loading layer {other_layer.name} from model:"
-                        f" {model_layers}. Will still try to load other layers.",
+                        f" {donor_layers}. Will still try to load other layers.",
                     )
         except ValueError as e:
             logging.info(
@@ -1451,7 +1451,7 @@ def make_multimodal_multitask_model(
             )
         logging.info(
             f'Loaded {"and froze " if freeze else ""}{loaded} layers from'
-            f" {model_layers}.",
+            f" {donor_layers}.",
         )
     m.compile(
         optimizer=opt,
