@@ -67,6 +67,11 @@ def parse_args():
 
     # Input and Output files and directories
     parser.add_argument(
+        "--bad_files_dir",
+        default="/data/failed-tensorization",
+        help="Path to directory to store XMLs and HD5s that fail tensorization.",
+    )
+    parser.add_argument(
         "--xml_folder",
         default="/mnt/disks/ecg-rest-xml/",
         help="Path to folder of XMLs of ECG data.",
