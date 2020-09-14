@@ -5,6 +5,7 @@ import base64
 import shutil
 import struct
 import logging
+import argparse
 import multiprocessing
 from typing import Dict, List, Tuple, Union
 from datetime import datetime
@@ -20,9 +21,7 @@ import numcodecs
 from ml4cvd.definitions import XML_EXT, TENSOR_EXT
 
 
-def write_tensors_ecg(
-    xml_folder: str, tensors: str, num_workers: int, bad_xml_dir: str, bad_hd5_dir: str,
-):
+def tensorize_ecg(args: argparse.Namespace):
     """Convert data from GE Muse XMLs into HD5 files
     One HD5 is generated per patient. One HD5 may contain multiple ECGs.
 
@@ -32,30 +31,39 @@ def write_tensors_ecg(
 
     :return: None
     """
-    if not os.path.exists(bad_xml_dir):
-        os.mkdir(bad_xml_dir)
-        logging.info(f"Created {bad_xml_dir}")
-    if not os.path.exists(bad_hd5_dir):
-        os.mkdir(bad_hd5_dir)
-        logging.info(f"Created {bad_hd5_dir}")
+
+    if not os.path.exists(args.bad_xml_dir):
+        os.mkdir(args.bad_xml_dir)
+        logging.info(f"Created {args.bad_xml_dir}")
+
+    if not os.path.exists(args.bad_hd5_dir):
+        os.mkdir(args.bad_hd5_dir)
+        logging.info(f"Created {args.bad_hd5_dir}")
 
     logging.info("Mapping XMLs to MRNs")
-    mrn_xmls_map = _get_mrn_xmls_map(xml_folder=xml_folder, num_workers=num_workers)
-
-    logging.info("Converting XMLs into HD5s")
-    _convert_mrn_xmls_to_hd5_wrapper(
-        mrn_xmls_map=mrn_xmls_map,
-        dir_hd5=tensors,
-        num_workers=num_workers,
-        bad_xml_dir=bad_xml_dir,
-        bad_hd5_dir=bad_hd5_dir,
+    mrn_xmls_map = _get_mrn_xmls_map(
+        xml_folder=args.xml_folder,
+        num_workers=args.num_workers,
+        mrn_key_in_xml=args.mrn_key_in_xml,
     )
 
+    if not args.tensorize_dry_run:
+        logging.info("Converting XMLs into HD5s")
+        _convert_mrn_xmls_to_hd5_wrapper(
+            mrn_xmls_map=mrn_xmls_map,
+            dir_hd5=args.tensors,
+            num_workers=args.num_workers,
+            bad_xml_dir=args.bad_xml_dir,
+            bad_hd5_dir=args.bad_hd5_dir,
+        )
 
-def _map_mrn_to_xml(fpath_xml: str) -> Union[Tuple[str, str], None]:
+
+def _get_mrn_from_xml(
+    fpath_xml: str, mrn_key_in_xml: str,
+) -> Union[Tuple[str, str], None]:
     with open(fpath_xml, "r") as f:
         for line in f:
-            match = re.match(r".*<PatientID>(.*)</PatientID>.*", line)
+            match = re.match(rf".*<{mrn_key_in_xml}>(.*)</{mrn_key_in_xml}>.*", line)
             if match:
                 mrn = _clean_mrn(match.group(1), fallback="bad_mrn")
                 return (mrn, fpath_xml)
@@ -63,7 +71,9 @@ def _map_mrn_to_xml(fpath_xml: str) -> Union[Tuple[str, str], None]:
     return None
 
 
-def _get_mrn_xmls_map(xml_folder: str, num_workers: int) -> Dict[str, List[str]]:
+def _get_mrn_xmls_map(
+    xml_folder: str, num_workers: int, mrn_key_in_xml: str,
+) -> Dict[str, List[str]]:
     fpath_xmls = []
     for root, dirs, files in os.walk(xml_folder):
         for file in files:
@@ -72,11 +82,19 @@ def _get_mrn_xmls_map(xml_folder: str, num_workers: int) -> Dict[str, List[str]]
             fpath_xmls.append(os.path.join(root, file))
     logging.info(f"Found {len(fpath_xmls)} XMLs at {xml_folder}")
 
-    # Read through xmls to get MRN in parallel
-    with multiprocessing.Pool(processes=num_workers) as pool:
-        mrn_xml_list = pool.starmap(
-            _map_mrn_to_xml, [(fpath_xml,) for fpath_xml in fpath_xmls],
-        )
+    mrn_xml_list = []
+
+    if num_workers == 1:
+        for fpath_xml in fpath_xmls:
+            mrn_xml_list.append(
+                _get_mrn_from_xml(fpath_xml=fpath_xml, mrn_key_in_xml=mrn_key_in_xml),
+            )
+    else:
+        with multiprocessing.Pool(processes=num_workers) as pool:
+            mrn_xml_list = pool.starmap(
+                _get_mrn_from_xml,
+                [(fpath_xml, mrn_key_in_xml) for fpath_xml in fpath_xmls],
+            )
 
     # Build dict of MRN to XML files with that MRN
     mrn_xml_dict = defaultdict(list)

@@ -42,18 +42,6 @@ def _sha256sum_of_xml(fname: str) -> str:
     return h.hexdigest()
 
 
-def _hash_xmls(fpath_dir: str) -> list:
-    # Create list to store path to XML file, and hashed file name
-    xml_fpaths_hashes = []
-    for dirpath, subdirs, fnames in os.walk(fpath_dir):
-        for fname in fnames:
-            if fname.endswith(".xml"):
-                fpath_xml = os.path.join(dirpath, fname)
-                xml_hash = _sha256sum_of_xml(fpath_xml)
-                xml_fpaths_hashes.append((fpath_xml, xml_hash))
-    return xml_fpaths_hashes
-
-
 def run(args):
 
     start = timer()
@@ -64,19 +52,16 @@ def run(args):
     fpath_dirs.sort()
     xml_fpaths_hashes = []
 
-    # Loop through all yyyy-mm/ dirs of XMLs
-    for fpath_dir in fpath_dirs:
-
-        # For path to directory of XMLs, get list of tuples (fpath_xml, hash)
-        # for all XMLs in that dir:
-        # fpath_xml: full path to XML on disk
-        # hash: SHA-256 of the XML file contents; duplicate XMLs have same hash
-        xml_fpaths_hashes_yyyy_mm = _hash_xmls(fpath_dir)
-        xml_fpaths_hashes += xml_fpaths_hashes_yyyy_mm
-        logging.info(
-            f"Computed hashes for {len(xml_fpaths_hashes_yyyy_mm)} XMLs in {fpath_dir}",
-        )
-
+    # Iterate through all XML files in directory, hash contents, append to list of tuples
+    logging.info(
+        f"Iterating through alL XML files in directory, hashing contents, and appending original fpath and hash to list of tuples.",
+    )
+    for dirpath, subdirs, fnames in os.walk(fpath_xml):
+        for fname in fnames:
+            if fname.endswith(".xml"):
+                fpath_xml = os.path.join(dirpath, fname)
+                xml_hash = _sha256sum_of_xml(fpath_xml)
+                xml_fpaths_hashes.append((fpath_xml, xml_hash))
     end = timer()
     logging.info(f"Hashing {len(xml_fpaths_hashes)} XML files took {end-start:.2f} sec")
 

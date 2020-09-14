@@ -47,7 +47,7 @@ from ml4cvd.arguments import parse_args
 from ml4cvd.definitions import IMAGE_EXT, MODEL_EXT, TENSOR_EXT
 from ml4cvd.evaluations import predict_and_evaluate
 from ml4cvd.explorations import explore
-from ml4cvd.tensorizer_ecg import write_tensors_ecg
+from ml4cvd.tensorizer_ecg import tensorize_ecg
 from ml4cvd.hyperparameters import hyperoptimize, sample_random_hyperparameter
 from ml4cvd.tensor_generators import (
     BATCH_INPUT_INDEX,
@@ -66,13 +66,7 @@ def run(args):
         if "train" == args.mode:
             train_multimodal_multitask(args)
         elif "tensorize" == args.mode:
-            write_tensors_ecg(
-                xml_folder=args.xml_folder,
-                tensors=args.tensors,
-                num_workers=args.num_workers,
-                bad_xml_dir=args.bad_xml_dir,
-                bad_hd5_dir=args.bad_hd5_dir,
-            )
+            tensorize_ecg(args)
         elif "explore" == args.mode:
             explore(args=args, save_output=args.explore_save_output)
         elif "compare" == args.mode:
