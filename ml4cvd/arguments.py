@@ -43,6 +43,31 @@ def parse_args():
         ),
     )
 
+    # Tensorize arguments
+    parser.add_argument(
+        "--bad_xml_dir",
+        default="~/bad-xml",
+        help="Path to directory to store XML files that fail tensorization.",
+    )
+    parser.add_argument(
+        "--bad_hd5_dir",
+        default="~/bad-hd5",
+        help="Path to directory to store HD5 files that fail tensorization.",
+    )
+    parser.add_argument(
+        "--xml_folder", default="", help="Path to folder of XMLs of ECG data.",
+    )
+    parser.add_argument(
+        "--mrn_key_in_xml",
+        default="PatientID",
+        help="Name of key (tag) in XML file encoding MRN (e.g. patient ID)",
+    )
+    parser.add_argument(
+        "--tensorize_dry_run",
+        action="store_true",
+        help="Do not convert XMLs to HD5s; only map XMLs to MRNs",
+    )
+
     # Tensor Map arguments
     parser.add_argument("--input_tensors", default=[], nargs="+")
     parser.add_argument("--output_tensors", default=[], nargs="+")
@@ -67,21 +92,6 @@ def parse_args():
 
     # Input and Output files and directories
     parser.add_argument(
-        "--bad_xml_dir",
-        default="/data/bad-xml",
-        help="Path to directory to store XML files that fail tensorization.",
-    )
-    parser.add_argument(
-        "--bad_hd5_dir",
-        default="/data/bad-hd5",
-        help="Path to directory to store HD5 files that fail tensorization.",
-    )
-    parser.add_argument(
-        "--xml_folder",
-        default="/mnt/disks/ecg-rest-xml/",
-        help="Path to folder of XMLs of ECG data.",
-    )
-    parser.add_argument(
         "--sample_csv", help="Path to CSV with Sample IDs to restrict tensor paths",
     )
     parser.add_argument(
@@ -90,7 +100,7 @@ def parse_args():
     )
     parser.add_argument(
         "--output_folder",
-        default="./recipes_output/",
+        default="./ml4cvd-output",
         help="Path to output folder for recipes.py runs.",
     )
     parser.add_argument(
@@ -119,7 +129,6 @@ def parse_args():
     )
     parser.add_argument(
         "--freeze_donor_layers",
-        default=False,
         action="store_true",
         help="Whether to freeze the layers from donor_layers.",
     )
@@ -777,6 +786,12 @@ def _process_args(args):
         )
 
     np.random.seed(args.random_seed)
+
+    # Replace tildes with full path to home dirs
+    if args.bad_xml_dir:
+        args.bad_xml_dir = os.path.expanduser(args.bad_xml_dir)
+    if args.bad_hd5_dir:
+        args.bad_hd5_dir = os.path.expanduser(args.bad_hd5_dir)
 
     logging.info(f"Command Line was: {command_line}")
     logging.info(f"Total TensorMaps: {len(tmaps)} Arguments are {args}")
