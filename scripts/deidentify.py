@@ -105,7 +105,7 @@ def _get_sts_mrns(args):
     return mrns
 
 
-def _get_mrns(args):
+def _get_mrns(args, skip_mrns=set()):
     """
     Get a list of unique MRNs from the data sources that are being remapped.
     """
@@ -114,13 +114,17 @@ def _get_mrns(args):
     mrns |= _get_ecg_mrns(args)
     mrns |= _get_sts_mrns(args)
 
-    return list(mrns)
+    mrns -= skip_mrns
+
+    return mrns
 
 
 def _remap_mrns(args):
     """
     Remap and save the MRNs from the data sources that are being remapped to new random IDs.
     """
+    mrn_map = dict()
+    starting_id = args.starting_id
     if os.path.isfile(args.mrn_map):
         # call to _get_sts_mrns to determine which files to skip for sts deidentification
         _get_sts_mrns(args)
@@ -128,21 +132,26 @@ def _remap_mrns(args):
         mrn_map = pd.read_csv(args.mrn_map, low_memory=False, usecols=["mrn", "new_id"])
         mrn_map = mrn_map.set_index("mrn")
         mrn_map = mrn_map["new_id"].to_dict()
+        if starting_id is None:
+            starting_id = max(mrn_map.values()) + 1
         print(f"Existing MRN map loaded from {args.mrn_map}")
-    else:
-        mrns = _get_mrns(args)
 
-        new_ids = list(range(args.starting_id, len(mrns) + args.starting_id))
-        print(f"Last ID used in remapping MRNs was {new_ids[-1]}")
-        np.random.shuffle(new_ids)
+    if starting_id is None:
+        starting_id = 1
 
-        mrn_map = dict(zip(mrns, new_ids))
+    new_mrns = _get_mrns(args, skip_mrns=set(mrn_map.keys()))
+    new_ids = list(range(starting_id, len(new_mrns) + starting_id))
+    np.random.shuffle(new_ids)
 
-        df = pd.DataFrame.from_dict(mrn_map, orient="index", columns=["new_id"])
-        df.index.name = "mrn"
-        os.makedirs(os.path.dirname(args.mrn_map), exist_ok=True)
-        df.to_csv(args.mrn_map)
-        print(f"MRN map saved to {args.mrn_map}")
+    mrn_map.update(dict(zip(new_mrns, new_ids)))
+    print(f"New MRNs remapped starting at ID {starting_id}")
+
+    df = pd.DataFrame.from_dict(mrn_map, orient="index", columns=["new_id"])
+    df.index.name = "mrn"
+    os.makedirs(os.path.dirname(args.mrn_map), exist_ok=True)
+    df.sort_values("new_id").to_csv(args.mrn_map)
+    print(f"MRN map saved to {args.mrn_map}")
+    print(f"Last ID used in remapping MRNs was {df['new_id'].max()}")
 
     return mrn_map
 
@@ -169,8 +178,6 @@ def _deidentify_ecg(old_new_path):
     """
     old_path, new_path = old_new_path
     if os.path.exists(new_path):
-        print(f"Path to new de-identified ECG already exists: {new_path}")
-        print(f"Replaced {new_path}")
         os.remove(new_path)
     shutil.copyfile(old_path, new_path)
 
@@ -262,8 +269,6 @@ def _deidentify_sts_csvs(args, mrn_map):
             old_path = os.path.join(root, file)
             new_path = os.path.join(new_root, file)
             if os.path.exists(new_path):
-                print(f"Path to new de-identified STS CSV already exists: {new_path}")
-                print(f"Replaced {new_path}")
                 os.remove(new_path)
             shutil.copyfile(old_path, new_path)
             # if there was no PHI in the original file, copy it without trying to deidentify
@@ -297,7 +302,7 @@ if __name__ == "__main__":
         help="Path to CSV of MRN -> deidentified ID map.",
     )
     parser.add_argument(
-        "--starting_id", default=1, type=int, help="Starting value for new IDs.",
+        "--starting_id", type=int, help="Starting value for new IDs.",
     )
     parser.add_argument(
         "--ecg_dir", default="/data/ecg/mgh", help="Path to ECG HD5s.",
