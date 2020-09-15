@@ -109,17 +109,43 @@ Some compute resources may not be allowed to store Protected Health Information 
 
 The script at [scripts/deidentify.py](../scripts/deidentify.py) currently supports deidentification of ECG HD5s and STS CSV files (including both feature & outcome spreadsheets, and bootstrap lists of MRNs). Deidenfication of additional data sources can be implemented using the modular approach documented in the script itself.
 
-To deidentify ECG and STS data:
+To deidentify data from different institutions, the `starting_id` for each institution should be far apart. For example, if deidentifying MGH and BWH ECGs for the first time, use `starting_id 1` for MGH and `5000001` for BWH.
+
+To deidentify ECG and STS data for MGH for the first time:
 ```bash
 ./scripts/run.sh -c -t \
     $PWD/scripts/deidentify.py \
     --starting_id 1 \
+    --mrn_map $HOME/data/deid/mgh-deid-map.csv \
+    \
     --ecg_dir $HOME/data/ecg/mgh \
-    --sts_dir $HOME/data/sts-data \
-    --mrn_map $HOME/data/deid/mgh_mrn_deid_map.csv \
     --new_ecg_dir $HOME/data/deid/ecg/mgh \
+    \
+    --sts_dir $HOME/data/sts-data \
     --new_sts_dir $HOME/data/deid/sts-data
 ```
+
+To deidentify ECG data for BWH for the first time:
+```bash
+./scripts/run.sh -c -t \
+    $PWD/scripts/deidentify.py \
+    --starting_id 50000001 \
+    --mrn_map $HOME/data/deid/bwh-deid-map.csv \
+    \
+    --ecg_dir $HOME/data/ecg/bwh \
+    --new_ecg_dir $HOME/data/deid/ecg/bwh
+```
+
+To incrementally de-identify data for an institution (e.g. to deidentify additional HD5 files without having to repeat the de-identification process), do not specificy `starting_id`. The pipeline uses the existing MRN mapping; `starting_id` is inferred from the existing data:
+```bash
+./scripts/run.sh -c -t \
+    $PWD/scripts/deidentify.py \
+    --mrn_map $HOME/data/deid/mgh-deid-map.csv \
+    --ecg_dir $HOME/data/new-ecg/mgh \
+    --new_ecg_dir $HOME/data/deid/ecg/mgh
+```
+
+If incrementally updating the mapping for an institution, `starting_id` can be explicitly set but take care it does not collide with any existing IDs.
 
 ## Jupyter Lab
 
