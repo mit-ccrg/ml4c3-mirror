@@ -339,14 +339,12 @@ We do not enforce strict commit message style, but try to follow good practices 
 ### PRs
 To contribute code or documentation changes from your branch to the `master` branch in the repo, open a PR.
 
-Select `aguirre-lab/ml` instead of `broadinstitute/ml` (the core Broad repo) as the destination for your PR.
-
 New PRs use our repo template by default. Describe the major changes, at a high level.
 
 Assign at least one reviewer from Aguirre Lab.
 
-Reviewers approve PRs before code is merged to `master`.
+Reviewers approve PRs before code merges to `master`.
 
-Reviewers review their assigned PRs within 48 hours. If your requested PR review is overdue, remind the reviewer on Slack.
+Reviewers should review PRs within 48 hours. If your requested PR review is overdue, remind the reviewer on Slack.
 
 When PRs are approved, all commits are "squash merged", e.g. combine all commits from the head branch into a single commit in the base branch. Also, the branch is automatically deleted.
