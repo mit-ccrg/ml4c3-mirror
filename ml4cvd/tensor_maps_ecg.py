@@ -36,7 +36,7 @@ from ml4cvd.definitions import (
 tmaps: Dict[str, TensorMap] = {}
 
 
-def get_ecg_dates(tm: TensorMap, hd5: h5py.File) -> List[str]:
+def get_ecg_dates(tm: TensorMap, hd5: h5py.File, cache: bool = True) -> List[str]:
     """
     Given a tensor map, retrieve the ECG dates from an hd5
     in the order and in the time series defined by the tensor map.
@@ -46,11 +46,12 @@ def get_ecg_dates(tm: TensorMap, hd5: h5py.File) -> List[str]:
     set of dates. This cache enables multiple tensor maps to select data
     from the same ECG(s) within an hd5. The saved dates are keyed by MRN.
     """
-    if not hasattr(get_ecg_dates, "mrn_lookup"):
-        get_ecg_dates.mrn_lookup = dict()
     mrn = id_from_filename(hd5.filename)
-    if mrn in get_ecg_dates.mrn_lookup:
-        return get_ecg_dates.mrn_lookup[mrn]
+    if cache:
+        if not hasattr(get_ecg_dates, "mrn_lookup"):
+            get_ecg_dates.mrn_lookup = dict()
+        if mrn in get_ecg_dates.mrn_lookup:
+            return get_ecg_dates.mrn_lookup[mrn]
     dates = list(hd5[tm.path_prefix])
     if tm.time_series_lookup is not None:
         dates = [
@@ -73,7 +74,8 @@ def get_ecg_dates(tm: TensorMap, hd5: h5py.File) -> List[str]:
     start_idx = tm.time_series_limit if tm.time_series_limit is not None else 1
     dates = dates[-start_idx:]  # If num_tensors is 0, get all tensors
     dates.sort(reverse=True)
-    get_ecg_dates.mrn_lookup[mrn] = dates
+    if cache:
+        get_ecg_dates.mrn_lookup[mrn] = dates
     return dates
 
 
@@ -261,6 +263,48 @@ tmaps["voltage_len"] = TensorMap(
 )
 
 
+def make_binary_ecg_label_from_any_read_tff(
+    keys: List[str], channel_terms: Dict[str, Set[str]], not_found_channel: str,
+):
+    def tensor_from_file(tm, hd5, dependents={}):
+        # get all the ecgs in range (time series lookup is set)
+        tm.time_series_limit = 0
+        ecg_dates = get_ecg_dates(tm, hd5, cache=False)
+        tm.time_series_limit = None
+
+        tensor = np.zeros(tm.shape, dtype=np.float32)
+
+        read = ""
+        for ecg_idx, ecg_date in enumerate(ecg_dates):
+            for key in keys:
+                path = _make_hd5_path(tm, ecg_date, key)
+                if path not in hd5:
+                    continue
+                read += decompress_data(data_compressed=hd5[path][()], dtype="str")
+            read = read.lower()
+
+        if read != "":
+            found = False
+            for channel, channel_idx in sorted(
+                tm.channel_map.items(), key=lambda cm: cm[1],
+            ):
+                if channel not in channel_terms:
+                    continue
+                if any(
+                    re.search(term.lower(), read) is not None
+                    for term in channel_terms[channel]
+                ):
+                    tensor[channel_idx] = 1
+                    found = True
+                    break
+            if not found:
+                not_found_idx = tm.channel_map[not_found_channel]
+                tensor[not_found_idx] = 1
+        return tensor
+
+    return tensor_from_file
+
+
 def make_ecg_label_from_read_tff(
     keys: List[str], channel_terms: Dict[str, Set[str]], not_found_channel: str,
 ):
@@ -284,7 +328,7 @@ def make_ecg_label_from_read_tff(
                 if channel not in channel_terms:
                     continue
                 if any(
-                    re.match(term.lower(), read) is not None
+                    re.search(term.lower(), read) is not None
                     for term in channel_terms[channel]
                 ):
                     slices = (ecg_idx, channel_idx) if dynamic else (channel_idx,)

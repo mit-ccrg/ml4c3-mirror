@@ -28,7 +28,10 @@ Outputs = Inputs
 Path = str
 Paths = List[Path]
 Predictions = List[np.ndarray]
-SampleIntervalData = Dict[int, Dict[Tuple[str, str], Dict[str, Union[str, int, float]]]]
+SampleIntervalData = Dict[
+    int,
+    Dict[Tuple[Tuple[str, str], Tuple[str, str]], Dict[str, Union[str, int, float]]],
+]
 ChannelMap = Dict[str, int]
 
 YEAR_DAYS = 365.26
