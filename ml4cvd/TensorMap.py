@@ -100,7 +100,7 @@ class TensorMap(object):
         dependent_map: Optional["TensorMap"] = None,
         augmentations: Optional[List[Callable[[np.ndarray], np.ndarray]]] = None,
         normalization: Optional[Normalizer] = None,
-        annotation_units: Optional[int] = 32,
+        annotation_units: Optional[int] = None,
         tensor_from_file: Optional[Callable] = None,
         time_series_limit: Optional[int] = None,
         time_series_order: Optional[TimeSeriesOrder] = TimeSeriesOrder.NEWEST,
