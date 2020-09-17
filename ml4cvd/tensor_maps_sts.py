@@ -112,8 +112,6 @@ sts_features_binary = (
     - set(sts_features_categorical)
     - set(sts_features_continuous)
 )
-sts_features_binary.add("opcab")
-sts_features_binary.add("opvalve")
 
 # fmt: off
 sts_outcomes = {
@@ -124,6 +122,9 @@ sts_outcomes = {
     "sts_dsw_infection":         "deepsterninf",
     "sts_reoperation":           "reop",
     "sts_long_stay":             "llos",
+    "opcab":                     "opcab",
+    "opvalve":                   "opvalve",
+    "opother":                   "opother",
 }
 # fmt: on
 
@@ -131,10 +132,11 @@ sts_outcomes = {
 def _get_sts_data(
     data_file: str = STS_DATA_CSV,
     patient_column: str = "medrecn",
-    start_column: str = "surgdt",
-    start_offset: int = -30,
-    end_column: str = "surgdt",
-    end_offset: int = 0,
+    date_column: str = "surgdt",
+    preop_start: int = -30,
+    preop_end: int = 0,
+    postop_start: int = 1,
+    postop_end: int = 30,
 ) -> SampleIntervalData:
     """
     Load and organize STS data from CSV file into a nested dict keyed by MRN -> preop window (tuple) → surgical data
@@ -166,19 +168,19 @@ def _get_sts_data(
     df = pd.read_csv(data_file, low_memory=False)
     for surgery_data in df.to_dict(orient="records"):
         mrn = surgery_data[patient_column]
-        start = (
-            str2datetime(
-                input_date=surgery_data[start_column], date_format=STS_DATE_FORMAT,
-            )
-            + datetime.timedelta(days=start_offset)
+        surgery_date = str2datetime(
+            input_date=surgery_data[date_column], date_format=STS_DATE_FORMAT,
+        )
+        date_offset = lambda offset: (
+            surgery_date + datetime.timedelta(days=offset)
         ).strftime(ECG_DATETIME_FORMAT)
-        end = (
-            str2datetime(
-                input_date=surgery_data[end_column], date_format=STS_DATE_FORMAT,
-            )
-            + datetime.timedelta(days=end_offset)
-        ).strftime(ECG_DATETIME_FORMAT)
-        sts_data[mrn][(start, end)] = surgery_data
+        preop_start_date = date_offset(preop_start)
+        preop_end_date = date_offset(preop_end)
+        postop_start_date = date_offset(postop_start)
+        postop_end_date = date_offset(postop_end)
+        sts_data[mrn][
+            (preop_start_date, preop_end_date), (postop_start_date, postop_end_date),
+        ] = surgery_data
     return sts_data
 
 
@@ -202,13 +204,15 @@ def _get_sts_data_for_newest_surgery_with_preop_ecg(
     mrn = id_from_filename(hd5.filename)
     ecg_dates = get_ecg_dates(tm, hd5)
     ecg_dates.sort()
-    preop_windows = list(sts_data[mrn].keys())
-    preop_windows.sort(key=lambda x: x[1])
+    surgery_windows = list(sts_data[mrn])
+    surgery_windows.sort(
+        key=lambda x: x[0][1],
+    )  # sort by surgery date (end of preop window)
     newest_surgery_data = None
     for ecg_date in ecg_dates:
-        for start, end in preop_windows:
+        for ((start, end), postop_window) in surgery_windows:
             if start < ecg_date < end:
-                newest_surgery_data = sts_data[mrn][(start, end)]
+                newest_surgery_data = sts_data[mrn][((start, end), postop_window)]
     if newest_surgery_data is None:
         raise ValueError(f"No surgery found for patient {mrn} with ECGs {ecg_dates}")
     return newest_surgery_data
@@ -313,8 +317,15 @@ outcome_keys = [key for outcome, key in sts_outcomes.items()]
 
 # Get STS features from CSV as dict
 sts_data = _get_sts_data()
-date_interval_lookup = {mrn: list(sts_data[mrn]) for mrn in sts_data}
-
+date_interval_lookup = dict()
+date_interval_lookup["preop"] = {
+    mrn: [preop_window for preop_window, postop_window in sts_data[mrn]]
+    for mrn in sts_data
+}
+date_interval_lookup["postop"] = {
+    mrn: [postop_window for preop_window, postop_window in sts_data[mrn]]
+    for mrn in sts_data
+}
 
 # Categorical (non-binary)
 for tmap_name in sts_features_categorical:
@@ -330,7 +341,7 @@ for tmap_name in sts_features_categorical:
         tensor_from_file=tff,
         channel_map=channel_map,
         validator=validator,
-        time_series_lookup=date_interval_lookup,
+        time_series_lookup=date_interval_lookup["preop"],
     )
 
 # Binary
@@ -349,7 +360,7 @@ for tmap_name in sts_features_binary:
         tensor_from_file=tff,
         channel_map=channel_map,
         validator=validator,
-        time_series_lookup=date_interval_lookup,
+        time_series_lookup=date_interval_lookup["preop"],
     )
 
 # Continuous
@@ -380,7 +391,7 @@ for tmap_name in sts_features_continuous:
             channel_map=channel_map,
             validator=validator,
             normalization=normalizer,
-            time_series_lookup=date_interval_lookup,
+            time_series_lookup=date_interval_lookup["preop"],
         )
 
 # Outcomes
@@ -402,5 +413,5 @@ for tmap_name in sts_outcomes:
         tensor_from_file=tff,
         channel_map=channel_map,
         validator=validator,
-        time_series_lookup=date_interval_lookup,
+        time_series_lookup=date_interval_lookup["preop"],
     )

@@ -217,20 +217,23 @@ def update_tmaps_sts_window(
     tmap_name: str, tmaps: Dict[str, TensorMap],
 ) -> Dict[str, TensorMap]:
     """Make new tmap from base name, making conditional on surgery date"""
-    from ml4cvd.tensor_maps_sts import date_interval_lookup  # isort:skip
 
-    if "_sts" not in tmap_name:
-        return tmaps
-    base_name, _ = tmap_name.split("_sts")
-    if base_name not in tmaps:
-        raise ValueError(
-            f"Base tmap {base_name} not in existing tmaps. Cannot modify STS window.",
-        )
-    tmap = copy.deepcopy(tmaps[base_name])
-    new_tmap_name = f"{base_name}_sts"
-    tmap.name = new_tmap_name
-    tmap.time_series_lookup = date_interval_lookup
-    tmaps[new_tmap_name] = tmap
+    suffixes = ["preop", "postop"]
+    for suffix in suffixes:
+        if suffix in tmap_name:
+            from ml4cvd.tensor_maps_sts import date_interval_lookup  # isort:skip
+
+            base_name, _ = tmap_name.split(f"_{suffix}")
+            if base_name not in tmaps:
+                raise ValueError(
+                    f"Base tmap {base_name} not in existing tmaps. Cannot modify STS {suffix} window.",
+                )
+            tmap = copy.deepcopy(tmaps[base_name])
+            new_tmap_name = f"{base_name}_{suffix}"
+            tmap.name = new_tmap_name
+            tmap.time_series_lookup = date_interval_lookup[suffix]
+            tmaps[new_tmap_name] = tmap
+            break
     return tmaps
 
 
