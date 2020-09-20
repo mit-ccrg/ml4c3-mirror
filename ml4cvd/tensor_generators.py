@@ -412,9 +412,7 @@ class TensorGeneratorWorker:
 
     def __next__(
         self,
-    ) -> Tuple[
-        Dict[str, np.ndarray], Dict[str, np.ndarray], str, str, bool,
-    ]:
+    ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], str, str, bool]:
         in_tensor = dict()
         out_tensor = dict()
         error = ""
@@ -1103,7 +1101,7 @@ def train_valid_test_tensor_generators(
             ids = [id_from_filename(path) for path in paths]
             df = pd.DataFrame({"sample_id": ids})
             df.to_csv(fpath, index=False)
-            logging.info(f"{split}_csv was not provided, saved {fpath}")
+            logging.info(f"--{split}_csv was not provided; saved sample IDs to {fpath}")
 
         if train_csv is None:
             save_paths(paths=train_paths, split="train")

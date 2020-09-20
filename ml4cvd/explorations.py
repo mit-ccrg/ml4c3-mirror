@@ -22,6 +22,7 @@ from ml4cvd.TensorMap import (
     TensorMap,
     Interpretation,
     update_tmaps,
+    binary_channel_map,
     find_negative_label_and_channel,
 )
 from ml4cvd.definitions import IMAGE_EXT
@@ -105,8 +106,8 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
         export_generator=args.explore_export_generator,
     )
 
-    # Remove redundant columns for binary labels, but save them for later
-    redundant_cols = _get_redundant_cols(tmaps=required_tmaps, df=df)
+    # Remove redundant columns for binary labels from df
+    df = _remove_redundant_cols(tmaps=required_tmaps, df=df)
 
     # If time windows are specified, extend reference columns
     use_time = not any(arg is None for arg in [src_time, ref_start, ref_end])
@@ -449,11 +450,19 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
                         )
                         # Calculate summary statistics for that tmap
                         if tm.channel_map:
-                            for cm in tm.channel_map:
-                                key = f"{tm.name}_{cm}"
-                                if key in redundant_cols:
-                                    continue
-                                else:
+                            # If the channel map is binary, we only want to parse the
+                            # positive label and ignore the redundant negative label
+                            if binary_channel_map(tm=tm):
+                                key = tm.name
+                                stats = _calculate_summary_stats(
+                                    df=df_label, key=key, interpretation=interpretation,
+                                )
+                                stats_all.append(stats)
+                                stats_keys.append(f"{tm.name}{key_suffix}")
+                            # If not binary, parse each channel map
+                            else:
+                                for cm in tm.channel_map:
+                                    key = f"{tm.name}_{cm}"
                                     stats = _calculate_summary_stats(
                                         df=df_label,
                                         key=key,
@@ -463,23 +472,20 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
                                     stats_keys.append(f"{tm.name}_{cm}{key_suffix}")
                         else:
                             key = tm.name
-                            if key in redundant_cols:
-                                continue
-                            else:
-                                stats = _calculate_summary_stats(
-                                    df=df_label, key=key, interpretation=interpretation,
-                                )
-                                stats_all.append(stats)
-                                stats_keys.append(f"{tm.name}{key_suffix}")
+                            stats = _calculate_summary_stats(
+                                df=df_label, key=key, interpretation=interpretation,
+                            )
+                            stats_all.append(stats)
+                            stats_keys.append(f"{tm.name}{key_suffix}")
 
-                # Turn list of dicts into dataframe
-                df_stats = pd.DataFrame(data=stats_all, index=[stats_keys])
-                fpath = os.path.join(
-                    args.output_folder,
-                    args.id,
-                    f"stats_{interpretation}_{window}_{union_or_intersect}.csv",
-                )
-                if save_output:
+                # Convert summary statistics into dataframe and save to CSV
+                if save_output and len(stats_all) > 0:
+                    df_stats = pd.DataFrame(data=stats_all, index=[stats_keys])
+                    fpath = os.path.join(
+                        args.output_folder,
+                        args.id,
+                        f"stats_{interpretation}_{window}_{union_or_intersect}.csv",
+                    )
                     df_stats.round(3).to_csv(fpath)
                     logging.info(
                         f"{window} / {union_or_intersect} / {interpretation} tmaps: saved summary stats to {fpath}",
@@ -519,17 +525,30 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
     return return_df
 
 
-def _get_redundant_cols(tmaps: List[TensorMap], df: pd.DataFrame) -> list:
-    redundant_cols = []
+def _remove_redundant_cols(tmaps: List[TensorMap], df: pd.DataFrame) -> pd.DataFrame:
+    """Given a list of tensor maps, and a dataframe with tensors, checks categorical
+    # tensor maps, parses binary tmaps to find the negative label, removes it from the
+    dataframe, and simplifies the remaining positive column name"""
     if Interpretation.CATEGORICAL in [tm.interpretation for tm in tmaps]:
         for tm in [
             tm for tm in tmaps if tm.interpretation is Interpretation.CATEGORICAL
         ]:
-            if tm.channel_map is not None and len(tm.channel_map) == 2:
-                redundant_col, _ = find_negative_label_and_channel(tm.channel_map)
-                df.drop(f"{tm.name}_{redundant_col}", axis=1, inplace=True)
-                redundant_cols.append(f"{tm.name}_{redundant_col}")
-    return redundant_cols
+            # If two-element channel map, with "no_" in it, it is probably binary
+            if binary_channel_map(tm=tm):
+                # Find name of redundant label so we can drop it
+                negative_label, _ = find_negative_label_and_channel(tm.channel_map)
+                df.drop(f"{tm.name}_{negative_label}", axis=1, inplace=True)
+
+                # Find name of non-redundant label
+                positive_label = [
+                    cm for cm in tm.channel_map if cm is not negative_label
+                ][0]
+
+                # Simplify name of positive label column
+                df.rename(
+                    columns={f"{tm.name}_{positive_label}": f"{tm.name}"}, inplace=True,
+                )
+    return df
 
 
 def _plot_histogram_continuous_tensor(
@@ -826,13 +845,11 @@ class TensorsToDataFrameParallelWrapper:
         try:
             with h5py.File(path, "r") as hd5:
                 dict_of_tensor_dicts = defaultdict(dict)
-                # Iterate through each tmap
                 for tm in self.tmaps:
                     shape = tm.shape if tm.shape[0] is not None else tm.shape[1:]
                     try:
                         tensors = tm.tensor_from_file(tm, hd5)
                         if tm.shape[0] is not None:
-                            # If not a multi-tensor tensor, wrap in array to loop through
                             tensors = np.array([tensors])
                         for i, tensor in enumerate(tensors):
                             if tensor is None:
@@ -841,17 +858,16 @@ class TensorsToDataFrameParallelWrapper:
                                 tensor = tm.postprocess_tensor(
                                     tensor, augment=False, hd5=hd5,
                                 )
-                                # Append tensor to dict
                                 if tm.channel_map:
                                     for cm in tm.channel_map:
                                         dict_of_tensor_dicts[i][
                                             f"{tm.name}_{cm}"
                                         ] = tensor[tm.channel_map[cm]]
                                 else:
-                                    # If tensor is a scalar, isolate the value in the array;
-                                    # otherwise, retain the value as array
+                                    # If tensor is a scalar, isolate value in array;
+                                    # otherwise, retain value as array
                                     if shape[0] == 1:
-                                        if type(tensor) == np.ndarray:
+                                        if isinstance(tensor, np.ndarray):
                                             tensor = tensor.item()
                                     dict_of_tensor_dicts[i][tm.name] = tensor
                             except (
@@ -874,7 +890,6 @@ class TensorsToDataFrameParallelWrapper:
                                 dict_of_tensor_dicts[i][f"error_type_{tm.name}"] = type(
                                     e,
                                 ).__name__
-
                     except (
                         IndexError,
                         KeyError,
