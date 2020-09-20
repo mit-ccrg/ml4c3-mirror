@@ -65,14 +65,8 @@ class TestRecipes:
                     assert actual == row_expected
                     continue
                 if tm.is_categorical():
-                    _, negative_label_idx = find_negative_label_and_channel(
-                        tm.channel_map,
-                    )
                     for channel, idx in tm.channel_map.items():
-                        if idx == negative_label_idx and len(tm.channel_map) == 2:
-                            assert categorical_explore_header(tm, channel) not in row
-                        else:
-                            channel_val = getattr(
-                                row, categorical_explore_header(tm, channel),
-                            )
-                            assert channel_val == row_expected[idx]
+                        channel_val = getattr(
+                            row, categorical_explore_header(tm, channel),
+                        )
+                        assert channel_val == row_expected[idx]

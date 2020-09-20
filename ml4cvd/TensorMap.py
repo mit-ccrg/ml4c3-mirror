@@ -556,8 +556,8 @@ def find_negative_label_and_channel(
     labels: Dict[str, int], negative_label_prefix: str = "no_",
 ) -> Tuple[str, int]:
     """
-    Given a set of labels and their channel indices,
-    return the negative label and its channel, defaults to label with the smallest channel index.
+    Given a dict of labels (e.g. tm.channel_map) and their channel indices,
+    return the negative label and its channel; defaults to smallest channel index
     """
     labels = sorted(labels.items(), key=lambda cm: cm[1])
     negative_label, negative_label_index = labels[0]
@@ -570,6 +570,18 @@ def find_negative_label_and_channel(
 
 def id_from_filename(fpath: str) -> int:
     return int(os.path.basename(fpath).split(".")[0])
+
+
+def binary_channel_map(tm: TensorMap) -> bool:
+    """Return true if"
+    a) tensor map has a channel map,
+    b) the channel map has two elements
+    c) the string "no_" is in the channel map"""
+    return (
+        (tm.channel_map is not None)
+        and (len(tm.channel_map) == 2)
+        and (np.any(["no_" in cm for cm in tm.channel_map]))
+    )
 
 
 def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, TensorMap]:
