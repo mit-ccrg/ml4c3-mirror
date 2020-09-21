@@ -313,7 +313,17 @@ def parse_args():
     parser.add_argument(
         "--directly_embed_and_repeat",
         type=int,
-        help="If set, directly embed input tensors (without passing to a dense layer) into concatenation layer, and repeat each input N times, where N is this argument's value. To directly embed a feature without repetition, set to 1.",
+        help="If set, directly embed input tensors (without passing to a dense layer) into concatenation layer,"
+        " and repeat each input N times, where N is this argument's value. To directly embed a feature"
+        " without repetition, set to 1.",
+    )
+    parser.add_argument(
+        "--nest_model",
+        nargs=2,
+        action="append",
+        help="Embed a nested model ending at the specified layer before the bottleneck layer of the current model."
+        " Repeat this argument to embed multiple models."
+        " For example --nest_model /path/to/model_weights.h5 embed_layer",
     )
 
     # Training Parameters

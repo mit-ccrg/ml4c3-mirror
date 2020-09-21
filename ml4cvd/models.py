@@ -42,6 +42,7 @@ from tensorflow.keras.layers import (
     Reshape,
     LeakyReLU,
     Activation,
+    InputLayer,
     Concatenate,
     MaxPooling1D,
     MaxPooling2D,
@@ -1220,6 +1221,7 @@ def make_multimodal_multitask_model(
     training_steps: int = None,
     learning_rate_schedule: str = None,
     directly_embed_and_repeat: int = None,
+    nest_model: List[List[str]] = None,
     **kwargs,
 ) -> Model:
     """Make multi-task, multi-modal feed forward neural network for all kinds of prediction
@@ -1264,6 +1266,7 @@ def make_multimodal_multitask_model(
     :param donor_layers: HD5 model file whose weights will be loaded into this model when layer names match.
     :param freeze_donor_layers: Whether to freeze layers from loaded from donor_layers
     :param directly_embed_and_repeat: If set, directly embed input tensors (without passing to a dense layer) into concatenation layer, and repeat each input N times, where N is this argument's value. To directly embed a feature without repetition, set to 1.
+    :param nest_model: Embed a nested model ending at the specified layer before the bottleneck layer of the current model. List of models to embed and layer name of embedded layer.
     """
     tensor_maps_out = parent_sort(tensor_maps_out)
     u_connect: DefaultDict[TensorMap, Set[TensorMap]] = u_connect or defaultdict(set)
@@ -1300,8 +1303,24 @@ def make_multimodal_multitask_model(
     conv_y = _repeat_dimension(conv_y, "y", num_filters_needed)
     conv_z = _repeat_dimension(conv_z, "z", num_filters_needed)
 
+    nest_model = nest_model or []
+    nested_models = [
+        (
+            load_model(model_file, custom_objects=custom_dict, compile=False),
+            hidden_layer,
+        )
+        for model_file, hidden_layer in nest_model
+    ]
+    nested_model_inputs = {
+        input_layer.name
+        for nested_model, _ in nested_models
+        for input_layer in nested_model.inputs
+    }
+
     encoders: Dict[TensorMap:Layer] = {}
     for tm in tensor_maps_in:
+        if any(tm.input_name() in input_layer for input_layer in nested_model_inputs):
+            continue
         if tm.static_axes() > 1:
             encoders[tm] = ConvEncoder(
                 filters_per_dense_block=dense_blocks,
@@ -1418,7 +1437,13 @@ def make_multimodal_multitask_model(
                 tensor_map_out=tm, parents=tm.parents, activation=activation,
             )
 
-    m = _make_multimodal_multitask_model(encoders, bottleneck, decoders)
+    m = _make_multimodal_multitask_model(
+        encoders=encoders,
+        nested_models=nested_models,
+        bottleneck=bottleneck,
+        decoders=decoders,
+        freeze=kwargs.get("freeze_donor_layers", False),
+    )
 
     # load layers for transfer learning
     donor_layers = kwargs.get("donor_layers", False)
@@ -1464,24 +1489,37 @@ def make_multimodal_multitask_model(
 
 def _make_multimodal_multitask_model(
     encoders: Dict[TensorMap, Encoder],
-    bottle_neck: BottleNeck,
+    nested_models: List[Tuple[Model, str]],
+    bottleneck: BottleNeck,
     decoders: Dict[
         TensorMap, Decoder,
     ],  # Assumed to be topologically sorted according to parents hierarchy
+    freeze: bool,
 ) -> Model:
-    inputs: Dict[TensorMap, Input] = {}
+    inputs: List[Input] = []
     encoder_outputs: Dict[
         TensorMap, Tuple[Tensor, List[Tensor]],
     ] = {}  # TensorMap -> embed, encoder_intermediates
     encoder_intermediates = {}
     for tm, encoder in encoders.items():
         x = Input(shape=tm.static_shape, name=tm.input_name())
-        inputs[tm] = x
+        inputs.append(x)
         y, intermediates = encoder(x)
         encoder_outputs[tm] = y
         encoder_intermediates[tm] = intermediates
 
-    bottle_neck_outputs = bottle_neck(encoder_outputs)
+    for i, (model, hidden_layer) in enumerate(nested_models):
+        for layer in model.layers:
+            layer.trainable = not freeze
+            if isinstance(layer, InputLayer):
+                continue
+            layer._name = f"{layer.name}_{i}"
+        model._name = str(i)
+        inputs.extend(model.inputs)
+        hidden_layer = f"{hidden_layer}_{i}"
+        encoder_outputs[i] = model.get_layer(hidden_layer).output
+
+    bottle_neck_outputs = bottleneck(encoder_outputs)
 
     decoder_outputs = {}
     for tm, decoder in decoders.items():
@@ -1489,12 +1527,9 @@ def _make_multimodal_multitask_model(
             bottle_neck_outputs[tm], encoder_intermediates, decoder_outputs,
         )
 
-    return Model(inputs=list(inputs.values()), outputs=list(decoder_outputs.values()))
+    return Model(inputs=inputs, outputs=list(decoder_outputs.values()))
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ~~~~~~~ Training ~~~~~~~~~~~~~~~~
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def train_model_from_generators(
     model: Model,
     generate_train: TensorGenerator,
@@ -1597,17 +1632,11 @@ def _get_callbacks(
     return callbacks
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ~~~~~~~ Predicting ~~~~~~~~~~~~~~
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def embed_model_predict(model, tensor_maps_in, embed_layer, test_data, batch_size):
     embed_model = make_hidden_layer_model(model, tensor_maps_in, embed_layer)
     return embed_model.predict(test_data, batch_size=batch_size)
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ~~~~~~~ Model Builders ~~~~~~~~~~
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def _one_by_n_kernel(dimension):
     return tuple([1] * (dimension - 1))
 
@@ -1726,9 +1755,6 @@ def _regularization_layer(dimension: int, regularization_type: str, rate: float)
         return lambda x: x
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ~~~~~~~ Inspections ~~~~~~~~~~~~~
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def _save_architecture_diagram(dot: pydot.Dot, image_path: str):
     """
     Given a graph representation of a model architecture, save the architecture diagram as a png.
