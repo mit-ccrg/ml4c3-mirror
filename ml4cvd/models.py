@@ -1513,10 +1513,10 @@ def _make_multimodal_multitask_model(
             layer.trainable = not freeze
             if isinstance(layer, InputLayer):
                 continue
-            layer._name = f"{layer.name}_{i}"
+            layer._name = f"{layer.name}_n{i}"
         model._name = str(i)
         inputs.extend(model.inputs)
-        hidden_layer = f"{hidden_layer}_{i}"
+        hidden_layer = f"{hidden_layer}_n{i}"
         encoder_outputs[i] = model.get_layer(hidden_layer).output
 
     bottle_neck_outputs = bottleneck(encoder_outputs)
