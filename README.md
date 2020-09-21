@@ -38,7 +38,7 @@ Modes are either within `recipes.py` or a standalone script in `/scripts`. Eithe
 ```bash
 ./scripts/run.sh -c -t $PWD/ml4cvd/recipes.py \
 --mode explore \
---tensors /data/ecg/mgh \
+--tensors /storage/shared/ecg/mgh \
 --sample_csv ~/dropbox/sts-data/mgh-all-features-labels.csv \
 --source_name ecg \
 --join_tensors ecg_patientid_clean_sts_newest \
@@ -71,7 +71,7 @@ Train and evaluate a deep learning model with smart defaults.
 ```bash
 ./scripts/run.sh -t $PWD/ml4cvd/recipes.py \
 --mode train \
---tensors /path/to/data \
+--tensors /storage/shared/ecg/mgh \
 --input_tensors ecg_signal \
 --output_tensors patient_outcome \
 --output_folder results \
@@ -83,7 +83,7 @@ Evaluate model performance and save model predictions for inspection. The number
 ```bash
 ./scripts/run.sh -t $PWD/ml4cvd/recipes.py \
 --mode infer \
---tensors /path/to/data \
+--tensors /storage/shared/ecg \
 --input_tensors ecg_signal \
 --output_tensors patient_outcome \
 --batch_size 64 \
@@ -115,13 +115,13 @@ To deidentify ECG and STS data for MGH for the first time:
 ./scripts/run.sh -c -t \
     $PWD/scripts/deidentify.py \
     --starting_id 1 \
-    --mrn_map $HOME/data/deid/mgh-deid-map.csv \
+    --mrn_map $HOME/dropbox/ecg/mgh-deid-map.csv \
     \
-    --ecg_dir $HOME/data/ecg/mgh \
-    --new_ecg_dir $HOME/data/deid/ecg/mgh \
+    --ecg_dir /storage/shared/ecg/mgh \
+    --new_ecg_dir /storage/shared/ecg-deid/mgh \
     \
-    --sts_dir $HOME/data/sts-data \
-    --new_sts_dir $HOME/data/deid/sts-data
+    --sts_dir $HOME/dropbox/sts-data \
+    --new_sts_dir $HOME/dropbox/sts-data-deid
 ```
 
 To deidentify ECG data for BWH for the first time:
@@ -129,19 +129,19 @@ To deidentify ECG data for BWH for the first time:
 ./scripts/run.sh -c -t \
     $PWD/scripts/deidentify.py \
     --starting_id 50000001 \
-    --mrn_map $HOME/data/deid/bwh-deid-map.csv \
+    --mrn_map $HOME/dropbox/ecg/bwh-deid-map.csv \
     \
-    --ecg_dir $HOME/data/ecg/bwh \
-    --new_ecg_dir $HOME/data/deid/ecg/bwh
+    --ecg_dir /storage/shared/ecg/bwh \
+    --new_ecg_dir /storage/shared/deid/ecg/bwh
 ```
 
 To incrementally de-identify data for an institution (e.g. to deidentify additional HD5 files without having to repeat the de-identification process), do not specificy `starting_id`. The pipeline uses the existing MRN mapping; `starting_id` is inferred from the existing data:
 ```bash
 ./scripts/run.sh -c -t \
     $PWD/scripts/deidentify.py \
-    --mrn_map $HOME/data/deid/mgh-deid-map.csv \
-    --ecg_dir $HOME/data/new-ecg/mgh \
-    --new_ecg_dir $HOME/data/deid/ecg/mgh
+    --mrn_map $HOME/dropbox/ecg/mgh-deid-map.csv \
+    --ecg_dir /storage/shared/ecg/mgh \
+    --new_ecg_dir /storage/shared/ecg-deid/mgh
 ```
 
 If incrementally updating the mapping for an institution, `starting_id` can be explicitly set but take care it does not collide with any existing IDs.
@@ -243,7 +243,7 @@ The generated script is not initially formatted with `Black`. However, `pre-comm
 
 ```bash
 ./scripts/run.sh -c $PWD/scripts/remove_xml_duplicates.py \
---src /data/xmls-to-dedup
+--src /path/to/xmls-to-dedup
 ```
 
 ### Organize XMLs into `yyyy-mm` subdirectories
@@ -251,7 +251,7 @@ The generated script is not initially formatted with `Black`. However, `pre-comm
 
 ```bash
 ./scripts/run.sh -c $PWD/scripts/organize_xmls.py \
---source_xml_folder /data/xmls-to-organize \
+--source_xml_folder /path/to/xmls-to-organize \
 --destination_xml_folder /media/2tb/ecg_xmls \
 --method copy \ # can be also be 'move'
 --verbose
@@ -269,8 +269,8 @@ This mode is called with the following arguments:
 ```bash
 ./scripts/run.sh -c $PWD/ml4cvd/recipes.py \
 --mode tensorize \
---xml_folder /data/xml-files \
---tensors /data/hd5-files
+--xml_folder /path/to/xml-files \
+--tensors /path/to/hd5-files
 ```
 
 All the ECGs belonging to one patient, identified by medical record number (MRN), will be saved to one HD5, indexed by ECG acquisition date and time:

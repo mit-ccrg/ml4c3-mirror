@@ -156,12 +156,6 @@ if [[ -d "/storage/shared" ]] ; then
     MOUNTS="${MOUNTS} -v /storage/shared/:/storage/shared/"
 fi
 
-
-if [[ -d "/data" ]] ; then
-    echo "Found /data; will try to mount it."
-    MOUNTS="${MOUNTS} -v /data/:/data/"
-fi
-
 if [[ -d "/media" ]] ; then
     echo "Found /media; will try to mount it."
     MOUNTS="${MOUNTS} -v /media/:/media/"

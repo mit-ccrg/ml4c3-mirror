@@ -20,9 +20,9 @@ def _get_path_to_ecgs() -> str:
     If there is no match found, this function does not return anything, and
     the script ends up with a non-viable path prefix to HD5 files and will fail."""
     if "anduril" == socket.gethostname():
-        path = "/media/4tb1/ecg"
+        path = "/storage/shared/ecg"
     elif "mithril" == socket.gethostname():
-        path = "/data/ecg"
+        path = "/storage/shared/ecg"
     elif "stultzlab" in socket.gethostname():
         path = "/storage/shared/ecg"
     else:

@@ -305,7 +305,7 @@ if __name__ == "__main__":
         "--starting_id", type=int, help="Starting value for new IDs.",
     )
     parser.add_argument(
-        "--ecg_dir", default="/data/ecg/mgh", help="Path to ECG HD5s.",
+        "--ecg_dir", default="/storage/shared/ecg/mgh", help="Path to ECG HD5s.",
     )
     parser.add_argument(
         "--sts_dir",
