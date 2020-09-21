@@ -87,6 +87,8 @@ def run(args):
             train_siamese_model(args)
         elif "hyperoptimize" == args.mode:
             hyperoptimize(args)
+        elif "build" == args.mode:
+            build_multimodal_multitask(args)
         else:
             raise ValueError("Unknown mode:", args.mode)
 
@@ -98,6 +100,18 @@ def run(args):
     logging.info(
         "Executed the '{}' operation in {:.2f} seconds".format(args.mode, elapsed_time),
     )
+
+
+def build_multimodal_multitask(args):
+    model = make_multimodal_multitask_model(**args.__dict__)
+    model_file = os.path.join(args.output_folder, args.id, "model_weights" + MODEL_EXT)
+    model.save(model_file)
+    _save_architecture_diagram(
+        model_to_dot(model, show_shapes=True, expand_nested=True),
+        os.path.join(args.output_folder, args.id, "architecture_graph" + IMAGE_EXT),
+    )
+    logging.info(f"Model saved to {model_file}")
+    return model
 
 
 def train_multimodal_multitask(args):
