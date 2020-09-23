@@ -34,37 +34,49 @@ Machine Learning for CardioVascular Disease - MGH/MIT edition!
 Modes are either within `recipes.py` or a standalone script in `/scripts`. Either are run from Bash inside of a Docker container that has the necessary environment.
 
 ### `explore`
-`explore` mode in `recipes.py` extracts data specified by `--input_tensors` from all HD5 files at `--tensors` and calculates summary statistics. Additionally, all metadata is saved to a large CSV file.
+`explore` mode in `recipes.py` extracts data specified by `--input_tensors` from all HD5 files at `--tensors` and calculates summary statistics. The specified tensors are saved to a large CSV file, and histograms of continous tensors are generated for data in all time windows.
+
+This mode also lets you cross-reference data in `--tensors` against data in `--reference_tensors` which must be a path to a `.csv` file (we do not yet support cross-referencing two sets of `.hd5` files against each other). The column on which the source and reference data are joined is specified via `--reference_join_tensors`; this argument accepts multiple values.
+
+Analyses can be further substratified by a binary or categorical tensor specified via `--explore_stratify_label`.
+
 ```bash
 ./scripts/run.sh -c -t $PWD/ml4cvd/recipes.py \
 --mode explore \
 --tensors /storage/shared/ecg/mgh \
---sample_csv ~/dropbox/sts-data/mgh-all-features-labels.csv \
+--sample_csv ~/dropbox/sts-data/sts-mgh.csv \
 --source_name ecg \
 --join_tensors ecg_patientid_clean_sts_newest \
 --time_tensor  ecg_datetime_sts_newest \
---reference_tensors ~/dropbox/sts-data/mgh-all-features-labels.csv \
+--reference_tensors ~/dropbox/sts-data/sts-mgh.csv \
 --reference_name sts \
 --reference_join_tensors medrecn \
 --input_tensors \
-    ecg_rate_md_sts_newest \
-    ecg_qrs_md_sts_newest \
-    ecg_pr_md_sts_newest \
-    ecg_qt_md_sts_newest \
-    ecg_qtc_md_sts_newest \
-    ecg_paxis_md_sts_newest \
-    ecg_raxis_md_sts_newest \
-    ecg_taxis_md_sts_newest \
-    ecg_ponset_md_sts_newest \
-    ecg_poffset_md_sts_newest \
-    ecg_qonset_md_sts_newest \
-    ecg_qoffset_md_sts_newest \
-    ecg_toffset_md_sts_newest \
+    ecg_rate_md_preop_newest \
+    ecg_qrs_md_preop_newest \
+    ecg_pr_md_preop_newest \
+    ecg_qt_md_preop_newest \
+    ecg_qtc_md_preop_newest \
+    ecg_paxis_md_preop_newest \
+    ecg_raxis_md_preop_newest \
+    ecg_taxis_md_preop_newest \
+    ecg_ponset_md_preop_newest \
+    ecg_poffset_md_preop_newest \
+    ecg_qonset_md_preop_newest \
+    ecg_qoffset_md_preop_newest \
+    ecg_toffset_md_preop_newest \
 --output_folder ~/dropbox/sts-ecg \
 --explore_save_output \
 --id explore
 ```
 
+You can further stratify summary statistics tables and histograms of continuous tensors by a categorical tensor map. Just specificy its name:
+
+```bash
+--explore_stratify_label sts_death \
+```
+
+Support for stratifying categorical tensors does not yet exist.
 
 #### `train`
 Train and evaluate a deep learning model with smart defaults.
