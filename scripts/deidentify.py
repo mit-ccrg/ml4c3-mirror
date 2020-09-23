@@ -40,8 +40,6 @@ phi_keys = {
     "patientlastname",
     "patientid",
     "patientid_clean",
-    "diagnosis_md",
-    "diagnosis_pc",
     "acquisitiontechfirstname",
     "acquisitiontechid",
     "acquisitiontechlastname",
