@@ -44,6 +44,7 @@ from ml4cvd.metrics import (
     get_precision_recall_aucs,
 )
 from ml4cvd.arguments import parse_args
+from ml4cvd.TensorMap import TensorMap
 from ml4cvd.definitions import IMAGE_EXT, MODEL_EXT, TENSOR_EXT
 from ml4cvd.evaluations import predict_and_evaluate
 from ml4cvd.explorations import explore
@@ -60,7 +61,7 @@ from ml4cvd.tensor_generators import (
 )
 
 
-def run(args):
+def run(args: argparse.Namespace):
     start_time = timer()  # Keep track of elapsed execution time
     try:
         if "train" == args.mode:
@@ -102,7 +103,7 @@ def run(args):
     )
 
 
-def build_multimodal_multitask(args):
+def build_multimodal_multitask(args: argparse.Namespace):
     model = make_multimodal_multitask_model(**args.__dict__)
     model_file = os.path.join(args.output_folder, args.id, "model_weights" + MODEL_EXT)
     model.save(model_file)
@@ -114,7 +115,7 @@ def build_multimodal_multitask(args):
     return model
 
 
-def train_multimodal_multitask(args):
+def train_multimodal_multitask(args: argparse.Namespace):
     generate_train, generate_valid, generate_test = train_valid_test_tensor_generators(
         **args.__dict__
     )
@@ -179,7 +180,7 @@ def train_multimodal_multitask(args):
     return performance_metrics
 
 
-def compare_multimodal_multitask_models(args):
+def compare_multimodal_multitask_models(args: argparse.Namespace):
     _, _, generate_test = train_valid_test_tensor_generators(**args.__dict__)
     models_inputs_outputs = get_model_inputs_outputs(
         args.model_files, args.tensor_maps_in, args.tensor_maps_out,
@@ -194,7 +195,7 @@ def compare_multimodal_multitask_models(args):
     _calculate_and_plot_prediction_stats(args, predictions, output_data, paths)
 
 
-def compare_multimodal_scalar_task_models(args):
+def compare_multimodal_scalar_task_models(args: argparse.Namespace):
     _, _, generate_test = train_valid_test_tensor_generators(**args.__dict__)
     models_io = get_model_inputs_outputs(
         args.model_files, args.tensor_maps_in, args.tensor_maps_out,
@@ -206,7 +207,7 @@ def compare_multimodal_scalar_task_models(args):
     _calculate_and_plot_prediction_stats(args, predictions, labels, paths)
 
 
-def _make_tmap_nan_on_fail(tmap):
+def _make_tmap_nan_on_fail(tmap: TensorMap):
     """
     Builds a copy TensorMap with a tensor_from_file that returns nans on errors instead of raising an error
     """
@@ -223,7 +224,7 @@ def _make_tmap_nan_on_fail(tmap):
     return new_tmap
 
 
-def infer_multimodal_multitask(args):
+def infer_multimodal_multitask(args: argparse.Namespace):
     _, _, generate_test = train_valid_test_tensor_generators(
         no_empty_paths_allowed=False, **args.__dict__
     )
@@ -251,7 +252,7 @@ def hidden_inference_file_name(output_folder: str, id_: str) -> str:
     return os.path.join(output_folder, id_, "hidden_inference_" + id_ + ".tsv")
 
 
-def infer_hidden_layer_multimodal_multitask(args):
+def infer_hidden_layer_multimodal_multitask(args: argparse.Namespace):
     stats = Counter()
     args.num_workers = 0
     inference_tsv = hidden_inference_file_name(args.output_folder, args.id)
@@ -516,7 +517,7 @@ def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
     return performance_metrics
 
 
-def train_siamese_model(args):
+def train_siamese_model(args: argparse.Namespace):
     base_model = make_multimodal_multitask_model(**args.__dict__)
     siamese_model = make_siamese_model(base_model, **args.__dict__)
     generate_train, generate_valid, generate_test = train_valid_test_tensor_generators(
@@ -549,7 +550,7 @@ def train_siamese_model(args):
     )
 
 
-def saliency_maps(args):
+def saliency_maps(args: argparse.Namespace):
     tf.compat.v1.disable_eager_execution()
     _, _, generate_test = train_valid_test_tensor_generators(**args.__dict__)
     model = make_multimodal_multitask_model(**args.__dict__)
@@ -584,7 +585,12 @@ def _get_common_outputs(models_inputs_outputs, output_prefix):
 
 
 def _get_predictions(
-    args, models_inputs_outputs, input_data, outputs, input_prefix, output_prefix,
+    args: argparse.Namespace,
+    models_inputs_outputs,
+    input_data,
+    outputs,
+    input_prefix,
+    output_prefix,
 ):
     """Makes multi-modal predictions for a given number of models.
 
@@ -626,7 +632,13 @@ def _get_predictions(
 
 
 def _scalar_predictions_from_generator(
-    args, models_inputs_outputs, generator, steps, outputs, input_prefix, output_prefix,
+    args: argparse.Namespace,
+    models_inputs_outputs,
+    generator,
+    steps,
+    outputs,
+    input_prefix,
+    output_prefix,
 ):
     """Makes multi-modal scalar predictions for a given number of models.
 
@@ -707,7 +719,9 @@ def _scalar_predictions_from_generator(
     return predictions, test_labels, test_paths
 
 
-def _calculate_and_plot_prediction_stats(args, predictions, outputs, paths):
+def _calculate_and_plot_prediction_stats(
+    args: argparse.Namespace, predictions, outputs, paths,
+):
     rocs = []
     scatters = []
     for tm in args.tensor_maps_out:
@@ -800,5 +814,5 @@ def _calculate_and_plot_prediction_stats(args, predictions, outputs, paths):
 
 
 if __name__ == "__main__":
-    arguments = parse_args()
-    run(arguments)  # back to the top
+    args = parse_args()
+    run(args)
