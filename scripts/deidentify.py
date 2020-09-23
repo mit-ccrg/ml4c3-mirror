@@ -294,11 +294,11 @@ def run(args):
     print(f"De-identification took {elapsed_time:.2f} seconds.")
 
 
-if __name__ == "__main__":
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--mrn_map",
-        default=os.path.expanduser("~/dropbox/ecg/mgh_mrn_deid_map.csv"),
+        default=os.path.expanduser("~/dropbox/ecg/mgh-mrn-deid-map.csv"),
         help="Path to CSV of MRN -> deidentified ID map.",
     )
     parser.add_argument(
@@ -328,5 +328,9 @@ if __name__ == "__main__":
         type=int,
         help="Number of worker processes to use if processing in parallel.",
     )
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
     run(args)
