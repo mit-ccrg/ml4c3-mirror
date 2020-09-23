@@ -144,7 +144,7 @@ To deidentify ECG data for BWH for the first time:
     --mrn_map $HOME/dropbox/ecg/bwh-deid-map.csv \
     \
     --ecg_dir /storage/shared/ecg/bwh \
-    --new_ecg_dir /storage/shared/deid/ecg/bwh
+    --new_ecg_dir /storage/shared/ecg-deid/bwh
 ```
 
 To incrementally de-identify data for an institution (e.g. to deidentify additional HD5 files without having to repeat the de-identification process), do not specificy `starting_id`. The pipeline uses the existing MRN mapping; `starting_id` is inferred from the existing data:
