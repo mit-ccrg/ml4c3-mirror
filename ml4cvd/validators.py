@@ -3,8 +3,8 @@ import h5py
 import numpy as np
 
 # Imports: first party
-from ml4cvd.TensorMap import TensorMap
 from ml4cvd.definitions import ECG_ZERO_PADDING_THRESHOLD
+from ml4cvd.tensormap.TensorMap import TensorMap
 
 
 def validator_clean_mrn(tm: TensorMap, tensor: np.ndarray, hd5: h5py.File):
@@ -43,19 +43,11 @@ def validator_voltage_no_zero_padding(
     tm: TensorMap, tensor: np.ndarray, hd5: h5py.File,
 ):
     for cm, idx in tm.channel_map.items():
-        lead_length = tm.static_shape[-1]
+        lead_length = tm.shape[-1]
         lead = tensor[..., tm.channel_map[cm]]
         num_zero = lead_length - np.count_nonzero(lead)
         if num_zero > ECG_ZERO_PADDING_THRESHOLD * lead_length:
             raise ValueError(f"Lead {cm} is zero-padded for ECG in {hd5.filename}")
-
-
-def v6_zeros_validator(tm: TensorMap, tensor: np.ndarray, hd5: h5py.File):
-    voltage = decompress_data(
-        data_compressed=hd5["V6"][()], dtype=hd5["V6"].attrs["dtype"],
-    )
-    if np.count_nonzero(voltage == 0) > 10:
-        raise ValueError(f"TensorMap {tm.name} has too many zeros in V6.")
 
 
 class RangeValidator:

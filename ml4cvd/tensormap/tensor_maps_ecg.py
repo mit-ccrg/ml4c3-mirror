@@ -9,14 +9,6 @@ import h5py
 import numpy as np
 
 # Imports: first party
-from ml4cvd.metrics import weighted_crossentropy
-from ml4cvd.TensorMap import (
-    TensorMap,
-    Interpretation,
-    TimeSeriesOrder,
-    decompress_data,
-    id_from_filename,
-)
 from ml4cvd.normalizer import Standardize
 from ml4cvd.validators import (
     RangeValidator,
@@ -26,11 +18,17 @@ from ml4cvd.validators import (
     validator_not_all_zero,
 )
 from ml4cvd.definitions import (
-    STOP_CHAR,
     YEAR_DAYS,
     ECG_PREFIX,
     ECG_DATE_FORMAT,
     ECG_REST_AMP_LEADS,
+)
+from ml4cvd.tensormap.TensorMap import (
+    TensorMap,
+    Interpretation,
+    TimeSeriesOrder,
+    decompress_data,
+    id_from_filename,
 )
 
 tmaps: Dict[str, TensorMap] = {}
@@ -80,8 +78,8 @@ def get_ecg_dates(tm: TensorMap, hd5: h5py.File, cache: bool = True) -> List[str
 
 
 def _is_dynamic_shape(tm: TensorMap, num_ecgs: int) -> Tuple[bool, Tuple[int, ...]]:
-    if tm.shape[0] is None:
-        return True, (num_ecgs,) + tm.shape[1:]
+    if tm.time_series_limit is not None:
+        return True, (num_ecgs,) + tm.shape
     return False, tm.shape
 
 
@@ -89,7 +87,7 @@ def _make_hd5_path(tm: TensorMap, ecg_date: str, value_key: str) -> str:
     return f"{tm.path_prefix}/{ecg_date}/{value_key}"
 
 
-def _resample_voltage(voltage: np.array, desired_samples: float, fs: float) -> np.array:
+def _resample_voltage(voltage: np.array, desired_samples: int, fs: float) -> np.array:
     """Resample array of voltage amplitudes (voltage) given desired number of samples
     (length) and reported sampling frequency (fs) in Hz. Note the reported fs is solely
     for processing 240 Hz ECGs that have 2500 samples."""
@@ -111,7 +109,7 @@ def _resample_voltage(voltage: np.array, desired_samples: float, fs: float) -> n
 
 
 def make_voltage_tff(exact_length=False):
-    def tensor_from_file(tm, hd5, dependents={}):
+    def tensor_from_file(tm, hd5):
         ecg_dates = get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         voltage_length = shape[1] if dynamic else shape[0]
@@ -156,7 +154,7 @@ def make_voltage_tff(exact_length=False):
     return tensor_from_file
 
 
-# ECG augmentations
+# ECG augmenters
 def _crop_ecg(ecg: np.array):
     cropped_ecg = ecg.copy()
     for j in range(ecg.shape[1]):
@@ -187,14 +185,14 @@ def _warp_ecg(ecg: np.array):
     return warped_ecg
 
 
-name2augmentations = {
+name2augmenters = {
     "crop": _crop_ecg,
     "noise": _noise_ecg,
     "warp": _warp_ecg,
 }
 
 
-def voltage_stat(tm, hd5, dependents={}):
+def voltage_stat(tm, hd5):
     ecg_dates = get_ecg_dates(tm, hd5)
     dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.zeros(shape, dtype=np.float32)
@@ -224,7 +222,7 @@ def voltage_stat(tm, hd5, dependents={}):
 
 tmaps["ecg_voltage_stats"] = TensorMap(
     "ecg_voltage_stats",
-    shape=(None, 5),
+    shape=(5,),
     path_prefix=ECG_PREFIX,
     tensor_from_file=voltage_stat,
     channel_map={"mean": 0, "std": 1, "min": 2, "max": 3, "median": 4},
@@ -233,7 +231,7 @@ tmaps["ecg_voltage_stats"] = TensorMap(
 
 
 def make_voltage_attribute_tff(volt_attr: str = ""):
-    def tensor_from_file(tm, hd5, dependents={}):
+    def tensor_from_file(tm, hd5):
         ecg_dates = get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         tensor = np.zeros(shape, dtype=np.float32)
@@ -257,7 +255,7 @@ tmaps["voltage_len"] = TensorMap(
     interpretation=Interpretation.CONTINUOUS,
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_voltage_attribute_tff(volt_attr="len"),
-    shape=(None, 12),
+    shape=(12,),
     channel_map=ECG_REST_AMP_LEADS,
     time_series_limit=0,
 )
@@ -266,7 +264,7 @@ tmaps["voltage_len"] = TensorMap(
 def make_binary_ecg_label_from_any_read_tff(
     keys: List[str], channel_terms: Dict[str, Set[str]], not_found_channel: str,
 ):
-    def tensor_from_file(tm, hd5, dependents={}):
+    def tensor_from_file(tm, hd5):
         # get all the ecgs in range (time series lookup is set)
         tm.time_series_limit = 0
         ecg_dates = get_ecg_dates(tm, hd5, cache=False)
@@ -308,7 +306,7 @@ def make_binary_ecg_label_from_any_read_tff(
 def make_ecg_label_from_read_tff(
     keys: List[str], channel_terms: Dict[str, Set[str]], not_found_channel: str,
 ):
-    def tensor_from_file(tm, hd5, dependents={}):
+    def tensor_from_file(tm, hd5):
         ecg_dates = get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         tensor = np.zeros(shape, dtype=np.float32)
@@ -344,7 +342,7 @@ def make_ecg_label_from_read_tff(
     return tensor_from_file
 
 
-def ecg_datetime(tm, hd5, dependents={}):
+def ecg_datetime(tm, hd5):
     ecg_dates = get_ecg_dates(tm, hd5)
     dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.full(shape, "", dtype=f"<U19")
@@ -359,16 +357,16 @@ tmaps[tmap_name] = TensorMap(
     interpretation=Interpretation.LANGUAGE,
     path_prefix=ECG_PREFIX,
     tensor_from_file=ecg_datetime,
-    shape=(None, 1),
+    shape=(1,),
     time_series_limit=0,
-    validator=validator_no_empty,
+    validators=validator_no_empty,
 )
 
 
 def make_voltage_len_tff(
     lead, channel_prefix="_", channel_unknown="other",
 ):
-    def tensor_from_file(tm, hd5, dependents={}):
+    def tensor_from_file(tm, hd5):
         ecg_dates = get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         tensor = np.zeros(shape, dtype=float)
@@ -414,14 +412,14 @@ for lead in ECG_REST_AMP_LEADS:
         tensor_from_file=make_voltage_len_tff(lead=lead),
         channel_map={"_2500": 0, "_5000": 1, "other": 2},
         time_series_limit=0,
-        validator=validator_not_all_zero,
+        validators=validator_not_all_zero,
     )
 
 
 def make_ecg_tensor(
     key: str, fill: float = 0, channel_prefix: str = "", channel_unknown: str = "other",
 ):
-    def get_ecg_tensor(tm, hd5, dependents={}):
+    def get_ecg_tensor(tm, hd5):
         ecg_dates = get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         if tm.interpretation == Interpretation.LANGUAGE:
@@ -477,37 +475,15 @@ def make_ecg_tensor(
     return get_ecg_tensor
 
 
-def make_language_tensor(key: str):
-    def language_tensor(tm, hd5, dependents={}):
-        words = str(
-            decompress_data(
-                data_compressed=hd5[key][()], dtype=hd5[key].attrs["dtype"],
-            ),
-        )
-        tensor = np.zeros(tm.shape, dtype=np.float32)
-        for i, c in enumerate(words):
-            if i >= tm.shape[0]:
-                logging.debug(
-                    f"Text {words} is longer than {tm.name} can store in"
-                    f" shape:{tm.shape}, truncating...",
-                )
-                break
-            tensor[i, tm.channel_map[c]] = 1.0
-        tensor[min(tm.shape[0] - 1, i + 1), tm.channel_map[STOP_CHAR]] = 1.0
-        return tensor
-
-    return language_tensor
-
-
 tmap_name = "ecg_read_md"
 tmaps[tmap_name] = TensorMap(
     name=tmap_name,
     interpretation=Interpretation.LANGUAGE,
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(key="read_md_clean"),
-    shape=(None, 1),
+    shape=(1,),
     time_series_limit=0,
-    validator=validator_no_empty,
+    validators=validator_no_empty,
 )
 
 
@@ -517,9 +493,9 @@ tmaps[tmap_name] = TensorMap(
     interpretation=Interpretation.LANGUAGE,
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(key="read_pc_clean"),
-    shape=(None, 1),
+    shape=(1,),
     time_series_limit=0,
-    validator=validator_no_empty,
+    validators=validator_no_empty,
 )
 
 
@@ -529,9 +505,9 @@ tmaps[tmap_name] = TensorMap(
     interpretation=Interpretation.LANGUAGE,
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(key="patientid"),
-    shape=(None, 1),
+    shape=(1,),
     time_series_limit=0,
-    validator=validator_no_empty,
+    validators=validator_no_empty,
 )
 
 
@@ -541,9 +517,9 @@ tmaps[tmap_name] = TensorMap(
     interpretation=Interpretation.LANGUAGE,
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(key="patientid_clean"),
-    shape=(None, 1),
+    shape=(1,),
     time_series_limit=0,
-    validator=validator_clean_mrn,
+    validators=validator_clean_mrn,
 )
 
 
@@ -553,9 +529,9 @@ tmaps[tmap_name] = TensorMap(
     interpretation=Interpretation.LANGUAGE,
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(key="patientfirstname"),
-    shape=(None, 1),
+    shape=(1,),
     time_series_limit=0,
-    validator=validator_no_empty,
+    validators=validator_no_empty,
 )
 
 
@@ -565,9 +541,9 @@ tmaps[tmap_name] = TensorMap(
     interpretation=Interpretation.LANGUAGE,
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(key="patientlastname"),
-    shape=(None, 1),
+    shape=(1,),
     time_series_limit=0,
-    validator=validator_no_empty,
+    validators=validator_no_empty,
 )
 
 
@@ -579,7 +555,7 @@ tmaps[tmap_name] = TensorMap(
     tensor_from_file=make_ecg_tensor(key="gender"),
     channel_map={"female": 0, "male": 1},
     time_series_limit=0,
-    validator=validator_not_all_zero,
+    validators=validator_not_all_zero,
 )
 
 tmap_name = "ecg_date"
@@ -588,9 +564,9 @@ tmaps[tmap_name] = TensorMap(
     interpretation=Interpretation.LANGUAGE,
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(key="acquisitiondate"),
-    shape=(None, 1),
+    shape=(1,),
     time_series_limit=0,
-    validator=validator_no_empty,
+    validators=validator_no_empty,
 )
 
 
@@ -600,9 +576,9 @@ tmaps[tmap_name] = TensorMap(
     interpretation=Interpretation.LANGUAGE,
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(key="acquisitiontime"),
-    shape=(None, 1),
+    shape=(1,),
     time_series_limit=0,
-    validator=validator_no_empty,
+    validators=validator_no_empty,
 )
 
 
@@ -612,9 +588,9 @@ tmaps[tmap_name] = TensorMap(
     interpretation=Interpretation.LANGUAGE,
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(key="sitename"),
-    shape=(None, 1),
+    shape=(1,),
     time_series_limit=0,
-    validator=validator_no_empty,
+    validators=validator_no_empty,
 )
 
 
@@ -624,9 +600,9 @@ tmaps[tmap_name] = TensorMap(
     interpretation=Interpretation.LANGUAGE,
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(key="location"),
-    shape=(None, 1),
+    shape=(1,),
     time_series_limit=0,
-    validator=validator_no_empty,
+    validators=validator_no_empty,
 )
 
 
@@ -636,9 +612,9 @@ tmaps[tmap_name] = TensorMap(
     interpretation=Interpretation.LANGUAGE,
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(key="dateofbirth"),
-    shape=(None, 1),
+    shape=(1,),
     time_series_limit=0,
-    validator=validator_no_empty,
+    validators=validator_no_empty,
 )
 
 
@@ -649,9 +625,7 @@ def make_sampling_frequency_from_file(
     channel_unknown: str = "other",
     fill: int = -1,
 ):
-    def sampling_frequency_from_file(
-        tm: TensorMap, hd5: h5py.File, dependents: Dict = {},
-    ):
+    def sampling_frequency_from_file(tm: TensorMap, hd5: h5py.File):
         ecg_dates = get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         if tm.interpretation == Interpretation.CATEGORICAL:
@@ -705,7 +679,7 @@ tmaps[tmap_name] = TensorMap(
     tensor_from_file=make_sampling_frequency_from_file(),
     channel_map={"_250": 0, "_500": 1, "other": 2},
     time_series_limit=0,
-    validator=validator_not_all_zero,
+    validators=validator_not_all_zero,
 )
 
 
@@ -717,7 +691,7 @@ tmaps[tmap_name] = TensorMap(
     tensor_from_file=make_ecg_tensor(key="ecgsamplebase_pc", channel_prefix="_"),
     channel_map={"_0": 0, "_250": 1, "_500": 2, "other": 3},
     time_series_limit=0,
-    validator=validator_not_all_zero,
+    validators=validator_not_all_zero,
 )
 
 
@@ -729,7 +703,7 @@ tmaps[tmap_name] = TensorMap(
     tensor_from_file=make_ecg_tensor(key="ecgsamplebase_md", channel_prefix="_"),
     channel_map={"_0": 0, "_250": 1, "_500": 2, "other": 3},
     time_series_limit=0,
-    validator=validator_not_all_zero,
+    validators=validator_not_all_zero,
 )
 
 
@@ -741,7 +715,7 @@ tmaps[tmap_name] = TensorMap(
     tensor_from_file=make_ecg_tensor(key="waveform_samplebase", channel_prefix="_"),
     channel_map={"_0": 0, "_240": 1, "_250": 2, "_500": 3, "other": 4},
     time_series_limit=0,
-    validator=validator_not_all_zero,
+    validators=validator_not_all_zero,
 )
 
 
@@ -752,8 +726,8 @@ tmaps[tmap_name] = TensorMap(
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_sampling_frequency_from_file(),
     time_series_limit=0,
-    shape=(None, 1),
-    validator=validator_no_negative,
+    shape=(1,),
+    validators=validator_no_negative,
 )
 
 
@@ -764,8 +738,8 @@ tmaps[tmap_name] = TensorMap(
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(key="ecgsamplebase_pc", fill=-1),
     time_series_limit=0,
-    shape=(None, 1),
-    validator=validator_no_negative,
+    shape=(1,),
+    validators=validator_no_negative,
 )
 
 
@@ -776,8 +750,8 @@ tmaps[tmap_name] = TensorMap(
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(key="ecgsamplebase_md", fill=-1),
     time_series_limit=0,
-    shape=(None, 1),
-    validator=validator_no_negative,
+    shape=(1,),
+    validators=validator_no_negative,
 )
 
 
@@ -788,8 +762,8 @@ tmaps[tmap_name] = TensorMap(
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(key="waveform_samplebase", fill=-1),
     time_series_limit=0,
-    shape=(None, 1),
-    validator=validator_no_negative,
+    shape=(1,),
+    validators=validator_no_negative,
 )
 
 
@@ -803,7 +777,7 @@ tmaps[tmap_name] = TensorMap(
     ),
     channel_map={"_25": 0, "_50": 1, "_100": 2, "other": 3},
     time_series_limit=0,
-    validator=validator_not_all_zero,
+    validators=validator_not_all_zero,
 )
 
 
@@ -817,7 +791,7 @@ tmaps[tmap_name] = TensorMap(
     ),
     channel_map={"_10": 0, "_20": 1, "_40": 2, "other": 3},
     time_series_limit=0,
-    validator=validator_not_all_zero,
+    validators=validator_not_all_zero,
 )
 
 
@@ -831,7 +805,7 @@ tmaps[tmap_name] = TensorMap(
     ),
     time_series_limit=0,
     channel_map={"_None": 0, "_40": 1, "_80": 2, "other": 3},
-    validator=validator_not_all_zero,
+    validators=validator_not_all_zero,
 )
 
 
@@ -842,8 +816,8 @@ tmaps[tmap_name] = TensorMap(
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(key="waveform_highpassfilter", fill=-1),
     time_series_limit=0,
-    shape=(None, 1),
-    validator=validator_no_negative,
+    shape=(1,),
+    validators=validator_no_negative,
 )
 
 
@@ -854,8 +828,8 @@ tmaps[tmap_name] = TensorMap(
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(key="waveform_lowpassfilter", fill=-1),
     time_series_limit=0,
-    shape=(None, 1),
-    validator=validator_no_negative,
+    shape=(1,),
+    validators=validator_no_negative,
 )
 
 
@@ -867,7 +841,7 @@ tmaps[tmap_name] = TensorMap(
     tensor_from_file=make_ecg_tensor(key="waveform_acfilter", channel_prefix="_"),
     time_series_limit=0,
     channel_map={"_None": 0, "_50": 1, "_60": 2, "other": 3},
-    validator=validator_not_all_zero,
+    validators=validator_not_all_zero,
 )
 
 # Creates TMaps for interval measurements.
@@ -879,7 +853,7 @@ tmaps[tmap_name] = TensorMap(
 #     ecg_rate_std_pc
 
 # fmt: off
-# TMap name      ->      (hd5 key,          fill, validator,                       normalization)
+# TMap name      ->      (hd5 key,          fill, validator,                 normalizer)
 interval_key_map = {
     "ecg_rate":          ("ventricularrate", 0,   RangeValidator(10, 200),   None),
     "ecg_rate_std":      ("ventricularrate", 0,   RangeValidator(10, 200),   Standardize(mean=70, std=16)),
@@ -912,7 +886,7 @@ interval_key_map = {
 }
 # fmt: on
 
-for interval, (key, fill, validator, normalization) in interval_key_map.items():
+for interval, (key, fill, validator, normalizer) in interval_key_map.items():
     for suffix in ["_md", "_pc"]:
         name = f"{interval}{suffix}"
         _key = f"{key}{suffix}"
@@ -922,10 +896,10 @@ for interval, (key, fill, validator, normalization) in interval_key_map.items():
             path_prefix=ECG_PREFIX,
             loss="logcosh",
             tensor_from_file=make_ecg_tensor(key=_key, fill=fill),
-            shape=(None, 1),
+            shape=(1,),
             time_series_limit=0,
-            validator=validator,
-            normalization=normalization,
+            validators=validator,
+            normalizers=normalizer,
         )
 
 
@@ -936,13 +910,13 @@ tmaps[tmap_name] = TensorMap(
     path_prefix=ECG_PREFIX,
     loss="logcosh",
     tensor_from_file=make_ecg_tensor(key="weightlbs"),
-    shape=(None, 1),
+    shape=(1,),
     time_series_limit=0,
-    validator=RangeValidator(100, 800),
+    validators=RangeValidator(100, 800),
 )
 
 
-def get_ecg_age_from_hd5(tm, hd5, dependents={}):
+def get_ecg_age_from_hd5(tm, hd5):
     ecg_dates = get_ecg_dates(tm, hd5)
     dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.full(shape, fill_value=-1, dtype=float)
@@ -979,9 +953,9 @@ tmaps[tmap_name] = TensorMap(
     path_prefix=ECG_PREFIX,
     loss="logcosh",
     tensor_from_file=get_ecg_age_from_hd5,
-    shape=(None, 1),
+    shape=(1,),
     time_series_limit=0,
-    validator=RangeValidator(0, 120),
+    validators=RangeValidator(0, 120),
 )
 
 tmap_name = "ecg_age_std"
@@ -990,14 +964,14 @@ tmaps[tmap_name] = TensorMap(
     path_prefix=ECG_PREFIX,
     loss="logcosh",
     tensor_from_file=get_ecg_age_from_hd5,
-    shape=(None, 1),
+    shape=(1,),
     time_series_limit=0,
-    validator=RangeValidator(0, 120),
-    normalization=Standardize(mean=65, std=16),
+    validators=RangeValidator(0, 120),
+    normalizers=Standardize(mean=65, std=16),
 )
 
 
-def ecg_acquisition_year(tm, hd5, dependents={}):
+def ecg_acquisition_year(tm, hd5):
     ecg_dates = get_ecg_dates(tm, hd5)
     dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.zeros(shape, dtype=int)
@@ -1016,12 +990,12 @@ tmaps["ecg_acquisition_year"] = TensorMap(
     path_prefix=ECG_PREFIX,
     loss="logcosh",
     tensor_from_file=ecg_acquisition_year,
-    shape=(None, 1),
+    shape=(1,),
     time_series_limit=0,
 )
 
 
-def ecg_bmi(tm, hd5, dependents={}):
+def ecg_bmi(tm, hd5):
     ecg_dates = get_ecg_dates(tm, hd5)
     dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.zeros(shape, dtype=float)
@@ -1054,7 +1028,7 @@ tmaps["ecg_bmi"] = TensorMap(
 
 
 def ecg_channel_string(hd5_key, race_synonyms={}, unspecified_key=None):
-    def tensor_from_string(tm, hd5, dependents={}):
+    def tensor_from_string(tm, hd5):
         ecg_dates = get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         tensor = np.zeros(shape, dtype=np.float32)
@@ -1112,7 +1086,7 @@ tmaps["ecg_race"] = TensorMap(
 
 
 def _ecg_adult(hd5_key, minimum_age=18):
-    def tensor_from_string(tm, hd5, dependents={}):
+    def tensor_from_string(tm, hd5):
         ecg_dates = get_ecg_dates(tm, hd5)
         dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
         tensor = np.zeros(shape, dtype=np.float32)
@@ -1162,7 +1136,7 @@ tmaps["ecg_adult_sex"] = TensorMap(
 )
 
 
-def voltage_zeros(tm, hd5, dependents={}):
+def voltage_zeros(tm, hd5):
     ecg_dates = get_ecg_dates(tm, hd5)
     dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.zeros(shape, dtype=np.float32)
@@ -1182,7 +1156,7 @@ tmaps["voltage_zeros"] = TensorMap(
     interpretation=Interpretation.CONTINUOUS,
     path_prefix=ECG_PREFIX,
     tensor_from_file=voltage_zeros,
-    shape=(None, 12),
+    shape=(12,),
     channel_map=ECG_REST_AMP_LEADS,
     time_series_limit=0,
 )

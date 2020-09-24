@@ -81,11 +81,6 @@ MODEL_EXT = ".h5"
 XML_EXT = ".xml"
 CSV_EXT = ".csv"
 
-STOP_CHAR = "!"
-JOIN_CHAR = "_"
-CONCAT_CHAR = "-"
-HD5_GROUP_CHAR = "/"
-
 ECG_READ_TEXT = "_read"
 
 ECG_REST_LEADS = {

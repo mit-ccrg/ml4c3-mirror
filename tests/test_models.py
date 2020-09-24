@@ -2,7 +2,6 @@
 import os
 from typing import Dict, List, Tuple, Iterator, Optional
 from itertools import cycle
-from collections import defaultdict
 
 # Imports: third party
 import numpy as np
@@ -14,12 +13,9 @@ from ml4cvd.models import (
     MODEL_EXT,
     ACTIVATION_FUNCTIONS,
     BottleneckType,
-    parent_sort,
-    check_no_bottleneck,
-    train_model_from_generators,
     make_multimodal_multitask_model,
 )
-from ml4cvd.TensorMap import TensorMap
+from ml4cvd.tensormap.TensorMap import TensorMap
 
 MEAN_PRECISION_EPS = 0.02  # how much mean precision degradation is acceptable
 DEFAULT_PARAMS = {
@@ -57,10 +53,10 @@ def make_training_data(
         [
             (
                 {
-                    tm.input_name(): tf.random.normal((2,) + tm.shape)
+                    tm.input_name: tf.random.normal((2,) + tm.shape)
                     for tm in input_tmaps
                 },
-                {tm.output_name(): tf.zeros((2,) + tm.shape) for tm in output_tmaps},
+                {tm.output_name: tf.zeros((2,) + tm.shape) for tm in output_tmaps},
                 [None] * len(output_tmaps),
             ),
         ],
@@ -79,7 +75,7 @@ def assert_model_trains(
     for tmap, tensor in zip(input_tmaps, m.inputs):
         assert tensor.shape[1:] == tmap.shape
         assert tensor.shape[1:] == tmap.shape
-    for tmap, tensor in zip(parent_sort(output_tmaps), m.outputs):
+    for tmap, tensor in zip(output_tmaps, m.outputs):
         assert tensor.shape[1:] == tmap.shape
         assert tensor.shape[1:] == tmap.shape
     data = make_training_data(input_tmaps, output_tmaps)
@@ -90,7 +86,7 @@ def assert_model_trains(
         for metric in tmap.metrics:
             metric_name = metric if type(metric) == str else metric.__name__
             name = (
-                f"{tmap.output_name()}_{metric_name}"
+                f"{tmap.output_name}_{metric_name}"
                 if len(output_tmaps) > 1
                 else metric_name
             )
@@ -189,30 +185,6 @@ class TestMakeMultimodalMultitaskModel:
             input_tmaps, output_tmaps, model_file=path, **DEFAULT_PARAMS,
         )
 
-    def test_u_connect_auto_encode(self):
-        params = DEFAULT_PARAMS.copy()
-        params["pool_x"] = params["pool_y"] = 2
-        params["conv_layers"] = [8, 8]
-        params["dense_blocks"] = [4, 4, 2]
-        m = make_multimodal_multitask_model(
-            [pytest.SEGMENT_IN],
-            [pytest.SEGMENT_IN],
-            u_connect=defaultdict(set, {pytest.SEGMENT_IN: {pytest.SEGMENT_IN}}),
-            **params,
-        )
-        assert_model_trains([pytest.SEGMENT_IN], [pytest.SEGMENT_IN], m)
-
-    def test_u_connect_segment(self):
-        params = DEFAULT_PARAMS.copy()
-        params["pool_x"] = params["pool_y"] = 2
-        m = make_multimodal_multitask_model(
-            [pytest.SEGMENT_IN],
-            [pytest.SEGMENT_OUT],
-            u_connect=defaultdict(set, {pytest.SEGMENT_IN: {pytest.SEGMENT_OUT}}),
-            **params,
-        )
-        assert_model_trains([pytest.SEGMENT_IN], [pytest.SEGMENT_OUT], m)
-
     @pytest.mark.parametrize(
         "input_output_tmaps",
         [
@@ -242,86 +214,9 @@ class TestMakeMultimodalMultitaskModel:
             **DEFAULT_PARAMS,
         )
 
-    def test_u_connect_adaptive_normalization(self):
-        params = DEFAULT_PARAMS.copy()
-        params["pool_x"] = params["pool_y"] = 2
-        params["bottleneck_type"] = BottleneckType.GlobalAveragePoolStructured
-        m = make_multimodal_multitask_model(
-            [pytest.SEGMENT_IN, pytest.TMAPS_UP_TO_4D[0]],
-            [pytest.SEGMENT_OUT],
-            u_connect=defaultdict(set, {pytest.SEGMENT_IN: {pytest.SEGMENT_OUT}}),
-            **params,
-        )
-        assert_model_trains(
-            [pytest.SEGMENT_IN, pytest.TMAPS_UP_TO_4D[0]], [pytest.SEGMENT_OUT], m,
-        )
-
-    def test_u_connect_no_bottleneck(self):
-        params = DEFAULT_PARAMS.copy()
-        params["pool_x"] = params["pool_y"] = 2
-        params["bottleneck_type"] = BottleneckType.NoBottleNeck
-        m = make_multimodal_multitask_model(
-            [pytest.SEGMENT_IN, pytest.TMAPS_UP_TO_4D[0]],
-            [pytest.SEGMENT_OUT],
-            u_connect=defaultdict(set, {pytest.SEGMENT_IN: {pytest.SEGMENT_OUT}}),
-            **params,
-        )
-        assert_model_trains(
-            [pytest.SEGMENT_IN, pytest.TMAPS_UP_TO_4D[0]], [pytest.SEGMENT_OUT], m,
-        )
-
     def test_no_dense_layers(self):
         params = DEFAULT_PARAMS.copy()
         params["dense_layers"] = []
         inp, out = pytest.CONTINUOUS_TMAPS[:2], pytest.CATEGORICAL_TMAPS[:2]
         m = make_multimodal_multitask_model(inp, out, **DEFAULT_PARAMS)
         assert_model_trains(inp, out, m)
-
-    @pytest.mark.parametrize(
-        "output_tmaps",
-        [_rotate(pytest.PARENT_TMAPS, i) for i in range(len(pytest.PARENT_TMAPS))],
-    )
-    def test_parents(self, output_tmaps):
-        assert_model_trains([pytest.TMAPS_UP_TO_4D[-1]], output_tmaps)
-
-
-@pytest.mark.parametrize(
-    "tmaps", [_rotate(pytest.PARENT_TMAPS, i) for i in range(len(pytest.PARENT_TMAPS))],
-)
-def test_parent_sort(tmaps):
-    assert parent_sort(tmaps) == pytest.PARENT_TMAPS
-
-
-@pytest.mark.parametrize(
-    "tmaps",
-    [_rotate(pytest.CYCLE_PARENTS, i) for i in range(len(pytest.CYCLE_PARENTS))],
-)
-def test_parent_sort_cycle(tmaps):
-    with pytest.raises(ValueError):
-        parent_sort(tmaps)
-
-
-@pytest.mark.parametrize(
-    "tmaps",
-    [
-        _rotate(pytest.PARENT_TMAPS + pytest.TMAPS_UP_TO_4D, i)
-        for i in range(len(pytest.PARENT_TMAPS))
-    ],
-)
-def test_parent_sort_idempotent(tmaps):
-    assert (
-        parent_sort(tmaps)
-        == parent_sort(parent_sort(tmaps))
-        == parent_sort(parent_sort(parent_sort(tmaps)))
-    )
-
-
-@pytest.mark.parametrize(
-    "tmap_out", pytest.TMAPS_UP_TO_4D,
-)
-@pytest.mark.parametrize(
-    "u_connect_out", pytest.TMAPS_UP_TO_4D,
-)
-def test_check_no_bottleneck(tmap_out, u_connect_out):
-    u_connect = defaultdict(set, {tmap_out: {u_connect_out}})
-    assert check_no_bottleneck(u_connect, [tmap_out]) == (u_connect_out == tmap_out)

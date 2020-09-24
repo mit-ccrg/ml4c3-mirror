@@ -10,9 +10,7 @@ import pandas as pd
 from tensorflow.keras.models import Model
 
 # Imports: first party
-from ml4cvd.plots import plot_tsne, subplot_rocs, subplot_scatters, evaluate_predictions
-from ml4cvd.models import embed_model_predict
-from ml4cvd.TensorMap import TensorMap, find_negative_label_and_channel
+from ml4cvd.plots import subplot_rocs, subplot_scatters, evaluate_predictions
 from ml4cvd.definitions import CSV_EXT, Path, Paths, Inputs, Outputs, Predictions
 from ml4cvd.tensor_generators import (
     BATCH_INPUT_INDEX,
@@ -20,6 +18,7 @@ from ml4cvd.tensor_generators import (
     BATCH_OUTPUT_INDEX,
     TensorGenerator,
 )
+from ml4cvd.tensormap.TensorMap import TensorMap, find_negative_label_and_channel
 
 
 def predict_and_evaluate(
@@ -32,9 +31,6 @@ def predict_and_evaluate(
     save_coefficients: bool = False,
     steps: Optional[int] = None,
     batch_size: Optional[int] = None,
-    hidden_layer: Optional[str] = None,
-    embed_visualization: Optional[str] = None,
-    alpha: Optional[float] = None,
     save_predictions: bool = False,
 ) -> Dict:
     """
@@ -49,9 +45,6 @@ def predict_and_evaluate(
     :param save_coefficients: Save model coefficients
     :param steps: Number of batches to use, required if data is a TensorGenerator
     :param batch_size: Number of samples to use in a batch, required if data is a tuple input and output numpy arrays
-    :param hidden_layer: Name of hidden layer for embedded visualization
-    :param embed_visualization: Type of embedded visualization
-    :param alpha: Float of transparency for embedded visualization
     :param save_predictions: If true, save predicted and actual output values to a csv
 
     :return: Dictionary of performance metrics
@@ -99,10 +92,10 @@ def predict_and_evaluate(
                 os.path.splitext(os.path.basename(p))[0] for p in data_paths
             ]
         for y_prediction, tm in zip(y_predictions, tensor_maps_out):
-            if tm.static_axes() != 1:
+            if tm.axes != 1:
                 continue
 
-            y_actual = tm.rescale(output_data[tm.output_name()])
+            y_actual = tm.rescale(output_data[tm.output_name])
             y_prediction = tm.rescale(y_prediction)
 
             if tm.channel_map is not None:
@@ -124,9 +117,9 @@ def predict_and_evaluate(
         logging.info(f"Saved predictions at: {path}")
 
     for y, tm in zip(y_predictions, tensor_maps_out):
-        if tm.output_name() not in layer_names:
+        if tm.output_name not in layer_names:
             continue
-        y_truth = np.array(output_data[tm.output_name()])
+        y_truth = np.array(output_data[tm.output_name])
         performance_metrics.update(
             evaluate_predictions(
                 tm=tm,
@@ -145,28 +138,6 @@ def predict_and_evaluate(
         subplot_rocs(rocs, data_split, plot_path)
     if len(scatters) > 1:
         subplot_scatters(scatters, data_split, plot_path)
-
-    if embed_visualization == "tsne":
-        if isinstance(data, TensorGenerator):
-            raise NotImplementedError(
-                f"Embedded visualization is not currently supported with generators.",
-            )
-        output_data_1d = {
-            tm: np.array(output_data[tm.output_name()])
-            for tm in tensor_maps_out
-            if tm.output_name() in output_data
-        }
-        _tsne_wrapper(
-            model=model,
-            hidden_layer=hidden_layer,
-            alpha=alpha,
-            plot_path=plot_path,
-            test_paths=data_paths,
-            test_labels=output_data_1d,
-            test_data=data[BATCH_INPUT_INDEX],
-            tensor_maps_in=tensor_maps_in,
-            batch_size=batch_size,
-        )
 
     return performance_metrics
 
@@ -218,11 +189,9 @@ def _get_predictions_from_data(
         data.reset()
         batch_size = data.batch_size
         data_length = steps * batch_size
-        y_predictions = [
-            np.zeros((data_length,) + tm.static_shape) for tm in data.output_maps
-        ]
+        y_predictions = [np.zeros((data_length,) + tm.shape) for tm in data.output_maps]
         output_data = {
-            tm.output_name(): np.zeros((data_length,) + tm.static_shape)
+            tm.output_name: np.zeros((data_length,) + tm.shape)
             for tm in data.output_maps
         }
         paths = [] if data.keep_paths else None
@@ -265,81 +234,3 @@ def _get_predictions_from_data(
 
     # predictions returned by this function are lists of numpy arrays
     return y_predictions, output_data, paths
-
-
-def _test_labels_to_label_map(
-    test_labels: Dict[TensorMap, np.ndarray], examples: int,
-) -> Tuple[Dict[str, np.ndarray], List[str], List[str]]:
-    label_dict = {tm: np.zeros((examples,)) for tm in test_labels}
-    categorical_labels = []
-    continuous_labels = []
-
-    for tm in test_labels:
-        for i in range(examples):
-            if tm.is_continuous() and tm.static_axes() == 1:
-                label_dict[tm][i] = tm.rescale(test_labels[tm][i])
-                continuous_labels.append(tm)
-            elif tm.is_categorical() and tm.static_axes() == 1:
-                label_dict[tm][i] = np.argmax(test_labels[tm][i])
-                categorical_labels.append(tm)
-
-    return label_dict, categorical_labels, continuous_labels
-
-
-def _tsne_wrapper(
-    model: Model,
-    hidden_layer: str,
-    alpha: float,
-    plot_path: Path,
-    test_paths: Paths,
-    test_labels: Dict[TensorMap, np.ndarray],
-    test_data: Optional[Inputs] = None,
-    tensor_maps_in: Optional[List[TensorMap]] = None,
-    batch_size: Optional[int] = None,
-    embeddings: Optional[np.ndarray] = None,
-):
-    """Plot 2D t-SNE of a model's hidden layer colored by many different co-variates.
-
-    Callers must provide either model's embeddings or test_data on which embeddings will be inferred
-
-    :param model: Keras model
-    :param hidden_layer: String name of the hidden layer whose embeddings will be visualized
-    :param alpha: Transparency of each data point
-    :param plot_path: Image file name and path for the t_SNE plot
-    :param test_paths: Paths for hd5 file containing each sample
-    :param test_labels: Dictionary mapping TensorMaps to numpy arrays of labels (co-variates) to color code the t-SNE plots with
-    :param test_data: Input data for the model necessary if embeddings is None
-    :param tensor_maps_in: Input TensorMaps of the model necessary if embeddings is None
-    :param batch_size: Batch size necessary if embeddings is None
-    :param embeddings: (optional) Model's embeddings
-    :return: None
-    """
-    if hidden_layer_name not in [layer.name for layer in model.layers]:
-        logging.warning(
-            f"Can't compute t-SNE, layer:{hidden_layer_name} not in provided model.",
-        )
-        return
-
-    if embeddings is None:
-        embeddings = embed_model_predict(
-            model, tensor_maps_in, hidden_layer_name, test_data, batch_size,
-        )
-
-    gene_labels = []
-    label_dict, categorical_labels, continuous_labels = _test_labels_to_label_map(
-        test_labels, len(test_paths),
-    )
-    if (
-        len(categorical_labels) > 0
-        or len(continuous_labels) > 0
-        or len(gene_labels) > 0
-    ):
-        plot_tsne(
-            embeddings,
-            categorical_labels,
-            continuous_labels,
-            gene_labels,
-            label_dict,
-            plot_path,
-            alpha,
-        )
