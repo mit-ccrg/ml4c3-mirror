@@ -98,7 +98,7 @@ def _write_tmap(
         f"    time_series_limit=0,\n"
         f"    path_prefix='{TENSOR_PATH_PREFIX}',\n"
         f"    channel_map={channel_map},\n"
-        f"    validator=validator_not_all_zero,\n"
+        f"    validators=validator_not_all_zero,\n"
         f"    tensor_from_file={MAKE_TFF_FUNCTION_NAME}(\n"
         f"        keys={keys},\n"
         f"        channel_terms={channel_terms},\n"
@@ -112,7 +112,7 @@ def _write_tmap(
         f"    interpretation=Interpretation.CATEGORICAL,\n"
         f"    path_prefix='{TENSOR_PATH_PREFIX}',\n"
         f"    channel_map={channel_map},\n"
-        f"    validator=validator_not_all_zero,\n"
+        f"    validators=validator_not_all_zero,\n"
         f"    tensor_from_file={MAKE_ANY_TFF_FUNCTION_NAME}(\n"
         f"        keys={keys},\n"
         f"        channel_terms={channel_terms},\n"
@@ -142,7 +142,9 @@ if __name__ == "__main__":
     # users clone the ml repo on their machine
     this_script_name = os.path.split(__file__)[1]
     path_to_repo = os.path.abspath(__file__).replace(f"/scripts/{this_script_name}", "")
-    path_to_new_script = os.path.join(path_to_repo, "ml4cvd", NEW_SCRIPT_NAME)
+    path_to_new_script = os.path.join(
+        path_to_repo, "ml4cvd", "tensormap", NEW_SCRIPT_NAME,
+    )
 
     with open(path_to_new_script, "w") as py_file:
         py_file.write(f"from typing import Dict\n")

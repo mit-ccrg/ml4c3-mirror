@@ -16,14 +16,10 @@ from skimage.filters import threshold_otsu
 # Imports: first party
 from ml4cvd.plots import plot_metric_history
 from ml4cvd.models import train_model_from_generators, make_multimodal_multitask_model
-from ml4cvd.arguments import parse_args
-from ml4cvd.TensorMap import TensorMap, update_tmaps
-from ml4cvd.definitions import IMAGE_EXT, MODEL_EXT, Arguments
+from ml4cvd.definitions import IMAGE_EXT, Arguments
 from ml4cvd.evaluations import predict_and_evaluate
-from ml4cvd.tensor_generators import (
-    big_batch_from_minibatch_generator,
-    train_valid_test_tensor_generators,
-)
+from ml4cvd.tensor_generators import train_valid_test_tensor_generators
+from ml4cvd.tensormap.TensorMap import TensorMap, update_tmaps
 
 # fmt: off
 # need matplotlib -> Agg -> pyplot
@@ -201,9 +197,6 @@ def hyperparameter_optimizer(
                 tensor_maps_out=args.tensor_maps_out,
                 plot_path=os.path.join(trials_path, trial_id),
                 data_split="train",
-                hidden_layer=args.hidden_layer,
-                embed_visualization=args.embed_visualization,
-                alpha=args.alpha,
             )
             test_auc = predict_and_evaluate(
                 model=model,
@@ -213,9 +206,6 @@ def hyperparameter_optimizer(
                 tensor_maps_out=args.tensor_maps_out,
                 plot_path=os.path.join(trials_path, trial_id),
                 data_split="test",
-                hidden_layer=args.hidden_layer,
-                embed_visualization=args.embed_visualization,
-                alpha=args.alpha,
             )
             auc = {"train": train_auc, "test": test_auc}
             aucs.append(auc)
@@ -295,6 +285,9 @@ def set_args_from_x(args: argparse.Namespace, x: Arguments):
                 args.__dict__[k] = x[k]
             logging.info(f"value in args is now: {args.__dict__[k]}\n")
     logging.info(f"Set arguments to: {args}")
+    tmaps = {}
+    for tm in args.input_tensors + args.output_tensors:
+        tmaps = update_tmaps(tm, tmaps)
     args.tensor_maps_in = [tmaps[it] for it in args.input_tensors]
     args.tensor_maps_out = [tmaps[ot] for ot in args.output_tensors]
 

@@ -18,15 +18,15 @@ import seaborn as sns
 
 # Imports: first party
 from ml4cvd.plots import SUBPLOT_SIZE
-from ml4cvd.TensorMap import (
+from ml4cvd.definitions import IMAGE_EXT
+from ml4cvd.tensor_generators import train_valid_test_tensor_generators
+from ml4cvd.tensormap.TensorMap import (
     TensorMap,
     Interpretation,
     update_tmaps,
     binary_channel_map,
     find_negative_label_and_channel,
 )
-from ml4cvd.definitions import IMAGE_EXT
-from ml4cvd.tensor_generators import TensorGenerator, train_valid_test_tensor_generators
 
 # fmt: off
 # need matplotlib -> Agg -> pyplot
@@ -98,7 +98,6 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
         train_csv=args.train_csv,
         valid_csv=args.valid_csv,
         test_csv=args.test_csv,
-        sample_weight=args.sample_weight,
         output_folder=args.output_folder,
         run_id=args.id,
         export_error=args.explore_export_error,
@@ -182,7 +181,6 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
                 train_csv=args.train_csv,
                 valid_csv=args.valid_csv,
                 test_csv=args.test_csv,
-                sample_weight=args.sample_weight,
                 output_folder=args.output_folder,
                 run_id=args.id,
                 export_error=args.explore_export_error,
@@ -335,7 +333,14 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
         # Get exactly N occurrences in any time window
         if match_exact_window:
             dfs = [
-                _get_df_exactly_n_any_window(df=df, order=order, start=start, end=end)
+                _get_df_exactly_n_any_window(
+                    df=df,
+                    order=order,
+                    start=start,
+                    end=end,
+                    src_join=src_join,
+                    number_per_window=number_per_window,
+                )
                 for df, order, (start, end) in zip(
                     dfs_n_or_more_hits_any_window, order_in_window, time_windows_parsed,
                 )
@@ -631,7 +636,14 @@ def _calculate_summary_stats(df: pd.DataFrame, key: str, interpretation) -> dict
     return stats
 
 
-def _get_df_exactly_n_any_window(df: pd.DataFrame, order: str, start: str, end: str):
+def _get_df_exactly_n_any_window(
+    df: pd.DataFrame,
+    order: str,
+    start: str,
+    end: str,
+    src_join: List[str],
+    number_per_window: int,
+) -> pd.DataFrame:
     if order == "newest":
         df = df.groupby(src_join + [start, end]).tail(number_per_window)
     elif order == "oldest":
@@ -739,7 +751,10 @@ def _get_df_per_window(
 
 
 def _get_df_n_or_more_hits_any_window(
-    dfs: List[pd.DataFrame], windows: List[Tuple], src_join: str, num_per_window: int,
+    dfs: List[pd.DataFrame],
+    windows: List[Tuple[str, str]],
+    src_join: str,
+    num_per_window: int,
 ) -> List[pd.DataFrame]:
     return [
         df.groupby(src_join + [start, end]).filter(lambda g: len(g) >= num_per_window)
@@ -797,7 +812,7 @@ def _offset_ref_cols(name: str, days: int, ref_cols: list) -> list:
 
 
 def _offset_ref_df(
-    name: str, days: str, name_offset: str, df: pd.DataFrame,
+    name: str, days: int, name_offset: str, df: pd.DataFrame,
 ) -> pd.DataFrame:
     if name_offset not in df:
         df[name_offset] = df[name].apply(lambda x: x + datetime.timedelta(days=days))
@@ -846,10 +861,10 @@ class TensorsToDataFrameParallelWrapper:
             with h5py.File(path, "r") as hd5:
                 dict_of_tensor_dicts = defaultdict(dict)
                 for tm in self.tmaps:
-                    shape = tm.shape if tm.shape[0] is not None else tm.shape[1:]
+                    shape = tm.shape
                     try:
                         tensors = tm.tensor_from_file(tm, hd5)
-                        if tm.shape[0] is not None:
+                        if tm.time_series_limit is None:
                             tensors = np.array([tensors])
                         for i, tensor in enumerate(tensors):
                             if tensor is None:
@@ -961,7 +976,6 @@ def _tensors_to_df(
     train_csv: str = None,
     valid_csv: str = None,
     test_csv: str = None,
-    sample_weight: TensorMap = None,
     output_folder: str = "",
     run_id: str = "",
     export_error: bool = False,
@@ -991,25 +1005,15 @@ def _tensors_to_df(
         train_csv=train_csv,
         valid_csv=valid_csv,
         test_csv=test_csv,
-        sample_weight=sample_weight,
         output_folder=output_folder,
         id=run_id,
     )
     tmaps = [tm for tm in tensor_maps_in]
-    paths = (
-        [
-            (path, gen.name.replace("_worker", ""))
-            for gen in generators
-            for path in gen.paths
-        ]
-        if isinstance(generators[0], TensorGenerator)
-        else [
-            (path, gen.name.replace("_worker", ""))
-            for gen in generators
-            for worker_paths in gen.path_iters
-            for path in worker_paths.paths
-        ]
-    )
+    paths = [
+        (path, gen.name.replace("_worker", ""))
+        for gen in generators
+        for path in gen.paths
+    ]
 
     TensorsToDataFrameParallelWrapper(
         tmaps=tmaps,
@@ -1072,8 +1076,8 @@ def _modify_tmap_to_return_mean(tmap: TensorMap) -> TensorMap:
     new_tm.interpretation = Interpretation.CONTINUOUS
     new_tm.channel_map = None
 
-    def tff(_: TensorMap, hd5: h5py.File, dependents=None):
-        return tmap.tensor_from_file(tmap, hd5, dependents).mean()
+    def tff(_: TensorMap, hd5: h5py.File):
+        return tmap.tensor_from_file(tmap, hd5).mean()
 
     new_tm.tensor_from_file = tff
     return new_tm
@@ -1081,11 +1085,11 @@ def _modify_tmap_to_return_mean(tmap: TensorMap) -> TensorMap:
 
 def _tmap_requires_modification_for_explore(tmap: TensorMap) -> bool:
     """Whether a tmap has to be modified to be used in explore"""
-    if tmap.is_continuous():
-        return tmap.static_shape != (1,)
-    if tmap.is_categorical():
-        return tmap.static_axes() > 1
-    if tmap.is_language():
+    if tmap.is_continuous:
+        return tmap.shape != (1,)
+    if tmap.is_categorical:
+        return tmap.axes > 1
+    if tmap.is_language:
         return False
     return True
 

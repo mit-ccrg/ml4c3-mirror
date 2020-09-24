@@ -10,13 +10,6 @@ import pandas as pd
 
 # Imports: first party
 from ml4cvd.metrics import weighted_crossentropy
-from ml4cvd.TensorMap import (
-    TensorMap,
-    Interpretation,
-    TimeSeriesOrder,
-    id_from_filename,
-    find_negative_label_and_channel,
-)
 from ml4cvd.normalizer import Standardize
 from ml4cvd.validators import validator_voltage_no_zero_padding
 from ml4cvd.definitions import (
@@ -25,7 +18,18 @@ from ml4cvd.definitions import (
     STS_PREDICTION_DIR,
     ECG_REST_INDEPENDENT_LEADS,
 )
-from ml4cvd.tensor_maps_ecg import get_ecg_dates, make_voltage_tff, name2augmentations
+from ml4cvd.tensormap.TensorMap import (
+    TensorMap,
+    Interpretation,
+    TimeSeriesOrder,
+    id_from_filename,
+    find_negative_label_and_channel,
+)
+from ml4cvd.tensormap.tensor_maps_ecg import (
+    get_ecg_dates,
+    name2augmenters,
+    make_voltage_tff,
+)
 
 
 def update_tmaps_ecg_voltage(
@@ -67,27 +71,28 @@ def update_tmaps_ecg_voltage(
     leads = ECG_REST_AMP_LEADS if "12_lead" in tmap_name else ECG_REST_INDEPENDENT_LEADS
     length = int(tmap_name.split("ecg_")[1].split("_")[0])
     exact = "exact" in tmap_name
-    normalization = Standardize(mean=0, std=2000) if "std" in tmap_name else None
-    augmentations = [
+    normalizer = Standardize(mean=0, std=2000) if "std" in tmap_name else None
+    augmenters = [
         augment_function
-        for augment_option, augment_function in name2augmentations.items()
+        for augment_option, augment_function in name2augmenters.items()
         if augment_option in tmap_name
     ]
     tmap = TensorMap(
         name=match_tmap_name,
-        shape=(None, length, len(leads)),
+        shape=(length, len(leads)),
         path_prefix=ECG_PREFIX,
         tensor_from_file=make_voltage_tff(exact_length=exact),
-        normalization=normalization,
+        normalizers=normalizer,
         channel_map=leads,
         time_series_limit=0,
-        validator=validator_voltage_no_zero_padding,
-        augmentations=augmentations,
+        validators=validator_voltage_no_zero_padding,
+        augmenters=augmenters,
     )
     tmaps[match_tmap_name] = tmap
     return tmaps
 
 
+# TODO fix this
 def update_tmaps_sts_match_ecg(
     tmap_name: str, tmaps: Dict[str, TensorMap],
 ) -> Dict[str, TensorMap]:
@@ -113,11 +118,10 @@ def update_tmaps_sts_match_ecg(
     tmap = copy.deepcopy(tmaps[base_name])
     new_tmap_name = f"{base_name}_match_ecg"
     tmap.name = new_tmap_name
-    tmap.shape = (None,) + tmap.shape
     old_tm = tmaps[base_name]
 
-    def tff(tm, hd5, dependents={}):
-        tensor = old_tm.tensor_from_file(old_tm, hd5, dependents)
+    def tff(tm, hd5):
+        tensor = old_tm.tensor_from_file(old_tm, hd5)
         ecg_dates = get_ecg_dates.mrn_lookup[id_from_filename(hd5.filename)]
         return np.repeat(tensor[np.newaxis, ...], len(ecg_dates), axis=0)
 
@@ -176,7 +180,7 @@ def update_tmaps_model_predictions(
         channel for channel in base_tmap.channel_map if channel != negative_label
     ][0]
 
-    def tff(tm, hd5, dependents={}):
+    def tff(tm, hd5):
         mrn = id_from_filename(hd5.filename)
         tensor = np.array(
             [predictions[mrn][f"{original_name}_{positive_label}_predicted"]],
@@ -221,7 +225,9 @@ def update_tmaps_sts_window(
     suffixes = ["preop", "postop"]
     for suffix in suffixes:
         if suffix in tmap_name:
-            from ml4cvd.tensor_maps_sts import date_interval_lookup  # isort:skip
+            # fmt: off
+            from ml4cvd.tensormap.tensor_maps_sts import date_interval_lookup  # isort:skip
+            # fmt: on
 
             base_name, _ = tmap_name.split(f"_{suffix}")
             if base_name not in tmaps:
@@ -266,11 +272,8 @@ def update_tmaps_time_series(
     tmap = copy.deepcopy(tmaps[base_name])
     new_tmap_name = f"{base_name}{base_split}"
     tmap.name = new_tmap_name
-    if time_series_limit is None:
-        tmap.shape = tmap.static_shape
     tmap.time_series_limit = time_series_limit
     tmap.time_series_order = time_series_order
     tmap.metrics = None
-    tmap.infer_metrics()
     tmaps[new_tmap_name] = tmap
     return tmaps

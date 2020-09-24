@@ -12,17 +12,22 @@ import pytest
 # Imports: first party
 import ml4cvd
 from ml4cvd.arguments import parse_args
-from ml4cvd.TensorMap import TensorMap, Interpretation
 from ml4cvd.definitions import TENSOR_EXT
+from ml4cvd.tensormap.TensorMap import TensorMap, Interpretation
 
 
 def pytest_configure():
+    def tff(tm, hd5):
+        return hd5[f"/{tm.name}/"][:]
+
+    pytest.TFF = tff
     pytest.N_TENSORS = 50
     pytest.CONTINUOUS_TMAPS = [
         TensorMap(
             f"{n}d_cont",
             shape=tuple(range(2, n + 2)),
             interpretation=Interpretation.CONTINUOUS,
+            tensor_from_file=tff,
         )
         for n in range(1, 6)
     ]
@@ -32,6 +37,7 @@ def pytest_configure():
             shape=tuple(range(2, n + 2)),
             interpretation=Interpretation.CATEGORICAL,
             channel_map={f"c_{i}": i for i in range(n + 1)},
+            tensor_from_file=tff,
         )
         for n in range(1, 6)
     ]
@@ -46,36 +52,18 @@ def pytest_configure():
         shape=(32, 32, 1),
         interpretation=Interpretation.CONTINUOUS,
         metrics=["mse"],
+        tensor_from_file=tff,
     )
     pytest.SEGMENT_OUT = TensorMap(
         f"2d_for_segment_out",
         shape=(32, 32, 2),
         interpretation=Interpretation.CATEGORICAL,
         channel_map={"yes": 0, "no": 1},
+        tensor_from_file=tff,
     )
     pytest.MOCK_TMAPS = {
         tmap.name: tmap for tmap in pytest.CONTINUOUS_TMAPS + pytest.CATEGORICAL_TMAPS
     }
-    pytest.PARENT_TMAPS = [
-        TensorMap(
-            f"parent_test_{i}", shape=(1,), interpretation=Interpretation.CONTINUOUS,
-        )
-        for i in range(3)
-    ]
-    for i in range(len(pytest.PARENT_TMAPS)):
-        pytest.PARENT_TMAPS[i].parents = pytest.PARENT_TMAPS[:i]
-    pytest.CYCLE_PARENTS = [
-        TensorMap(
-            f"parent_test_cycle_{i}",
-            shape=(1,),
-            interpretation=Interpretation.CONTINUOUS,
-        )
-        for i in range(3)
-    ]
-    for i in range(len(pytest.CYCLE_PARENTS)):
-        pytest.CYCLE_PARENTS[i].parents = [
-            pytest.CYCLE_PARENTS[i - 1],
-        ]  # 0th tmap will be child of last
 
 
 pytest_configure()
@@ -94,9 +82,9 @@ class Utils:
             hd5_path = os.path.join(path, f"{i}{TENSOR_EXT}")
             with h5py.File(hd5_path, "w") as hd5:
                 for tm in tensor_maps:
-                    if tm.is_continuous():
+                    if tm.is_continuous:
                         value = np.full(tm.shape, fill_value=i, dtype=np.float32)
-                    elif tm.is_categorical():
+                    elif tm.is_categorical:
                         value = np.zeros(tm.shape, dtype=np.float32)
                         value[..., i % tm.shape[-1]] = 1
                     else:
@@ -104,7 +92,7 @@ class Utils:
                             "Cannot automatically build hdf5 from interpretation"
                             f' "{tm.interpretation}"',
                         )
-                    hd5.create_dataset(tm.hd5_key_guess(), data=value)
+                    hd5.create_dataset(f"/{tm.name}/", data=value)
                     out[(hd5_path, tm)] = value
         return out
 
@@ -131,7 +119,7 @@ def use_testing_tmaps(monkeypatch):
     def mock_update_tmaps(tmap_name, tmaps):
         return pytest.MOCK_TMAPS
 
-    monkeypatch.setattr(ml4cvd.TensorMap, "update_tmaps", mock_update_tmaps)
+    monkeypatch.setattr(ml4cvd.tensormap.TensorMap, "update_tmaps", mock_update_tmaps)
     monkeypatch.setattr("ml4cvd.arguments.update_tmaps", mock_update_tmaps)
     monkeypatch.setattr("ml4cvd.hyperparameters.update_tmaps", mock_update_tmaps)
 

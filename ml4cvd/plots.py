@@ -6,7 +6,7 @@ import hashlib
 import logging
 from typing import Dict, List, Tuple, Union, Callable, Optional
 from datetime import datetime
-from collections import Counter, OrderedDict, defaultdict
+from collections import OrderedDict, defaultdict
 
 # Imports: third party
 import h5py
@@ -14,7 +14,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from scipy import stats
-from sklearn import manifold
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
     auc,
@@ -24,21 +23,22 @@ from sklearn.metrics import (
     precision_recall_curve,
     average_precision_score,
 )
-from matplotlib.ticker import NullFormatter
 from sklearn.calibration import calibration_curve
-from scipy.ndimage.filters import gaussian_filter
 from tensorflow.keras.optimizers.schedules import LearningRateSchedule
 
 # Imports: first party
 from ml4cvd.metrics import concordance_index, coefficient_of_determination
-from ml4cvd.TensorMap import TensorMap, find_negative_label_and_channel
 from ml4cvd.definitions import (
     PDF_EXT,
     IMAGE_EXT,
     TENSOR_EXT,
-    ECG_REST_LEADS,
     ECG_DATE_FORMAT,
     ECG_DATETIME_FORMAT,
+)
+from ml4cvd.tensormap.TensorMap import (
+    TensorMap,
+    update_tmaps,
+    find_negative_label_and_channel,
 )
 
 # fmt: off
@@ -151,7 +151,7 @@ def evaluate_predictions(
     :return: Dictionary of performance metrics with string keys for labels and float values
     """
     performance_metrics = {}
-    if tm.is_categorical() and tm.static_axes() == 1:
+    if tm.is_categorical and tm.axes == 1:
         logging.info(
             f"{tm.name} has channel map: {tm.channel_map}"
             f" with {y_predictions.shape[0]} examples in the test set.\n"
@@ -195,7 +195,7 @@ def evaluate_predictions(
                 prefix=folder,
                 data_split=data_split,
             )
-    elif tm.is_categorical() and tm.static_axes() == 2:
+    elif tm.is_categorical and tm.axes == 2:
         melt_shape = (
             y_predictions.shape[0] * y_predictions.shape[1],
             y_predictions.shape[2],
@@ -234,7 +234,7 @@ def evaluate_predictions(
             data_split=data_split,
         )
         rocs.append((y_predictions, y_truth, tm.channel_map))
-    elif tm.is_categorical() and tm.static_axes() == 3:
+    elif tm.is_categorical and tm.axes == 3:
         melt_shape = (
             y_predictions.shape[0] * y_predictions.shape[1] * y_predictions.shape[2],
             y_predictions.shape[3],
@@ -273,7 +273,7 @@ def evaluate_predictions(
             data_split=data_split,
         )
         rocs.append((y_predictions, y_truth, tm.channel_map))
-    elif tm.is_categorical() and tm.static_axes() == 4:
+    elif tm.is_categorical and tm.axes == 4:
         melt_shape = (
             y_predictions.shape[0]
             * y_predictions.shape[1]
@@ -315,7 +315,7 @@ def evaluate_predictions(
             data_split=data_split,
         )
         rocs.append((y_predictions, y_truth, tm.channel_map))
-    elif tm.is_survival_curve():
+    elif tm.is_survival_curve:
         performance_metrics.update(
             plot_survival(
                 y_predictions,
@@ -362,7 +362,7 @@ def evaluate_predictions(
             folder,
             tm.days_window,
         )
-    elif tm.is_language():
+    elif tm.is_language:
         performance_metrics.update(
             plot_roc_per_class(
                 prediction=y_predictions,
@@ -384,23 +384,7 @@ def evaluate_predictions(
             ),
         )
         rocs.append((y_predictions, y_truth, tm.channel_map))
-    elif tm.static_axes() > 1 or tm.is_mesh():
-        prediction_flat = tm.rescale(y_predictions).flatten()[:max_melt]
-        truth_flat = tm.rescale(y_truth).flatten()[:max_melt]
-        if prediction_flat.shape[0] == truth_flat.shape[0]:
-            performance_metrics.update(
-                plot_scatter(
-                    prediction_flat,
-                    truth_flat,
-                    title,
-                    prefix=folder,
-                    data_split=data_split,
-                ),
-            )
-    elif tm.is_continuous():
-        if tm.sentinel is not None:
-            y_predictions = y_predictions[y_truth != tm.sentinel, np.newaxis]
-            y_truth = y_truth[y_truth != tm.sentinel, np.newaxis]
+    elif tm.is_continuous:
         performance_metrics.update(
             plot_scatter(
                 tm.rescale(y_predictions),
@@ -416,9 +400,6 @@ def evaluate_predictions(
         )
     else:
         logging.warning(f"No evaluation clause for tensor map {tm.name}")
-
-    if tm.name == "median":
-        plot_waves(y_predictions, y_truth, "median_waves_" + title, folder)
 
     return performance_metrics
 
@@ -1524,14 +1505,13 @@ def plot_ecg(args):
         "ecg_qtc_md",
     ]
     voltage_tensor = "12_lead_ecg_2500"
-
-    # Imports: first party
-    from ml4cvd.arguments import _get_tmap
-
     needed_tensors = plot_tensors + [voltage_tensor]
-    tensor_maps_in = [
-        _get_tmap(name=it, needed_tensor_maps=needed_tensors) for it in needed_tensors
-    ]
+
+    tmaps = {}
+    for needed_tensor in needed_tensors:
+        tmaps = update_tmaps(needed_tensor, tmaps)
+    tensor_maps_in = [tmaps[it] for it in needed_tensors]
+
     tensor_paths = [
         os.path.join(args.tensors, tp)
         for tp in os.listdir(args.tensors)
@@ -1557,8 +1537,7 @@ def plot_ecg(args):
                     try:
                         tensors = tm.tensor_from_file(tm, hd5)
 
-                        if tm.shape[0] is not None:
-                            # If not a multi-tensor tensor, wrap in array to loop through
+                        if tm.time_series_limit is None:
                             tensors = np.array([tensors])
                         for i, tensor in enumerate(tensors):
                             if tm.channel_map:
@@ -1570,11 +1549,7 @@ def plot_ecg(args):
                                         else tensor[tm.channel_map[cm]]
                                     )
                             else:
-                                if 1 == (
-                                    tm.shape[0]
-                                    if tm.shape[0] is not None
-                                    else tm.shape[1]
-                                ):
+                                if tm.shape[0] == 1:
                                     tensor = tensor.item()
                                 tdict[i][key] = tensor
                     except (
@@ -1605,48 +1580,6 @@ def plot_ecg(args):
                     )
         except:
             logging.exception(f"Broken tensor at: {tp}")
-
-
-def plot_cross_reference(
-    args, xref_df, title, time_description, window_start, window_end,
-):
-    # TODO make this work with multiple time windows
-    if xref_df.empty:
-        logging.info(f'No cross reference found for "{title}"')
-        return
-
-    title = title.replace(" ", "_")
-
-    # compute day diffs
-    day_diffs = np.array(
-        xref_df.apply(
-            lambda row: (row[args.time_tensor] - row[window_end]).days, axis=1,
-        ),
-    )
-
-    plt.rcParams["font.size"] = 18
-    fig = plt.figure(figsize=(15, 9))
-    ax = fig.add_subplot(111)
-    binwidth = 5
-    ax.hist(
-        day_diffs, bins=range(day_diffs.min(), day_diffs.max() + binwidth, binwidth),
-    )
-    ax.set_xlabel("Days relative to event")
-    ax.set_ylabel("Number of patients")
-    ax.set_title(
-        f"Distribution of {args.tensors_name} {time_description}: N={len(day_diffs)}",
-    )
-
-    ax.text(0.05, 0.90, f"Min: {day_diffs.min()}", transform=ax.transAxes)
-    ax.text(0.05, 0.85, f"Max: {day_diffs.max()}", transform=ax.transAxes)
-    ax.text(0.05, 0.80, f"Median: {np.median(day_diffs):.0f}", transform=ax.transAxes)
-    plt.tight_layout()
-
-    fpath = os.path.join(
-        args.output_folder, args.id, f"distribution_{title}{IMAGE_EXT}",
-    )
-    fig.savefig(fpath)
-    logging.info(f"Saved histogram of days relative to {window_end} to {fpath}")
 
 
 def plot_roc_per_class(
@@ -1974,120 +1907,6 @@ def get_fpr_tpr_roc_pred(y_pred, test_truth, labels):
     return fpr, tpr, roc_auc
 
 
-def plot_waves(predicted_waves, true_waves, title, plot_path, rows=6, cols=6):
-    row = 0
-    col = 0
-    f, axes = plt.subplots(rows, cols, sharex=True, figsize=(36, 36))
-    for i in range(true_waves.shape[0]):
-        axes[row, col].plot(true_waves[i, :, 0], color="blue", label="Actual Wave")
-        if predicted_waves is not None:
-            axes[row, col].plot(
-                predicted_waves[i, :, 0], color="green", label="Predicted",
-            )
-        axes[row, col].set_xlabel("time")
-        row += 1
-        if row == rows:
-            row = 0
-            col += 1
-            if col >= cols:
-                break
-    plt.legend(loc="lower left")
-    figure_path = os.path.join(plot_path, title + IMAGE_EXT)
-    if not os.path.exists(os.path.dirname(figure_path)):
-        os.makedirs(os.path.dirname(figure_path))
-    plt.savefig(figure_path)
-    plt.clf()
-    logging.info("Saved waves at: {}".format(figure_path))
-
-
-def plot_tsne(
-    x_embed,
-    categorical_labels,
-    continuous_labels,
-    gene_labels,
-    label_dict,
-    figure_path,
-    alpha,
-):
-    x_embed = np.array(x_embed)
-    if len(x_embed.shape) > 2:
-        x_embed = np.reshape(x_embed, (x_embed.shape[0], np.prod(x_embed.shape[1:])))
-
-    n_components = 2
-    rows = max(2, len(label_dict))
-    perplexities = [25, 75]
-    (fig, subplots) = plt.subplots(
-        rows,
-        len(perplexities),
-        figsize=(len(perplexities) * SUBPLOT_SIZE * 2, rows * SUBPLOT_SIZE * 2),
-    )
-
-    p2y = {}
-    for i, p in enumerate(perplexities):
-        tsne = manifold.TSNE(
-            n_components=n_components,
-            init="pca",
-            random_state=123,
-            perplexity=p,
-            learning_rate=20,
-            n_iter_without_progress=500,
-        )
-        p2y[p] = tsne.fit_transform(x_embed)
-
-    j = -1
-    for tm in label_dict:
-        j += 1
-        if j == rows:
-            break
-        categorical_subsets = {}
-        categorical_counts = Counter()
-        if tm in categorical_labels + gene_labels:
-            for c in tm.channel_map:
-                categorical_subsets[tm.channel_map[c]] = (
-                    label_dict[tm] == tm.channel_map[c]
-                )
-                categorical_counts[tm.channel_map[c]] = np.sum(
-                    categorical_subsets[tm.channel_map[c]],
-                )
-        elif tm in continuous_labels:
-            colors = label_dict[tm]
-        for i, p in enumerate(perplexities):
-            ax = subplots[j, i]
-            ax.set_title(f"{tm.name} | t-SNE perplexity:{p}")
-            if tm in categorical_labels + gene_labels:
-                color_labels = []
-                for c in tm.channel_map:
-                    channel_index = tm.channel_map[c]
-                    color = _hash_string_to_color(c)
-                    color_labels.append(
-                        f"{c} n={categorical_counts[tm.channel_map[c]]}",
-                    )
-                    ax.scatter(
-                        p2y[p][categorical_subsets[channel_index], 0],
-                        p2y[p][categorical_subsets[channel_index], 1],
-                        c=color,
-                        alpha=alpha,
-                    )
-                ax.legend(color_labels, loc="lower left")
-            elif tm in continuous_labels:
-                points = ax.scatter(
-                    p2y[p][:, 0], p2y[p][:, 1], c=colors, alpha=alpha, cmap="jet",
-                )
-                if i == len(perplexities) - 1:
-                    fig.colorbar(points, ax=ax)
-
-            ax.xaxis.set_major_formatter(NullFormatter())
-            ax.yaxis.set_major_formatter(NullFormatter())
-            ax.axis("tight")
-
-    figure_path += "tsne_plot" + IMAGE_EXT
-    if not os.path.exists(os.path.dirname(figure_path)):
-        os.makedirs(os.path.dirname(figure_path))
-    plt.savefig(figure_path)
-    plt.clf()
-    logging.info(f"Saved T-SNE plot at: {figure_path}")
-
-
 def plot_find_learning_rate(
     learning_rates: List[float],
     losses: List[float],
@@ -2115,148 +1934,6 @@ def plot_find_learning_rate(
     plt.xlabel("Log_10 learning rate")
     plt.legend()
     plt.savefig(os.path.join(figure_path, f"find_learning_rate{IMAGE_EXT}"))
-    plt.clf()
-
-
-def plot_saliency_maps(
-    data: np.ndarray, gradients: np.ndarray, paths: List, prefix: str,
-):
-    """Plot saliency maps of a batch of input tensors.
-
-    Saliency maps for each input tensor in the batch will be saved at the file path indicated by prefix.
-    Also creates a mean saliency map across the batch
-    2D tensors are assumed to be ECGs and 3D tensors are plotted with each slice as an RGB image.
-    The red channel indicates negative gradients, and the green channel positive ones.
-
-    :param data: A batch of input tensors
-    :param gradients: A corresponding batch of gradients for those inputs, must be the same shape as data
-    :param paths: A List of paths corresponding to each input tensor
-    :param prefix: file path prefix where saliency maps will be saved
-    """
-    if data.shape[-1] == 1:
-        data = data[..., 0]
-        gradients = gradients[..., 0]
-
-    mean_saliency = np.zeros(data.shape[1:4] + (3,))
-    for batch_i, path in enumerate(paths):
-        sample_id = os.path.basename(path).replace(TENSOR_EXT, "")
-        if len(data.shape) == 3:
-            ecgs = {f"{sample_id}_raw": data[batch_i], "gradients": gradients[batch_i]}
-            _plot_ecgs(ecgs, f"{prefix}_{sample_id}_saliency_{batch_i}{IMAGE_EXT}")
-        elif len(data.shape) == 4:
-            cols = max(2, int(math.ceil(math.sqrt(data.shape[-1]))))
-            rows = max(2, int(math.ceil(data.shape[-1] / cols)))
-            title = f"{prefix}_{sample_id}_saliency_{batch_i}{IMAGE_EXT}"
-            _plot_3d_tensor_slices_as_rgb(
-                _saliency_map_rgb(data[batch_i], gradients[batch_i]), title, cols, rows,
-            )
-            saliency = _saliency_blurred_and_scaled(
-                gradients[batch_i], blur_radius=5.0, max_value=1.0 / data.shape[0],
-            )
-            mean_saliency[..., 0] -= saliency
-            mean_saliency[..., 1] += saliency
-        elif len(data.shape) == 5:
-            for j in range(data.shape[-1]):
-                cols = max(2, int(math.ceil(math.sqrt(data.shape[-2]))))
-                rows = max(2, int(math.ceil(data.shape[-2] / cols)))
-                name = f"{prefix}_saliency_{batch_i}_channel_{j}{IMAGE_EXT}"
-                _plot_3d_tensor_slices_as_rgb(
-                    _saliency_map_rgb(
-                        data[batch_i, ..., j], gradients[batch_i, ..., j],
-                    ),
-                    name,
-                    cols,
-                    rows,
-                )
-                saliency = _saliency_blurred_and_scaled(
-                    gradients[batch_i, ..., j],
-                    blur_radius=5.0,
-                    max_value=1.0 / data.shape[0],
-                )
-                mean_saliency[..., 0] -= saliency
-                mean_saliency[..., 1] += saliency
-        else:
-            logging.warning(f"No method to plot saliency for data shape: {data.shape}")
-
-    if len(data.shape) == 4:
-        _plot_3d_tensor_slices_as_rgb(
-            _scale_tensor_inplace(mean_saliency),
-            f"{prefix}_batch_mean_saliency{IMAGE_EXT}",
-            cols,
-            rows,
-        )
-    logging.info(f"Saved saliency maps at:{prefix}")
-
-
-def _scale_tensor_inplace(tensor, min_value=0.0, max_value=1.0):
-    tensor -= tensor.min()
-    tensor *= (max_value - min_value) / tensor.max()
-    tensor += min_value
-    return tensor
-
-
-def _saliency_blurred_and_scaled(gradients, blur_radius, max_value=1.0):
-    blurred = gaussian_filter(gradients, sigma=blur_radius)
-    _scale_tensor_inplace(blurred, max_value=max_value)
-    blurred -= blurred.mean()
-    return blurred
-
-
-def _saliency_map_rgb(image, gradients, blur_radius=0):
-    _scale_tensor_inplace(image)
-    rgb_map = np.zeros(image.shape + (3,))
-    blurred = _saliency_blurred_and_scaled(gradients, blur_radius)
-    rgb_map[..., 0] = image - blurred
-    rgb_map[..., 1] = image + blurred
-    rgb_map[..., 2] = image
-    rgb_map = np.clip(rgb_map, 0, 1)
-    # _scale_tensor_inplace(rgb_map)
-    return rgb_map
-
-
-def _plot_ecgs(
-    ecgs,
-    figure_path,
-    rows=3,
-    cols=4,
-    time_interval=2.5,
-    raw_scale=0.005,
-    hertz=500,
-    lead_dictionary=ECG_REST_LEADS,
-):
-    index2leads = {v: k for k, v in lead_dictionary.items()}
-    _, axes = plt.subplots(rows, cols, figsize=(18, 16), sharey=True)
-    for i in range(rows):
-        for j in range(cols):
-            start = int(i * time_interval * hertz)
-            stop = int((i + 1) * time_interval * hertz)
-            axes[i, j].set_xlim(start, stop)
-            for label in ecgs:
-                axes[i, j].plot(
-                    range(start, stop),
-                    ecgs[label][start:stop, j + i * cols] * raw_scale,
-                    label=label,
-                )
-            axes[i, j].legend(loc="lower right")
-            axes[i, j].set_xlabel("milliseconds")
-            axes[i, j].set_ylabel("mV")
-            axes[i, j].set_title(index2leads[j + i * cols])
-    if not os.path.exists(os.path.dirname(figure_path)):
-        os.makedirs(os.path.dirname(figure_path))
-    plt.savefig(figure_path)
-    plt.clf()
-
-
-def _plot_3d_tensor_slices_as_rgb(tensor, figure_path, cols=3, rows=10):
-    _, axes = plt.subplots(rows, cols, figsize=(cols * 4, rows * 4))
-    for i in range(tensor.shape[-2]):
-        axes[i // cols, i % cols].imshow(tensor[:, :, i, :])
-        axes[i // cols, i % cols].set_yticklabels([])
-        axes[i // cols, i % cols].set_xticklabels([])
-
-    if not os.path.exists(os.path.dirname(figure_path)):
-        os.makedirs(os.path.dirname(figure_path))
-    plt.savefig(figure_path)
     plt.clf()
 
 

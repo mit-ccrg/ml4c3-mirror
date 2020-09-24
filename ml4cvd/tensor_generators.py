@@ -10,7 +10,7 @@ import logging
 from queue import Full, Empty
 from ctypes import c_uint64
 from typing import Any, Set, Dict, List, Tuple, Union, Callable, Iterator, Optional
-from itertools import chain, cycle
+from itertools import cycle
 from collections import Counter, defaultdict
 from multiprocessing import Lock, Barrier, Process
 from multiprocessing.sharedctypes import RawArray, RawValue
@@ -21,8 +21,8 @@ import numpy as np
 import pandas as pd
 
 # Imports: first party
-from ml4cvd.TensorMap import TensorMap, id_from_filename
 from ml4cvd.definitions import CSV_EXT, TENSOR_EXT, MRN_COLUMNS, Path, Paths
+from ml4cvd.tensormap.TensorMap import TensorMap, id_from_filename
 
 np.set_printoptions(threshold=np.inf)
 
@@ -92,10 +92,10 @@ class SharedMemoryTensorQueue:
             (output_maps, self.out_tensors, False),
         ]:
             for tm in tms:
-                name = tm.input_name() if input else tm.output_name()
-                tensors[name] = np.frombuffer(
-                    RawArray("d", size * tm.flat_size()),
-                ).reshape((size,) + tm.static_shape)
+                name = tm.input_name if input else tm.output_name
+                tensors[name] = np.frombuffer(RawArray("d", size * tm.size)).reshape(
+                    (size,) + tm.shape,
+                )
         self.paths = np.frombuffer(
             RawArray("u", size * MAX_STRING_LENGTH), dtype=f"<U{MAX_STRING_LENGTH}",
         )
@@ -207,13 +207,16 @@ class TensorGenerator:
         self.stats = Counter()
         self.true_epoch_stats = self.stats
 
-        # all tmaps must be dynamic in the same dimension
-        # fmt: off
-        if len(set([tm.first_dynamic_index() for tm in self.input_maps + self.output_maps])) > 1:
-            raise ValueError(
-                "TMap shape mismatch, all TMaps must be dynamically shaped in the same dimension.",
-            )
-        # fmt: on
+        # If any tensor map retrieves data from multiple time points for a given patient,
+        # Then all tensor maps must also be dynamic in the first dimension.
+        dynamic = set(
+            [
+                tm.time_series_limit is not None
+                for tm in self.input_maps + self.output_maps
+            ],
+        )
+        if len(dynamic) > 1:
+            raise ValueError("Dynamic TensorMaps mixed with Static TensorMaps")
 
         self.true_epoch_len = len(paths)
         self._reset_worker_paths()
@@ -237,11 +240,11 @@ class TensorGenerator:
             self.init_workers()
 
         in_batch = {
-            tm.input_name(): np.zeros((self.batch_size,) + tm.static_shape)
+            tm.input_name: np.zeros((self.batch_size,) + tm.shape)
             for tm in self.input_maps
         }
         out_batch = {
-            tm.output_name(): np.zeros((self.batch_size,) + tm.static_shape)
+            tm.output_name: np.zeros((self.batch_size,) + tm.shape)
             for tm in self.output_maps
         }
         paths = []
@@ -421,17 +424,14 @@ class TensorGeneratorWorker:
             self.path = next(self.path_iter)
             # load all samples in a time series from a given path
             try:
-                dependents = {}
                 self.hd5 = h5py.File(self.path, "r")
                 for tensors, tmaps, is_input in [
                     (self.in_tensors, self.input_maps, True),
                     (self.out_tensors, self.output_maps, False),
                 ]:
                     for tm in tmaps:
-                        name = tm.input_name() if is_input else tm.output_name()
-                        tensors[name] = self.get_tensor(
-                            tm, self.hd5, dependents, is_input,
-                        )
+                        name = tm.input_name if is_input else tm.output_name
+                        tensors[name] = self.get_tensor(tm, self.hd5, is_input)
             except (IndexError, KeyError, ValueError, OSError, RuntimeError) as e:
                 error = type(e).__name__
                 complete = True
@@ -444,9 +444,11 @@ class TensorGeneratorWorker:
                     (out_tensor, self.out_tensors, self.output_maps, False),
                 ]:
                     for tm in tmaps:
-                        name = tm.input_name() if is_input else tm.output_name()
+                        name = tm.input_name if is_input else tm.output_name
                         tensor[name] = tm.postprocess_tensor(
-                            tensors[name][self.idx], self.augment, self.hd5,
+                            tensor=tensors[name][self.idx],
+                            hd5=self.hd5,
+                            augment=self.augment,
                         )
             except (IndexError, KeyError, ValueError, OSError, RuntimeError) as e:
                 in_tensor = dict()
@@ -472,15 +474,11 @@ class TensorGeneratorWorker:
 
         return in_tensor, out_tensor, path, error, complete
 
-    def get_tensor(
-        self, tm: TensorMap, hd5: h5py.File, dependents: Dict, input: bool,
-    ) -> np.ndarray:
-        name = tm.input_name() if input else tm.output_name()
-        if name in dependents:
-            return dependents[name]
-        tensor = tm.tensor_from_file(tm, hd5, dependents)
+    def get_tensor(self, tm: TensorMap, hd5: h5py.File, input: bool) -> np.ndarray:
+        name = tm.input_name if input else tm.output_name
+        tensor = tm.tensor_from_file(tm, hd5)
         # if tensor is not dynamically shaped, wrap in extra dimension to simulate time series with 1 sample
-        if tm.shape[0] is not None:
+        if tm.time_series_limit is None:
             tensor = np.array([tensor])
         if self.tensor_len is None:
             self.tensor_len = len(tensor)
@@ -510,7 +508,7 @@ class TensorGeneratorWorker:
 
 def _collect_tensor_stats(
     generator: TensorGenerator,
-    tensors: Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], str, str],
+    tensors: Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], str, str, bool],
 ) -> None:
     stats = generator.stats
     in_tensors, out_tensors, path, error, complete = tensors
@@ -523,11 +521,11 @@ def _collect_tensor_stats(
         ]:
             for tm in tms:
                 stats[f"{tm.name}_n"] += 1
-                if tm.static_axes() == 1:
-                    tensor = tensors[tm.input_name() if is_input else tm.output_name()]
-                    if tm.is_categorical():
+                if tm.axes == 1:
+                    tensor = tensors[tm.input_name if is_input else tm.output_name]
+                    if tm.is_categorical:
                         stats[f"{tm.name}_index_{np.argmax(tensor):.0f}"] += 1
-                    elif tm.is_continuous():
+                    elif tm.is_continuous:
                         value = tensor[0]
                         min_key = f"{tm.name}_min"
                         max_key = f"{tm.name}_max"
@@ -602,9 +600,9 @@ def _get_stats_as_dataframes(
     categorical_tmaps = []
     other_tmaps = []
     for tm in input_maps + output_maps:
-        if tm.static_axes() == 1 and tm.is_continuous():
+        if tm.axes == 1 and tm.is_continuous:
             continuous_tmaps.append(tm)
-        elif tm.static_axes() == 1 and tm.is_categorical():
+        elif tm.axes == 1 and tm.is_categorical:
             categorical_tmaps.append(tm)
         else:
             other_tmaps.append(tm)
@@ -695,61 +693,6 @@ def _get_stats_as_dataframes_from_multiple_generators(
     )
 
     return continuous_tm_df, categorical_tm_df, other_tm_df
-
-
-def big_batch_from_minibatch_generator(generator: TensorGenerator, minibatches: int):
-    """Collect minibatches into bigger batches
-
-    Returns a dicts of numpy arrays like the same kind as generator but with more examples.
-
-    Arguments:
-        generator: TensorGenerator of minibatches
-        minibatches: number of times to call generator and collect a minibatch
-
-    Returns:
-        A tuple of dicts mapping tensor names to big batches of numpy arrays mapping.
-    """
-    generator.reset(deterministic=True)
-    first_batch = next(generator)
-    saved_tensors = {}
-    batch_size = None
-    for key, batch_array in chain(
-        first_batch[BATCH_INPUT_INDEX].items(), first_batch[BATCH_OUTPUT_INDEX].items(),
-    ):
-        shape = (batch_array.shape[0] * minibatches,) + batch_array.shape[1:]
-        saved_tensors[key] = np.zeros(shape)
-        batch_size = batch_array.shape[0]
-        saved_tensors[key][:batch_size] = batch_array
-
-    keep_paths = generator.keep_paths
-    if keep_paths:
-        paths = first_batch[BATCH_PATHS_INDEX]
-
-    input_tensors, output_tensors = (
-        list(first_batch[BATCH_INPUT_INDEX]),
-        list(first_batch[BATCH_OUTPUT_INDEX]),
-    )
-    for i in range(1, minibatches):
-        logging.debug(f"big_batch_from_minibatch {100 * i / minibatches:.2f}% done.")
-        next_batch = next(generator)
-        s, t = i * batch_size, (i + 1) * batch_size
-        for key in input_tensors:
-            saved_tensors[key][s:t] = next_batch[BATCH_INPUT_INDEX][key]
-        for key in output_tensors:
-            saved_tensors[key][s:t] = next_batch[BATCH_OUTPUT_INDEX][key]
-        if keep_paths:
-            paths.extend(next_batch[BATCH_PATHS_INDEX])
-
-    for key, array in saved_tensors.items():
-        logging.info(
-            f"Made a big batch of tensors with key:{key} and shape:{array.shape}.",
-        )
-    inputs = {key: saved_tensors[key] for key in input_tensors}
-    outputs = {key: saved_tensors[key] for key in output_tensors}
-    if keep_paths:
-        return inputs, outputs, paths
-    else:
-        return inputs, outputs
 
 
 def _get_train_valid_test_discard_ratios(
@@ -1111,16 +1054,7 @@ def train_valid_test_tensor_generators(
             save_paths(paths=test_paths, split="test")
         weights = None
 
-    _TensorGenerator = TensorGenerator
-    if "legacy_tensor_generator" in kwargs and kwargs["legacy_tensor_generator"]:
-        # Imports: first party
-        from ml4cvd.tensor_generators_legacy import (
-            TensorGenerator as TensorGeneratorLegacy,
-        )
-
-        _TensorGenerator = TensorGeneratorLegacy
-
-    generate_train = _TensorGenerator(
+    generate_train = TensorGenerator(
         batch_size,
         tensor_maps_in,
         tensor_maps_out,
@@ -1135,7 +1069,7 @@ def train_valid_test_tensor_generators(
         augment=True,
         sample_weight=sample_weight,
     )
-    generate_valid = _TensorGenerator(
+    generate_valid = TensorGenerator(
         batch_size,
         tensor_maps_in,
         tensor_maps_out,
@@ -1148,7 +1082,7 @@ def train_valid_test_tensor_generators(
         siamese=siamese,
         augment=False,
     )
-    generate_test = _TensorGenerator(
+    generate_test = TensorGenerator(
         batch_size,
         tensor_maps_in,
         tensor_maps_out,
@@ -1253,7 +1187,7 @@ def _weighted_batch(
     paths: List[Path],
     sample_weight: TensorMap,
 ):
-    sample_weights = [in_batch.pop(sample_weight.input_name()).flatten()] * len(
+    sample_weights = [in_batch.pop(sample_weight.input_name).flatten()] * len(
         out_batch,
     )
     return (

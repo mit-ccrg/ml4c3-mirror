@@ -8,13 +8,13 @@ import pytest
 
 # Imports: first party
 from ml4cvd.recipes import infer_multimodal_multitask, train_multimodal_multitask
-from ml4cvd.TensorMap import TensorMap, Interpretation, find_negative_label_and_channel
 from ml4cvd.explorations import (
     explore,
     continuous_explore_header,
     categorical_explore_header,
     _tmap_requires_modification_for_explore,
 )
+from ml4cvd.tensormap.TensorMap import TensorMap, Interpretation
 
 
 class TestRecipes:
@@ -39,7 +39,12 @@ class TestRecipes:
         default_arguments.tensors = str(temp_dir)
         tmaps = pytest.TMAPS_UP_TO_4D[:]
         tmaps.append(
-            TensorMap(f"scalar", shape=(1,), interpretation=Interpretation.CONTINUOUS),
+            TensorMap(
+                f"scalar",
+                shape=(1,),
+                interpretation=Interpretation.CONTINUOUS,
+                tensor_from_file=pytest.TFF,
+            ),
         )
         explore_expected = utils.build_hdf5s(temp_dir, tmaps, n=pytest.N_TENSORS)
         default_arguments.num_workers = 3
@@ -60,11 +65,11 @@ class TestRecipes:
                     actual = getattr(row, continuous_explore_header(tm))
                     assert not np.isnan(actual)
                     continue
-                if tm.is_continuous():
+                if tm.is_continuous:
                     actual = getattr(row, continuous_explore_header(tm))
                     assert actual == row_expected
                     continue
-                if tm.is_categorical():
+                if tm.is_categorical:
                     for channel, idx in tm.channel_map.items():
                         channel_val = getattr(
                             row, categorical_explore_header(tm, channel),

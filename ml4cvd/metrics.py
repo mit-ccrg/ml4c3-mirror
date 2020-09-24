@@ -56,123 +56,6 @@ def weighted_crossentropy(weights, name="anonymous"):
     return loss_fxn
 
 
-def angle_between_batches(tensors):
-    l0 = K.sqrt(K.sum(K.square(tensors[0]), axis=-1, keepdims=True) + K.epsilon())
-    l1 = K.sqrt(K.sum(K.square(tensors[1]), axis=-1, keepdims=True) + K.epsilon())
-    numerator = K.sum(tensors[0] * tensors[1], axis=-1, keepdims=True)
-    return tf.acos(numerator / (l0 * l1))
-
-
-def two_batch_euclidean(tensors):
-    return K.sqrt(
-        K.sum(K.square(tensors[0] - tensors[1]), axis=-1, keepdims=True) + K.epsilon(),
-    )
-
-
-def custom_loss_keras(user_id, encodings):
-    pairwise_diff = K.expand_dims(encodings, 0) - K.expand_dims(encodings, 1)
-    pairwise_squared_distance = K.sum(K.square(pairwise_diff), axis=-1)
-    pairwise_distance = K.sqrt(pairwise_squared_distance + K.epsilon())
-
-    user_id = K.squeeze(user_id, axis=1)  # remove the axis added by Keras
-    pairwise_equal = K.equal(K.expand_dims(user_id, 0), K.expand_dims(user_id, 1))
-
-    pos_neg = K.cast(pairwise_equal, K.floatx()) * 2 - 1
-    return K.sum(pairwise_distance * pos_neg, axis=-1) / 2
-
-
-def euclid_dist(v):
-    return (v[0] - v[1]) ** 2
-
-
-def angle_between_batches(tensors):
-    l0 = K.sqrt(K.sum(K.square(tensors[0]), axis=-1, keepdims=True) + K.epsilon())
-    l1 = K.sqrt(K.sum(K.square(tensors[1]), axis=-1, keepdims=True) + K.epsilon())
-    numerator = K.sum(tensors[0] * tensors[1], axis=-1, keepdims=True)
-    return tf.acos(numerator / (l0 * l1))
-
-
-def paired_angle_between_batches(tensors):
-    l0 = K.sqrt(K.sum(K.square(tensors[0]), axis=-1, keepdims=True) + K.epsilon())
-    l1 = K.sqrt(K.sum(K.square(tensors[1]), axis=-1, keepdims=True) + K.epsilon())
-    numerator = K.sum(tensors[0] * tensors[1], axis=-1, keepdims=True)
-    angle_w_self = tf.acos(numerator / (l0 * l1))
-    # This is very hacky! we assume batch sizes are odd and reverse the batch to compare to others.
-    l1_other = K.sqrt(
-        K.sum(K.square(K.reverse(tensors[1], 0)), axis=-1, keepdims=True) + K.epsilon(),
-    )
-    other_numerator = K.sum(
-        tensors[0] * K.reverse(tensors[1], 0), axis=-1, keepdims=True,
-    )
-    angle_w_other = tf.acos(other_numerator / (l0 * l1_other))
-    return angle_w_self - angle_w_other
-
-
-def ignore_zeros_l2(y_true, y_pred):
-    mask = K.cast(K.not_equal(y_true, 0), K.floatx())
-    return mean_squared_error(y_true * mask, y_pred * mask)
-
-
-def ignore_zeros_logcosh(y_true, y_pred):
-    mask = K.cast(K.not_equal(y_true, 0), K.floatx())
-    return logcosh(y_true * mask, y_pred * mask)
-
-
-def sentinel_logcosh_loss(sentinel: float):
-    def ignore_sentinel_logcosh(y_true, y_pred):
-        mask = K.cast(K.not_equal(y_true, sentinel), K.floatx())
-        return logcosh(y_true * mask, y_pred * mask)
-
-    return ignore_sentinel_logcosh
-
-
-def y_true_times_mse(y_true, y_pred):
-    return K.maximum(y_true, 1.0) * mean_squared_error(y_true, y_pred)
-
-
-def y_true_squared_times_mse(y_true, y_pred):
-    return (
-        K.maximum(1.0 + y_true, 1.0)
-        * K.maximum(1.0 + y_true, 1.0)
-        * mean_squared_error(y_true, y_pred)
-    )
-
-
-def y_true_cubed_times_mse(y_true, y_pred):
-    return (
-        K.maximum(y_true, 1.0)
-        * K.maximum(y_true, 1.0)
-        * K.maximum(y_true, 1.0)
-        * mean_squared_error(y_true, y_pred)
-    )
-
-
-def y_true_squared_times_logcosh(y_true, y_pred):
-    return (
-        K.maximum(1.0 + y_true, 1.0)
-        * K.maximum(1.0 + y_true, 1.0)
-        * logcosh(y_true, y_pred)
-    )
-
-
-def two_batch_euclidean(tensors):
-    return K.sqrt(
-        K.sum(K.square(tensors[0] - tensors[1]), axis=-1, keepdims=True) + K.epsilon(),
-    )
-
-
-def custom_loss_keras(user_id, encodings):
-    pairwise_diff = K.expand_dims(encodings, 0) - K.expand_dims(encodings, 1)
-    pairwise_squared_distance = K.sum(K.square(pairwise_diff), axis=-1)
-    pairwise_distance = K.sqrt(pairwise_squared_distance + K.epsilon())
-
-    user_id = K.squeeze(user_id, axis=1)  # remove the axis added by Keras
-    pairwise_equal = K.equal(K.expand_dims(user_id, 0), K.expand_dims(user_id, 1))
-
-    pos_neg = K.cast(pairwise_equal, K.floatx()) * 2 - 1
-    return K.sum(pairwise_distance * pos_neg, axis=-1) / 2
-
-
 def pearson(y_true, y_pred):
     # normalizing stage - setting a 0 mean.
     y_true -= K.mean(y_true, axis=-1)
@@ -279,10 +162,6 @@ def survival_likelihood_loss(n_intervals):
         )  # return -log likelihood
 
     return loss
-
-
-def euclid_dist(v):
-    return (v[0] - v[1]) ** 2
 
 
 def per_class_recall(labels):
@@ -561,87 +440,12 @@ def get_metric_dict(output_tensor_maps):
     return metrics
 
 
-def get_roc_aucs(predictions, truth, labels):
-    """Compute ROC AUC for each label of each given model"""
-    aucs = dict()
-
-    for model in predictions.keys():
-        roc_auc = dict()
-        for label_name in labels.keys():
-            label_encoding = labels[label_name]
-            fpr, tpr, _ = roc_curve(
-                truth[:, label_encoding], predictions[model][:, label_encoding],
-            )
-            roc_auc[label_name] = auc(fpr, tpr)
-        aucs[model] = roc_auc
-
-    return aucs
-
-
-def get_precision_recall_aucs(predictions, truth, labels):
-    """Compute Precision-Recall AUC for each label of each given model"""
-    aucs = dict()
-
-    for model in predictions.keys():
-        average_precision = dict()
-        for label_name in labels.keys():
-            label_encoding = labels[label_name]
-            average_precision[label_name] = average_precision_score(
-                truth[:, label_encoding], predictions[model][:, label_encoding],
-            )
-        aucs[model] = average_precision
-
-    return aucs
-
-
-def log_aucs(**aucs):
-    """Log and tabulate AUCs given as nested dictionaries in the format '{model: {label: auc}}'"""
-
-    def dashes(n):
-        return "-" * n
-
-    header = "{:<35} {:<20} {:<15}"
-    row = "{:<35} {:<20} {:<15.10f}"
-    width = 85
-    logging.info(dashes(width))
-    for auc_name, auc_value in aucs.items():
-        logging.info(header.format("Model", "Label", auc_name + " AUC"))
-        for model, model_value in auc_value.items():
-            for label, auc in model_value.items():
-                logging.info(row.format(model, label, auc))
-        logging.info(dashes(width))
-
-
 def coefficient_of_determination(truth, predictions, eps=1e-6):
     true_mean = np.mean(truth)
     total_sum_of_squares = np.sum((truth - true_mean) * (truth - true_mean))
     residual_sum_of_squares = np.sum((predictions - truth) * (predictions - truth))
     r_squared = 1 - (residual_sum_of_squares / (total_sum_of_squares + eps))
     return r_squared
-
-
-def get_pearson_coefficients(predictions, truth):
-    coefs = dict()
-    for model in predictions.keys():
-        # corrcoef() returns full covariance matrix
-        pearson = np.corrcoef(predictions[model].flatten(), truth.flatten())[1, 0]
-        coefs[model] = pearson
-
-    return coefs
-
-
-def log_pearson_coefficients(coefs, label):
-    def dashes(n):
-        return "-" * n
-
-    header = "{:<30} {:<25} {:<15} {:<15}"
-    row = "{:<30} {:<25} {:<15.10f} {:<15.10f}"
-    width = 85
-    logging.info(dashes(width))
-    logging.info(header.format("Model", "Label", "Pearson R", "Pearson R^2"))
-    for model, coef in coefs.items():
-        logging.info(row.format(model, label, coef, coef * coef))
-    logging.info(dashes(width))
 
 
 def _unpack_truth_into_events(truth, intervals):

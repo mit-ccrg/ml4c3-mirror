@@ -10,12 +10,6 @@ import numpy as np
 import pandas as pd
 
 # Imports: first party
-from ml4cvd.TensorMap import (
-    TensorMap,
-    Interpretation,
-    id_from_filename,
-    outcome_channels,
-)
 from ml4cvd.normalizer import RobustScaler
 from ml4cvd.validators import validator_no_nans, validator_not_all_zero
 from ml4cvd.definitions import (
@@ -26,7 +20,13 @@ from ml4cvd.definitions import (
     ChannelMap,
     SampleIntervalData,
 )
-from ml4cvd.tensor_maps_ecg import get_ecg_dates
+from ml4cvd.tensormap.TensorMap import (
+    TensorMap,
+    Interpretation,
+    id_from_filename,
+    outcome_channels,
+)
+from ml4cvd.tensormap.tensor_maps_ecg import get_ecg_dates
 
 tmaps: Dict[str, TensorMap] = {}
 
@@ -158,10 +158,11 @@ def _get_sts_data(
 
     :param data_file: path to STS data file
     :param patient_column: name of column in data to patient identifier
-    :param start_column: name of column in data to preop window start value
-    :param start_offset: offset in days to add to preop window start value
-    :param end_column: name of column in data to preop window end value
-    :param end_offset: offset in days to add to preop window end value
+    :param date_column: name of column in data to surgery date to define preop and postop windows
+    :param preop_start: days relative to surgery date for preop window start
+    :param preop_end: days relative to surgery date for preop window end
+    :param postop_start: days relative to surgery date for postop window start
+    :param postop_end: days relative to surgery date for postop window end
     :return: dictionary of MRN to dictionary of intervals to dictionary of surgical features
     """
     sts_data = defaultdict(dict)
@@ -219,7 +220,7 @@ def _get_sts_data_for_newest_surgery_with_preop_ecg(
 
 
 def _make_sts_tff_continuous(sts_data: SampleIntervalData, key: str = "") -> Callable:
-    def tensor_from_file(tm: TensorMap, hd5: h5py.File, dependents: Dict = {}):
+    def tensor_from_file(tm: TensorMap, hd5: h5py.File):
         newest_surgery_data = _get_sts_data_for_newest_surgery_with_preop_ecg(
             sts_data=sts_data, tm=tm, hd5=hd5,
         )
@@ -246,7 +247,7 @@ def _make_sts_tff_binary(
     negative_value: int = 2,
     positive_value: int = 1,
 ) -> Callable:
-    def tensor_from_file(tm: TensorMap, hd5: h5py.File, dependents: Dict = {}):
+    def tensor_from_file(tm: TensorMap, hd5: h5py.File):
         """Parses MRN from the HD5 file name, look up the feature in a dict, and
         return the feature. Note the default encoding of +/- features in STS is 2/1,
         # e.g. yes == 1, no == 2, but outcomes are encoded using the usual format of 0/1.
@@ -275,7 +276,7 @@ def _make_sts_tff_binary(
 
 
 def _make_sts_tff_categorical(sts_data: SampleIntervalData, key: str = "") -> Callable:
-    def tensor_from_file(tm: TensorMap, hd5: h5py.File, dependents: Dict = {}):
+    def tensor_from_file(tm: TensorMap, hd5: h5py.File):
         newest_surgery_data = _get_sts_data_for_newest_surgery_with_preop_ecg(
             sts_data=sts_data, tm=tm, hd5=hd5,
         )
@@ -340,7 +341,7 @@ for tmap_name in sts_features_categorical:
         path_prefix=ECG_PREFIX,
         tensor_from_file=tff,
         channel_map=channel_map,
-        validator=validator,
+        validators=validator,
         time_series_lookup=date_interval_lookup["preop"],
     )
 
@@ -359,7 +360,7 @@ for tmap_name in sts_features_binary:
         path_prefix=ECG_PREFIX,
         tensor_from_file=tff,
         channel_map=channel_map,
-        validator=validator,
+        validators=validator,
         time_series_lookup=date_interval_lookup["preop"],
     )
 
@@ -389,8 +390,8 @@ for tmap_name in sts_features_continuous:
             path_prefix=ECG_PREFIX,
             tensor_from_file=tff,
             channel_map=channel_map,
-            validator=validator,
-            normalization=normalizer,
+            validators=validator,
+            normalizers=normalizer,
             time_series_lookup=date_interval_lookup["preop"],
         )
 
@@ -412,6 +413,6 @@ for tmap_name in sts_outcomes:
         path_prefix=ECG_PREFIX,
         tensor_from_file=tff,
         channel_map=channel_map,
-        validator=validator,
+        validators=validator,
         time_series_lookup=date_interval_lookup["preop"],
     )

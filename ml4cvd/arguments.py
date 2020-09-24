@@ -6,8 +6,6 @@ import argparse
 import datetime
 import operator
 import multiprocessing
-from typing import Set, Dict, List, Optional
-from collections import defaultdict
 
 # Imports: third party
 import numpy as np
@@ -15,19 +13,18 @@ import numpy as np
 # Imports: first party
 import ml4cvd.definitions
 from ml4cvd.logger import load_config
-from ml4cvd.models import BottleneckType, parent_sort, check_no_bottleneck
-from ml4cvd.TensorMap import TensorMap, update_tmaps
+from ml4cvd.models import BottleneckType
 from ml4cvd.definitions import STS_DATA_CSV
+from ml4cvd.tensormap.TensorMap import update_tmaps
 
 BOTTLENECK_STR_TO_ENUM = {
     "flatten_restructure": BottleneckType.FlattenRestructure,
     "global_average_pool": BottleneckType.GlobalAveragePoolStructured,
     "variational": BottleneckType.Variational,
-    "no_bottleneck": BottleneckType.NoBottleNeck,
 }
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--mode", default="train", help="What would you like to do?")
@@ -71,9 +68,6 @@ def parse_args():
     # Tensor Map arguments
     parser.add_argument("--input_tensors", default=[], nargs="+")
     parser.add_argument("--output_tensors", default=[], nargs="+")
-    parser.add_argument(
-        "--sample_weight", help="TensorMap key for sample weight in training.",
-    )
     parser.add_argument(
         "--tensor_maps_in",
         default=[],
@@ -279,24 +273,10 @@ def parse_args():
         help="Number of convolutional layers within a block.",
     )
     parser.add_argument(
-        "--u_connect",
-        nargs=2,
-        action="append",
-        help=(
-            "U-Net connect first TensorMap to second TensorMap. They must be the same"
-            " shape except for number of channels. Can be provided multiple times."
-        ),
-    )
-    parser.add_argument(
         "--bottleneck_type",
         type=str,
         default=list(BOTTLENECK_STR_TO_ENUM)[0],
         choices=list(BOTTLENECK_STR_TO_ENUM),
-    )
-    parser.add_argument(
-        "--hidden_layer",
-        default="embed",
-        help="Name of a hidden layer for inspections.",
     )
     parser.add_argument(
         "--language_layer",
@@ -524,20 +504,10 @@ def parse_args():
         ),
     )
     parser.add_argument(
-        "--alpha",
-        default=0.5,
-        type=float,
-        help="Alpha transparency for t-SNE plots must in [0.0-1.0].",
-    )
-    parser.add_argument(
         "--plot_mode",
         default="clinical",
         choices=["clinical", "full"],
         help="ECG view to plot.",
-    )
-    parser.add_argument(
-        "--embed_visualization",
-        help="Method to visualize embed layer. Options: None, tsne, or umap",
     )
 
     # Training optimization options
@@ -719,30 +689,7 @@ def parse_args():
     return args
 
 
-def _process_u_connect_args(
-    u_connect: Optional[List[List]],
-) -> Dict[TensorMap, Set[TensorMap]]:
-    u_connect = u_connect or []
-    new_u_connect = defaultdict(set)
-    tmaps = {}
-    for connect_pair in u_connect:
-        tmap_key_in, tmap_key_out = connect_pair[0], connect_pair[1]
-        tmaps = update_tmaps(tmap_name=tmap_key_in, tmaps=tmaps)
-        tmap_in = tmaps[tmap_key_in]
-        tmaps = update_tmaps(tmap_name=tmap_key_out, tmaps=tmaps)
-        tmap_out = tmaps[tmap_key_out]
-        if tmap_in.shape[:-1] != tmap_out.shape[:-1]:
-            raise TypeError(
-                f"u_connect of {tmap_in} {tmap_out} requires matching shapes besides"
-                " channel dimension.",
-            )
-        if tmap_in.static_axes() < 2 or tmap_out.static_axes() < 2:
-            raise TypeError(f"Cannot u_connect 1d TensorMaps ({tmap_in} {tmap_out}).")
-        new_u_connect[tmap_in].add(tmap_out)
-    return new_u_connect
-
-
-def _process_args(args):
+def _process_args(args: argparse.Namespace):
     now_string = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
     args_file = os.path.join(
         args.output_folder, args.id, "arguments_" + now_string + ".txt",
@@ -759,16 +706,11 @@ def _process_args(args):
         os.path.join(args.output_folder, args.id),
         "log_" + now_string,
     )
-    args.u_connect = _process_u_connect_args(args.u_connect)
 
     ml4cvd.definitions.STS_DATA_CSV = args.sts_csv
 
     # Create list of names of all needed TMaps
-    needed_tmaps_names = (
-        args.input_tensors + args.output_tensors + [args.sample_weight]
-        if args.sample_weight
-        else args.input_tensors + args.output_tensors
-    )
+    needed_tmaps_names = args.input_tensors + args.output_tensors
 
     # Update dict of tmaps to include all needed tmaps
     tmaps = {}
@@ -777,17 +719,9 @@ def _process_args(args):
 
     # Update args with TMaps
     args.tensor_maps_in = [tmaps[tmap_name] for tmap_name in args.input_tensors]
-
     args.tensor_maps_out = [tmaps[tmap_name] for tmap_name in args.output_tensors]
-    args.tensor_maps_out = parent_sort(args.tensor_maps_out)
-
-    args.sample_weight = tmaps[args.sample_weight] if args.sample_weight else None
-    if args.sample_weight:
-        assert args.sample_weight.shape == (1,)
 
     args.bottleneck_type = BOTTLENECK_STR_TO_ENUM[args.bottleneck_type]
-    if args.bottleneck_type == BottleneckType.NoBottleNeck:
-        check_no_bottleneck(args.u_connect, args.tensor_maps_out)
 
     if args.learning_rate_schedule is not None and args.patience < args.epochs:
         raise ValueError(
