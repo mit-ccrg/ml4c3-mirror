@@ -1476,7 +1476,7 @@ def _plot_ecg_figure(
         weight="bold",
     )
 
-    # save both pdf and png
+    # save both pdf and image
     title = re.sub(r"[:/. ]", "", f'{plot_mode}_{data["patientid"]}_{data["datetime"]}')
     plt.savefig(os.path.join(output_folder, run_id, f"{title}{PDF_EXT}"))
     plt.savefig(os.path.join(output_folder, run_id, f"{title}{IMAGE_EXT}"))

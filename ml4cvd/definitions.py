@@ -74,7 +74,7 @@ MRN_COLUMNS = {
 EPS = 1e-7
 
 DICOM_EXT = ".dcm"
-IMAGE_EXT = ".png"
+IMAGE_EXT = ".svg"
 PDF_EXT = ".pdf"
 TENSOR_EXT = ".hd5"
 MODEL_EXT = ".h5"

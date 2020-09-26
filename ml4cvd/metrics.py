@@ -1,10 +1,6 @@
-# Imports: standard library
-import logging
-
 # Imports: third party
 import numpy as np
 import tensorflow as tf
-from sklearn.metrics import auc, roc_curve, average_precision_score
 from tensorflow.keras import backend as K
 from tensorflow.keras.losses import (
     logcosh,
