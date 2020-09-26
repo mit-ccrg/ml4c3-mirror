@@ -1,5 +1,6 @@
 # Imports: standard library
 import os
+import re
 import logging
 from enum import Enum, auto
 from typing import Any, Dict, List, Tuple, Union, Callable, Optional, Sequence
@@ -1045,12 +1046,15 @@ def make_multimodal_multitask_model(
 
     pre_decoder_shapes: Dict[TensorMap, Optional[Tuple[int, ...]]] = {}
     for tm in tensor_maps_out:
-        pre_decoder_shapes[tm] = _calc_start_shape(
-            num_upsamples=len(dense_blocks),
-            output_shape=tm.shape,
-            upsample_rates=[pool_x, pool_y, pool_z],
-            channels=dense_blocks[-1],
-        )
+        if tm.axes == 1:
+            pre_decoder_shapes[tm] = None
+        else:
+            pre_decoder_shapes[tm] = _calc_start_shape(
+                num_upsamples=len(dense_blocks),
+                output_shape=tm.shape,
+                upsample_rates=[pool_x, pool_y, pool_z],
+                channels=dense_blocks[-1],
+            )
 
     if bottleneck_type in {
         BottleneckType.FlattenRestructure,
@@ -1416,10 +1420,11 @@ def _regularization_layer(dimension: int, regularization_type: str, rate: float)
 
 def _save_architecture_diagram(dot: pydot.Dot, image_path: str):
     """
-    Given a graph representation of a model architecture, save the architecture diagram as a png.
+    Given a graph representation of a model architecture,
+    save the architecture diagram as a svg.
 
     :param dot: pydot.Dot representation of model
-    :param image_path: path to save png of architecture diagram to
+    :param image_path: path to save svg of architecture diagram to
     """
     legend = {}
     for n in dot.get_nodes():
@@ -1471,8 +1476,14 @@ def _save_architecture_diagram(dot: pydot.Dot, image_path: str):
         )
         dot.add_node(legend_node)
 
-    logging.info("Saving architecture diagram to:{}".format(image_path))
-    dot.write_png(image_path)
+    # pydot svg applies a scale factor that clips the image so unscale it
+    svg_string = dot.create_svg().decode()
+    svg_string = re.sub(
+        r"scale\(\d+\.?\d+\ \d+\.?\d+\)", "scale(1 1)", svg_string,
+    ).encode()
+    with open(image_path, "wb") as f:
+        f.write(svg_string)
+    logging.info("Saved architecture diagram to:{}".format(image_path))
 
 
 def saliency_map(

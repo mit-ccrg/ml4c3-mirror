@@ -26,8 +26,6 @@ from ml4cvd.metrics import (
 )
 from ml4cvd.normalizer import Normalizer
 
-MEAN_IDX = 0
-STD_IDX = 1
 DEFAULT_TIME_TO_EVENT_CHANNELS = {"event": 0, "follow_up_days": 1}
 
 
