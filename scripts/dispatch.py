@@ -45,6 +45,19 @@ def _get_path_to_bootstraps() -> str:
     return os.path.expanduser(path)
 
 
+def _get_path_to_results() -> str:
+    """Check the hostname of the machine and return the appropriate path."""
+    if "anduril" == socket.gethostname():
+        path = "~/dropbox/sts-ecg/results"
+    elif "mithril" == socket.gethostname():
+        path = "~/dropbox/sts-ecg/results"
+    elif "stultzlab" in socket.gethostname():
+        path = "~/"
+    else:
+        path = "~/"
+    return os.path.expanduser(path)
+
+
 def setup_job(script: str, bootstrap: str, gpu: str) -> subprocess.Popen:
     """
     Setup environment variables, launch job, and return job object.
@@ -53,6 +66,7 @@ def setup_job(script: str, bootstrap: str, gpu: str) -> subprocess.Popen:
     env["BOOTSTRAP"] = bootstrap
     env["PATH_TO_ECGS"] = _get_path_to_ecgs()
     env["PATH_TO_BOOTSTRAPS"] = _get_path_to_bootstraps()
+    env["PATH_TO_RESULTS"] = _get_path_to_results()
 
     job = subprocess.Popen(
         f"bash {script}_temp".split(),
