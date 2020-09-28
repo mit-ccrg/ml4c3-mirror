@@ -206,6 +206,7 @@ class TestSampleCsvToSet:
     def test_sample_csv(self, sample_csv):
         csv_path, sample_ids = sample_csv
         sample_set = _sample_csv_to_set(csv_path)
+
         assert open(csv_path).readline() != "sample_id\n"
         assert all([sample_id in sample_set for sample_id in sample_ids])
         assert len(sample_ids) == len(sample_set)

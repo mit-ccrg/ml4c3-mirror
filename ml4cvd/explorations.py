@@ -36,7 +36,9 @@ from matplotlib import pyplot as plt    # isort:skip
 # fmt: on
 
 
-def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
+def explore(
+    args: argparse.Namespace, disable_saving_output: bool = False,
+) -> pd.DataFrame:
     cohort_counts = OrderedDict()
 
     src_path = args.tensors
@@ -202,11 +204,6 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
 
         if use_time:
             src_cols.append(src_time)
-
-        # Remove duplicates defined by join tensors (and time tensor if exists)
-        df.drop_duplicates(subset=src_cols, inplace=True, ignore_index=True)
-        df_ref.drop_duplicates(subset=ref_cols, inplace=True, ignore_index=True)
-        logging.info("Removed duplicates based on join and time columns")
 
         # Count total and unique entries in df: source
         cohort_counts = _update_cohort_counts_len_and_unique(
@@ -375,10 +372,8 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
 
     # Iterate through time window names and dataframes
     for window, df_window in zip(windows, dfs):
-
-        # If stratified, save label distribution for this window
         if args.explore_stratify_label is not None:
-            if save_output:
+            if not disable_saving_output:
                 _save_label_distribution(
                     df=df_window,
                     title=title,
@@ -429,7 +424,7 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
                     if (union_or_intersect == "union") and (
                         interpretation is Interpretation.CONTINUOUS
                     ):
-                        if save_output:
+                        if not disable_saving_output:
                             _plot_histogram_continuous_tensor(
                                 tmap_name=tm.name,
                                 df=df,
@@ -453,6 +448,7 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
                             if label == "all"
                             else f"_{args.explore_stratify_label}={label}"
                         )
+
                         # Calculate summary statistics for that tmap
                         if tm.channel_map:
                             # If the channel map is binary, we only want to parse the
@@ -484,7 +480,7 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
                             stats_keys.append(f"{tm.name}{key_suffix}")
 
                 # Convert summary statistics into dataframe and save to CSV
-                if save_output and len(stats_all) > 0:
+                if not disable_saving_output and len(stats_all) > 0:
                     df_stats = pd.DataFrame(data=stats_all, index=[stats_keys])
                     fpath = os.path.join(
                         args.output_folder,
@@ -501,21 +497,21 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
 
     # Time-windowed
     if use_time:
-        if save_output:
+        if not disable_saving_output:
             df_aggregated.set_index(src_join, drop=True).to_csv(fpath)
         return_df = df_aggregated
     else:
         # No cross-reference
         if args.reference_tensors is None:
-            if save_output:
+            if not disable_saving_output:
                 df.to_csv(fpath, index=False)
             return_df = df
         # Cross-reference
         else:
-            if save_output:
+            if not disable_saving_output:
                 df_cross.set_index(src_join, drop=True).to_csv(fpath)
             return_df = df_cross
-    if save_output:
+    if not disable_saving_output:
         logging.info(f"Saved tensors to {fpath}")
 
     # Save cohort counts to CSV
@@ -524,7 +520,7 @@ def explore(args: argparse.Namespace, save_output: bool = True) -> pd.DataFrame:
         cohort_counts, orient="index", columns=["count"],
     )
     df_cohort_counts = df_cohort_counts.rename_axis("description")
-    if save_output:
+    if not disable_saving_output:
         df_cohort_counts.to_csv(fpath)
         logging.info(f"Saved cohort counts to {fpath}")
     return return_df

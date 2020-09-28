@@ -740,12 +740,15 @@ def _sample_csv_to_set(
     # If first row and column is castable to int, there is no header
     try:
         int(df.iloc[0].values[0])
+
     # If fails, must be header; overwrite column name with first row and remove first row
     except ValueError:
         df.columns = df.iloc[0]
         df = df[1:]
-
     if mrn_col_name is None:
+        df.columns = [
+            col.lower() if isinstance(col, str) else col for col in df.columns
+        ]
 
         # Find intersection between CSV columns and possible MRN column names
         matches = set(df.columns).intersection(MRN_COLUMNS)
