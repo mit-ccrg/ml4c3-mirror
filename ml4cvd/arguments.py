@@ -538,9 +538,9 @@ def parse_args() -> argparse.Namespace:
 
     # Explore arguments
     parser.add_argument(
-        "--explore_save_output",
-        action="store_false",
-        help="Save outputs from explore: histograms, summary statistics, and tensors.",
+        "--explore_disable_saving_output",
+        action="store_true",
+        help="Disable saving outputs from explore: histograms, summary statistics, and tensors.",
     )
     parser.add_argument(
         "--explore_export_error",

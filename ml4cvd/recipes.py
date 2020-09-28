@@ -39,7 +39,7 @@ def run(args: argparse.Namespace):
         elif "tensorize" == args.mode:
             tensorize_ecg(args)
         elif "explore" == args.mode:
-            explore(args=args, save_output=args.explore_save_output)
+            explore(args=args, disable_saving_output=args.explore_disable_saving_output)
         elif "infer" == args.mode:
             infer_multimodal_multitask(args)
         elif "plot_ecg" == args.mode:
