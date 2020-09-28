@@ -1,4 +1,4 @@
-name: ml4cvd
+name: ml
 channels:
   - conda-forge
   - defaults

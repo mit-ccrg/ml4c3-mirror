@@ -8,22 +8,14 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  test:
 
     runs-on: ubuntu-latest
-
+    container: ghcr.io/aguirre-lab/ml:latest-gpu
     steps:
     - uses: actions/checkout@v2
-    - name: Set up Python 3.6.9
-      uses: actions/setup-python@v2
-      with:
-        python-version: 3.6.9
-    - name: Install dependencies
+    - name: Install repo
       run: |
-        sudo bash docker/config/ubuntu.sh
-        python -m pip install --upgrade pip
-        pip install -r docker/config/pre_requirements.txt
-        pip install -r docker/config/requirements.txt
         pip install .
     - name: Test with pytest
       run: |

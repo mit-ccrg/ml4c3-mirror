@@ -48,7 +48,7 @@ TrainType = Dict[str, np.ndarray]  # TODO: better name
 
 def make_training_data(
     input_tmaps: List[TensorMap], output_tmaps: List[TensorMap],
-) -> Iterator[Tuple[TrainType, TrainType, List[None]]]:
+) -> Iterator[Tuple[TrainType, TrainType, None]]:
     return cycle(
         [
             (
@@ -57,7 +57,7 @@ def make_training_data(
                     for tm in input_tmaps
                 },
                 {tm.output_name: tf.zeros((2,) + tm.shape) for tm in output_tmaps},
-                [None] * len(output_tmaps),
+                None,
             ),
         ],
     )
@@ -185,34 +185,35 @@ class TestMakeMultimodalMultitaskModel:
             input_tmaps, output_tmaps, model_file=path, **DEFAULT_PARAMS,
         )
 
-    @pytest.mark.parametrize(
-        "input_output_tmaps",
-        [
-            (pytest.CONTINUOUS_TMAPS[:1], [pytest.SEGMENT_IN]),
-            ([pytest.SEGMENT_IN], pytest.CONTINUOUS_TMAPS[:1]),
-            ([pytest.SEGMENT_IN], [pytest.SEGMENT_IN]),
-        ],
-    )
-    def test_multimodal_multitask_variational(self, input_output_tmaps, tmpdir):
-        """
-        Tests 1d->2d, 2d->1d, (1d,2d)->(1d,2d)
-        """
-        params = DEFAULT_PARAMS.copy()
-        params["bottleneck_type"] = BottleneckType.Variational
-        params["pool_x"] = params["pool_y"] = 2
-        m = make_multimodal_multitask_model(
-            input_output_tmaps[0], input_output_tmaps[1], **params
-        )
-        assert_model_trains(input_output_tmaps[0], input_output_tmaps[1], m)
-        m.save(os.path.join(tmpdir, "vae.h5"))
-        path = os.path.join(tmpdir, f"m{MODEL_EXT}")
-        m.save(path)
-        make_multimodal_multitask_model(
-            input_output_tmaps[0],
-            input_output_tmaps[1],
-            model_file=path,
-            **DEFAULT_PARAMS,
-        )
+    # TODO waiting on tensorflow probability dependencies
+    # @pytest.mark.parametrize(
+    #     "input_output_tmaps",
+    #     [
+    #         (pytest.CONTINUOUS_TMAPS[:1], [pytest.SEGMENT_IN]),
+    #         ([pytest.SEGMENT_IN], pytest.CONTINUOUS_TMAPS[:1]),
+    #         ([pytest.SEGMENT_IN], [pytest.SEGMENT_IN]),
+    #     ],
+    # )
+    # def test_multimodal_multitask_variational(self, input_output_tmaps, tmpdir):
+    #     """
+    #     Tests 1d->2d, 2d->1d, (1d,2d)->(1d,2d)
+    #     """
+    #     params = DEFAULT_PARAMS.copy()
+    #     params["bottleneck_type"] = BottleneckType.Variational
+    #     params["pool_x"] = params["pool_y"] = 2
+    #     m = make_multimodal_multitask_model(
+    #         input_output_tmaps[0], input_output_tmaps[1], **params
+    #     )
+    #     assert_model_trains(input_output_tmaps[0], input_output_tmaps[1], m)
+    #     m.save(os.path.join(tmpdir, "vae.h5"))
+    #     path = os.path.join(tmpdir, f"m{MODEL_EXT}")
+    #     m.save(path)
+    #     make_multimodal_multitask_model(
+    #         input_output_tmaps[0],
+    #         input_output_tmaps[1],
+    #         model_file=path,
+    #         **DEFAULT_PARAMS,
+    #     )
 
     def test_no_dense_layers(self):
         params = DEFAULT_PARAMS.copy()

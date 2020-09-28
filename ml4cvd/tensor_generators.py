@@ -1104,7 +1104,7 @@ def train_valid_test_tensor_generators(
 def _identity_batch(
     in_batch: Batch, out_batch: Batch, return_paths: bool, paths: List[Path],
 ):
-    sample_weights = [None] * len(out_batch)
+    sample_weights = None
     return (
         (in_batch, out_batch, sample_weights, paths)
         if return_paths
