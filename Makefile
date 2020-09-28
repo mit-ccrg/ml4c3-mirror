@@ -25,7 +25,7 @@ help:
 setup:
 > @echo Setting up the repo...
 > @conda env create -f .pre-commit-env.yml
-> @conda run -n ml4cvd pre-commit install
+> @conda run -n ml pre-commit install
 
 lint_staged:
 > @echo Running hook with staged files...

@@ -11,8 +11,8 @@ REPO="ghcr.io/aguirre-lab/ml"
 CONTEXT="docker/"
 CPU_ONLY="false"
 
-BASE_IMAGE_GPU="tensorflow/tensorflow:2.1.0-gpu-py3"
-BASE_IMAGE_CPU="tensorflow/tensorflow:2.1.0-py3"
+BASE_IMAGE_GPU="tensorflow/tensorflow:2.3.0-gpu"
+BASE_IMAGE_CPU="tensorflow/tensorflow:2.3.0"
 
 LATEST_TAG_GPU="latest-gpu"
 LATEST_TAG_CPU="latest-cpu"
@@ -59,9 +59,9 @@ while getopts ":d:t:chp" opt ; do
         c)
             CPU_ONLY="true"
             ;;
-		p)
-			PUSH_TO_GHCR="true"
-			;;
+        p)
+            PUSH_TO_GHCR="true"
+            ;;
         :)
             echo -e "${RED}ERROR: Option -${OPTARG} requires an argument.${NC}" 1>&2
             usage

@@ -325,7 +325,10 @@ def _is_equal_field(field1: Any, field2: Any) -> bool:
 def _get_name_if_function(field: Any) -> Any:
     """We assume 'field' is a function if it's 'callable()'"""
     if callable(field):
-        return field.__name__
+        field = field.__name__
+
+    if isinstance(field, str):
+        return field.replace("-", "").replace("_", "")
     else:
         return field
 
