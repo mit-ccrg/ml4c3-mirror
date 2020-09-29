@@ -11,8 +11,8 @@ REPO="ghcr.io/aguirre-lab/ml"
 CONTEXT="docker/"
 CPU_ONLY="false"
 
-BASE_IMAGE_GPU="tensorflow/tensorflow:2.3.0-gpu"
-BASE_IMAGE_CPU="tensorflow/tensorflow:2.3.0"
+BASE_IMAGE_GPU="tensorflow/tensorflow:2.3.1-gpu"
+BASE_IMAGE_CPU="tensorflow/tensorflow:2.3.1"
 
 LATEST_TAG_GPU="latest-gpu"
 LATEST_TAG_CPU="latest-cpu"

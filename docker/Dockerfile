@@ -12,20 +12,5 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 COPY ./config/* /app/
 WORKDIR /app
 
-# Upgrade python
-RUN ./upgrade-python.sh
-
-# Basic setup
-RUN ./ubuntu.sh
-
-# Python packages
-RUN pip3 install --upgrade pip
-RUN pip3 install -r pre-requirements.txt
-RUN pip3 install -r requirements.txt
-
-# Jupyter Lab
-RUN curl -sL https://deb.nodesource.com/setup_12.x -o nodesource_setup.sh
-RUN bash nodesource_setup.sh
-RUN apt-get install -y nodejs
-RUN jupyter labextension install @jupyter-widgets/jupyterlab-manager
-RUN jupyter lab build
+# Install dependencies
+RUN ./install.sh
