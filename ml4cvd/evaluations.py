@@ -54,6 +54,12 @@ def predict_and_evaluate(
     scatters = []
     rocs = []
 
+    for tm in tensor_maps_out:
+        if tm.output_name not in layer_names:
+            raise ValueError(
+                "Output tensor map name not found in layers of loaded model",
+            )
+
     if save_coefficients:
         # Get coefficients from model layers
         coefficients = [c[0].round(3) for c in model.layers[-1].get_weights()[0]]
