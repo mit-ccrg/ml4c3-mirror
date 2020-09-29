@@ -11,6 +11,7 @@ import numpy as np
 import pydot
 import tensorflow as tf
 import tensorflow_addons as tfa
+import tensorflow_probability as tfp
 from tensorflow.keras import backend as K
 from tensorflow.keras.utils import model_to_dot
 from tensorflow.keras.layers import (
@@ -75,9 +76,7 @@ from ml4cvd.tensormap.TensorMap import TensorMap
 CHANNEL_AXIS = -1  # Set to 1 for Theano backend
 LANGUAGE_MODEL_SUFFIX = "_next_character"
 
-# TODO replace this once tensorflow_probability updates cloudpickle dependency
-# import tensorflow_probability as tfp
-# tfd = tfp.distributions
+tfd = tfp.distributions
 
 
 class BottleneckType(Enum):
@@ -485,85 +484,84 @@ def global_average_pool(x: Tensor) -> Tensor:
     return K.mean(x, axis=tuple(range(1, len(x.shape) - 1)))
 
 
-# TODO replace this once tensorflow_probability updates cloudpickle dependency
-# class VariationalDiagNormal(Layer):
-#     def __init__(self, latent_size: int, **kwargs):
-#         self.latent_size = latent_size
-#         super(VariationalDiagNormal, self).__init__(**kwargs)
-#         self.prior = tfd.MultivariateNormalDiag(
-#             loc=tf.zeros([latent_size]), scale_identity_multiplier=1.0,
-#         )
-#
-#     def call(self, mu: Tensor, log_sigma: Tensor, **kwargs):
-#         """mu and sigma must be shape (None, latent_size)"""
-#         approx_posterior = tfd.MultivariateNormalDiag(
-#             loc=mu, scale_diag=tf.math.exp(log_sigma),
-#         )
-#         kl = tf.reduce_mean(tfd.kl_divergence(approx_posterior, self.prior))
-#         self.add_loss(kl)
-#         self.add_metric(kl, "mean", name="KL_divergence")
-#         return approx_posterior.sample()
-#
-#     def get_config(self):
-#         return {"latent_size": self.latent_size}
+class VariationalDiagNormal(Layer):
+    def __init__(self, latent_size: int, **kwargs):
+        self.latent_size = latent_size
+        super(VariationalDiagNormal, self).__init__(**kwargs)
+        self.prior = tfd.MultivariateNormalDiag(
+            loc=tf.zeros([latent_size]), scale_identity_multiplier=1.0,
+        )
 
-# TODO replace this once tensorflow_probability updates cloudpickle dependency
-# class VariationalBottleNeck:
-#     def __init__(
-#         self,
-#         activation: str,
-#         normalization: str,
-#         fully_connected_widths: List[int],
-#         latent_size: int,
-#         regularization: str,
-#         regularization_rate: float,
-#         layer_order: List[str],
-#         pre_decoder_shapes: Dict[TensorMap, Optional[Tuple[int, ...]]],
-#     ):
-#         self.fully_connected = (
-#             FullyConnectedBlock(
-#                 widths=fully_connected_widths,
-#                 activation=activation,
-#                 normalization=normalization,
-#                 regularization=regularization,
-#                 regularization_rate=regularization_rate,
-#                 layer_order=layer_order,
-#             )
-#             if fully_connected_widths
-#             else None
-#         )
-#         self.restructures = {
-#             tm: FlatToStructure(
-#                 output_shape=shape,
-#                 activation=activation,
-#                 normalization=normalization,
-#                 layer_order=layer_order,
-#             )
-#             for tm, shape in pre_decoder_shapes.items()
-#             if shape is not None
-#         }
-#         self.latent_size = latent_size
-#         self.sampler: Callable = VariationalDiagNormal(latent_size)
-#         self.no_restructures = [
-#             tm for tm, shape in pre_decoder_shapes.items() if shape is None
-#         ]
-#
-#     def __call__(
-#         self, encoder_outputs: Dict[TensorMap, Tensor],
-#     ) -> Dict[TensorMap, Tensor]:
-#         y = [Flatten()(x) for x in encoder_outputs.values()]
-#         if len(y) > 1:
-#             y = concatenate(y)
-#         else:
-#             y = y[0]
-#         y = self.fully_connected(y) if self.fully_connected else y
-#         mu = Dense(self.latent_size, name="embed")(y)
-#         log_sigma = Dense(self.latent_size, name="log_sigma")(y)
-#         y = self.sampler(mu, log_sigma)
-#         return {
-#             **{tm: restructure(y) for tm, restructure in self.restructures.items()},
-#             **{tm: y for tm in self.no_restructures},
-#         }
+    def call(self, mu: Tensor, log_sigma: Tensor, **kwargs):
+        """mu and sigma must be shape (None, latent_size)"""
+        approx_posterior = tfd.MultivariateNormalDiag(
+            loc=mu, scale_diag=tf.math.exp(log_sigma),
+        )
+        kl = tf.reduce_mean(tfd.kl_divergence(approx_posterior, self.prior))
+        self.add_loss(kl)
+        self.add_metric(kl, aggregation="mean", name="KL_divergence")
+        return approx_posterior.sample()
+
+    def get_config(self):
+        return {"latent_size": self.latent_size}
+
+
+class VariationalBottleNeck:
+    def __init__(
+        self,
+        activation: str,
+        normalization: str,
+        fully_connected_widths: List[int],
+        latent_size: int,
+        regularization: str,
+        regularization_rate: float,
+        layer_order: List[str],
+        pre_decoder_shapes: Dict[TensorMap, Optional[Tuple[int, ...]]],
+    ):
+        self.fully_connected = (
+            FullyConnectedBlock(
+                widths=fully_connected_widths,
+                activation=activation,
+                normalization=normalization,
+                regularization=regularization,
+                regularization_rate=regularization_rate,
+                layer_order=layer_order,
+            )
+            if fully_connected_widths
+            else None
+        )
+        self.restructures = {
+            tm: FlatToStructure(
+                output_shape=shape,
+                activation=activation,
+                normalization=normalization,
+                layer_order=layer_order,
+            )
+            for tm, shape in pre_decoder_shapes.items()
+            if shape is not None
+        }
+        self.latent_size = latent_size
+        self.sampler: Callable = VariationalDiagNormal(latent_size)
+        self.no_restructures = [
+            tm for tm, shape in pre_decoder_shapes.items() if shape is None
+        ]
+
+    def __call__(
+        self, encoder_outputs: Dict[TensorMap, Tensor],
+    ) -> Dict[TensorMap, Tensor]:
+        y = [Flatten()(x) for x in encoder_outputs.values()]
+        if len(y) > 1:
+            y = concatenate(y)
+        else:
+            y = y[0]
+        y = self.fully_connected(y) if self.fully_connected else y
+        mu = Dense(self.latent_size, name="embed")(y)
+        log_sigma = Dense(self.latent_size, name="log_sigma")(y)
+        y = self.sampler(mu, log_sigma)
+        return {
+            **{tm: restructure(y) for tm, restructure in self.restructures.items()},
+            **{tm: y for tm in self.no_restructures},
+        }
 
 
 class ConcatenateRestructure:
@@ -862,7 +860,7 @@ def _get_custom_objects(tensor_maps_out: List[TensorMap]) -> Dict[str, Any]:
             NON_KERAS_OPTIMIZERS.values(),
             ACTIVATION_FUNCTIONS.values(),
             NORMALIZATION_CLASSES.values(),
-            # [VariationalDiagNormal], TODO replace once tfp updates dependencies
+            [VariationalDiagNormal],
         )
     }
     return {**custom_objects, **get_metric_dict(tensor_maps_out)}
@@ -1073,18 +1071,17 @@ def make_multimodal_multitask_model(
             pre_decoder_shapes=pre_decoder_shapes,
             bottleneck_type=bottleneck_type,
         )
-    # TODO replace this once tensorflow_probability updates cloudpickle dependency
-    # elif bottleneck_type == BottleneckType.Variational:
-    #     bottleneck = VariationalBottleNeck(
-    #         fully_connected_widths=dense_layers[:-1],
-    #         latent_size=dense_layers[-1],
-    #         activation=activation,
-    #         regularization=dense_regularize,
-    #         regularization_rate=dense_regularize_rate,
-    #         normalization=dense_normalize,
-    #         layer_order=layer_order,
-    #         pre_decoder_shapes=pre_decoder_shapes,
-    #     )
+    elif bottleneck_type == BottleneckType.Variational:
+        bottleneck = VariationalBottleNeck(
+            fully_connected_widths=dense_layers[:-1],
+            latent_size=dense_layers[-1],
+            activation=activation,
+            regularization=dense_regularize,
+            regularization_rate=dense_regularize_rate,
+            normalization=dense_normalize,
+            layer_order=layer_order,
+            pre_decoder_shapes=pre_decoder_shapes,
+        )
     else:
         raise NotImplementedError(f"Unknown BottleneckType {bottleneck_type}.")
 

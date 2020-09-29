@@ -37,6 +37,7 @@ export GROUP_NAMES GROUP_IDS
 
 # Create string to be called in Docker's bash shell via eval;
 # this creates a user, adds groups, adds user to groups, then calls the Python script
+# the 'staff' group is a preloaded group in the docker image which enables access to root owned folders
 SETUP_USER="
     useradd -u $(id -u) -d ${HOME} ${USER};
     GROUP_NAMES_ARR=( \${GROUP_NAMES} );
@@ -47,6 +48,8 @@ SETUP_USER="
         echo \"Adding user ${USER} to group\" \${GROUP_NAMES_ARR[i]}
         usermod -aG \${GROUP_NAMES_ARR[i]} ${USER}
     done;
+    echo \"Adding user ${USER} to group staff\";
+    usermod -aG staff ${USER}
 "
 CALL_AS_USER="sudo SETUPTOOLS_USE_DISTUTILS=stdlib -H -u ${USER}"
 
