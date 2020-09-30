@@ -121,7 +121,7 @@ def use_testing_tmaps(monkeypatch):
 
     monkeypatch.setattr(ml4cvd.tensormap.TensorMap, "update_tmaps", mock_update_tmaps)
     monkeypatch.setattr("ml4cvd.arguments.update_tmaps", mock_update_tmaps)
-    monkeypatch.setattr("ml4cvd.hyperparameters.update_tmaps", mock_update_tmaps)
+    monkeypatch.setattr("ml4cvd.hyperoptimizers.update_tmaps", mock_update_tmaps)
 
 
 @pytest.fixture(scope="function")

@@ -26,7 +26,6 @@ BOTTLENECK_STR_TO_ENUM = {
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-
     parser.add_argument("--mode", default="train", help="What would you like to do?")
 
     # Config arguments
@@ -117,9 +116,9 @@ def parse_args() -> argparse.Namespace:
         "--remap_layer",
         action="append",
         nargs=2,
-        help="For transfer layer, manually remap layer from pretrained model to layer in new model. "
-        "For example: --rename_layer pretrained_layer_name new_layer_name. "
-        "Layers are remapped using this argument one at a time, repeat for multiple layers.",
+        help="For transfer layer, manually remap layer from pretrained model to layer"
+        " in new model. For example: --rename_layer pretrained_layer_name new_layer_name."
+        " Layers are remapped using this argument one at a time, repeat for multiple layers.",
     )
     parser.add_argument(
         "--freeze_donor_layers",
@@ -129,22 +128,21 @@ def parse_args() -> argparse.Namespace:
 
     # Model Architecture Parameters
     parser.add_argument(
-        "--dense_layers",
-        nargs="*",
-        default=[16, 64],
-        type=int,
-        help="List of number of hidden units in neural nets dense layers.",
-    )
-    parser.add_argument(
-        "--dropout",
-        default=0.0,
-        type=float,
-        help="Dropout rate of dense layers must be in [0.0, 1.0].",
-    )
-    parser.add_argument(
         "--activation",
         default="relu",
         help="Activation function for hidden units in neural nets dense layers.",
+    )
+    parser.add_argument(
+        "--block_size",
+        default=3,
+        type=int,
+        help="Number of convolutional layers within a block.",
+    )
+    parser.add_argument(
+        "--bottleneck_type",
+        type=str,
+        default=list(BOTTLENECK_STR_TO_ENUM)[0],
+        choices=list(BOTTLENECK_STR_TO_ENUM),
     )
     parser.add_argument(
         "--conv_layers",
@@ -215,6 +213,45 @@ def parse_args() -> argparse.Namespace:
         help="Type of regularization layer for convolutions.",
     )
     parser.add_argument(
+        "--dense_blocks",
+        nargs="*",
+        default=[32, 24, 16],
+        type=int,
+        help="List of number of kernels in convolutional layers.",
+    )
+    parser.add_argument(
+        "--dense_layers",
+        nargs="*",
+        default=[16, 64],
+        type=int,
+        help="List of number of hidden units in neural nets dense layers.",
+    )
+    parser.add_argument(
+        "--directly_embed_and_repeat",
+        type=int,
+        help="If set, directly embed input tensors (without passing to a dense layer)"
+        " into concatenation layer, and repeat each input N times, where N is this"
+        " argument's value. To directly embed a feature without repetition, set to 1.",
+    )
+    parser.add_argument(
+        "--dropout",
+        default=0.0,
+        type=float,
+        help="Dropout rate of dense layers must be in [0.0, 1.0].",
+    )
+    parser.add_argument(
+        "--language_layer",
+        default="ecg_rest_text",
+        help="Name of TensorMap for learning language models (eg train_char_model).",
+    )
+    parser.add_argument(
+        "--language_prefix",
+        default="partners_ecg_rest",
+        help=(
+            "Path prefix for a TensorMap to learn language models (eg train_char_model)"
+        ),
+    )
+    parser.add_argument(
         "--layer_order",
         nargs=3,
         default=["activation", "regularization", "normalization"],
@@ -223,6 +260,19 @@ def parse_args() -> argparse.Namespace:
             "Order of activation, regularization, and normalization layers following"
             " convolutional layers."
         ),
+    )
+    parser.add_argument(
+        "--nest_model",
+        nargs=2,
+        action="append",
+        help="Embed a nested model ending at the specified layer before the bottleneck"
+        " layer of the current model. Repeat this argument to embed multiple models."
+        " For example --nest_model /path/to/model_weights.h5 embed_layer",
+    )
+    parser.add_argument(
+        "--padding",
+        default="same",
+        help="Valid or same border padding on the convolutional layers.",
     )
     parser.add_argument(
         "--pool_after_final_dense_block",
@@ -253,57 +303,6 @@ def parse_args() -> argparse.Namespace:
         default=1,
         type=int,
         help="Pooling size in the z-axis, if 1 no pooling will be performed.",
-    )
-    parser.add_argument(
-        "--padding",
-        default="same",
-        help="Valid or same border padding on the convolutional layers.",
-    )
-    parser.add_argument(
-        "--dense_blocks",
-        nargs="*",
-        default=[32, 24, 16],
-        type=int,
-        help="List of number of kernels in convolutional layers.",
-    )
-    parser.add_argument(
-        "--block_size",
-        default=3,
-        type=int,
-        help="Number of convolutional layers within a block.",
-    )
-    parser.add_argument(
-        "--bottleneck_type",
-        type=str,
-        default=list(BOTTLENECK_STR_TO_ENUM)[0],
-        choices=list(BOTTLENECK_STR_TO_ENUM),
-    )
-    parser.add_argument(
-        "--language_layer",
-        default="ecg_rest_text",
-        help="Name of TensorMap for learning language models (eg train_char_model).",
-    )
-    parser.add_argument(
-        "--language_prefix",
-        default="partners_ecg_rest",
-        help=(
-            "Path prefix for a TensorMap to learn language models (eg train_char_model)"
-        ),
-    )
-    parser.add_argument(
-        "--directly_embed_and_repeat",
-        type=int,
-        help="If set, directly embed input tensors (without passing to a dense layer) into concatenation layer,"
-        " and repeat each input N times, where N is this argument's value. To directly embed a feature"
-        " without repetition, set to 1.",
-    )
-    parser.add_argument(
-        "--nest_model",
-        nargs=2,
-        action="append",
-        help="Embed a nested model ending at the specified layer before the bottleneck layer of the current model."
-        " Repeat this argument to embed multiple models."
-        " For example --nest_model /path/to/model_weights.h5 embed_layer",
     )
 
     # Training Parameters
@@ -385,7 +384,9 @@ def parse_args() -> argparse.Namespace:
         "--learning_rate_patience",
         default=8,
         type=int,
-        help="Number of epochs without validation loss improvement to wait before reducing learning rate by multiplying by the learning_rate_reduction scale factor.",
+        help="Number of epochs without validation loss improvement to wait before"
+        " reducing learning rate by multiplying by the learning_rate_reduction scale"
+        " factor.",
     )
     parser.add_argument(
         "--learning_rate_reduction",
@@ -443,16 +444,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--anneal_max", default=2.0, type=float, help="Annealing maximum value",
     )
-    parser.add_argument(
-        "--shallow_model_regularization",
-        nargs="?",
-        default="l1l2",
-        choices=["l1l2", "l1", "l2"],
-        help="Regularization to apply to shallow model. "
-        "L values are dynamically optimized from a range of values set by --L_range. "
-        "The maximum number of L values sampled is set by --max_evals. "
-        "To disable regularization in shallow models, use this argument with no value.",
-    )
 
     # Hyperoptimize arguments
     parser.add_argument(
@@ -471,13 +462,16 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--L_range",
-        default=[1e-4, 1e4],
-        nargs=2,
+        "--l1",
+        default=0.01,
         type=float,
-        help="Range of L values to sample logarithmically to create random combinations "
-        "of L1 and L2 values for L1 L2 regularization of shallow model."
-        "Default 1e-4 to 1e4",
+        help="L1 value for regularization in shallow model.",
+    )
+    parser.add_argument(
+        "--l2",
+        default=0.01,
+        type=float,
+        help="L2 value for regularization in shallow model.",
     )
 
     # Run specific and debugging arguments

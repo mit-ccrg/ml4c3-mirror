@@ -34,58 +34,56 @@ MAX_LOSS = 9e9
 
 def hyperoptimize(args: argparse.Namespace):
     """
-    hyperopt is a Python library that performs Bayesian optimization over a given set of hyperparameters
-    to minimize an objective function. Here, the objective function is loss_from_multimodal_multitask.
-
-    Hyperparameter combinations are randomly chosen and non-unique choices are skipped before model
-    compilation. The computation to skip repeated combinations is fast and inexpensive. However, each
-    non-unique combination counts towards the maximum number of models to evaluate. If a grid search
-    over a relatively small search space is desired, set max_evals >> size of search space. In this
-    case, it is likely, but not guaranteed, that all combinations will be seen.
+    hyperopt is a Python library that performs Bayesian optimization over hyperparameters
+    to minimize an objective function. Here, the objective function is
+    loss_from_multimodal_multitask.
+    Hyperparameter combinations are randomly chosen and non-unique choices are skipped
+    before model compilation. The computation to skip repeated combinations is fast and
+    inexpensive. However, each non-unique combination counts towards the maximum number
+    of models to evaluate. If a grid search over a relatively small search space is
+    desired, set max_evals >> size of search space. In this case, it is likely, but not
+    guaranteed, that all combinations will be seen.
     """
-
     block_size_sets = [2, 3, 4]
-    conv_layers_sets = [[32]]  # Baseline
+    conv_layers_sets = [[32]]
     conv_normalize_sets = [""]
-
     dense_layers_sets = [
-        # [256],
-        # [1000],  # Collin's suggestion
-        [16, 64],  # Baseline
+        [10, 5],
+        [40, 20],
+        [30, 30],
+        [64, 16],
+        [100, 50],
     ]
     dense_blocks_sets = [
-        # [64, 128],  # Collin's suggestion
-        # [24, 12],  # Baseline
-        [32, 24, 16],  # Baseline
+        [32, 24, 16],
     ]
     pool_types = ["max", "average"]
-
     conv_regularize_sets = ["spatial_dropout"]
     conv_dropout_sets = [0.5]
-    dropout_sets = [0.5]
-
+    dropout_sets = [0, 0.1, 0.2, 0.3]
     conv_x_sets = _generate_conv1D_filter_widths(
         num_unique_filters=6,
         list_len_bounds=[1, 1],
         first_filter_width_bounds=[6, 200],
         probability_vary_filter_width=0,
     )
-    learning_rate_sets = [0.0002, 0.0001, 0.00005, 0.00002]
+    learning_rate_sets = [0.001, 0.005, 0.01]
 
     # Initialize empty dict of tmaps
     tmaps: Dict[str, TensorMap] = {}
 
     # Generate weighted loss tmaps for STS death
-    weighted_losses = [val for val in range(1, 12, 4)]
+    weighted_losses = [val for val in range(1, 10, 2)]
     output_tensors_sets = _generate_weighted_loss_tmaps(
         base_tmap_name="sts_death", weighted_losses=weighted_losses,
     )
     for tmap_name in output_tensors_sets:
         tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
 
-    # Input tensors maps with data augmentation and 8 vs. 12 leads
     input_tmap_sets = [
-        ["ecg_2500_std_newest_sts", "ecg_age_std_newest_sts", "ecg_sex_newest_sts"],
+        "ecg_2500_std_preop_newest",
+        "ecg_age_std_preop_newest",
+        "ecg_sex_preop_newest",
     ]
     for tmap_name_or_list in input_tmap_sets:
         if isinstance(tmap_name_or_list, list):
@@ -96,33 +94,33 @@ def hyperoptimize(args: argparse.Namespace):
 
     space = {
         # "block_size": hp.choice("block_size", block_size_sets),
-        # "conv_x": hp.choice("conv_x", conv_x_sets),
-        # "conv_normalize": hp.choice("conv_normalize", conv_normalize_sets),
         # "conv_dropout": hp.choice("conv_dropout", conv_dropout_sets),
-        # "dense_blocks": hp.choice("dense_blocks", dense_blocks_sets),
-        # "dense_layers": hp.choice("dense_layers", dense_layers_sets),
-        # "dropout": hp.choice("dropout", dropout_sets),
-        # "output_tensors": hp.choice("output_tensors", output_tensors_sets),
-        # "input_tensors": hp.choice("input_tensors", input_tmap_sets),
-        # "learning_rate": hp.choice("learning_rate", learning_rate_sets),
+        # "conv_normalize": hp.choice("conv_normalize", conv_normalize_sets),
         # "conv_regularize": hp.choice("conv_regularize", conv_regularize_sets),
-        "pool_type": hp.choice("pool_type", pool_types),
+        # "conv_x": hp.choice("conv_x", conv_x_sets),
+        # "dense_blocks": hp.choice("dense_blocks", dense_blocks_sets),
+        "dense_layers": hp.choice("dense_layers", dense_layers_sets),
+        "dropout": hp.choice("dropout", dropout_sets),
+        "output_tensors": hp.choice("output_tensors", output_tensors_sets),
+        # "input_tensors": hp.choice("input_tensors", input_tmap_sets),
+        "learning_rate": hp.choice("learning_rate", learning_rate_sets),
+        # "pool_type": hp.choice("pool_type", pool_types),
     }
     param_lists = {
         # "block_size": block_size_sets,
         # "conv_x": conv_x_sets,
-        # "conv_normalize": conv_normalize_sets,
         # "conv_dropout": conv_dropout_sets,
-        # "dense_blocks": dense_blocks_sets,
-        # "dense_layers": dense_layers_sets,
-        # "dropout": dropout_sets,
-        # "output_tensors": output_tensors_sets,
+        # "conv_normalize": conv_normalize_sets,
         # "conv_regularize": conv_regularize_sets,
+        # "dense_blocks": dense_blocks_sets,
+        "dense_layers": dense_layers_sets,
+        "dropout": dropout_sets,
+        "output_tensors": output_tensors_sets,
         # "input_tensors": input_tmap_sets,
-        # "learning_rate": learning_rate_sets,
-        "pool_type": pool_types,
+        "learning_rate": learning_rate_sets,
+        # "pool_type": pool_types,
     }
-    hyperparameter_optimizer(args, space, param_lists)
+    hyperparameter_optimizer(args=args, space=space, param_lists=param_lists)
 
 
 def hyperparameter_optimizer(
@@ -212,15 +210,22 @@ def hyperparameter_optimizer(
             plot_metric_history(
                 history, args.training_steps, "", os.path.join(trials_path, trial_id),
             )
-            loss_and_metrics = model.evaluate(generate_test, steps=args.test_steps)
             logging.info(
                 f"Current architecture:\n{_string_from_architecture_dict(x)}\nCurrent"
                 f" model size: {model.count_params()}.",
             )
-            logging.info(
-                f"Iteration {i} out of maximum {args.max_evals}\nTest Loss:"
-                f" {loss_and_metrics[0]}",
-            )
+
+            logging.info(f"Iteration {i} / {args.max_evals} max evaluations")
+
+            loss_and_metrics = model.evaluate(generate_train, steps=args.training_steps)
+            logging.info(f"Train loss: {loss_and_metrics[0]:0.3f}")
+
+            loss_and_metrics = model.evaluate(generate_test, steps=args.test_steps)
+            logging.info(f"Test loss: {loss_and_metrics[0]:0.3f}")
+
+            logging.info(f"Train AUC(s): {train_auc}")
+            logging.info(f"Test AUC(s): {test_auc}")
+
             generate_train.kill_workers()
             generate_valid.kill_workers()
             generate_test.kill_workers()
@@ -252,7 +257,6 @@ def hyperparameter_optimizer(
                 )
 
     trials = hyperopt.Trials()
-
     fmin(
         fn=loss_from_multimodal_multitask,
         space=space,
