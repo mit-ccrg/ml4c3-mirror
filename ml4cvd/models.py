@@ -61,8 +61,6 @@ from tensorflow.keras.callbacks import (
     ReduceLROnPlateau,
 )
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.regularizers import l1 as _l1
-from tensorflow.keras.regularizers import l2 as _l2
 from tensorflow.keras.regularizers import l1_l2
 
 # Imports: first party
@@ -128,14 +126,7 @@ def make_shallow_model(
     outputs = []
     my_metrics = {}
     loss_weights = []
-
-    regularizer = None
-    if l1 is not None and l2 is not None:
-        regularizer = l1_l2(l1=l1, l2=l2)
-    elif l1 is not None:
-        regularizer = _l1(l=l1)
-    elif l2 is not None:
-        regularizer = _l2(l=l2)
+    regularizer = l1_l2(l1=l1, l2=l2)
 
     input_tensors = [Input(shape=tm.shape, name=tm.input_name) for tm in tensor_maps_in]
     it = concatenate(input_tensors) if len(input_tensors) > 1 else input_tensors[0]
