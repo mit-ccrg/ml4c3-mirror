@@ -49,7 +49,9 @@ SETUP_USER="
         usermod -aG \${GROUP_NAMES_ARR[i]} ${USER}
     done;
     echo \"Adding user ${USER} to group staff\";
-    usermod -aG staff ${USER}
+    usermod -aG staff ${USER};
+    usermod -aG sudo ${USER};
+    echo -e \"password\npassword\" | passwd ${USER};
 "
 CALL_AS_USER="sudo SETUPTOOLS_USE_DISTUTILS=stdlib -H -u ${USER}"
 
