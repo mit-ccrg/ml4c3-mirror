@@ -175,6 +175,11 @@ if [[ "$PYTHON_COMMAND" == "$JUPYTER_COMMAND" ]] ; then
     CONTAINER_NAME="--name ${USER}-notebook-${PORT}"
 fi
 
+PYTHON_PACKAGES="$PWD"
+if [[ -d $PWD/../icu ]] ; then
+    PYTHON_PACKAGES="$PYTHON_PACKAGES $PWD/../icu"
+fi
+
 cat <<LAUNCH_MESSAGE
 Attempting to run Docker with
     docker run --rm \
@@ -191,7 +196,7 @@ Attempting to run Docker with
     ${DOCKER_IMAGE} /bin/bash -c \
     "${SETUP_USER}
     cd ${HOME};
-    ${CALL_AS_USER} pip install $(pwd);
+    ${CALL_AS_USER} pip install ${PYTHON_PACKAGES};
     ${CALL_AS_USER} ${PYTHON_COMMAND} ${PYTHON_ARGS}"
 LAUNCH_MESSAGE
 
@@ -209,5 +214,5 @@ ${CONTAINER_NAME} \
 ${DOCKER_IMAGE} /bin/bash -c \
 "${SETUP_USER}
 cd ${HOME};
-${CALL_AS_USER} pip install $(pwd);
+${CALL_AS_USER} pip install ${PYTHON_PACKAGES};
 ${CALL_AS_USER} ${PYTHON_COMMAND} ${PYTHON_ARGS}"

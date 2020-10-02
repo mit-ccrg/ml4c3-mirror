@@ -398,10 +398,20 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
 
     # fmt: off
 
+    # ICU tmaps
+    try:
+        from ml4icu.tensormap import TMAPS as tmaps_icu # isort: skip
+        tm = tmaps_icu[tmap_name]
+        tmaps[tmap_name] = tm
+        return tmaps
+    except ModuleNotFoundError:
+        logging.debug("ml4icu is not installed")
+    except KeyError:
+        logging.debug(f"{tmap_name} not found in icu tmaps")
+
     # Base tmaps: ECG
     from ml4cvd.tensormap.tensor_maps_ecg import tmaps as tmaps_ecg  # isort:skip
     tmaps.update(tmaps_ecg)
-
     if tmap_name in tmaps:
         return tmaps
 
