@@ -419,6 +419,10 @@ def plot_metric_history(history, training_steps: int, title: str, prefix="./figu
     for k in sorted(history.history.keys()):
         if not k.startswith("val_") and not k.startswith("no_"):
             if isinstance(history.history[k][0], LearningRateSchedule):
+                if training_steps is None:
+                    raise NotImplementedError(
+                        f"cannot plot learning rate schedule without training_steps",
+                    )
                 history.history[k] = [
                     history.history[k][0](i * training_steps)
                     for i in range(len(history.history[k]))
@@ -1525,7 +1529,7 @@ def plot_ecg(args):
     else:
         raise ValueError(f"Unsupported plot mode: {args.plot_mode}")
 
-    # TODO use TensorGenerator here
+    # TODO use Dataset here
     # Get tensors for all hd5
     for tp in tensor_paths:
         try:

@@ -135,7 +135,7 @@ def survival_likelihood_loss(n_intervals):
               a sample who is lost to follow up (censored) in middle time bin will have y_true [1, 0, 0, 0, 0, 0]
             y_pred: Tensor, predicted survival probability (1-hazard probability) for each time interval.
         Returns
-            Vector of losses for this minibatch.
+            Vector of losses for this batch.
         """
         failure_likelihood = 1.0 - (
             y_true[:, n_intervals:] * y_pred[:, 0:n_intervals]

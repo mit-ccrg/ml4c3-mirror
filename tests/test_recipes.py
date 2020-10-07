@@ -29,10 +29,12 @@ class TestRecipes:
             f"predictions_test.csv",
         )
         predictions = pd.read_csv(path)
-        assert (
-            len(set(predictions["sample_id"]))
-            == default_arguments.test_steps * default_arguments.batch_size
+        test_samples = pd.read_csv(
+            os.path.join(
+                default_arguments.output_folder, default_arguments.id, "test.csv",
+            ),
         )
+        assert len(set(predictions["sample_id"])) == len(test_samples)
 
     def test_explore(self, default_arguments, tmpdir_factory, utils):
         temp_dir = tmpdir_factory.mktemp("explore_tensors")

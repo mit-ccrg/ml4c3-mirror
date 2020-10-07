@@ -2,34 +2,31 @@
 import os
 import logging
 from typing import Dict, List, Tuple, Union, Optional
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 
 # Imports: third party
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from tensorflow.keras.models import Model
 
 # Imports: first party
 from ml4cvd.plots import subplot_rocs, subplot_scatters, evaluate_predictions
+from ml4cvd.datasets import BATCH_INPUT_INDEX, BATCH_PATHS_INDEX, BATCH_OUTPUT_INDEX
 from ml4cvd.definitions import CSV_EXT, Path, Paths, Inputs, Outputs, Predictions
-from ml4cvd.tensor_generators import (
-    BATCH_INPUT_INDEX,
-    BATCH_PATHS_INDEX,
-    BATCH_OUTPUT_INDEX,
-    TensorGenerator,
-)
 from ml4cvd.tensormap.TensorMap import TensorMap, find_negative_label_and_channel
 
 
 def predict_and_evaluate(
     model: Model,
-    data: Union[TensorGenerator, Tuple[Inputs, Outputs], Tuple[Inputs, Outputs, Paths]],
+    data: Union[
+        tf.data.Dataset, Tuple[Inputs, Outputs], Tuple[Inputs, Outputs, Paths],
+    ],
     tensor_maps_in: List[TensorMap],
     tensor_maps_out: List[TensorMap],
     plot_path: Path,
     data_split: str,
     save_coefficients: bool = False,
-    steps: Optional[int] = None,
     batch_size: Optional[int] = None,
     save_predictions: bool = False,
 ) -> Dict:
@@ -37,13 +34,12 @@ def predict_and_evaluate(
     Evaluate model on dataset, save plots, and return performance metrics
 
     :param model: Model
-    :param data: TensorGenerator or tuple of inputs, outputs, and optionally paths
+    :param data: tensorflow Dataset or tuple of inputs, outputs, and optionally paths
     :param tensor_maps_in: Input maps
     :param tensor_maps_out: Output maps
     :param plot_path: Path to directory to save plots to
     :param data_split: Name of data split
     :param save_coefficients: Save model coefficients
-    :param steps: Number of batches to use, required if data is a TensorGenerator
     :param batch_size: Number of samples to use in a batch, required if data is a tuple input and output numpy arrays
     :param save_predictions: If true, save predicted and actual output values to a csv
 
@@ -88,7 +84,7 @@ def predict_and_evaluate(
         df.round(3).to_csv(path_or_buf=fname, index=False)
 
     y_predictions, output_data, data_paths = _get_predictions_from_data(
-        model=model, data=data, steps=steps, batch_size=batch_size,
+        model=model, data=data, batch_size=batch_size,
     )
 
     if save_predictions:
@@ -150,19 +146,16 @@ def predict_and_evaluate(
 
 def _get_predictions_from_data(
     model: Model,
-    data: Union[TensorGenerator, Tuple[Inputs, Outputs], Tuple[Inputs, Outputs, Paths]],
-    steps: Optional[int],
+    data: Union[
+        tf.data.Dataset, Tuple[Inputs, Outputs], Tuple[Inputs, Outputs, Paths],
+    ],
     batch_size: Optional[int],
 ) -> Tuple[Predictions, Outputs, Optional[Paths]]:
     """
-    Get model predictions, output data, and paths from data source. If data source is a TensorGenerator, each sample
-    in the dataset will be used no more than once. In the case where steps * batch_size > num_samples, each sample
-    is used exactly once. If data source is a tuple of inputs and outputs, it is up to the user to provide the
-    correct number of samples.
+    Get model predictions, output data, and paths from data source. Data must not be infinite.
 
     :param model: Model
-    :param data: TensorGenerator or tuple of inputs, outputs, and optionally paths
-    :param steps: Number of batches to use, required if data is a TensorGenerator
+    :param data: finite tensorflow Dataset or tuple of inputs, outputs, and optionally paths
     :param batch_size: Number of samples to use in a batch, required if data is a tuple input and output numpy arrays
     :return: Tuple of predictions as a list of numpy arrays, a dictionary of output data, and optionally paths
     """
@@ -181,58 +174,42 @@ def _get_predictions_from_data(
                 f"When providing data as tuple of inputs and outputs, batch_size is required, got {batch_size}",
             )
 
-        y_predictions = model.predict(input_data, batch_size=batch_size)
+        y_predictions = model.predict(x=input_data, batch_size=batch_size)
         if not isinstance(y_predictions, list):
             y_predictions = [y_predictions]
-    elif isinstance(data, TensorGenerator):
-        if steps is None:
-            raise ValueError(
-                f"When providing data as a generator, steps is required, got {steps}",
-            )
+    elif isinstance(data, tf.data.Dataset):
+        y_prediction_batches = defaultdict(list)
+        output_data_batches = defaultdict(list)
+        path_batches = []
 
-        # no need for deterministic operation, we truncate after the first true epoch of
-        # samples which is guaranteed to be unique, order within true epoch does not matter
-        data.reset()
-        batch_size = data.batch_size
-        data_length = steps * batch_size
-        y_predictions = [np.zeros((data_length,) + tm.shape) for tm in data.output_maps]
-        output_data = {
-            tm.output_name: np.zeros((data_length,) + tm.shape)
-            for tm in data.output_maps
-        }
-        paths = [] if data.keep_paths else None
-        for step in range(steps):
-            start_idx = step * batch_size
-            end_idx = start_idx + batch_size
-            batch = next(data)
+        for batch in data:
+            batch_y_predictions = model.predict(batch[BATCH_INPUT_INDEX])
 
             # for single output models, prediction is an ndarray
             # for multi output models, predictions are a list of ndarrays
-            batch_y_predictions = model.predict(batch[BATCH_INPUT_INDEX])
             if not isinstance(batch_y_predictions, list):
                 batch_y_predictions = [batch_y_predictions]
-            for i in range(len(y_predictions)):
-                y_predictions[i][start_idx:end_idx] = batch_y_predictions[i]
+            for prediction_idx, batch_y_prediction in enumerate(batch_y_predictions):
+                y_prediction_batches[prediction_idx].append(batch_y_prediction)
 
-            for output_name, output_tensor in batch[BATCH_OUTPUT_INDEX].items():
-                output_data[output_name][start_idx:end_idx] = output_tensor
+            output_data_batch = batch[BATCH_OUTPUT_INDEX]
+            for output_name, output_tensor in output_data_batch.items():
+                output_data_batches[output_name].append(output_tensor.numpy())
 
-            if data.keep_paths:
-                paths.extend(batch[BATCH_PATHS_INDEX])
+            if len(batch) == 3:
+                path_batches.append(batch[BATCH_PATHS_INDEX].numpy().astype(str))
 
-            # truncate arrays to only use each sample exactly once
-            if data.true_epoch_successful_samples is not None:
-                num_samples = data.true_epoch_successful_samples
-                if end_idx >= num_samples:
-                    for i in range(len(y_predictions)):
-                        y_predictions[i] = y_predictions[i][:num_samples]
-                    for output_name in output_data:
-                        # fmt: off
-                        output_data[output_name] = output_data[output_name][:num_samples]
-                        # fmt: on
-                    if data.keep_paths:
-                        paths = paths[:num_samples]
-                    break
+        y_predictions = [
+            np.concatenate(y_prediction_batches[prediction_idx])
+            for prediction_idx in sorted(y_prediction_batches)
+        ]
+        output_data = {
+            output_name: np.concatenate(output_data_batches[output_name])
+            for output_name in output_data_batches
+        }
+        paths = (
+            None if len(path_batches) == 0 else np.concatenate(path_batches).tolist()
+        )
     else:
         raise NotImplementedError(
             f"Cannot get data for inference from data of type {type(data).__name__}: {data}",

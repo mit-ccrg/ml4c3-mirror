@@ -6,29 +6,24 @@ from timeit import default_timer as timer
 from typing import Dict
 
 # Imports: third party
-import numpy as np
 from tensorflow.keras.utils import model_to_dot
 from tensorflow.keras.models import Model
 
 # Imports: first party
-from ml4cvd.plots import plot_ecg, plot_metric_history
+from ml4cvd.plots import plot_ecg
 from ml4cvd.models import (
     make_shallow_model,
+    train_model_from_datasets,
     _save_architecture_diagram,
-    train_model_from_generators,
     make_multimodal_multitask_model,
 )
+from ml4cvd.datasets import get_verbose_stats_string, train_valid_test_datasets
 from ml4cvd.arguments import parse_args
 from ml4cvd.definitions import IMAGE_EXT, MODEL_EXT
 from ml4cvd.evaluations import predict_and_evaluate
 from ml4cvd.explorations import explore
 from ml4cvd.tensorizer_ecg import tensorize_ecg
 from ml4cvd.hyperoptimizers import hyperoptimize
-from ml4cvd.tensor_generators import (
-    TensorGenerator,
-    get_verbose_stats_string,
-    train_valid_test_tensor_generators,
-)
 
 
 def run(args: argparse.Namespace):
@@ -78,16 +73,27 @@ def build_multimodal_multitask(args: argparse.Namespace) -> Model:
 
 
 def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
-    generate_train, generate_valid, generate_test = train_valid_test_tensor_generators(
-        **args.__dict__
+    datasets, stats, cleanups = train_valid_test_datasets(
+        tensor_maps_in=args.tensor_maps_in,
+        tensor_maps_out=args.tensor_maps_out,
+        tensors=args.tensors,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        sample_csv=args.sample_csv,
+        valid_ratio=args.valid_ratio,
+        test_ratio=args.test_ratio,
+        train_csv=args.train_csv,
+        valid_csv=args.valid_csv,
+        test_csv=args.test_csv,
+        output_folder=args.output_folder,
+        run_id=args.id,
     )
+    train_dataset, valid_dataset, test_dataset = datasets
     model = make_multimodal_multitask_model(**args.__dict__)
-    model, history = train_model_from_generators(
+    model, history = train_model_from_datasets(
         model=model,
-        generate_train=generate_train,
-        generate_valid=generate_valid,
-        training_steps=args.training_steps,
-        validation_steps=args.validation_steps,
+        train_dataset=train_dataset,
+        valid_dataset=valid_dataset,
         epochs=args.epochs,
         patience=args.patience,
         learning_rate_patience=args.learning_rate_patience,
@@ -100,8 +106,7 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
     out_path = os.path.join(args.output_folder, args.id + "/")
     predict_and_evaluate(
         model=model,
-        data=generate_train,
-        steps=args.training_steps,
+        data=train_dataset,
         tensor_maps_in=args.tensor_maps_in,
         tensor_maps_out=args.tensor_maps_out,
         plot_path=out_path,
@@ -109,46 +114,58 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
     )
     performance_metrics = predict_and_evaluate(
         model=model,
-        data=generate_test,
-        steps=args.test_steps,
+        data=test_dataset,
         tensor_maps_in=args.tensor_maps_in,
         tensor_maps_out=args.tensor_maps_out,
         plot_path=out_path,
         data_split="test",
     )
 
-    generate_train.kill_workers()
-    generate_valid.kill_workers()
-    generate_test.kill_workers()
+    for cleanup in cleanups:
+        cleanup()
 
     logging.info(f"Model trained for {len(history.history['loss'])} epochs")
-
-    if isinstance(generate_train, TensorGenerator):
-        logging.info(
-            get_verbose_stats_string(
-                {
-                    "train": generate_train,
-                    "valid": generate_valid,
-                    "test": generate_test,
-                },
-            ),
-        )
+    logging.info(
+        get_verbose_stats_string(
+            split_stats={
+                "train": stats[0].stats,
+                "valid": stats[1].stats,
+                "test": stats[2].stats,
+            },
+            input_maps=args.tensor_maps_in,
+            output_maps=args.tensor_maps_out,
+        ),
+    )
     return performance_metrics
 
 
 def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
-    _, _, generate_test = train_valid_test_tensor_generators(
-        no_empty_paths_allowed=False, **args.__dict__
+    datasets, stats, cleanups = train_valid_test_datasets(
+        tensor_maps_in=args.tensor_maps_in,
+        tensor_maps_out=args.tensor_maps_out,
+        tensors=args.tensors,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        sample_csv=args.sample_csv,
+        valid_ratio=args.valid_ratio,
+        test_ratio=args.test_ratio,
+        train_csv=args.train_csv,
+        valid_csv=args.valid_csv,
+        test_csv=args.test_csv,
+        output_folder=args.output_folder,
+        run_id=args.id,
+        no_empty_paths_allowed=False,
     )
+    _, _, test_dataset = datasets
+
     model = make_multimodal_multitask_model(**args.__dict__)
     out_path = os.path.join(args.output_folder, args.id + "/")
     data_split = "test"
     if args.test_csv is not None:
         data_split = os.path.splitext(os.path.basename(args.test_csv))[0]
-    return predict_and_evaluate(
+    performance_metrics = predict_and_evaluate(
         model=model,
-        data=generate_test,
-        steps=args.test_steps,
+        data=test_dataset,
         tensor_maps_in=args.tensor_maps_in,
         tensor_maps_out=args.tensor_maps_out,
         plot_path=out_path,
@@ -156,15 +173,32 @@ def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         save_predictions=True,
     )
 
+    for cleanup in cleanups:
+        cleanup()
+    return performance_metrics
+
 
 def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
     """
     Train shallow model (e.g. linear or logistic regression) and return performance metrics.
     """
-    # Create generators
-    generate_train, generate_valid, generate_test = train_valid_test_tensor_generators(
-        **args.__dict__
+    # Create datasets
+    datasets, stats, cleanups = train_valid_test_datasets(
+        tensor_maps_in=args.tensor_maps_in,
+        tensor_maps_out=args.tensor_maps_out,
+        tensors=args.tensors,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        sample_csv=args.sample_csv,
+        valid_ratio=args.valid_ratio,
+        test_ratio=args.test_ratio,
+        train_csv=args.train_csv,
+        valid_csv=args.valid_csv,
+        test_csv=args.test_csv,
+        output_folder=args.output_folder,
+        run_id=args.id,
     )
+    train_dataset, valid_dataset, test_dataset = datasets
 
     # Initialize shallow model
     model = make_shallow_model(
@@ -173,20 +207,17 @@ def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
         optimizer=args.optimizer,
         learning_rate=args.learning_rate,
         learning_rate_schedule=args.learning_rate_schedule,
-        training_steps=args.training_steps,
         model_file=args.model_file,
         donor_layers=args.donor_layers,
         l1=args.l1,
         l2=args.l2,
     )
 
-    # Train model using generators
-    model = train_model_from_generators(
+    # Train model using datasets
+    model = train_model_from_datasets(
         model=model,
-        generate_train=generate_train,
-        generate_valid=generate_valid,
-        training_steps=args.training_steps,
-        validation_steps=args.validation_steps,
+        train_dataset=train_dataset,
+        valid_dataset=valid_dataset,
         epochs=args.epochs,
         patience=args.patience,
         learning_rate_patience=args.learning_rate_patience,
@@ -199,8 +230,7 @@ def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
     plot_path = os.path.join(args.output_folder, args.id + "/")
     predict_and_evaluate(
         model=model,
-        data=generate_train,
-        steps=args.training_steps,
+        data=train_dataset,
         tensor_maps_in=args.tensor_maps_in,
         tensor_maps_out=args.tensor_maps_out,
         plot_path=plot_path,
@@ -208,17 +238,15 @@ def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
     )
     performance_metrics = predict_and_evaluate(
         model=model,
-        data=generate_test,
-        steps=args.test_steps,
+        data=test_dataset,
         tensor_maps_in=args.tensor_maps_in,
         tensor_maps_out=args.tensor_maps_out,
         plot_path=plot_path,
         data_split="test",
         save_coefficients=True,
     )
-    generate_train.kill_workers()
-    generate_valid.kill_workers()
-    generate_test.kill_workers()
+    for cleanup in cleanups:
+        cleanup()
     return performance_metrics
 
 

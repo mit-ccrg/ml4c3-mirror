@@ -357,24 +357,6 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--training_steps",
-        default=400,
-        type=int,
-        help="Number of minibatches to examine in an epoch: train split",
-    )
-    parser.add_argument(
-        "--validation_steps",
-        default=40,
-        type=int,
-        help="Number of minibatches to examine in an epoch: validation split",
-    )
-    parser.add_argument(
-        "--test_steps",
-        default=32,
-        type=int,
-        help="Number of minibatches to examine in an epoch: test split",
-    )
-    parser.add_argument(
         "--learning_rate",
         default=0.0002,
         type=float,
@@ -510,24 +492,6 @@ def parse_args() -> argparse.Namespace:
         default=multiprocessing.cpu_count(),
         type=int,
         help="Number of workers to use for every tensor generator.",
-    )
-    parser.add_argument(
-        "--cache_size",
-        default=3.5e9 / multiprocessing.cpu_count(),
-        type=float,
-        help=(
-            "Tensor map cache size per worker. Only compatible with legacy"
-            " TensorGenerator."
-        ),
-    )
-    parser.add_argument(
-        "--legacy_tensor_generator",
-        action="store_true",
-        help=(
-            "Use legacy version of Tensor Generator. Legacy version is buggy and should"
-            " only be used if absolutely necessary. Current version is faster and more"
-            " reliable."
-        ),
     )
 
     # Explore arguments
@@ -744,6 +708,11 @@ def _process_args(args: argparse.Namespace):
         raise ValueError(
             "Activation, normalization, and regularization layers must each be listed"
             f" exactly once for valid ordering. Got : {args.layer_order}",
+        )
+
+    if args.num_workers <= 0:
+        raise ValueError(
+            f"num_workers must be a positive integer, got: {args.num_workers}",
         )
 
     if args.remap_layer is not None:
