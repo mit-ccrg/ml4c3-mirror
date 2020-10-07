@@ -235,7 +235,11 @@ def _deidentify_sts_csv(path, mrn_map):
         df.columns = df.iloc[0]
         df = df[1:]
 
-    matches = {col for col in df.columns for mrn_col in MRN_COLUMNS if mrn_col in col}
+    # Cast each column name in df to string (in case column name is an int)
+    # and check if defined MRN column names match the column names in the df
+    matches = {
+        col for col in df.columns for mrn_col in MRN_COLUMNS if mrn_col in str(col)
+    }
     if len(matches) == 0:
         # If none of the known MRN columns are in the csv, assume it's the first column
         mrn_cols = [df.columns[0]]
