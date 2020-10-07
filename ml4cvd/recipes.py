@@ -2,6 +2,7 @@
 import os
 import logging
 import argparse
+import multiprocessing as mp
 from timeit import default_timer as timer
 from typing import Dict
 
@@ -52,6 +53,8 @@ def run(args: argparse.Namespace):
 
     except Exception as e:
         logging.exception(e)
+        for child in mp.active_children():
+            child.terminate()
 
     end_time = timer()
     elapsed_time = end_time - start_time
