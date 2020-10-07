@@ -207,10 +207,10 @@ def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
         optimizer=args.optimizer,
         learning_rate=args.learning_rate,
         learning_rate_schedule=args.learning_rate_schedule,
-        model_file=args.model_file,
-        donor_layers=args.donor_layers,
         l1=args.l1,
         l2=args.l2,
+        model_file=args.model_file,
+        donor_layers=args.donor_layers,
     )
 
     # Train model using datasets
