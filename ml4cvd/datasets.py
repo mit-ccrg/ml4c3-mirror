@@ -293,6 +293,9 @@ def train_valid_test_datasets(
     :param run_id: id of experiment
     :return: tuple of three tensorflow Datasets, three StatsWrapper objects, and three callbacks to cleanup worker processes
     """
+    if len(tensor_maps_in) == 0 or len(tensor_maps_out) == 0:
+        raise ValueError(f"input and output tensors must both be given")
+
     train_paths, valid_paths, test_paths = get_train_valid_test_paths(
         tensors=tensors,
         sample_csv=sample_csv,
