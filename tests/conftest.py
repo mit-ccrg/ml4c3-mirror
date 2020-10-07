@@ -1,6 +1,7 @@
 # Imports: standard library
 import os
 import sys
+import multiprocessing as mp
 from typing import Dict, List, Tuple
 from itertools import product
 
@@ -156,3 +157,8 @@ def default_arguments(tmpdir_factory, utils):
     ]
     args = parse_args()
     return args
+
+
+def pytest_exception_interact(node, call, report):
+    for child in mp.active_children():
+        child.terminate()
