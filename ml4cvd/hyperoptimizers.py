@@ -15,10 +15,10 @@ from skimage.filters import threshold_otsu
 
 # Imports: first party
 from ml4cvd.plots import plot_metric_history
-from ml4cvd.models import train_model_from_generators, make_multimodal_multitask_model
+from ml4cvd.models import train_model_from_datasets, make_multimodal_multitask_model
+from ml4cvd.datasets import train_valid_test_datasets
 from ml4cvd.definitions import IMAGE_EXT, Arguments
 from ml4cvd.evaluations import predict_and_evaluate
-from ml4cvd.tensor_generators import train_valid_test_tensor_generators
 from ml4cvd.tensormap.TensorMap import TensorMap, update_tmaps
 
 # fmt: off
@@ -165,17 +165,26 @@ def hyperparameter_optimizer(
                 )
                 return MAX_LOSS
 
-            (
-                generate_train,
-                generate_valid,
-                generate_test,
-            ) = train_valid_test_tensor_generators(**args.__dict__)
-            model, history = train_model_from_generators(
+            datasets, stats, cleanups = train_valid_test_datasets(
+                tensor_maps_in=args.tensor_maps_in,
+                tensor_maps_out=args.tensor_maps_out,
+                tensors=args.tensors,
+                batch_size=args.batch_size,
+                num_workers=args.num_workers,
+                sample_csv=args.sample_csv,
+                valid_ratio=args.valid_ratio,
+                test_ratio=args.test_ratio,
+                train_csv=args.train_csv,
+                valid_csv=args.valid_csv,
+                test_csv=args.test_csv,
+                output_folder=args.output_folder,
+                run_id=args.id,
+            )
+            train_dataset, valid_dataset, test_dataset = datasets
+            model, history = train_model_from_datasets(
                 model=model,
-                generate_train=generate_train,
-                generate_valid=generate_valid,
-                training_steps=args.training_steps,
-                validation_steps=args.validation_steps,
+                train_dataset=train_dataset,
+                valid_dataset=valid_dataset,
                 epochs=args.epochs,
                 patience=args.patience,
                 learning_rate_patience=args.learning_rate_patience,
@@ -189,8 +198,7 @@ def hyperparameter_optimizer(
             histories.append(history.history)
             train_auc = predict_and_evaluate(
                 model=model,
-                data=generate_train,
-                steps=args.training_steps,
+                data=train_dataset,
                 tensor_maps_in=args.tensor_maps_in,
                 tensor_maps_out=args.tensor_maps_out,
                 plot_path=os.path.join(trials_path, trial_id),
@@ -198,8 +206,7 @@ def hyperparameter_optimizer(
             )
             test_auc = predict_and_evaluate(
                 model=model,
-                data=generate_test,
-                steps=args.test_steps,
+                data=test_dataset,
                 tensor_maps_in=args.tensor_maps_in,
                 tensor_maps_out=args.tensor_maps_out,
                 plot_path=os.path.join(trials_path, trial_id),
@@ -208,7 +215,7 @@ def hyperparameter_optimizer(
             auc = {"train": train_auc, "test": test_auc}
             aucs.append(auc)
             plot_metric_history(
-                history, args.training_steps, "", os.path.join(trials_path, trial_id),
+                history, None, "", os.path.join(trials_path, trial_id),
             )
             logging.info(
                 f"Current architecture:\n{_string_from_architecture_dict(x)}\nCurrent"
@@ -217,18 +224,17 @@ def hyperparameter_optimizer(
 
             logging.info(f"Iteration {i} / {args.max_evals} max evaluations")
 
-            loss_and_metrics = model.evaluate(generate_train, steps=args.training_steps)
+            loss_and_metrics = model.evaluate(train_dataset)
             logging.info(f"Train loss: {loss_and_metrics[0]:0.3f}")
 
-            loss_and_metrics = model.evaluate(generate_test, steps=args.test_steps)
+            loss_and_metrics = model.evaluate(test_dataset)
             logging.info(f"Test loss: {loss_and_metrics[0]:0.3f}")
 
             logging.info(f"Train AUC(s): {train_auc}")
             logging.info(f"Test AUC(s): {test_auc}")
 
-            generate_train.kill_workers()
-            generate_valid.kill_workers()
-            generate_test.kill_workers()
+            for cleanup in cleanups:
+                cleanup()
             return loss_and_metrics[0]
 
         except ValueError:

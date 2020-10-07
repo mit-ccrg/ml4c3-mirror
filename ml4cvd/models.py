@@ -68,7 +68,6 @@ from ml4cvd.plots import plot_metric_history
 from ml4cvd.metrics import get_metric_dict
 from ml4cvd.optimizers import NON_KERAS_OPTIMIZERS, get_optimizer
 from ml4cvd.definitions import IMAGE_EXT, MODEL_EXT
-from ml4cvd.tensor_generators import TensorGenerator
 from ml4cvd.tensormap.TensorMap import TensorMap
 
 CHANNEL_AXIS = -1  # Set to 1 for Theano backend
@@ -95,7 +94,6 @@ def make_shallow_model(
     optimizer: str,
     learning_rate: float,
     learning_rate_schedule: str,
-    training_steps: int,
     model_file: str = None,
     donor_layers: str = None,
     l1: float = None,
@@ -109,7 +107,6 @@ def make_shallow_model(
     :param optimizer: which optimizer to use. See optimizers.py.
     :param learning_rate: Size of learning steps in SGD optimization
     :param learning_rate_schedule: learning rate schedule to train with, e.g. triangular
-    :param training_steps: How many training steps to train the model. Only needed if learning_rate_schedule given
     :param model_file: Optional HD5 model file to load and return.
     :param donor_layers: Optional HD5 model file whose weights will be loaded into this model when layer names match.
     :param l1: Optional float value to use for L1 regularization. If L2 is given as well, L1_L2 regularization is used.
@@ -146,7 +143,6 @@ def make_shallow_model(
     opt = get_optimizer(
         name=optimizer,
         learning_rate=learning_rate,
-        steps_per_epoch=training_steps,
         learning_rate_schedule=learning_rate_schedule,
         optimizer_kwargs=kwargs.get("optimizer_kwargs"),
     )
@@ -896,7 +892,6 @@ def make_multimodal_multitask_model(
     pool_x: int = None,
     pool_y: int = None,
     pool_z: int = None,
-    training_steps: int = None,
     learning_rate_schedule: str = None,
     directly_embed_and_repeat: int = None,
     nest_model: List[List[str]] = None,
@@ -942,7 +937,6 @@ def make_multimodal_multitask_model(
     :param optimizer: which optimizer to use. See optimizers.py.
     :return: a compiled keras model
     :param learning_rate_schedule: learning rate schedule to train with, e.g. triangular
-    :param training_steps: How many training steps to train the model. Only needed if learning_rate_schedule given
     :param model_file: HD5 model file to load and return.
     :param donor_layers: HD5 model file whose weights will be loaded into this model when layer names match.
     :param freeze_donor_layers: Whether to freeze layers from loaded from donor_layers
@@ -954,7 +948,6 @@ def make_multimodal_multitask_model(
     opt = get_optimizer(
         name=optimizer,
         learning_rate=learning_rate,
-        steps_per_epoch=training_steps,
         learning_rate_schedule=learning_rate_schedule,
         optimizer_kwargs=kwargs.get("optimizer_kwargs"),
     )
@@ -1190,12 +1183,10 @@ def _make_multimodal_multitask_model(
     return Model(inputs=inputs, outputs=list(decoder_outputs.values()))
 
 
-def train_model_from_generators(
+def train_model_from_datasets(
     model: Model,
-    generate_train: TensorGenerator,
-    generate_valid: Optional[TensorGenerator],
-    training_steps: int,
-    validation_steps: Optional[int],
+    train_dataset: tf.data.Dataset,
+    valid_dataset: Optional[tf.data.Dataset],
     epochs: int,
     patience: int,
     learning_rate_patience: int,
@@ -1205,25 +1196,24 @@ def train_model_from_generators(
     return_history: bool = False,
     plot: bool = True,
 ) -> Union[Model, Tuple[Model, History]]:
-    """Train a model from tensor generators for validation and training data.
+    """
+    Train a model from tensorflow.data.Datasets for validation and training data.
 
-    Training data lives on disk, it will be loaded by generator functions.
+    Training data lives on disk and is dynamically loaded by the Datasets.
     Plots the metric history after training. Creates a directory to save weights, if necessary.
 
     :param model: The model to optimize
-    :param generate_train: Generator function that yields mini-batches of training data.
-    :param generate_valid: Generator function that yields mini-batches of validation data.
-    :param training_steps: Number of mini-batches in each so-called epoch
-    :param validation_steps: Number of validation mini-batches to examine after each epoch.
+    :param train_dataset: Dataset that yields batches of training data
+    :param valid_dataset: Dataset that yields batches of validation data
     :param epochs: Maximum number of epochs to run regardless of Early Stopping
-    :param patience: Number of epochs to wait before reducing learning rate.
-    :param learning_rate_patience: Number of epochs without validation loss improvement to wait before reducing learning rate.
-    :param learning_rate_reduction: Scale factor to reduce learning rate by.
+    :param patience: Number of epochs to wait before reducing learning rate
+    :param learning_rate_patience: Number of epochs without validation loss improvement to wait before reducing learning rate
+    :param learning_rate_reduction: Scale factor to reduce learning rate by
     :param output_folder: Directory where output file will be stored
     :param run_id: User-chosen string identifying this run
     :param return_history: Whether or not to return history from training
     :param plot: Whether or not to plot metrics from training
-    :return: The optimized model.
+    :return: The optimized model which achieved the best validation loss or training loss if validation data was not provided
     """
     model_file = os.path.join(output_folder, run_id, "model_weights" + MODEL_EXT)
     if not os.path.exists(os.path.dirname(model_file)):
@@ -1235,32 +1225,24 @@ def train_model_from_generators(
             os.path.join(output_folder, run_id, "architecture_graph" + IMAGE_EXT),
         )
 
-    generate_train.reset()
-
-    # Shallow models do not always use validation split
-    if generate_valid is not None:
-        generate_valid.reset()
-
     history = model.fit(
-        generate_train,
-        steps_per_epoch=training_steps,
+        x=train_dataset,
         epochs=epochs,
         verbose=1,
-        validation_steps=validation_steps,
-        validation_data=generate_valid,
+        validation_data=valid_dataset,
         callbacks=_get_callbacks(
-            model_file,
-            patience,
-            learning_rate_patience,
-            learning_rate_reduction,
-            monitor="loss" if generate_valid is None else "val_loss",
+            model_file=model_file,
+            patience=patience,
+            learning_rate_patience=learning_rate_patience,
+            learning_rate_reduction=learning_rate_reduction,
+            monitor="loss" if valid_dataset is None else "val_loss",
         ),
     )
 
     logging.info(f"Model weights saved at: {model_file}")
     if plot:
         plot_metric_history(
-            history, training_steps, run_id, os.path.dirname(model_file),
+            history, None, run_id, os.path.dirname(model_file),
         )
 
     # load the weights from model which achieved the best validation loss

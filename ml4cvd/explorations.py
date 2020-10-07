@@ -18,8 +18,8 @@ import seaborn as sns
 
 # Imports: first party
 from ml4cvd.plots import SUBPLOT_SIZE
+from ml4cvd.datasets import get_train_valid_test_paths
 from ml4cvd.definitions import IMAGE_EXT
-from ml4cvd.tensor_generators import train_valid_test_tensor_generators
 from ml4cvd.tensormap.TensorMap import (
     TensorMap,
     Interpretation,
@@ -85,15 +85,8 @@ def explore(
 
     df = _tensors_to_df(
         tensor_maps_in=required_tmaps,
-        tensor_maps_out=[],
         tensors=args.tensors,
-        batch_size=args.batch_size,
         num_workers=args.num_workers,
-        training_steps=args.training_steps,
-        validation_steps=args.validation_steps,
-        cache_size=args.cache_size,
-        balance_csvs=args.balance_csvs,
-        mixup_alpha=args.mixup_alpha,
         sample_csv=args.sample_csv,
         valid_ratio=args.valid_ratio,
         test_ratio=args.test_ratio,
@@ -168,15 +161,8 @@ def explore(
             ref_tmaps = [ref_tmaps[tm_name] for tm_name in ref_cols]
             df_ref = _tensors_to_df(
                 tensor_maps_in=ref_tmaps,
-                tensor_maps_out=[],
                 tensors=args.reference_tensors,
-                batch_size=args.batch_size,
                 num_workers=args.num_workers,
-                training_steps=args.training_steps,
-                validation_steps=args.validation_steps,
-                cache_size=args.cache_size,
-                balance_csvs=args.balance_csvs,
-                mixup_alpha=args.mixup_alpha,
                 sample_csv=args.sample_csv,
                 valid_ratio=args.valid_ratio,
                 test_ratio=args.test_ratio,
@@ -957,15 +943,8 @@ class TensorsToDataFrameParallelWrapper:
 
 def _tensors_to_df(
     tensor_maps_in: List[TensorMap],
-    tensor_maps_out: List[TensorMap],
     tensors: str,
-    batch_size: int,
     num_workers: int,
-    training_steps: int,
-    validation_steps: int,
-    cache_size: float,
-    balance_csvs: List[str],
-    mixup_alpha: float = -1.0,
     sample_csv: str = None,
     valid_ratio: float = None,
     test_ratio: float = None,
@@ -984,32 +963,21 @@ def _tensors_to_df(
     single dataframe, and return dataframe.
     """
     logging.info("Building generators for specified tensors")
-    generators = train_valid_test_tensor_generators(
-        tensor_maps_in=tensor_maps_in,
-        tensor_maps_out=tensor_maps_out,
+    train_paths, valid_paths, test_paths = get_train_valid_test_paths(
         tensors=tensors,
-        batch_size=batch_size,
-        num_workers=num_workers,
-        training_steps=training_steps,
-        validation_steps=validation_steps,
-        cache_size=cache_size,
-        balance_csvs=balance_csvs,
-        mixup_alpha=mixup_alpha,
         sample_csv=sample_csv,
         valid_ratio=valid_ratio,
         test_ratio=test_ratio,
         train_csv=train_csv,
         valid_csv=valid_csv,
         test_csv=test_csv,
-        output_folder=output_folder,
-        id=run_id,
+        no_empty_paths_allowed=False,
     )
+    paths = []
+    paths.extend(zip(train_paths, ["train"] * len(train_paths)))
+    paths.extend(zip(valid_paths, ["valid"] * len(valid_paths)))
+    paths.extend(zip(test_paths, ["test"] * len(test_paths)))
     tmaps = [tm for tm in tensor_maps_in]
-    paths = [
-        (path, gen.name.replace("_worker", ""))
-        for gen in generators
-        for path in gen.paths
-    ]
 
     TensorsToDataFrameParallelWrapper(
         tmaps=tmaps,

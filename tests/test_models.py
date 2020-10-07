@@ -80,7 +80,7 @@ def assert_model_trains(
         assert tensor.shape[1:] == tmap.shape
     data = make_training_data(input_tmaps, output_tmaps)
     history = m.fit(
-        data, steps_per_epoch=2, epochs=2, validation_data=data, validation_steps=2,
+        x=data, steps_per_epoch=2, epochs=2, validation_data=data, validation_steps=2,
     )
     for tmap in output_tmaps:
         for metric in tmap.metrics:

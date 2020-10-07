@@ -91,7 +91,7 @@ Train and evaluate a deep learning model with smart defaults.
 ```
 
 #### `infer`
-Evaluate model performance and save model predictions for inspection. The number of samples inferred is controlled by `--batch_size` and `--test_steps`
+Evaluate model performance and save model predictions for inspection.
 ```bash
 ./scripts/run.sh -t $PWD/ml4cvd/recipes.py \
 --mode infer \
@@ -99,7 +99,6 @@ Evaluate model performance and save model predictions for inspection. The number
 --input_tensors ecg_signal \
 --output_tensors patient_outcome \
 --batch_size 64 \
---test_steps 100 \
 --output_folder results \
 --id my-inference
 ```
