@@ -94,11 +94,10 @@ def make_shallow_model(
     optimizer: str,
     learning_rate: float,
     learning_rate_schedule: str,
+    l1: float,
+    l2: float,
     model_file: str = None,
     donor_layers: str = None,
-    l1: float = None,
-    l2: float = None,
-    **kwargs,
 ) -> Model:
     """Make a shallow model (e.g. linear or logistic regression)
 
@@ -107,10 +106,10 @@ def make_shallow_model(
     :param optimizer: which optimizer to use. See optimizers.py.
     :param learning_rate: Size of learning steps in SGD optimization
     :param learning_rate_schedule: learning rate schedule to train with, e.g. triangular
+    :param l1: Optional float value to use for L1 regularization.
+    :param l2: Optional float value to use for L2 regularization.
     :param model_file: Optional HD5 model file to load and return.
     :param donor_layers: Optional HD5 model file whose weights will be loaded into this model when layer names match.
-    :param l1: Optional float value to use for L1 regularization. If L2 is given as well, L1_L2 regularization is used.
-    :param l2: Optional float value to use for L2 regularization. If L1 is given as well, L1_L2 regularization is used.
     :return: a compiled keras model
     """
     if model_file is not None:
