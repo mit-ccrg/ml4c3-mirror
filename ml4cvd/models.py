@@ -98,6 +98,7 @@ def make_shallow_model(
     l2: float,
     model_file: str = None,
     donor_layers: str = None,
+    **kwargs,
 ) -> Model:
     """Make a shallow model (e.g. linear or logistic regression)
 
