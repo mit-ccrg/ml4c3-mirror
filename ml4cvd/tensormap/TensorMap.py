@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Tuple, Union, Callable, Optional
 # Imports: third party
 import h5py
 import numpy as np
-import numcodecs
 from tensorflow.keras import Model
 
 # Imports: first party
@@ -331,20 +330,6 @@ def _get_name_if_function(field: Any) -> Any:
         return field.replace("-", "").replace("_", "")
     else:
         return field
-
-
-def decompress_data(data_compressed: np.array, dtype: str) -> np.array:
-    """Decompresses a compressed byte array. If the primitive type of the data
-    to decompress is a string, calls decode using the zstd codec. If the
-    primitive type of the data to decompress is not a string (e.g. int or
-    float), the buffer is interpreted using the passed dtype."""
-    codec = numcodecs.zstd.Zstd()
-    data_decompressed = codec.decode(data_compressed)
-    if dtype == "str":
-        data = data_decompressed.decode()
-    else:
-        data = np.frombuffer(data_decompressed, dtype)
-    return data
 
 
 def outcome_channels(outcome: str):

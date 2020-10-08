@@ -52,7 +52,7 @@ import pandas as pd
 JOIN_CHAR = "_"
 MAKE_TFF_FUNCTION_NAME = "make_ecg_label_from_read_tff"
 MAKE_ANY_TFF_FUNCTION_NAME = "make_binary_ecg_label_from_any_read_tff"
-TENSOR_PATH_PREFIX = "partners_ecg_rest"
+TENSOR_PATH_PREFIX = "ECG_PREFIX"
 NEW_SCRIPT_NAME = "tensor_maps_ecg_labels.py"
 
 
@@ -149,6 +149,7 @@ if __name__ == "__main__":
     with open(path_to_new_script, "w") as py_file:
         py_file.write(f"from typing import Dict\n")
         py_file.write(f"from ml4cvd.TensorMap import TensorMap, Interpretation\n")
+        py_file.write(f"from ml4cvd.definitions import ECG_PREFIX\n")
         py_file.write(
             f"from ml4cvd.tensor_maps_ecg import {MAKE_TFF_FUNCTION_NAME}, {MAKE_ANY_TFF_FUNCTION_NAME}\n",
         )

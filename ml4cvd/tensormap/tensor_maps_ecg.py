@@ -27,7 +27,6 @@ from ml4cvd.tensormap.TensorMap import (
     TensorMap,
     Interpretation,
     TimeSeriesOrder,
-    decompress_data,
     id_from_filename,
 )
 
@@ -118,19 +117,12 @@ def make_voltage_tff(exact_length=False):
             for cm in tm.channel_map:
                 try:
                     path = _make_hd5_path(tm=tm, ecg_date=ecg_date, value_key=cm)
-                    voltage = decompress_data(
-                        data_compressed=hd5[path][()], dtype=hd5[path].attrs["dtype"],
-                    )
+                    voltage = hd5[path][()]
                     path_waveform_samplebase = _make_hd5_path(
                         tm=tm, ecg_date=ecg_date, value_key="waveform_samplebase",
                     )
                     try:
-                        fs = float(
-                            decompress_data(
-                                data_compressed=hd5[path_waveform_samplebase][()],
-                                dtype=hd5[path_waveform_samplebase].attrs["dtype"],
-                            ),
-                        )
+                        fs = float(hd5[path_waveform_samplebase][()])
                     except:
                         fs = 250
                     if exact_length:
@@ -204,12 +196,7 @@ def voltage_stat(tm, hd5):
                 else (tm.channel_map[stat],)
             )
             path = lambda lead: _make_hd5_path(tm, ecg_date, lead)
-            voltages = np.array(
-                [
-                    decompress_data(data_compressed=hd5[path(lead)][()], dtype="int16")
-                    for lead in ECG_REST_AMP_LEADS
-                ],
-            )
+            voltages = np.array([hd5[path(lead)][()] for lead in ECG_REST_AMP_LEADS])
             tensor[slices("mean")] = np.mean(voltages)
             tensor[slices("std")] = np.std(voltages)
             tensor[slices("min")] = np.min(voltages)
@@ -278,7 +265,7 @@ def make_binary_ecg_label_from_any_read_tff(
                 path = _make_hd5_path(tm, ecg_date, key)
                 if path not in hd5:
                     continue
-                read += decompress_data(data_compressed=hd5[path][()], dtype="str")
+                read += hd5[path][()]
             read = read.lower()
 
         if read != "":
@@ -316,7 +303,7 @@ def make_ecg_label_from_read_tff(
                 path = _make_hd5_path(tm, ecg_date, key)
                 if path not in hd5:
                     continue
-                read += decompress_data(data_compressed=hd5[path][()], dtype="str")
+                read += hd5[path][()]
             read = read.lower()
 
             found = False
@@ -440,7 +427,7 @@ def make_ecg_tensor(
         for i, ecg_date in enumerate(ecg_dates):
             path = _make_hd5_path(tm, ecg_date, key)
             try:
-                data = decompress_data(data_compressed=hd5[path][()], dtype="str")
+                data = hd5[path][()]
                 if tm.interpretation == Interpretation.CATEGORICAL:
                     matched = False
                     data = f"{channel_prefix}{data}"
@@ -925,20 +912,14 @@ def get_ecg_age_from_hd5(tm, hd5):
             break
         path = lambda key: _make_hd5_path(tm, ecg_date, key)
         try:
-            birthday = decompress_data(
-                data_compressed=hd5[path("dateofbirth")][()], dtype="str",
-            )
-            acquisition = decompress_data(
-                data_compressed=hd5[path("acquisitiondate")][()], dtype="str",
-            )
+            birthday = hd5[path("dateofbirth")][()]
+            acquisition = hd5[path("acquisitiondate")][()]
             delta = _ecg_str2date(acquisition) - _ecg_str2date(birthday)
             years = delta.days / YEAR_DAYS
             tensor[i] = years
         except KeyError:
             try:
-                tensor[i] = decompress_data(
-                    data_compressed=hd5[path("patientage")][()], dtype="str",
-                )
+                tensor[i] = hd5[path("patientage")][()]
             except KeyError:
                 logging.debug(
                     f"Could not get patient date of birth or age from ECG on {ecg_date}"
@@ -978,7 +959,7 @@ def ecg_acquisition_year(tm, hd5):
     for i, ecg_date in enumerate(ecg_dates):
         path = _make_hd5_path(tm, ecg_date, "acquisitiondate")
         try:
-            acquisition = decompress_data(data_compressed=hd5[path][()], dtype="str")
+            acquisition = hd5[path][()]
             tensor[i] = _ecg_str2date(acquisition).year
         except KeyError:
             pass
@@ -1002,13 +983,9 @@ def ecg_bmi(tm, hd5):
     for i, ecg_date in enumerate(ecg_dates):
         path = lambda key: _make_hd5_path(tm, ecg_date, key)
         try:
-            weight_lbs = decompress_data(
-                data_compressed=hd5[path("weightlbs")][()], dtype="str",
-            )
+            weight_lbs = hd5[path("weightlbs")][()]
             weight_kg = 0.453592 * float(weight_lbs)
-            height_in = decompress_data(
-                data_compressed=hd5[path("heightin")][()], dtype="str",
-            )
+            height_in = hd5[path("heightin")][()]
             height_m = 0.0254 * float(height_in)
             bmi = weight_kg / (height_m * height_m)
             logging.info(f" Height was {height_in} weight: {weight_lbs} bmi is {bmi}")
@@ -1036,7 +1013,7 @@ def ecg_channel_string(hd5_key, race_synonyms={}, unspecified_key=None):
             path = _make_hd5_path(tm, ecg_date, hd5_key)
             found = False
             try:
-                hd5_string = decompress_data(data_compressed=hd5[path][()], dtype="str")
+                hd5_string = hd5[path][()]
                 for key in tm.channel_map:
                     slices = (
                         (i, tm.channel_map[key]) if dynamic else (tm.channel_map[key],)
@@ -1092,20 +1069,13 @@ def _ecg_adult(hd5_key, minimum_age=18):
         tensor = np.zeros(shape, dtype=np.float32)
         for i, ecg_date in enumerate(ecg_dates):
             path = lambda key: _make_hd5_path(tm, ecg_date, key)
-            birthday = decompress_data(
-                data_compressed=hd5[path("dateofbirth")][()], dtype="str",
-            )
-            acquisition = decompress_data(
-                data_compressed=hd5[path("acquisitiondate")][()], dtype="str",
-            )
+            birthday = hd5[path("dateofbirth")][()]
+            acquisition = hd5[path("acquisitiondate")][()]
             delta = _ecg_str2date(acquisition) - _ecg_str2date(birthday)
             years = delta.days / YEAR_DAYS
             if years < minimum_age:
                 raise ValueError(f"ECG taken on patient below age cutoff.")
-            hd5_string = decompress_data(
-                data_compressed=hd5[path(hd5_key)][()],
-                dtype=hd5[path(hd5_key)].attrs["dtype"],
-            )
+            hd5_string = hd5[path(hd5_key)][()]
             found = False
             for key in tm.channel_map:
                 if hd5_string.lower() == key.lower():
@@ -1143,9 +1113,7 @@ def voltage_zeros(tm, hd5):
     for i, ecg_date in enumerate(ecg_dates):
         for cm in tm.channel_map:
             path = _make_hd5_path(tm, ecg_date, cm)
-            voltage = decompress_data(
-                data_compressed=hd5[path][()], dtype=hd5[path].attrs["dtype"],
-            )
+            voltage = hd5[path][()]
             slices = (i, tm.channel_map[cm]) if dynamic else (tm.channel_map[cm],)
             tensor[slices] = np.count_nonzero(voltage == 0)
     return tensor

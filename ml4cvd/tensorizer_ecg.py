@@ -15,10 +15,15 @@ from collections import defaultdict
 import bs4
 import h5py
 import numpy as np
-import numcodecs
 
 # Imports: first party
 from ml4cvd.definitions import XML_EXT, TENSOR_EXT
+
+excluded_keys = {
+    "acquisitiondate",
+    "acquisitiontime",
+    "ageunits",
+}
 
 
 def tensorize_ecg(args: argparse.Namespace):
@@ -334,37 +339,12 @@ def _get_voltage_from_lead_tags(
 
 
 def _compress_and_save_data(
-    hd5: h5py.Group,
-    name: str,
-    data: Union[str, np.ndarray],
-    dtype: str,
-    method: str = "zstd",
-    compression_opts: int = 19,
-) -> None:
-    # Define codec
-    codec = numcodecs.zstd.Zstd(level=compression_opts)
-
-    # If data is string, encode to bytes
-    if dtype == "str":
-        # do not save empty string, cannot be decoded
-        if data == "":
-            return
-        data_compressed = codec.encode(data.encode())
-        dsize = len(data.encode())
-    else:
-        data_compressed = codec.encode(data)
-        dsize = len(data) * data.itemsize
-
-    # Save data to HD5
-    dat = hd5.create_dataset(name=name, data=np.void(data_compressed))
-
-    # Set attributes
-    dat.attrs["method"] = method
-    dat.attrs["compression_level"] = compression_opts
-    dat.attrs["len"] = len(data)
-    dat.attrs["uncompressed_length"] = dsize
-    dat.attrs["compressed_length"] = len(data_compressed)
-    dat.attrs["dtype"] = dtype
+    hd5: h5py.Group, name: str, data: Union[str, np.ndarray],
+) -> h5py.Dataset:
+    compression = None
+    if isinstance(data, np.ndarray):
+        compression = 32015
+    return hd5.create_dataset(name=name, data=data, compression=compression)
 
 
 def _get_max_voltage(voltage: Dict[str, np.ndarray]) -> float:
@@ -420,19 +400,21 @@ def _convert_xml_to_hd5(fpath_xml: str, fpath_hd5: str, hd5: h5py.Group) -> int:
         voltage = ecg_data.pop("voltage")
         for lead in voltage:
             _compress_and_save_data(
-                hd5=gp, name=lead, data=voltage[lead].astype("int16"), dtype="int16",
+                hd5=gp, name=lead, data=voltage[lead].astype("int16"),
             )
 
         # Save everything else
         for key in ecg_data:
-            _compress_and_save_data(hd5=gp, name=key, data=ecg_data[key], dtype="str")
+            if key in excluded_keys:
+                continue
+            _compress_and_save_data(hd5=gp, name=key, data=ecg_data[key])
 
         # Clean Patient MRN to only numbers
         key_mrn_clean = "patientid_clean"
         if "patientid" in ecg_data:
             mrn_clean = _clean_mrn(ecg_data["patientid"], fallback="")
             _compress_and_save_data(
-                hd5=gp, name=key_mrn_clean, data=mrn_clean, dtype="str",
+                hd5=gp, name=key_mrn_clean, data=mrn_clean,
             )
 
         # Clean cardiologist read
@@ -441,7 +423,7 @@ def _convert_xml_to_hd5(fpath_xml: str, fpath_hd5: str, hd5: h5py.Group) -> int:
         if key_read_md in ecg_data:
             read_md_clean = _clean_read_text(text=ecg_data[key_read_md])
             _compress_and_save_data(
-                hd5=gp, name=key_read_md_clean, data=read_md_clean, dtype="str",
+                hd5=gp, name=key_read_md_clean, data=read_md_clean,
             )
 
         # Clean MUSE read
@@ -450,7 +432,7 @@ def _convert_xml_to_hd5(fpath_xml: str, fpath_hd5: str, hd5: h5py.Group) -> int:
         if key_read_pc in ecg_data:
             read_pc_clean = _clean_read_text(text=ecg_data[key_read_pc])
             _compress_and_save_data(
-                hd5=gp, name=key_read_pc_clean, data=read_pc_clean, dtype="str",
+                hd5=gp, name=key_read_pc_clean, data=read_pc_clean,
             )
 
         logging.info(f"Wrote {fpath_xml} to {fpath_hd5}")
@@ -519,7 +501,8 @@ def _convert_mrn_xmls_to_hd5(
             except:
                 logging.warning(f"Could not delete empty HD5 at {fpath_hd5}")
         num_hd5_written = 1 if num_xml_converted else 0
-    except:
+    except Exception as e:
+        logging.warning(e)
         _move_bad_files(
             fpath_xmls=fpath_xmls,
             fpath_hd5=fpath_hd5,
@@ -538,7 +521,7 @@ def _convert_mrn_xmls_to_hd5_wrapper(
     num_workers: int,
     bad_xml_dir: str,
     bad_hd5_dir: str,
-    hd5_prefix: str = "partners_ecg_rest",
+    hd5_prefix: str = "ecg",
 ):
     tot_xml = sum([len(v) for k, v in mrn_xmls_map.items()])
     os.makedirs(dir_hd5, exist_ok=True)
