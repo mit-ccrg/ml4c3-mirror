@@ -10,7 +10,6 @@ ipywidgets>=7.5.1
 jupyterlab
 lxml
 neurokit2
-numcodecs
 pydot>=1.2.4
 pylint
 pytz

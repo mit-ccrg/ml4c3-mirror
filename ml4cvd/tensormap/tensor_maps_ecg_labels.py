@@ -3,6 +3,7 @@ from typing import Dict
 
 # Imports: first party
 from ml4cvd.validators import validator_not_all_zero
+from ml4cvd.definitions import ECG_PREFIX
 from ml4cvd.tensormap.TensorMap import TensorMap, Interpretation
 from ml4cvd.tensormap.tensor_maps_ecg import (
     make_ecg_label_from_read_tff,
@@ -14,7 +15,7 @@ tmaps["asystole"] = TensorMap(
     "asystole",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_asystole": 0, "asystole": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -28,7 +29,7 @@ tmaps["asystole"] = TensorMap(
 tmaps["asystole_any"] = TensorMap(
     "asystole_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_asystole": 0, "asystole": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -43,7 +44,7 @@ tmaps["atrial_fibrillation"] = TensorMap(
     "atrial_fibrillation",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_atrial_fibrillation": 0, "atrial_fibrillation": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -69,7 +70,7 @@ tmaps["atrial_fibrillation"] = TensorMap(
 tmaps["atrial_fibrillation_any"] = TensorMap(
     "atrial_fibrillation_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_atrial_fibrillation": 0, "atrial_fibrillation": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -96,7 +97,7 @@ tmaps["atrial_flutter"] = TensorMap(
     "atrial_flutter",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_atrial_flutter": 0, "atrial_flutter": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -122,7 +123,7 @@ tmaps["atrial_flutter"] = TensorMap(
 tmaps["atrial_flutter_any"] = TensorMap(
     "atrial_flutter_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_atrial_flutter": 0, "atrial_flutter": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -149,7 +150,7 @@ tmaps["atrial_paced_rhythm"] = TensorMap(
     "atrial_paced_rhythm",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_atrial_paced_rhythm": 0, "atrial_paced_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -163,7 +164,7 @@ tmaps["atrial_paced_rhythm"] = TensorMap(
 tmaps["atrial_paced_rhythm_any"] = TensorMap(
     "atrial_paced_rhythm_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_atrial_paced_rhythm": 0, "atrial_paced_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -178,7 +179,7 @@ tmaps["ectopic_atrial_bradycardia"] = TensorMap(
     "ectopic_atrial_bradycardia",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ectopic_atrial_bradycardia": 0, "ectopic_atrial_bradycardia": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -197,7 +198,7 @@ tmaps["ectopic_atrial_bradycardia"] = TensorMap(
 tmaps["ectopic_atrial_bradycardia_any"] = TensorMap(
     "ectopic_atrial_bradycardia_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ectopic_atrial_bradycardia": 0, "ectopic_atrial_bradycardia": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -217,7 +218,7 @@ tmaps["ectopic_atrial_rhythm"] = TensorMap(
     "ectopic_atrial_rhythm",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ectopic_atrial_rhythm": 0, "ectopic_atrial_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -255,7 +256,7 @@ tmaps["ectopic_atrial_rhythm"] = TensorMap(
 tmaps["ectopic_atrial_rhythm_any"] = TensorMap(
     "ectopic_atrial_rhythm_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ectopic_atrial_rhythm": 0, "ectopic_atrial_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -294,7 +295,7 @@ tmaps["ectopic_atrial_tachycardia"] = TensorMap(
     "ectopic_atrial_tachycardia",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ectopic_atrial_tachycardia": 0, "ectopic_atrial_tachycardia": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -321,7 +322,7 @@ tmaps["ectopic_atrial_tachycardia"] = TensorMap(
 tmaps["ectopic_atrial_tachycardia_any"] = TensorMap(
     "ectopic_atrial_tachycardia_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ectopic_atrial_tachycardia": 0, "ectopic_atrial_tachycardia": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -349,7 +350,7 @@ tmaps["narrow_qrs_tachycardia"] = TensorMap(
     "narrow_qrs_tachycardia",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_narrow_qrs_tachycardia": 0, "narrow_qrs_tachycardia": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -369,7 +370,7 @@ tmaps["narrow_qrs_tachycardia"] = TensorMap(
 tmaps["narrow_qrs_tachycardia_any"] = TensorMap(
     "narrow_qrs_tachycardia_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_narrow_qrs_tachycardia": 0, "narrow_qrs_tachycardia": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -390,7 +391,7 @@ tmaps["pulseless_electrical_activity"] = TensorMap(
     "pulseless_electrical_activity",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_pulseless_electrical_activity": 0,
         "pulseless_electrical_activity": 1,
@@ -412,7 +413,7 @@ tmaps["pulseless_electrical_activity"] = TensorMap(
 tmaps["pulseless_electrical_activity_any"] = TensorMap(
     "pulseless_electrical_activity_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_pulseless_electrical_activity": 0,
         "pulseless_electrical_activity": 1,
@@ -435,7 +436,7 @@ tmaps["retrograde_atrial_activation"] = TensorMap(
     "retrograde_atrial_activation",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_retrograde_atrial_activation": 0,
         "retrograde_atrial_activation": 1,
@@ -454,7 +455,7 @@ tmaps["retrograde_atrial_activation"] = TensorMap(
 tmaps["retrograde_atrial_activation_any"] = TensorMap(
     "retrograde_atrial_activation_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_retrograde_atrial_activation": 0,
         "retrograde_atrial_activation": 1,
@@ -474,7 +475,7 @@ tmaps["sinus_arrest"] = TensorMap(
     "sinus_arrest",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_sinus_arrest": 0, "sinus_arrest": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -488,7 +489,7 @@ tmaps["sinus_arrest"] = TensorMap(
 tmaps["sinus_arrest_any"] = TensorMap(
     "sinus_arrest_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_sinus_arrest": 0, "sinus_arrest": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -503,7 +504,7 @@ tmaps["sinus_pause"] = TensorMap(
     "sinus_pause",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_sinus_pause": 0, "sinus_pause": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -517,7 +518,7 @@ tmaps["sinus_pause"] = TensorMap(
 tmaps["sinus_pause_any"] = TensorMap(
     "sinus_pause_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_sinus_pause": 0, "sinus_pause": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -532,7 +533,7 @@ tmaps["sinus_rhythm"] = TensorMap(
     "sinus_rhythm",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_sinus_rhythm": 0, "sinus_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -586,7 +587,7 @@ tmaps["sinus_rhythm"] = TensorMap(
 tmaps["sinus_rhythm_any"] = TensorMap(
     "sinus_rhythm_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_sinus_rhythm": 0, "sinus_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -641,7 +642,7 @@ tmaps["supraventricular_tachycardia"] = TensorMap(
     "supraventricular_tachycardia",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_supraventricular_tachycardia": 0,
         "supraventricular_tachycardia": 1,
@@ -674,7 +675,7 @@ tmaps["supraventricular_tachycardia"] = TensorMap(
 tmaps["supraventricular_tachycardia_any"] = TensorMap(
     "supraventricular_tachycardia_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_supraventricular_tachycardia": 0,
         "supraventricular_tachycardia": 1,
@@ -708,7 +709,7 @@ tmaps["torsade_de_pointes"] = TensorMap(
     "torsade_de_pointes",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_torsade_de_pointes": 0, "torsade_de_pointes": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -722,7 +723,7 @@ tmaps["torsade_de_pointes"] = TensorMap(
 tmaps["torsade_de_pointes_any"] = TensorMap(
     "torsade_de_pointes_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_torsade_de_pointes": 0, "torsade_de_pointes": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -737,7 +738,7 @@ tmaps["unspecified"] = TensorMap(
     "unspecified",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_unspecified": 0, "unspecified": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -758,7 +759,7 @@ tmaps["unspecified"] = TensorMap(
 tmaps["unspecified_any"] = TensorMap(
     "unspecified_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_unspecified": 0, "unspecified": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -780,7 +781,7 @@ tmaps["ventricular_rhythm"] = TensorMap(
     "ventricular_rhythm",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ventricular_rhythm": 0, "ventricular_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -794,7 +795,7 @@ tmaps["ventricular_rhythm"] = TensorMap(
 tmaps["ventricular_rhythm_any"] = TensorMap(
     "ventricular_rhythm_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ventricular_rhythm": 0, "ventricular_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -809,7 +810,7 @@ tmaps["wpw"] = TensorMap(
     "wpw",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_wpw": 0, "wpw": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -825,7 +826,7 @@ tmaps["wpw"] = TensorMap(
 tmaps["wpw_any"] = TensorMap(
     "wpw_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_wpw": 0, "wpw": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -842,7 +843,7 @@ tmaps["brugada_pattern"] = TensorMap(
     "brugada_pattern",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_brugada_pattern": 0, "brugada_pattern": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -856,7 +857,7 @@ tmaps["brugada_pattern"] = TensorMap(
 tmaps["brugada_pattern_any"] = TensorMap(
     "brugada_pattern_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_brugada_pattern": 0, "brugada_pattern": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -871,7 +872,7 @@ tmaps["digitalis_effect"] = TensorMap(
     "digitalis_effect",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_digitalis_effect": 0, "digitalis_effect": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -885,7 +886,7 @@ tmaps["digitalis_effect"] = TensorMap(
 tmaps["digitalis_effect_any"] = TensorMap(
     "digitalis_effect_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_digitalis_effect": 0, "digitalis_effect": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -900,7 +901,7 @@ tmaps["early_repolarization"] = TensorMap(
     "early_repolarization",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_early_repolarization": 0, "early_repolarization": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -914,7 +915,7 @@ tmaps["early_repolarization"] = TensorMap(
 tmaps["early_repolarization_any"] = TensorMap(
     "early_repolarization_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_early_repolarization": 0, "early_repolarization": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -929,7 +930,7 @@ tmaps["inverted_u_waves"] = TensorMap(
     "inverted_u_waves",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_inverted_u_waves": 0, "inverted_u_waves": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -943,7 +944,7 @@ tmaps["inverted_u_waves"] = TensorMap(
 tmaps["inverted_u_waves_any"] = TensorMap(
     "inverted_u_waves_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_inverted_u_waves": 0, "inverted_u_waves": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -958,7 +959,7 @@ tmaps["ischemia"] = TensorMap(
     "ischemia",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ischemia": 0, "ischemia": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1021,7 +1022,7 @@ tmaps["ischemia"] = TensorMap(
 tmaps["ischemia_any"] = TensorMap(
     "ischemia_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ischemia": 0, "ischemia": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1085,7 +1086,7 @@ tmaps["metabolic_or_drug_effect"] = TensorMap(
     "metabolic_or_drug_effect",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_metabolic_or_drug_effect": 0, "metabolic_or_drug_effect": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1099,7 +1100,7 @@ tmaps["metabolic_or_drug_effect"] = TensorMap(
 tmaps["metabolic_or_drug_effect_any"] = TensorMap(
     "metabolic_or_drug_effect_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_metabolic_or_drug_effect": 0, "metabolic_or_drug_effect": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1114,7 +1115,7 @@ tmaps["osborn_wave"] = TensorMap(
     "osborn_wave",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_osborn_wave": 0, "osborn_wave": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1128,7 +1129,7 @@ tmaps["osborn_wave"] = TensorMap(
 tmaps["osborn_wave_any"] = TensorMap(
     "osborn_wave_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_osborn_wave": 0, "osborn_wave": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1143,7 +1144,7 @@ tmaps["pericarditis"] = TensorMap(
     "pericarditis",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_pericarditis": 0, "pericarditis": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1157,7 +1158,7 @@ tmaps["pericarditis"] = TensorMap(
 tmaps["pericarditis_any"] = TensorMap(
     "pericarditis_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_pericarditis": 0, "pericarditis": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1172,7 +1173,7 @@ tmaps["prominent_u_waves"] = TensorMap(
     "prominent_u_waves",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_prominent_u_waves": 0, "prominent_u_waves": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1186,7 +1187,7 @@ tmaps["prominent_u_waves"] = TensorMap(
 tmaps["prominent_u_waves_any"] = TensorMap(
     "prominent_u_waves_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_prominent_u_waves": 0, "prominent_u_waves": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1201,7 +1202,7 @@ tmaps["st_abnormality"] = TensorMap(
     "st_abnormality",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_st_abnormality": 0, "st_abnormality": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1249,7 +1250,7 @@ tmaps["st_abnormality"] = TensorMap(
 tmaps["st_abnormality_any"] = TensorMap(
     "st_abnormality_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_st_abnormality": 0, "st_abnormality": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1298,7 +1299,7 @@ tmaps["st_or_t_change_due_to_ventricular_hypertrophy"] = TensorMap(
     "st_or_t_change_due_to_ventricular_hypertrophy",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_st_or_t_change_due_to_ventricular_hypertrophy": 0,
         "st_or_t_change_due_to_ventricular_hypertrophy": 1,
@@ -1319,7 +1320,7 @@ tmaps["st_or_t_change_due_to_ventricular_hypertrophy"] = TensorMap(
 tmaps["st_or_t_change_due_to_ventricular_hypertrophy_any"] = TensorMap(
     "st_or_t_change_due_to_ventricular_hypertrophy_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_st_or_t_change_due_to_ventricular_hypertrophy": 0,
         "st_or_t_change_due_to_ventricular_hypertrophy": 1,
@@ -1341,7 +1342,7 @@ tmaps["t_wave_abnormality"] = TensorMap(
     "t_wave_abnormality",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_t_wave_abnormality": 0, "t_wave_abnormality": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1378,7 +1379,7 @@ tmaps["t_wave_abnormality"] = TensorMap(
 tmaps["t_wave_abnormality_any"] = TensorMap(
     "t_wave_abnormality_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_t_wave_abnormality": 0, "t_wave_abnormality": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1416,7 +1417,7 @@ tmaps["tu_fusion"] = TensorMap(
     "tu_fusion",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_tu_fusion": 0, "tu_fusion": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1430,7 +1431,7 @@ tmaps["tu_fusion"] = TensorMap(
 tmaps["tu_fusion_any"] = TensorMap(
     "tu_fusion_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_tu_fusion": 0, "tu_fusion": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1445,7 +1446,7 @@ tmaps["fascicular_rhythm"] = TensorMap(
     "fascicular_rhythm",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_fascicular_rhythm": 0, "fascicular_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1459,7 +1460,7 @@ tmaps["fascicular_rhythm"] = TensorMap(
 tmaps["fascicular_rhythm_any"] = TensorMap(
     "fascicular_rhythm_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_fascicular_rhythm": 0, "fascicular_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1474,7 +1475,7 @@ tmaps["fusion_complexes"] = TensorMap(
     "fusion_complexes",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_fusion_complexes": 0, "fusion_complexes": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1488,7 +1489,7 @@ tmaps["fusion_complexes"] = TensorMap(
 tmaps["fusion_complexes_any"] = TensorMap(
     "fusion_complexes_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_fusion_complexes": 0, "fusion_complexes": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1503,7 +1504,7 @@ tmaps["idioventricular_rhythm"] = TensorMap(
     "idioventricular_rhythm",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_idioventricular_rhythm": 0, "idioventricular_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1517,7 +1518,7 @@ tmaps["idioventricular_rhythm"] = TensorMap(
 tmaps["idioventricular_rhythm_any"] = TensorMap(
     "idioventricular_rhythm_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_idioventricular_rhythm": 0, "idioventricular_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1532,7 +1533,7 @@ tmaps["junctional_rhythm"] = TensorMap(
     "junctional_rhythm",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_junctional_rhythm": 0, "junctional_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1546,7 +1547,7 @@ tmaps["junctional_rhythm"] = TensorMap(
 tmaps["junctional_rhythm_any"] = TensorMap(
     "junctional_rhythm_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_junctional_rhythm": 0, "junctional_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1561,7 +1562,7 @@ tmaps["parasystole"] = TensorMap(
     "parasystole",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_parasystole": 0, "parasystole": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1575,7 +1576,7 @@ tmaps["parasystole"] = TensorMap(
 tmaps["parasystole_any"] = TensorMap(
     "parasystole_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_parasystole": 0, "parasystole": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1590,7 +1591,7 @@ tmaps["ventricular_fibrillation"] = TensorMap(
     "ventricular_fibrillation",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ventricular_fibrillation": 0, "ventricular_fibrillation": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1604,7 +1605,7 @@ tmaps["ventricular_fibrillation"] = TensorMap(
 tmaps["ventricular_fibrillation_any"] = TensorMap(
     "ventricular_fibrillation_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ventricular_fibrillation": 0, "ventricular_fibrillation": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1619,7 +1620,7 @@ tmaps["ventricular_tachycardia"] = TensorMap(
     "ventricular_tachycardia",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ventricular_tachycardia": 0, "ventricular_tachycardia": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1638,7 +1639,7 @@ tmaps["ventricular_tachycardia"] = TensorMap(
 tmaps["ventricular_tachycardia_any"] = TensorMap(
     "ventricular_tachycardia_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ventricular_tachycardia": 0, "ventricular_tachycardia": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1658,7 +1659,7 @@ tmaps["wide_qrs_rhythm"] = TensorMap(
     "wide_qrs_rhythm",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_wide_qrs_rhythm": 0, "wide_qrs_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1672,7 +1673,7 @@ tmaps["wide_qrs_rhythm"] = TensorMap(
 tmaps["wide_qrs_rhythm_any"] = TensorMap(
     "wide_qrs_rhythm_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_wide_qrs_rhythm": 0, "wide_qrs_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1687,7 +1688,7 @@ tmaps["first_degree_av_block"] = TensorMap(
     "first_degree_av_block",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_first_degree_av_block": 0, "first_degree_av_block": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1711,7 +1712,7 @@ tmaps["first_degree_av_block"] = TensorMap(
 tmaps["first_degree_av_block_any"] = TensorMap(
     "first_degree_av_block_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_first_degree_av_block": 0, "first_degree_av_block": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1736,7 +1737,7 @@ tmaps["aberrant_conduction_of_supraventricular_beats"] = TensorMap(
     "aberrant_conduction_of_supraventricular_beats",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_aberrant_conduction_of_supraventricular_beats": 0,
         "aberrant_conduction_of_supraventricular_beats": 1,
@@ -1758,7 +1759,7 @@ tmaps["aberrant_conduction_of_supraventricular_beats"] = TensorMap(
 tmaps["aberrant_conduction_of_supraventricular_beats_any"] = TensorMap(
     "aberrant_conduction_of_supraventricular_beats_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_aberrant_conduction_of_supraventricular_beats": 0,
         "aberrant_conduction_of_supraventricular_beats": 1,
@@ -1781,7 +1782,7 @@ tmaps["crista_pattern"] = TensorMap(
     "crista_pattern",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_crista_pattern": 0, "crista_pattern": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1795,7 +1796,7 @@ tmaps["crista_pattern"] = TensorMap(
 tmaps["crista_pattern_any"] = TensorMap(
     "crista_pattern_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_crista_pattern": 0, "crista_pattern": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1810,7 +1811,7 @@ tmaps["epsilon_wave"] = TensorMap(
     "epsilon_wave",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_epsilon_wave": 0, "epsilon_wave": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -1824,7 +1825,7 @@ tmaps["epsilon_wave"] = TensorMap(
 tmaps["epsilon_wave_any"] = TensorMap(
     "epsilon_wave_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_epsilon_wave": 0, "epsilon_wave": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -1839,7 +1840,7 @@ tmaps["incomplete_right_bundle_branch_block"] = TensorMap(
     "incomplete_right_bundle_branch_block",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_incomplete_right_bundle_branch_block": 0,
         "incomplete_right_bundle_branch_block": 1,
@@ -1860,7 +1861,7 @@ tmaps["incomplete_right_bundle_branch_block"] = TensorMap(
 tmaps["incomplete_right_bundle_branch_block_any"] = TensorMap(
     "incomplete_right_bundle_branch_block_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_incomplete_right_bundle_branch_block": 0,
         "incomplete_right_bundle_branch_block": 1,
@@ -1882,7 +1883,7 @@ tmaps["intraventricular_conduction_delay"] = TensorMap(
     "intraventricular_conduction_delay",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_intraventricular_conduction_delay": 0,
         "intraventricular_conduction_delay": 1,
@@ -1904,7 +1905,7 @@ tmaps["intraventricular_conduction_delay"] = TensorMap(
 tmaps["intraventricular_conduction_delay_any"] = TensorMap(
     "intraventricular_conduction_delay_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_intraventricular_conduction_delay": 0,
         "intraventricular_conduction_delay": 1,
@@ -1927,7 +1928,7 @@ tmaps["left_anterior_fascicular_block"] = TensorMap(
     "left_anterior_fascicular_block",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_left_anterior_fascicular_block": 0,
         "left_anterior_fascicular_block": 1,
@@ -1949,7 +1950,7 @@ tmaps["left_anterior_fascicular_block"] = TensorMap(
 tmaps["left_anterior_fascicular_block_any"] = TensorMap(
     "left_anterior_fascicular_block_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_left_anterior_fascicular_block": 0,
         "left_anterior_fascicular_block": 1,
@@ -1972,7 +1973,7 @@ tmaps["left_atrial_conduction_abnormality"] = TensorMap(
     "left_atrial_conduction_abnormality",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_left_atrial_conduction_abnormality": 0,
         "left_atrial_conduction_abnormality": 1,
@@ -1993,7 +1994,7 @@ tmaps["left_atrial_conduction_abnormality"] = TensorMap(
 tmaps["left_atrial_conduction_abnormality_any"] = TensorMap(
     "left_atrial_conduction_abnormality_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_left_atrial_conduction_abnormality": 0,
         "left_atrial_conduction_abnormality": 1,
@@ -2015,7 +2016,7 @@ tmaps["left_bundle_branch_block"] = TensorMap(
     "left_bundle_branch_block",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_left_bundle_branch_block": 0, "left_bundle_branch_block": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -2036,7 +2037,7 @@ tmaps["left_bundle_branch_block"] = TensorMap(
 tmaps["left_bundle_branch_block_any"] = TensorMap(
     "left_bundle_branch_block_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_left_bundle_branch_block": 0, "left_bundle_branch_block": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -2058,7 +2059,7 @@ tmaps["left_posterior_fascicular_block"] = TensorMap(
     "left_posterior_fascicular_block",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_left_posterior_fascicular_block": 0,
         "left_posterior_fascicular_block": 1,
@@ -2080,7 +2081,7 @@ tmaps["left_posterior_fascicular_block"] = TensorMap(
 tmaps["left_posterior_fascicular_block_any"] = TensorMap(
     "left_posterior_fascicular_block_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_left_posterior_fascicular_block": 0,
         "left_posterior_fascicular_block": 1,
@@ -2103,7 +2104,7 @@ tmaps["nonspecific_ivcd"] = TensorMap(
     "nonspecific_ivcd",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_nonspecific_ivcd": 0, "nonspecific_ivcd": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -2117,7 +2118,7 @@ tmaps["nonspecific_ivcd"] = TensorMap(
 tmaps["nonspecific_ivcd_any"] = TensorMap(
     "nonspecific_ivcd_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_nonspecific_ivcd": 0, "nonspecific_ivcd": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -2132,7 +2133,7 @@ tmaps["right_atrial_conduction_abnormality"] = TensorMap(
     "right_atrial_conduction_abnormality",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_right_atrial_conduction_abnormality": 0,
         "right_atrial_conduction_abnormality": 1,
@@ -2153,7 +2154,7 @@ tmaps["right_atrial_conduction_abnormality"] = TensorMap(
 tmaps["right_atrial_conduction_abnormality_any"] = TensorMap(
     "right_atrial_conduction_abnormality_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_right_atrial_conduction_abnormality": 0,
         "right_atrial_conduction_abnormality": 1,
@@ -2175,7 +2176,7 @@ tmaps["right_bundle_branch_block"] = TensorMap(
     "right_bundle_branch_block",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_right_bundle_branch_block": 0, "right_bundle_branch_block": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -2196,7 +2197,7 @@ tmaps["right_bundle_branch_block"] = TensorMap(
 tmaps["right_bundle_branch_block_any"] = TensorMap(
     "right_bundle_branch_block_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_right_bundle_branch_block": 0, "right_bundle_branch_block": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -2218,7 +2219,7 @@ tmaps["ventricular_preexcitation"] = TensorMap(
     "ventricular_preexcitation",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ventricular_preexcitation": 0, "ventricular_preexcitation": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -2232,7 +2233,7 @@ tmaps["ventricular_preexcitation"] = TensorMap(
 tmaps["ventricular_preexcitation_any"] = TensorMap(
     "ventricular_preexcitation_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ventricular_preexcitation": 0, "ventricular_preexcitation": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -2247,7 +2248,7 @@ tmaps["av_dissociation"] = TensorMap(
     "av_dissociation",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_av_dissociation": 0, "av_dissociation": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -2263,7 +2264,7 @@ tmaps["av_dissociation"] = TensorMap(
 tmaps["av_dissociation_any"] = TensorMap(
     "av_dissociation_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_av_dissociation": 0, "av_dissociation": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -2280,7 +2281,7 @@ tmaps["_2_to_1_av_block"] = TensorMap(
     "_2_to_1_av_block",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no__2_to_1_av_block": 0, "_2_to_1_av_block": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -2302,7 +2303,7 @@ tmaps["_2_to_1_av_block"] = TensorMap(
 tmaps["_2_to_1_av_block_any"] = TensorMap(
     "_2_to_1_av_block_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no__2_to_1_av_block": 0, "_2_to_1_av_block": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -2325,7 +2326,7 @@ tmaps["_4_to_1_av_block"] = TensorMap(
     "_4_to_1_av_block",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no__4_to_1_av_block": 0, "_4_to_1_av_block": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -2339,7 +2340,7 @@ tmaps["_4_to_1_av_block"] = TensorMap(
 tmaps["_4_to_1_av_block_any"] = TensorMap(
     "_4_to_1_av_block_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no__4_to_1_av_block": 0, "_4_to_1_av_block": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -2354,7 +2355,7 @@ tmaps["av_dissociation"] = TensorMap(
     "av_dissociation",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_av_dissociation": 0, "av_dissociation": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -2370,7 +2371,7 @@ tmaps["av_dissociation"] = TensorMap(
 tmaps["av_dissociation_any"] = TensorMap(
     "av_dissociation_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_av_dissociation": 0, "av_dissociation": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -2387,7 +2388,7 @@ tmaps["mobitz_type_i_second_degree_av_block_"] = TensorMap(
     "mobitz_type_i_second_degree_av_block_",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_mobitz_type_i_second_degree_av_block_": 0,
         "mobitz_type_i_second_degree_av_block_": 1,
@@ -2414,7 +2415,7 @@ tmaps["mobitz_type_i_second_degree_av_block_"] = TensorMap(
 tmaps["mobitz_type_i_second_degree_av_block__any"] = TensorMap(
     "mobitz_type_i_second_degree_av_block__any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_mobitz_type_i_second_degree_av_block_": 0,
         "mobitz_type_i_second_degree_av_block_": 1,
@@ -2442,7 +2443,7 @@ tmaps["mobitz_type_ii_second_degree_av_block"] = TensorMap(
     "mobitz_type_ii_second_degree_av_block",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_mobitz_type_ii_second_degree_av_block": 0,
         "mobitz_type_ii_second_degree_av_block": 1,
@@ -2466,7 +2467,7 @@ tmaps["mobitz_type_ii_second_degree_av_block"] = TensorMap(
 tmaps["mobitz_type_ii_second_degree_av_block_any"] = TensorMap(
     "mobitz_type_ii_second_degree_av_block_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_mobitz_type_ii_second_degree_av_block": 0,
         "mobitz_type_ii_second_degree_av_block": 1,
@@ -2491,7 +2492,7 @@ tmaps["third_degree_av_block"] = TensorMap(
     "third_degree_av_block",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_third_degree_av_block": 0, "third_degree_av_block": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -2513,7 +2514,7 @@ tmaps["third_degree_av_block"] = TensorMap(
 tmaps["third_degree_av_block_any"] = TensorMap(
     "third_degree_av_block_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_third_degree_av_block": 0, "third_degree_av_block": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -2536,7 +2537,7 @@ tmaps["unspecified_av_block"] = TensorMap(
     "unspecified_av_block",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_unspecified_av_block": 0, "unspecified_av_block": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -2559,7 +2560,7 @@ tmaps["unspecified_av_block"] = TensorMap(
 tmaps["unspecified_av_block_any"] = TensorMap(
     "unspecified_av_block_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_unspecified_av_block": 0, "unspecified_av_block": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -2583,7 +2584,7 @@ tmaps["variable_av_block"] = TensorMap(
     "variable_av_block",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_variable_av_block": 0, "variable_av_block": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -2599,7 +2600,7 @@ tmaps["variable_av_block"] = TensorMap(
 tmaps["variable_av_block_any"] = TensorMap(
     "variable_av_block_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_variable_av_block": 0, "variable_av_block": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -2616,7 +2617,7 @@ tmaps["atrial_premature_complexes"] = TensorMap(
     "atrial_premature_complexes",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_atrial_premature_complexes": 0, "atrial_premature_complexes": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -2643,7 +2644,7 @@ tmaps["atrial_premature_complexes"] = TensorMap(
 tmaps["atrial_premature_complexes_any"] = TensorMap(
     "atrial_premature_complexes_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_atrial_premature_complexes": 0, "atrial_premature_complexes": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -2671,7 +2672,7 @@ tmaps["ectopy"] = TensorMap(
     "ectopy",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ectopy": 0, "ectopy": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -2697,7 +2698,7 @@ tmaps["ectopy"] = TensorMap(
 tmaps["ectopy_any"] = TensorMap(
     "ectopy_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_ectopy": 0, "ectopy": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -2724,7 +2725,7 @@ tmaps["junctional_premature_complexes"] = TensorMap(
     "junctional_premature_complexes",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_junctional_premature_complexes": 0,
         "junctional_premature_complexes": 1,
@@ -2746,7 +2747,7 @@ tmaps["junctional_premature_complexes"] = TensorMap(
 tmaps["junctional_premature_complexes_any"] = TensorMap(
     "junctional_premature_complexes_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_junctional_premature_complexes": 0,
         "junctional_premature_complexes": 1,
@@ -2769,7 +2770,7 @@ tmaps["no_ectopy"] = TensorMap(
     "no_ectopy",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_no_ectopy": 0, "no_ectopy": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -2793,7 +2794,7 @@ tmaps["no_ectopy"] = TensorMap(
 tmaps["no_ectopy_any"] = TensorMap(
     "no_ectopy_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_no_ectopy": 0, "no_ectopy": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -2818,7 +2819,7 @@ tmaps["premature_supraventricular_complexes"] = TensorMap(
     "premature_supraventricular_complexes",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_premature_supraventricular_complexes": 0,
         "premature_supraventricular_complexes": 1,
@@ -2839,7 +2840,7 @@ tmaps["premature_supraventricular_complexes"] = TensorMap(
 tmaps["premature_supraventricular_complexes_any"] = TensorMap(
     "premature_supraventricular_complexes_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_premature_supraventricular_complexes": 0,
         "premature_supraventricular_complexes": 1,
@@ -2861,7 +2862,7 @@ tmaps["ventricular_premature_complexes"] = TensorMap(
     "ventricular_premature_complexes",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_ventricular_premature_complexes": 0,
         "ventricular_premature_complexes": 1,
@@ -2894,7 +2895,7 @@ tmaps["ventricular_premature_complexes"] = TensorMap(
 tmaps["ventricular_premature_complexes_any"] = TensorMap(
     "ventricular_premature_complexes_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={
         "no_ventricular_premature_complexes": 0,
         "ventricular_premature_complexes": 1,
@@ -2928,7 +2929,7 @@ tmaps["mi"] = TensorMap(
     "mi",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_mi": 0, "mi": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3082,7 +3083,7 @@ tmaps["mi"] = TensorMap(
 tmaps["mi_any"] = TensorMap(
     "mi_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_mi": 0, "mi": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3237,7 +3238,7 @@ tmaps["abnormal_p_wave_axis"] = TensorMap(
     "abnormal_p_wave_axis",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_abnormal_p_wave_axis": 0, "abnormal_p_wave_axis": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3251,7 +3252,7 @@ tmaps["abnormal_p_wave_axis"] = TensorMap(
 tmaps["abnormal_p_wave_axis_any"] = TensorMap(
     "abnormal_p_wave_axis_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_abnormal_p_wave_axis": 0, "abnormal_p_wave_axis": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3266,7 +3267,7 @@ tmaps["electrical_alternans"] = TensorMap(
     "electrical_alternans",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_electrical_alternans": 0, "electrical_alternans": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3280,7 +3281,7 @@ tmaps["electrical_alternans"] = TensorMap(
 tmaps["electrical_alternans_any"] = TensorMap(
     "electrical_alternans_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_electrical_alternans": 0, "electrical_alternans": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3295,7 +3296,7 @@ tmaps["low_voltage"] = TensorMap(
     "low_voltage",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_low_voltage": 0, "low_voltage": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3309,7 +3310,7 @@ tmaps["low_voltage"] = TensorMap(
 tmaps["low_voltage_any"] = TensorMap(
     "low_voltage_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_low_voltage": 0, "low_voltage": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3324,7 +3325,7 @@ tmaps["poor_r_wave_progression"] = TensorMap(
     "poor_r_wave_progression",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_poor_r_wave_progression": 0, "poor_r_wave_progression": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3349,7 +3350,7 @@ tmaps["poor_r_wave_progression"] = TensorMap(
 tmaps["poor_r_wave_progression_any"] = TensorMap(
     "poor_r_wave_progression_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_poor_r_wave_progression": 0, "poor_r_wave_progression": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3375,7 +3376,7 @@ tmaps["reversed_r_wave_progression"] = TensorMap(
     "reversed_r_wave_progression",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_reversed_r_wave_progression": 0, "reversed_r_wave_progression": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3394,7 +3395,7 @@ tmaps["reversed_r_wave_progression"] = TensorMap(
 tmaps["reversed_r_wave_progression_any"] = TensorMap(
     "reversed_r_wave_progression_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_reversed_r_wave_progression": 0, "reversed_r_wave_progression": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3414,7 +3415,7 @@ tmaps["lae"] = TensorMap(
     "lae",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_lae": 0, "lae": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3435,7 +3436,7 @@ tmaps["lae"] = TensorMap(
 tmaps["lae_any"] = TensorMap(
     "lae_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_lae": 0, "lae": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3457,7 +3458,7 @@ tmaps["lvh"] = TensorMap(
     "lvh",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_lvh": 0, "lvh": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3479,7 +3480,7 @@ tmaps["lvh"] = TensorMap(
 tmaps["lvh_any"] = TensorMap(
     "lvh_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_lvh": 0, "lvh": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3502,7 +3503,7 @@ tmaps["rae"] = TensorMap(
     "rae",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_rae": 0, "rae": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3523,7 +3524,7 @@ tmaps["rae"] = TensorMap(
 tmaps["rae_any"] = TensorMap(
     "rae_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_rae": 0, "rae": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3545,7 +3546,7 @@ tmaps["rvh"] = TensorMap(
     "rvh",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_rvh": 0, "rvh": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3568,7 +3569,7 @@ tmaps["rvh"] = TensorMap(
 tmaps["rvh_any"] = TensorMap(
     "rvh_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_rvh": 0, "rvh": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3592,7 +3593,7 @@ tmaps["sh"] = TensorMap(
     "sh",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_sh": 0, "sh": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3606,7 +3607,7 @@ tmaps["sh"] = TensorMap(
 tmaps["sh_any"] = TensorMap(
     "sh_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_sh": 0, "sh": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3621,7 +3622,7 @@ tmaps["pacemaker"] = TensorMap(
     "pacemaker",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_pacemaker": 0, "pacemaker": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3672,7 +3673,7 @@ tmaps["pacemaker"] = TensorMap(
 tmaps["pacemaker_any"] = TensorMap(
     "pacemaker_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_pacemaker": 0, "pacemaker": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3724,7 +3725,7 @@ tmaps["abnormal_ecg"] = TensorMap(
     "abnormal_ecg",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_abnormal_ecg": 0, "abnormal_ecg": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3738,7 +3739,7 @@ tmaps["abnormal_ecg"] = TensorMap(
 tmaps["abnormal_ecg_any"] = TensorMap(
     "abnormal_ecg_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_abnormal_ecg": 0, "abnormal_ecg": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3753,7 +3754,7 @@ tmaps["normal_sinus_rhythm"] = TensorMap(
     "normal_sinus_rhythm",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_normal_sinus_rhythm": 0, "normal_sinus_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3776,7 +3777,7 @@ tmaps["normal_sinus_rhythm"] = TensorMap(
 tmaps["normal_sinus_rhythm_any"] = TensorMap(
     "normal_sinus_rhythm_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_normal_sinus_rhythm": 0, "normal_sinus_rhythm": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3800,7 +3801,7 @@ tmaps["uninterpretable_ecg"] = TensorMap(
     "uninterpretable_ecg",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_uninterpretable_ecg": 0, "uninterpretable_ecg": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3814,7 +3815,7 @@ tmaps["uninterpretable_ecg"] = TensorMap(
 tmaps["uninterpretable_ecg_any"] = TensorMap(
     "uninterpretable_ecg_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_uninterpretable_ecg": 0, "uninterpretable_ecg": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3829,7 +3830,7 @@ tmaps["indeterminate_axis"] = TensorMap(
     "indeterminate_axis",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_indeterminate_axis": 0, "indeterminate_axis": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3849,7 +3850,7 @@ tmaps["indeterminate_axis"] = TensorMap(
 tmaps["indeterminate_axis_any"] = TensorMap(
     "indeterminate_axis_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_indeterminate_axis": 0, "indeterminate_axis": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3870,7 +3871,7 @@ tmaps["left_axis_deviation"] = TensorMap(
     "left_axis_deviation",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_left_axis_deviation": 0, "left_axis_deviation": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3890,7 +3891,7 @@ tmaps["left_axis_deviation"] = TensorMap(
 tmaps["left_axis_deviation_any"] = TensorMap(
     "left_axis_deviation_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_left_axis_deviation": 0, "left_axis_deviation": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3911,7 +3912,7 @@ tmaps["right_axis_deviation"] = TensorMap(
     "right_axis_deviation",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_right_axis_deviation": 0, "right_axis_deviation": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3932,7 +3933,7 @@ tmaps["right_axis_deviation"] = TensorMap(
 tmaps["right_axis_deviation_any"] = TensorMap(
     "right_axis_deviation_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_right_axis_deviation": 0, "right_axis_deviation": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(
@@ -3954,7 +3955,7 @@ tmaps["right_superior_axis"] = TensorMap(
     "right_superior_axis",
     interpretation=Interpretation.CATEGORICAL,
     time_series_limit=0,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_right_superior_axis": 0, "right_superior_axis": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_ecg_label_from_read_tff(
@@ -3968,7 +3969,7 @@ tmaps["right_superior_axis"] = TensorMap(
 tmaps["right_superior_axis_any"] = TensorMap(
     "right_superior_axis_any",
     interpretation=Interpretation.CATEGORICAL,
-    path_prefix="partners_ecg_rest",
+    path_prefix=ECG_PREFIX,
     channel_map={"no_right_superior_axis": 0, "right_superior_axis": 1},
     validators=validator_not_all_zero,
     tensor_from_file=make_binary_ecg_label_from_any_read_tff(

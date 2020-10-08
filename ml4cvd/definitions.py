@@ -54,7 +54,7 @@ def _get_sts_data_path() -> str:
 STS_DATA_CSV = os.path.join(_get_sts_data_path(), "sts-mgh.csv")
 STS_PREDICTION_DIR = os.path.expanduser("~/dropbox/sts-ecg/predictions")
 
-ECG_PREFIX = "partners_ecg_rest"
+ECG_PREFIX = "ecg"
 DATE_FORMAT = "%Y-%m-%d_%H-%M-%S"
 ECG_DATE_FORMAT = "%m-%d-%Y"
 ECG_TIME_FORMAT = "%H:%M:%S"

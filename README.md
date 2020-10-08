@@ -287,7 +287,7 @@ This mode is called with the following arguments:
 All the ECGs belonging to one patient, identified by medical record number (MRN), will be saved to one HD5, indexed by ECG acquisition date and time:
 ```
 <MRN>.hd5
-└--partners_ecg_rest
+└--ecg
    |--date_1
    |  └--ECG Data
    └--date_2

@@ -14,7 +14,7 @@ import numpy as np
 import ml4cvd.definitions
 from ml4cvd.logger import load_config
 from ml4cvd.models import BottleneckType
-from ml4cvd.definitions import STS_DATA_CSV
+from ml4cvd.definitions import ECG_PREFIX, STS_DATA_CSV
 from ml4cvd.tensormap.TensorMap import update_tmaps
 
 BOTTLENECK_STR_TO_ENUM = {
@@ -254,7 +254,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--language_prefix",
-        default="partners_ecg_rest",
+        default=ECG_PREFIX,
         help=(
             "Path prefix for a TensorMap to learn language models (eg train_char_model)"
         ),
