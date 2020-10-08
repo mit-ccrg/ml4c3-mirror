@@ -200,6 +200,28 @@ python scripts/dispatch.py \
     ~/dropbox/ml4cvd_run_scripts/sts_ecg/train-deeper.sh
 ```
 
+You can also pass in string values to the scripts you run. This enables you to iterate over cohorts, output tensor maps, and short names (paired with output tensor maps), e.g.:
+```bash
+python scripts/dispatch.py \
+--gpus 0-3 \
+--bootstraps 0-9 \
+--scripts ~/dropbox/ml-run-scripts/infer-outcome-tmap-cohort.sh \
+--cohorts cabg valve cabg-valve major other office \
+--output_tensors sts_death sts_renal_failure \
+--outcome_short_names death renal
+```
+
+Each of these extra arguments are optional, and the script(s) you call at `--scripts` must be written to use the values:
+
+```
+| arg in dispatch.py    | env variable name in script.sh |
+|-----------------------|--------------------------------|
+| --cohorts             | COHORT                         |
+| --output_tensors      | OUTPUT_TENSOR                  |
+| --outcome_short_names | OUTCOME_SHORT_NAME             |
+```
+
+
 ### Tests
 To run unit tests in Docker:
 ```bash
