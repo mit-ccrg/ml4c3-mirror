@@ -26,6 +26,7 @@ def predict_and_evaluate(
     tensor_maps_out: List[TensorMap],
     plot_path: Path,
     data_split: str,
+    image_ext: str,
     save_coefficients: bool = False,
     batch_size: Optional[int] = None,
     save_predictions: bool = False,
@@ -128,6 +129,7 @@ def predict_and_evaluate(
                 y_predictions=y,
                 y_truth=y_truth,
                 title=tm.name,
+                image_ext=image_ext,
                 folder=plot_path,
                 test_paths=data_paths,
                 rocs=rocs,
@@ -137,9 +139,16 @@ def predict_and_evaluate(
         )
 
     if len(rocs) > 1:
-        subplot_rocs(rocs, data_split, plot_path)
+        subplot_rocs(
+            rocs=rocs, data_split=data_split, image_ext=image_ext, plot_path=plot_path,
+        )
     if len(scatters) > 1:
-        subplot_scatters(scatters, data_split, plot_path)
+        subplot_scatters(
+            scatters=scatters,
+            data_split=data_split,
+            image_ext=image_ext,
+            plot_path=plot_path,
+        )
 
     return performance_metrics
 

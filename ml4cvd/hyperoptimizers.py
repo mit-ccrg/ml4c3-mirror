@@ -17,7 +17,7 @@ from skimage.filters import threshold_otsu
 from ml4cvd.plots import plot_metric_history
 from ml4cvd.models import train_model_from_datasets, make_multimodal_multitask_model
 from ml4cvd.datasets import train_valid_test_datasets
-from ml4cvd.definitions import IMAGE_EXT, Arguments
+from ml4cvd.definitions import Arguments
 from ml4cvd.evaluations import predict_and_evaluate
 from ml4cvd.tensormap.TensorMap import TensorMap, update_tmaps
 
@@ -203,6 +203,7 @@ def hyperparameter_optimizer(
                 tensor_maps_out=args.tensor_maps_out,
                 plot_path=os.path.join(trials_path, trial_id),
                 data_split="train",
+                image_ext=args.image_ext,
             )
             test_auc = predict_and_evaluate(
                 model=model,
@@ -211,6 +212,7 @@ def hyperparameter_optimizer(
                 tensor_maps_out=args.tensor_maps_out,
                 plot_path=os.path.join(trials_path, trial_id),
                 data_split="test",
+                image_ext=args.image_ext,
             )
             auc = {"train": train_auc, "test": test_auc}
             aucs.append(auc)
@@ -270,7 +272,14 @@ def hyperparameter_optimizer(
         max_evals=args.max_evals,
         trials=trials,
     )
-    plot_trials(trials, histories, aucs, results_path, param_lists)
+    plot_trials(
+        trials=trials,
+        histories=histories,
+        aucs=aucs,
+        figure_path=results_path,
+        image_ext=args.image_ext,
+        param_lists=param_lists,
+    )
 
 
 def set_args_from_x(args: argparse.Namespace, x: Arguments):
@@ -520,6 +529,7 @@ def plot_trials(
     histories: List[Dict],
     aucs: List[Dict[str, Dict]],
     figure_path: str,
+    image_ext: str,
     param_lists: Dict = {},
 ):
     if not os.path.isdir(figure_path):
@@ -564,7 +574,7 @@ def plot_trials(
     plt.axhline(
         cutoff, label=f"Loss display cutoff at {cutoff:.3f}", color="r", linestyle="--",
     )
-    loss_path = os.path.join(figure_path, "loss_per_trial" + IMAGE_EXT)
+    loss_path = os.path.join(figure_path, "loss_per_trial" + image_ext)
     plt.legend()
     plt.savefig(loss_path)
     logging.info(f"Saved loss plot to {loss_path}")
@@ -607,7 +617,7 @@ def plot_trials(
         ncol=5,
     )
     ax3.axis("off")
-    learning_path = os.path.join(figure_path, "learning_curves_all_trials" + IMAGE_EXT)
+    learning_path = os.path.join(figure_path, "learning_curves_all_trials" + image_ext)
     plt.tight_layout()
     plt.savefig(learning_path)
     logging.info(f"Saved learning curve plot to {learning_path}")

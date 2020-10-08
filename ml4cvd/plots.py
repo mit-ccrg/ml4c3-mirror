@@ -11,6 +11,7 @@ from collections import OrderedDict, defaultdict
 # Imports: third party
 import h5py
 import numpy as np
+import pydot
 import pandas as pd
 import seaborn as sns
 from scipy import stats
@@ -28,13 +29,7 @@ from tensorflow.keras.optimizers.schedules import LearningRateSchedule
 
 # Imports: first party
 from ml4cvd.metrics import concordance_index, coefficient_of_determination
-from ml4cvd.definitions import (
-    PDF_EXT,
-    IMAGE_EXT,
-    TENSOR_EXT,
-    ECG_DATE_FORMAT,
-    ECG_DATETIME_FORMAT,
-)
+from ml4cvd.definitions import PDF_EXT, TENSOR_EXT, ECG_DATE_FORMAT, ECG_DATETIME_FORMAT
 from ml4cvd.tensormap.TensorMap import (
     TensorMap,
     update_tmaps,
@@ -128,6 +123,7 @@ def evaluate_predictions(
     y_predictions: np.ndarray,
     y_truth: np.ndarray,
     title: str,
+    image_ext: str,
     folder: str,
     test_paths: List[str] = None,
     max_melt: int = 30000,
@@ -142,6 +138,7 @@ def evaluate_predictions(
     :param y_predictions: The predictions
     :param y_truth: The truth
     :param title: A title for the plots
+    :param image_ext: File type to save images as
     :param folder: The folder to save the plots at
     :param test_paths: The tensor paths that were predicted
     :param max_melt: For multi-dimensional prediction the maximum number of prediction to allow in the flattened array
@@ -163,6 +160,7 @@ def evaluate_predictions(
             truth=y_truth,
             labels=tm.channel_map,
             title=title,
+            image_ext=image_ext,
             prefix=folder,
             data_split=data_split,
         )
@@ -171,6 +169,7 @@ def evaluate_predictions(
             truth=y_truth,
             labels=tm.channel_map,
             title=title,
+            image_ext=image_ext,
             prefix=folder,
             data_split=data_split,
         )
@@ -180,6 +179,7 @@ def evaluate_predictions(
                 truth=y_truth,
                 labels=tm.channel_map,
                 title=title,
+                image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
             ),
@@ -192,6 +192,7 @@ def evaluate_predictions(
                 truth=y_truth,
                 labels=tm.channel_map,
                 title=title,
+                image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
             )
@@ -211,6 +212,7 @@ def evaluate_predictions(
                 truth=y_truth,
                 labels=tm.channel_map,
                 title=title,
+                image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
             ),
@@ -221,6 +223,7 @@ def evaluate_predictions(
                 truth=y_truth,
                 labels=tm.channel_map,
                 title=title,
+                image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
             ),
@@ -230,6 +233,7 @@ def evaluate_predictions(
             truth=y_truth,
             labels=tm.channel_map,
             title=title,
+            image_ext=image_ext,
             prefix=folder,
             data_split=data_split,
         )
@@ -250,6 +254,7 @@ def evaluate_predictions(
                 truth=y_truth,
                 labels=tm.channel_map,
                 title=title,
+                image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
             ),
@@ -260,6 +265,7 @@ def evaluate_predictions(
                 truth=y_truth,
                 labels=tm.channel_map,
                 title=title,
+                image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
             ),
@@ -269,6 +275,7 @@ def evaluate_predictions(
             truth=y_truth,
             labels=tm.channel_map,
             title=title,
+            image_ext=image_ext,
             prefix=folder,
             data_split=data_split,
         )
@@ -292,6 +299,7 @@ def evaluate_predictions(
                 truth=y_truth,
                 labels=tm.channel_map,
                 title=title,
+                image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
             ),
@@ -302,6 +310,7 @@ def evaluate_predictions(
                 truth=y_truth,
                 labels=tm.channel_map,
                 title=title,
+                image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
             ),
@@ -311,57 +320,11 @@ def evaluate_predictions(
             truth=y_truth,
             labels=tm.channel_map,
             title=title,
+            image_ext=image_ext,
             prefix=folder,
             data_split=data_split,
         )
         rocs.append((y_predictions, y_truth, tm.channel_map))
-    elif tm.is_survival_curve:
-        performance_metrics.update(
-            plot_survival(
-                y_predictions,
-                y_truth,
-                title,
-                days_window=tm.days_window,
-                prefix=folder,
-            ),
-        )
-        plot_survival_curves(
-            y_predictions,
-            y_truth,
-            title,
-            days_window=tm.days_window,
-            prefix=folder,
-            paths=test_paths,
-        )
-        time_steps = tm.shape[-1] // 2
-        days_per_step = 1 + tm.days_window // time_steps
-        predictions_at_end = (
-            1 - np.cumprod(y_predictions[:, :time_steps], axis=-1)[:, -1]
-        )
-        events_at_end = np.cumsum(y_truth[:, time_steps:], axis=-1)[:, -1]
-        follow_up = np.cumsum(y_truth[:, :time_steps], axis=-1)[:, -1] * days_per_step
-        logging.info(
-            f"Shapes event {events_at_end.shape}, preds shape"
-            f" {predictions_at_end.shape} new ax shape"
-            f" {events_at_end[:, np.newaxis].shape}",
-        )
-        calibration_title = f"{title}_at_{tm.days_window}_days"
-        plot_prediction_calibration(
-            prediction=predictions_at_end[:, np.newaxis],
-            truth=events_at_end[:, np.newaxis],
-            labels={tm.name: 0},
-            title=calibration_title,
-            prefix=folder,
-            data_split=data_split,
-        )
-        plot_survivorship(
-            events_at_end,
-            follow_up,
-            predictions_at_end,
-            tm.name,
-            folder,
-            tm.days_window,
-        )
     elif tm.is_language:
         performance_metrics.update(
             plot_roc_per_class(
@@ -369,6 +332,7 @@ def evaluate_predictions(
                 truth=y_truth,
                 labels=tm.channel_map,
                 title=title,
+                image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
             ),
@@ -379,6 +343,7 @@ def evaluate_predictions(
                 truth=y_truth,
                 labels=tm.channel_map,
                 title=title,
+                image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
             ),
@@ -387,9 +352,10 @@ def evaluate_predictions(
     elif tm.is_continuous:
         performance_metrics.update(
             plot_scatter(
-                tm.rescale(y_predictions),
-                tm.rescale(y_truth),
-                title,
+                prediction=tm.rescale(y_predictions),
+                truth=tm.rescale(y_truth),
+                title=title,
+                image_ext=image_ext,
                 prefix=folder,
                 paths=test_paths,
                 data_split=data_split,
@@ -404,7 +370,13 @@ def evaluate_predictions(
     return performance_metrics
 
 
-def plot_metric_history(history, training_steps: int, title: str, prefix="./figures/"):
+def plot_metric_history(
+    history,
+    training_steps: int,
+    title: str,
+    image_ext: str,
+    prefix: str = "./figures/",
+):
     plt.rcParams["font.size"] = 14
     row = 0
     col = 0
@@ -453,7 +425,7 @@ def plot_metric_history(history, training_steps: int, title: str, prefix="./figu
 
     plt.tight_layout()
     title = "metric_history" if title == "" else "metric_history_" + title
-    figure_path = os.path.join(prefix, title + IMAGE_EXT)
+    figure_path = os.path.join(prefix, title + image_ext)
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
     plt.savefig(figure_path, bbox_inches="tight")
@@ -466,6 +438,7 @@ def plot_prediction_calibration(
     truth: np.ndarray,
     labels: Dict[str, int],
     title: str,
+    image_ext: str,
     prefix: str = "./figures/",
     n_bins: int = 10,
     data_split: str = "test",
@@ -548,7 +521,7 @@ def plot_prediction_calibration(
     plt.tight_layout()
 
     figure_path = os.path.join(
-        prefix, "calibrations_" + title + "_" + data_split + IMAGE_EXT,
+        prefix, "calibrations_" + title + "_" + data_split + image_ext,
     )
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
@@ -562,6 +535,7 @@ def plot_confusion_matrix(
     truth: np.ndarray,
     labels: Dict[str, int],
     title: str,
+    image_ext: str,
     prefix: str,
     data_split: str,
 ):
@@ -602,7 +576,7 @@ def plot_confusion_matrix(
             logging.info(f"{matrix_title}:\n{cm_df}")
 
     figure_path = os.path.join(
-        prefix, f"confusion_matrix_{title}_{data_split}{IMAGE_EXT}",
+        prefix, f"confusion_matrix_{title}_{data_split}{image_ext}",
     )
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
@@ -614,7 +588,15 @@ def plot_confusion_matrix(
 
 
 def plot_scatter(
-    prediction, truth, title, data_split, prefix, paths=None, top_k=3, alpha=0.5,
+    prediction: np.array,
+    truth: np.array,
+    title: str,
+    image_ext: str,
+    data_split: str,
+    prefix: str = "./figures/",
+    paths=None,
+    top_k=3,
+    alpha=0.5,
 ):
     margin = float((np.max(truth) - np.min(truth)) / 100)
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(SUBPLOT_SIZE, 2 * SUBPLOT_SIZE))
@@ -671,7 +653,7 @@ def plot_scatter(
     sns.distplot(truth, label="Truth", color="b", ax=ax2)
     ax2.legend(loc="upper left")
 
-    figure_path = os.path.join(prefix, f"scatter_{title}_{data_split}{IMAGE_EXT}")
+    figure_path = os.path.join(prefix, f"scatter_{title}_{data_split}{image_ext}")
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
     logging.info("Try to save scatter plot at: {}".format(figure_path))
@@ -680,63 +662,10 @@ def plot_scatter(
     return {title + "_pearson": pearson}
 
 
-def plot_scatters(
-    predictions, truth, title, prefix="./figures/", paths=None, top_k=3, alpha=0.5,
-):
-    margin = float((np.max(truth) - np.min(truth)) / 100)
-    plt.figure(figsize=(SUBPLOT_SIZE, SUBPLOT_SIZE))
-    plt.plot([np.min(truth), np.max(truth)], [np.min(truth), np.max(truth)])
-    for k in predictions:
-        color = _hash_string_to_color(k)
-        pearson = np.corrcoef(predictions[k].flatten(), truth.flatten())[
-            1, 0,
-        ]  # corrcoef returns full covariance matrix
-        r2 = pearson * pearson
-        big_r2 = coefficient_of_determination(truth.flatten(), predictions[k].flatten())
-        plt.plot(
-            [np.min(predictions[k]), np.max(predictions[k])],
-            [np.min(predictions[k]), np.max(predictions[k])],
-            color=color,
-        )
-        plt.scatter(
-            predictions[k],
-            truth,
-            color=color,
-            label=str(k) + f" Pearson:{pearson:0.3f} r^2:{r2:0.3f} R^2:{big_r2:0.3f}",
-            marker=".",
-            alpha=alpha,
-        )
-        if paths is not None:
-            diff = np.abs(predictions[k] - truth)
-            arg_sorted = diff[:, 0].argsort()
-            _text_on_plot(
-                plt,
-                predictions[k][arg_sorted[0]] + margin,
-                truth[arg_sorted[0]] + margin,
-                os.path.basename(paths[arg_sorted[0]]),
-            )
-            for idx in arg_sorted[-top_k:]:
-                _text_on_plot(
-                    plt,
-                    predictions[k][idx] + margin,
-                    truth[idx] + margin,
-                    os.path.basename(paths[idx]),
-                )
-    plt.xlabel("Predictions")
-    plt.ylabel("Actual")
-    plt.title(title + "\n")
-    plt.legend(loc="upper left")
-
-    figure_path = os.path.join(prefix, "scatters_" + title + IMAGE_EXT)
-    if not os.path.exists(os.path.dirname(figure_path)):
-        os.makedirs(os.path.dirname(figure_path))
-    plt.savefig(figure_path)
-    logging.info("Saved scatter plot at: {}".format(figure_path))
-
-
 def subplot_scatters(
     scatters: List[Tuple[np.ndarray, np.ndarray, str, Optional[List[str]]]],
     data_split: str,
+    image_ext: str,
     plot_path: str = "./figures/",
     top_k: int = 3,
     alpha: float = 0.5,
@@ -800,329 +729,11 @@ def subplot_scatters(
             if col >= cols:
                 break
 
-    figure_path = os.path.join(plot_path, f"scatters_together_{data_split}{IMAGE_EXT}")
+    figure_path = os.path.join(plot_path, f"scatters_together_{data_split}{image_ext}")
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
     plt.savefig(figure_path)
     logging.info(f"Saved scatters together at: {figure_path}")
-
-
-def subplot_comparison_scatters(
-    scatters: List[Tuple[Dict[str, np.ndarray], np.ndarray, str, Optional[List[str]]]],
-    prefix: str = "./figures/",
-    top_k: int = 3,
-    alpha: float = 0.5,
-):
-    row = 0
-    col = 0
-    total_plots = len(scatters)
-    cols = max(2, int(math.ceil(math.sqrt(total_plots))))
-    rows = max(2, int(math.ceil(total_plots / cols)))
-    fig, axes = plt.subplots(
-        rows, cols, figsize=(cols * SUBPLOT_SIZE, rows * SUBPLOT_SIZE),
-    )
-    for predictions, truth, title, paths in scatters:
-        for k in predictions:
-            c = _hash_string_to_color(title + k)
-            pearson = np.corrcoef(predictions[k].flatten(), truth.flatten())[1, 0]
-            r2 = pearson * pearson
-            big_r2 = coefficient_of_determination(
-                truth.flatten(), predictions[k].flatten(),
-            )
-            axes[row, col].plot(
-                [np.min(predictions[k]), np.max(predictions[k])],
-                [np.min(predictions[k]), np.max(predictions[k])],
-                color=c,
-            )
-            axes[row, col].scatter(
-                predictions[k],
-                truth,
-                color=c,
-                label=f"{k} r:{pearson:0.3f} r^2:{r2:0.3f} R^2:{big_r2:0.3f}",
-                marker=".",
-                alpha=alpha,
-            )
-            axes[row, col].legend(loc="upper left")
-            if paths is not None:
-                margin = float((np.max(truth) - np.min(truth)) / 100)
-                diff = np.abs(predictions[k] - truth)
-                arg_sorted = diff[:, 0].argsort()
-                _text_on_plot(
-                    axes[row, col],
-                    predictions[k][arg_sorted[0]] + margin,
-                    truth[arg_sorted[0]] + margin,
-                    os.path.basename(paths[arg_sorted[0]]),
-                )
-                for idx in arg_sorted[-top_k:]:
-                    _text_on_plot(
-                        axes[row, col],
-                        predictions[k][idx] + margin,
-                        truth[idx] + margin,
-                        os.path.basename(paths[idx]),
-                    )
-        axes[row, col].set_xlabel("Predictions")
-        axes[row, col].set_ylabel("Actual")
-        axes[row, col].set_title(title + "\n")
-
-        row += 1
-        if row == rows:
-            row = 0
-            col += 1
-            if col >= cols:
-                break
-
-    figure_path = os.path.join(prefix, "scatters_compared_together" + IMAGE_EXT)
-    if not os.path.exists(os.path.dirname(figure_path)):
-        os.makedirs(os.path.dirname(figure_path))
-    plt.savefig(figure_path)
-    logging.info(f"Saved scatter comparisons together at: {figure_path}")
-
-
-def plot_survivorship(
-    events: np.ndarray,
-    days_follow_up: np.ndarray,
-    predictions: np.ndarray,
-    title: str,
-    prefix: str = "./figures/",
-    days_window: int = 1825,
-):
-    """Plot Kaplan-Meier survivorship curves and stratify by median model prediction.
-    All input arrays have the same shape: (num_samples,)
-
-    :param events: Array indicating if each sample had an event (1) or not (0) by the end of follow up
-    :param days_follow_up: Array with the total days of follow up for each sample
-    :param predictions: Array with model predictions of an event before the end of follow up.
-    :param title: Title for the plot
-    :param prefix: Path prefix where plot will be saved
-    :param days_window: Maximum days of follow up
-    """
-    plt.figure(figsize=(SUBPLOT_SIZE, SUBPLOT_SIZE))
-    days_sorted_index = np.argsort(days_follow_up)
-    days_sorted = days_follow_up[days_sorted_index]
-    alive_per_step = len(events)
-    sick_per_step = 0
-    censored = 0
-    survivorship = [1.0]
-    real_survivorship = [1.0]
-    for cur_day, day_index in enumerate(days_sorted_index):
-        if days_follow_up[day_index] > days_window:
-            break
-        sick_per_step += events[day_index]
-        censored += 1 - events[day_index]
-        alive_per_step -= events[day_index]
-        survivorship.append(1 - (sick_per_step / (alive_per_step + sick_per_step)))
-        real_survivorship.append(
-            real_survivorship[cur_day] * (1 - (events[day_index] / alive_per_step)),
-        )
-    logging.info(
-        f"Cur day {cur_day} totL {len(real_survivorship)} totL {len(days_sorted)} First"
-        f" day {days_sorted[0]} Last day, day {days_follow_up[day_index]}, censored"
-        f" {censored}",
-    )
-    plt.plot(
-        [0] + days_sorted[: cur_day + 1],
-        real_survivorship[: cur_day + 1],
-        marker=".",
-        label="Survivorship",
-    )
-    groups = ["High risk", "Low risk"]
-    predicted_alive = {g: len(events) // 2 for g in groups}
-    predicted_sick = {g: 0 for g in groups}
-    predicted_days = defaultdict(list)
-    predicted_survival = defaultdict(list)
-    threshold = np.median(predictions)
-    for cur_day, day_index in enumerate(days_sorted_index):
-        if days_follow_up[day_index] > days_window:
-            break
-        group = "High risk" if predictions[day_index] > threshold else "Low risk"
-        predicted_sick[group] += events[day_index]
-        predicted_survival[group].append(
-            1
-            - (
-                predicted_sick[group] / (predicted_alive[group] + predicted_sick[group])
-            ),
-        )
-        predicted_alive[group] -= events[day_index]
-        predicted_days[group].append(days_follow_up[day_index])
-
-    for group in groups:
-        plt.plot(
-            [0] + predicted_days[group],
-            [1] + predicted_survival[group],
-            color="r" if "High" in group else "g",
-            marker="o",
-            label=f"{group} group had {predicted_sick[group]} events",
-        )
-    plt.title(
-        f"{title}\nEnrolled: {len(events)}, Censored: {censored:.0f},"
-        f" {100 * (censored / len(events)):2.1f}%, Events: {sick_per_step:.0f},"
-        f" {100 * (sick_per_step / len(events)):2.1f}%\nMax follow up: {days_window}"
-        f" days, {days_window // 365} years.",
-    )
-    plt.xlabel("Follow up time (days)")
-    plt.ylabel("Proportion Surviving")
-    plt.legend(loc="lower left")
-
-    figure_path = os.path.join(
-        prefix, f"survivorship_fu_{days_window}_{title}{IMAGE_EXT}",
-    )
-    if not os.path.exists(os.path.dirname(figure_path)):
-        os.makedirs(os.path.dirname(figure_path))
-    logging.info(f"Try to save survival plot at: {figure_path}")
-    plt.savefig(figure_path)
-    return {}
-
-
-def plot_survival(
-    prediction: np.ndarray,
-    truth: np.ndarray,
-    title: str,
-    days_window: int,
-    prefix: str = "./figures/",
-) -> Dict[str, float]:
-    """Plot Kaplan-Meier survivorship and predicted proportion surviving, calculate and return C-Index
-
-    :param prediction: Array with model predictions of an event at each time step, with shape (num_samples, intervals*2).
-    :param truth: Array with survival at each time step followed by events, shape is (num_samples, intervals*2)
-    :param title: Title for the plot
-    :param days_window: Maximum days of follow up
-    :param prefix: Path prefix where plot will be saved
-
-    :return: Dictionary mapping metric names to their floating point values
-    """
-    c_index, concordant, discordant, tied_risk, tied_time = concordance_index(
-        prediction, truth,
-    )
-    logging.info(
-        f"C-index:{c_index} concordant:{concordant} discordant:{discordant}"
-        f" tied_risk:{tied_risk} tied_time:{tied_time}",
-    )
-    intervals = truth.shape[-1] // 2
-    plt.figure(figsize=(SUBPLOT_SIZE, SUBPLOT_SIZE))
-
-    cumulative_sick = np.cumsum(np.sum(truth[:, intervals:], axis=0))
-    cumulative_censored = (
-        truth.shape[0] - np.sum(truth[:, :intervals], axis=0)
-    ) - cumulative_sick
-    alive_per_step = np.sum(truth[:, :intervals], axis=0)
-    sick_per_step = np.sum(truth[:, intervals:], axis=0)
-    survivorship = np.cumprod(1 - (sick_per_step / alive_per_step))
-    logging.info(f"Sick per step is: {sick_per_step} out of {truth.shape[0]}")
-    logging.info(
-        "Predicted sick per step is:"
-        f" {list(map(int, np.sum(1-prediction[:, :intervals], axis=0)))} out of"
-        f" {truth.shape[0]}",
-    )
-    logging.info(f"Survivors at each step is: {alive_per_step} out of {truth.shape[0]}")
-    logging.info(
-        f"Cumulative Censored: {cumulative_censored} or"
-        f" {np.max(truth[:, :intervals]+truth[:, intervals:])}",
-    )
-    predicted_proportion = (
-        np.sum(np.cumprod(prediction[:, :intervals], axis=1), axis=0) / truth.shape[0]
-    )
-
-    plt.plot(
-        range(0, days_window, 1 + days_window // intervals),
-        predicted_proportion,
-        marker="o",
-        label=f"Predicted Proportion C-Index:{c_index:0.3f}",
-    )
-    plt.plot(
-        range(0, days_window, 1 + days_window // intervals),
-        survivorship,
-        marker="o",
-        label="Survivorship",
-    )
-    plt.xlabel("Follow up time (days)")
-    plt.ylabel("Proportion Surviving")
-    plt.title(
-        f"{title}\nEnrolled: {truth.shape[0]}, Censored: {cumulative_censored[-1]:.0f},"
-        f" {100 * (cumulative_censored[-1] / truth.shape[0]):2.1f}%, Events:"
-        f" {cumulative_sick[-1]:.0f},"
-        f" {100 * (cumulative_sick[-1] / truth.shape[0]):2.1f}%\nMax follow up:"
-        f" {days_window} days, {days_window // 365} years.",
-    )
-    plt.legend(loc="upper right")
-
-    figure_path = os.path.join(prefix, "proportional_hazards_" + title + IMAGE_EXT)
-    if not os.path.exists(os.path.dirname(figure_path)):
-        os.makedirs(os.path.dirname(figure_path))
-    logging.info(f"Try to save survival plot at: {figure_path}")
-    plt.savefig(figure_path)
-    return {
-        "c_index": c_index,
-        "concordant": concordant,
-        "discordant": discordant,
-        "tied_risk": tied_risk,
-        "tied_time": tied_time,
-    }
-
-
-def plot_survival_curves(
-    prediction,
-    truth,
-    title,
-    days_window,
-    prefix="./figures/",
-    num_curves=30,
-    paths=None,
-):
-    intervals = truth.shape[-1] // 2
-    plt.figure(figsize=(SUBPLOT_SIZE * 2, SUBPLOT_SIZE * 2))
-    predicted_survivals = np.cumprod(prediction[:, :intervals], axis=1)
-    sick = np.sum(truth[:, intervals:], axis=-1)
-    censor_periods = np.argmin(truth[:, :intervals], axis=-1)
-    x_days = range(0, days_window, 1 + days_window // intervals)
-    cur_sick = 0
-    cur_healthy = 0
-    min_sick = num_curves * 0.1
-    for i in range(truth.shape[0]):
-        p = os.path.basename(paths[i]).replace(TENSOR_EXT, "")
-        if sick[i] == 1:
-            sick_period = np.argmax(truth[i, intervals:])
-            sick_day = sick_period * (days_window // intervals)
-            plt.plot(
-                x_days[: sick_period + 2],
-                predicted_survivals[i, : sick_period + 2],
-                label=f"Failed:{p} p:{predicted_survivals[i, sick_period]:0.2f}",
-                color="red",
-            )
-            plt.text(
-                sick_day,
-                predicted_survivals[i, sick_period],
-                f"Diagnosed day:{sick_day} id:{p}",
-            )
-            cur_sick += 1
-            if cur_sick >= min_sick and i >= num_curves:
-                break
-        elif censor_periods[i] != 0:  # individual was censored before failure
-            plt.plot(
-                x_days[: censor_periods[i]],
-                predicted_survivals[i, : censor_periods[i]],
-                label=(
-                    f"Censored:{p} p:{predicted_survivals[i, censor_periods[i]]:0.2f}"
-                ),
-                color="blue",
-            )
-        elif cur_healthy < num_curves:
-            plt.plot(
-                x_days,
-                predicted_survivals[i],
-                label=f"Survived:{p} p:{predicted_survivals[i, -1]:0.2f}",
-                color="green",
-            )
-            cur_healthy += 1
-    plt.title(title + "\n")
-    plt.legend(loc="lower left")
-    plt.xlabel("Follow up time (days)")
-    plt.ylabel("Survival Curve Prediction")
-    figure_path = os.path.join(prefix, "survival_curves_" + title + IMAGE_EXT)
-    if not os.path.exists(os.path.dirname(figure_path)):
-        os.makedirs(os.path.dirname(figure_path))
-    logging.info("Try to save survival plot at: {}".format(figure_path))
-    plt.savefig(figure_path)
-    return {}
 
 
 def _plot_ecg_text(
@@ -1405,6 +1016,7 @@ def _plot_ecg_figure(
     plot_mode: str,
     output_folder: str,
     run_id: str,
+    image_ext: str,
 ) -> None:
     plt.rcParams["font.family"] = "Times New Roman"
     plt.rcParams["font.size"] = 9.5
@@ -1483,7 +1095,7 @@ def _plot_ecg_figure(
     # save both pdf and image
     title = re.sub(r"[:/. ]", "", f'{plot_mode}_{data["patientid"]}_{data["datetime"]}')
     plt.savefig(os.path.join(output_folder, run_id, f"{title}{PDF_EXT}"))
-    plt.savefig(os.path.join(output_folder, run_id, f"{title}{IMAGE_EXT}"))
+    plt.savefig(os.path.join(output_folder, run_id, f"{title}{image_ext}"))
     plt.close(fig)
 
 
@@ -1581,13 +1193,20 @@ def plot_ecg(args):
                         plot_mode=args.plot_mode,
                         output_folder=args.output_folder,
                         run_id=args.id,
+                        image_ext=args.image_ext,
                     )
         except:
             logging.exception(f"Broken tensor at: {tp}")
 
 
 def plot_roc_per_class(
-    prediction, truth, labels, title, prefix="./figures/", data_split="test",
+    prediction: np.array,
+    truth: np.array,
+    labels: dict,
+    title: str,
+    image_ext: str,
+    prefix: str = "./figures/",
+    data_split: str = "test",
 ):
     plt.rcParams["font.size"] = 14
     lw = 2
@@ -1630,7 +1249,7 @@ def plot_roc_per_class(
     plt.title(f"ROC curve: {title}, n={truth.shape[0]:.0f}\n")
 
     figure_path = os.path.join(
-        prefix, "per_class_roc_" + title + "_" + data_split + IMAGE_EXT,
+        prefix, "per_class_roc_" + title + "_" + data_split + image_ext,
     )
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
@@ -1640,54 +1259,10 @@ def plot_roc_per_class(
     return labels_to_areas
 
 
-def plot_rocs(predictions, truth, labels, title, prefix="./figures/"):
-    plt.rcParams["font.size"] = 14
-    lw = 2
-    true_sums = np.sum(truth, axis=0)
-    plt.figure(figsize=(SUBPLOT_SIZE, SUBPLOT_SIZE))
-
-    for p in predictions:
-        fpr, tpr, roc_auc = get_fpr_tpr_roc_pred(predictions[p], truth, labels)
-        if len(labels) == 2:
-            _, negative_label_idx = find_negative_label_and_channel(labels)
-
-        for label, idx in labels.items():
-            if len(labels) == 2 and idx == negative_label_idx:
-                continue
-
-            color = _hash_string_to_color(p + label)
-            label_text = (
-                f"{p}_{label} area:{roc_auc[labels[label]]:.3f}"
-                f" n={true_sums[labels[label]]:.0f}"
-            )
-            plt.plot(
-                fpr[labels[label]],
-                tpr[labels[label]],
-                color=color,
-                lw=lw,
-                label=label_text,
-            )
-            logging.info(f"ROC label {label_text}")
-
-    plt.xlim([0.0, 1.0])
-    plt.ylim([-0.02, 1.03])
-    plt.ylabel(RECALL_LABEL)
-    plt.xlabel(FALLOUT_LABEL)
-    plt.legend(loc="lower right")
-    plt.plot([0, 1], [0, 1], "k:", lw=0.5)
-    plt.title(f"ROC curve: {title}, n={np.sum(true_sums):.0f}\n")
-
-    figure_path = os.path.join(prefix, "per_class_roc_" + title + IMAGE_EXT)
-    if not os.path.exists(os.path.dirname(figure_path)):
-        os.makedirs(os.path.dirname(figure_path))
-    plt.savefig(figure_path)
-    plt.clf()
-    logging.info("Saved ROC curve at: {}".format(figure_path))
-
-
 def subplot_rocs(
     rocs: List[Tuple[np.ndarray, np.ndarray, Dict[str, int]]],
     data_split: str,
+    image_ext: str,
     plot_path: str = "./figures/",
 ):
     """Log and tabulate AUCs given as nested dictionaries in the format '{model: {label: auc}}'"""
@@ -1738,74 +1313,20 @@ def subplot_rocs(
             col += 1
             if col >= cols:
                 break
-    figure_path = os.path.join(plot_path, f"roc_together_{data_split}{IMAGE_EXT}")
-    if not os.path.exists(os.path.dirname(figure_path)):
-        os.makedirs(os.path.dirname(figure_path))
-    plt.savefig(figure_path)
-
-
-def subplot_comparison_rocs(
-    rocs: List[Tuple[Dict[str, np.ndarray], np.ndarray, Dict[str, int]]],
-    prefix: str = "./figures/",
-):
-    """Log and tabulate AUCs given as nested dictionaries in the format '{model: {label: auc}}'"""
-    lw = 3
-    row = 0
-    col = 0
-    total_plots = len(rocs)
-    cols = max(2, int(math.ceil(math.sqrt(total_plots))))
-    rows = max(2, int(math.ceil(total_plots / cols)))
-    fig, axes = plt.subplots(
-        rows, cols, figsize=(cols * SUBPLOT_SIZE, rows * SUBPLOT_SIZE),
-    )
-    for predictions, truth, labels in rocs:
-        true_sums = np.sum(truth, axis=0)
-        for p in predictions:
-            fpr, tpr, roc_auc = get_fpr_tpr_roc_pred(predictions[p], truth, labels)
-            if len(labels) == 2:
-                _, negative_label_idx = find_negative_label_and_channel(labels)
-
-            for label, idx in labels.items():
-                if len(labels) == 2 and idx == negative_label_idx:
-                    continue
-
-                color = _hash_string_to_color(p + label)
-                label_text = (
-                    f"{p}_{label} area:{roc_auc[labels[label]]:.3f}"
-                    f" n={true_sums[labels[label]]:.0f}"
-                )
-                axes[row, col].plot(
-                    fpr[labels[label]],
-                    tpr[labels[label]],
-                    color=color,
-                    lw=lw,
-                    label=label_text,
-                )
-                logging.info(f"ROC Label {label_text}")
-
-        axes[row, col].set_xlim([0.0, 1.0])
-        axes[row, col].set_ylim([-0.02, 1.03])
-        axes[row, col].set_ylabel(RECALL_LABEL)
-        axes[row, col].set_xlabel(FALLOUT_LABEL)
-        axes[row, col].legend(loc="lower right")
-        axes[row, col].plot([0, 1], [0, 1], "k:", lw=0.5)
-        axes[row, col].set_title(f"ROC n={np.sum(true_sums):.0f}\n")
-
-        row += 1
-        if row == rows:
-            row = 0
-            col += 1
-            if col >= cols:
-                break
-
-    figure_path = os.path.join(prefix, "rocs_compared_together" + IMAGE_EXT)
+    figure_path = os.path.join(plot_path, f"roc_together_{data_split}{image_ext}")
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
     plt.savefig(figure_path)
 
 
 def plot_precision_recall_per_class(
-    prediction, truth, labels, title, prefix="./figures/", data_split="test",
+    prediction: np.array,
+    truth: np.array,
+    labels: dict,
+    title: str,
+    image_ext: str,
+    prefix: str = "./figures/",
+    data_split: str = "test",
 ):
     plt.rcParams["font.size"] = 14
     lw = 2.0
@@ -1843,7 +1364,7 @@ def plot_precision_recall_per_class(
     plt.title(f"PR curve: {title}, n={np.sum(true_sums):.0f}\n")
 
     figure_path = os.path.join(
-        prefix, "precision_recall_" + title + "_" + data_split + IMAGE_EXT,
+        prefix, "precision_recall_" + title + "_" + data_split + image_ext,
     )
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
@@ -1851,49 +1372,6 @@ def plot_precision_recall_per_class(
     plt.clf()
     logging.info(f"Saved Precision Recall curve at: {figure_path}")
     return labels_to_areas
-
-
-def plot_precision_recalls(predictions, truth, labels, title, prefix="./figures/"):
-    # Compute Precision-Recall and plot curve for each model
-    lw = 2.0
-    true_sums = np.sum(truth, axis=0)
-    plt.figure(figsize=(SUBPLOT_SIZE, SUBPLOT_SIZE))
-
-    for p in predictions:
-        if len(labels) == 2:
-            _, negative_label_idx = find_negative_label_and_channel(labels)
-
-        for label, idx in labels.items():
-            if len(labels) == 2 and idx == negative_label_idx:
-                continue
-
-            c = _hash_string_to_color(p + label)
-            precision, recall, _ = precision_recall_curve(
-                truth[:, labels[label]], predictions[p][:, labels[label]],
-            )
-            average_precision = average_precision_score(
-                truth[:, labels[label]], predictions[p][:, labels[label]],
-            )
-            label_text = (
-                f"{p}_{label} mean precision:{average_precision:.3f}"
-                f" n={true_sums[labels[label]]:.0f}"
-            )
-            plt.plot(recall, precision, lw=lw, color=c, label=label_text)
-            logging.info(f"prAUC Label {label_text}")
-
-    plt.xlim([0.0, 1.00])
-    plt.ylim([-0.02, 1.03])
-    plt.xlabel(RECALL_LABEL)
-    plt.ylabel(PRECISION_LABEL)
-    plt.legend(loc="lower left")
-    plt.title(f"{title} n={np.sum(true_sums):.0f}")
-
-    figure_path = os.path.join(prefix, "precision_recall_" + title + IMAGE_EXT)
-    if not os.path.exists(os.path.dirname(figure_path)):
-        os.makedirs(os.path.dirname(figure_path))
-    plt.savefig(figure_path)
-    plt.clf()
-    logging.info("Saved Precision Recall curve at: {}".format(figure_path))
 
 
 def get_fpr_tpr_roc_pred(y_pred, test_truth, labels):
@@ -1911,36 +1389,6 @@ def get_fpr_tpr_roc_pred(y_pred, test_truth, labels):
     return fpr, tpr, roc_auc
 
 
-def plot_find_learning_rate(
-    learning_rates: List[float],
-    losses: List[float],
-    smoothed_losses: List[float],
-    picked_learning_rate: Optional[float],
-    figure_path: str,
-):
-    plt.figure(figsize=(2 * SUBPLOT_SIZE, SUBPLOT_SIZE))
-    plt.title("Learning rate finder")
-    cutoff = smoothed_losses[0]
-    plt.ylim(min(smoothed_losses), cutoff * 1.05)
-    plt.axhline(
-        cutoff, linestyle="--", color="k", label=f"Deltas ignored above {cutoff:.2f}",
-    )
-    learning_rates = np.log(learning_rates) / np.log(10)
-    plt.plot(learning_rates, losses, label="Loss", c="r")
-    plt.plot(learning_rates, smoothed_losses, label="Smoothed loss", c="b")
-    if picked_learning_rate is not None:
-        plt.axvline(
-            np.log(picked_learning_rate) / np.log(10),
-            label=f"Learning rate found {picked_learning_rate:.2E}",
-            color="g",
-            linestyle="--",
-        )
-    plt.xlabel("Log_10 learning rate")
-    plt.legend()
-    plt.savefig(os.path.join(figure_path, f"find_learning_rate{IMAGE_EXT}"))
-    plt.clf()
-
-
 def _hash_string_to_color(string):
     """Hash a string to color (using hashlib and not the built-in hash for consistency between runs)"""
     return COLOR_ARRAY[
@@ -1951,3 +1399,79 @@ def _hash_string_to_color(string):
 def _text_on_plot(axes, x, y, text, alpha=0.8, background="white"):
     t = axes.text(x, y, text)
     t.set_bbox({"facecolor": background, "alpha": alpha, "edgecolor": background})
+
+
+def plot_architecture_diagram(dot: pydot.Dot, image_path: str):
+    """
+    Given a graph representation of a model architecture,
+    save the architecture diagram to an image file.
+
+    :param dot: pydot.Dot representation of model
+    :param image_path: path to save svg of architecture diagram to
+    """
+    legend = {}
+    for n in dot.get_nodes():
+        if n.get_label():
+            if "Conv1" in n.get_label():
+                legend["Conv1"] = "cyan"
+                n.set_fillcolor("cyan")
+            elif "Conv2" in n.get_label():
+                legend["Conv2"] = "deepskyblue1"
+                n.set_fillcolor("deepskyblue1")
+            elif "Conv3" in n.get_label():
+                legend["Conv3"] = "deepskyblue3"
+                n.set_fillcolor("deepskyblue3")
+            elif "UpSampling" in n.get_label():
+                legend["UpSampling"] = "darkslategray2"
+                n.set_fillcolor("darkslategray2")
+            elif "Transpose" in n.get_label():
+                legend["Transpose"] = "deepskyblue2"
+                n.set_fillcolor("deepskyblue2")
+            elif "BatchNormalization" in n.get_label():
+                legend["BatchNormalization"] = "goldenrod1"
+                n.set_fillcolor("goldenrod1")
+            elif "output_" in n.get_label():
+                n.set_fillcolor("darkolivegreen2")
+                legend["Output"] = "darkolivegreen2"
+            elif "softmax" in n.get_label():
+                n.set_fillcolor("chartreuse")
+                legend["softmax"] = "chartreuse"
+            elif "MaxPooling" in n.get_label():
+                legend["MaxPooling"] = "aquamarine"
+                n.set_fillcolor("aquamarine")
+            elif "Dense" in n.get_label():
+                legend["Dense"] = "gold"
+                n.set_fillcolor("gold")
+            elif "Reshape" in n.get_label():
+                legend["Reshape"] = "coral"
+                n.set_fillcolor("coral")
+            elif "Input" in n.get_label():
+                legend["Input"] = "darkolivegreen1"
+                n.set_fillcolor("darkolivegreen1")
+            elif "Activation" in n.get_label():
+                legend["Activation"] = "yellow"
+                n.set_fillcolor("yellow")
+        n.set_style("filled")
+
+    for label in legend:
+        legend_node = pydot.Node(
+            "legend" + label, label=label, shape="box", fillcolor=legend[label],
+        )
+        dot.add_node(legend_node)
+
+    if image_path.endswith("svg"):
+        # pydot svg applies a scale factor that clips the image so unscale it
+        svg_string = dot.create_svg().decode()
+        svg_string = re.sub(
+            r"scale\(\d+\.?\d+\ \d+\.?\d+\)", "scale(1 1)", svg_string,
+        ).encode()
+        with open(image_path, "wb") as f:
+            f.write(svg_string)
+
+    elif image_path.endswith("eps"):
+        dot.write(path=image_path, prog="dot", format="eps", encoding=None)
+
+    elif image_path.endswith("png"):
+        dot.write_png(path=image_path)
+
+    logging.info("Saved architecture diagram to:{}".format(image_path))

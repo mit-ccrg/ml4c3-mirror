@@ -11,16 +11,15 @@ from tensorflow.keras.utils import model_to_dot
 from tensorflow.keras.models import Model
 
 # Imports: first party
-from ml4cvd.plots import plot_ecg
+from ml4cvd.plots import plot_ecg, plot_architecture_diagram
 from ml4cvd.models import (
     make_shallow_model,
     train_model_from_datasets,
-    _save_architecture_diagram,
     make_multimodal_multitask_model,
 )
 from ml4cvd.datasets import get_verbose_stats_string, train_valid_test_datasets
 from ml4cvd.arguments import parse_args
-from ml4cvd.definitions import IMAGE_EXT, MODEL_EXT
+from ml4cvd.definitions import MODEL_EXT
 from ml4cvd.evaluations import predict_and_evaluate
 from ml4cvd.explorations import explore
 from ml4cvd.tensorizer_ecg import tensorize_ecg
@@ -67,9 +66,11 @@ def build_multimodal_multitask(args: argparse.Namespace) -> Model:
     model = make_multimodal_multitask_model(**args.__dict__)
     model_file = os.path.join(args.output_folder, args.id, "model_weights" + MODEL_EXT)
     model.save(model_file)
-    _save_architecture_diagram(
+    plot_architecture_diagram(
         model_to_dot(model, show_shapes=True, expand_nested=True),
-        os.path.join(args.output_folder, args.id, "architecture_graph" + IMAGE_EXT),
+        os.path.join(
+            args.output_folder, args.id, "architecture_graph" + args.image_ext,
+        ),
     )
     logging.info(f"Model saved to {model_file}")
     return model
@@ -103,7 +104,9 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         learning_rate_reduction=args.learning_rate_reduction,
         output_folder=args.output_folder,
         run_id=args.id,
+        image_ext=args.image_ext,
         return_history=True,
+        plot=True,
     )
 
     out_path = os.path.join(args.output_folder, args.id + "/")
@@ -114,6 +117,7 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         tensor_maps_out=args.tensor_maps_out,
         plot_path=out_path,
         data_split="train",
+        image_ext=args.image_ext,
     )
     performance_metrics = predict_and_evaluate(
         model=model,
@@ -122,6 +126,7 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         tensor_maps_out=args.tensor_maps_out,
         plot_path=out_path,
         data_split="test",
+        image_ext=args.image_ext,
     )
 
     for cleanup in cleanups:
@@ -174,6 +179,7 @@ def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         plot_path=out_path,
         data_split=data_split,
         save_predictions=True,
+        image_ext=args.image_ext,
     )
 
     for cleanup in cleanups:
@@ -227,6 +233,7 @@ def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
         learning_rate_reduction=args.learning_rate_reduction,
         output_folder=args.output_folder,
         run_id=args.id,
+        image_ext=args.image_ext,
     )
 
     # Evaluate trained model
@@ -238,6 +245,7 @@ def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
         tensor_maps_out=args.tensor_maps_out,
         plot_path=plot_path,
         data_split="train",
+        image_ext=args.image_ext,
     )
     performance_metrics = predict_and_evaluate(
         model=model,
@@ -246,6 +254,7 @@ def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
         tensor_maps_out=args.tensor_maps_out,
         plot_path=plot_path,
         data_split="test",
+        image_ext=args.image_ext,
         save_coefficients=True,
     )
     for cleanup in cleanups:

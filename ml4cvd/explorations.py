@@ -19,7 +19,6 @@ import seaborn as sns
 # Imports: first party
 from ml4cvd.plots import SUBPLOT_SIZE
 from ml4cvd.datasets import get_train_valid_test_paths
-from ml4cvd.definitions import IMAGE_EXT
 from ml4cvd.tensormap.TensorMap import (
     TensorMap,
     Interpretation,
@@ -418,6 +417,7 @@ def explore(
                                 output_id=args.id,
                                 window=window,
                                 stratify_label=args.explore_stratify_label,
+                                image_ext=args.image_ext,
                             )
 
                     # Iterate over label and isolate those df rows if stratified
@@ -545,6 +545,7 @@ def _plot_histogram_continuous_tensor(
     output_id: str,
     window: str,
     stratify_label: str,
+    image_ext: str,
 ):
     sns.set_context("talk")
     plot_width = SUBPLOT_SIZE * 1.3 if stratify_label is not None else SUBPLOT_SIZE
@@ -576,9 +577,9 @@ def _plot_histogram_continuous_tensor(
         plt.xlabel("Value")
         plt.ylabel("Probability")
     fpath = os.path.join(
-        output_folder, output_id, f"histogram_{tmap_name}_{window}{IMAGE_EXT}",
+        output_folder, output_id, f"histogram_{tmap_name}_{window}{image_ext}",
     )
-    plt.savefig(fpath, dpi=100, bbox_inches="tight")
+    plt.savefig(fpath, dpi=150, bbox_inches="tight")
     plt.close()
     logging.info(f"Saved histogram of {tmap_name} to {fpath}")
 
