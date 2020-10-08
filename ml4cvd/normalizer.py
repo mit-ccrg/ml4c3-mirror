@@ -46,3 +46,15 @@ class ZeroMeanStd1(Normalizer):
         tensor -= np.mean(tensor)
         tensor /= np.std(tensor) + EPS
         return tensor
+
+
+class MinMax(Normalizer):
+    def __init__(self, min: float, max: float):
+        self.min = min
+        self.max = max
+
+    def normalize(self, tensor: np.ndarray) -> np.ndarray:
+        return (tensor - self.min) / (self.max - self.min)
+
+    def un_normalize(self, tensor: np.ndarray) -> np.ndarray:
+        return tensor * (self.max - self.min) + self.min
