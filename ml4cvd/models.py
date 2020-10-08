@@ -1,6 +1,5 @@
 # Imports: standard library
 import os
-import re
 import logging
 from enum import Enum, auto
 from typing import Any, Dict, List, Tuple, Union, Callable, Optional, Sequence
@@ -8,7 +7,6 @@ from itertools import chain
 
 # Imports: third party
 import numpy as np
-import pydot
 import tensorflow as tf
 import tensorflow_addons as tfa
 import tensorflow_probability as tfp
@@ -64,10 +62,10 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.regularizers import l1_l2
 
 # Imports: first party
-from ml4cvd.plots import plot_metric_history
+from ml4cvd.plots import plot_metric_history, plot_architecture_diagram
 from ml4cvd.metrics import get_metric_dict
 from ml4cvd.optimizers import NON_KERAS_OPTIMIZERS, get_optimizer
-from ml4cvd.definitions import IMAGE_EXT, MODEL_EXT
+from ml4cvd.definitions import MODEL_EXT
 from ml4cvd.tensormap.TensorMap import TensorMap
 
 CHANNEL_AXIS = -1  # Set to 1 for Theano backend
@@ -1193,6 +1191,7 @@ def train_model_from_datasets(
     learning_rate_reduction: float,
     output_folder: str,
     run_id: str,
+    image_ext: str,
     return_history: bool = False,
     plot: bool = True,
 ) -> Union[Model, Tuple[Model, History]]:
@@ -1211,6 +1210,7 @@ def train_model_from_datasets(
     :param learning_rate_reduction: Scale factor to reduce learning rate by
     :param output_folder: Directory where output file will be stored
     :param run_id: User-chosen string identifying this run
+    :param image_ext: File format of saved image
     :param return_history: Whether or not to return history from training
     :param plot: Whether or not to plot metrics from training
     :return: The optimized model which achieved the best validation loss or training loss if validation data was not provided
@@ -1220,9 +1220,12 @@ def train_model_from_datasets(
         os.makedirs(os.path.dirname(model_file))
 
     if plot:
-        _save_architecture_diagram(
-            model_to_dot(model, show_shapes=True, expand_nested=True),
-            os.path.join(output_folder, run_id, "architecture_graph" + IMAGE_EXT),
+        image_path = os.path.join(
+            output_folder, run_id, "architecture_graph" + image_ext,
+        )
+        plot_architecture_diagram(
+            dot=model_to_dot(model, show_shapes=True, expand_nested=True),
+            image_path=image_path,
         )
 
     history = model.fit(
@@ -1242,7 +1245,11 @@ def train_model_from_datasets(
     logging.info(f"Model weights saved at: {model_file}")
     if plot:
         plot_metric_history(
-            history, None, run_id, os.path.dirname(model_file),
+            history=history,
+            training_steps=None,
+            title=run_id,
+            image_ext=image_ext,
+            prefix=os.path.dirname(model_file),
         )
 
     # load the weights from model which achieved the best validation loss
@@ -1390,74 +1397,6 @@ def _regularization_layer(dimension: int, regularization_type: str, rate: float)
         return Dropout(rate)
     else:
         return lambda x: x
-
-
-def _save_architecture_diagram(dot: pydot.Dot, image_path: str):
-    """
-    Given a graph representation of a model architecture,
-    save the architecture diagram as a svg.
-
-    :param dot: pydot.Dot representation of model
-    :param image_path: path to save svg of architecture diagram to
-    """
-    legend = {}
-    for n in dot.get_nodes():
-        if n.get_label():
-            if "Conv1" in n.get_label():
-                legend["Conv1"] = "cyan"
-                n.set_fillcolor("cyan")
-            elif "Conv2" in n.get_label():
-                legend["Conv2"] = "deepskyblue1"
-                n.set_fillcolor("deepskyblue1")
-            elif "Conv3" in n.get_label():
-                legend["Conv3"] = "deepskyblue3"
-                n.set_fillcolor("deepskyblue3")
-            elif "UpSampling" in n.get_label():
-                legend["UpSampling"] = "darkslategray2"
-                n.set_fillcolor("darkslategray2")
-            elif "Transpose" in n.get_label():
-                legend["Transpose"] = "deepskyblue2"
-                n.set_fillcolor("deepskyblue2")
-            elif "BatchNormalization" in n.get_label():
-                legend["BatchNormalization"] = "goldenrod1"
-                n.set_fillcolor("goldenrod1")
-            elif "output_" in n.get_label():
-                n.set_fillcolor("darkolivegreen2")
-                legend["Output"] = "darkolivegreen2"
-            elif "softmax" in n.get_label():
-                n.set_fillcolor("chartreuse")
-                legend["softmax"] = "chartreuse"
-            elif "MaxPooling" in n.get_label():
-                legend["MaxPooling"] = "aquamarine"
-                n.set_fillcolor("aquamarine")
-            elif "Dense" in n.get_label():
-                legend["Dense"] = "gold"
-                n.set_fillcolor("gold")
-            elif "Reshape" in n.get_label():
-                legend["Reshape"] = "coral"
-                n.set_fillcolor("coral")
-            elif "Input" in n.get_label():
-                legend["Input"] = "darkolivegreen1"
-                n.set_fillcolor("darkolivegreen1")
-            elif "Activation" in n.get_label():
-                legend["Activation"] = "yellow"
-                n.set_fillcolor("yellow")
-        n.set_style("filled")
-
-    for label in legend:
-        legend_node = pydot.Node(
-            "legend" + label, label=label, shape="box", fillcolor=legend[label],
-        )
-        dot.add_node(legend_node)
-
-    # pydot svg applies a scale factor that clips the image so unscale it
-    svg_string = dot.create_svg().decode()
-    svg_string = re.sub(
-        r"scale\(\d+\.?\d+\ \d+\.?\d+\)", "scale(1 1)", svg_string,
-    ).encode()
-    with open(image_path, "wb") as f:
-        f.write(svg_string)
-    logging.info("Saved architecture diagram to:{}".format(image_path))
 
 
 def saliency_map(
