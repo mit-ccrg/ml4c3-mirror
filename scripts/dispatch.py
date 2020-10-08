@@ -9,6 +9,7 @@ import socket
 import logging
 import argparse
 import datetime
+import itertools
 import subprocess
 from typing import List
 
@@ -58,7 +59,14 @@ def _get_path_to_results() -> str:
     return os.path.expanduser(path)
 
 
-def setup_job(script: str, bootstrap: str, gpu: str) -> subprocess.Popen:
+def setup_job(
+    script: str,
+    bootstrap: str,
+    gpu: str,
+    cohort: str,
+    output_tensor: str,
+    outcome_short_name: str,
+) -> subprocess.Popen:
     """
     Setup environment variables, launch job, and return job object.
     """
@@ -67,6 +75,9 @@ def setup_job(script: str, bootstrap: str, gpu: str) -> subprocess.Popen:
     env["PATH_TO_ECGS"] = _get_path_to_ecgs()
     env["PATH_TO_BOOTSTRAPS"] = _get_path_to_bootstraps()
     env["PATH_TO_RESULTS"] = _get_path_to_results()
+    env["COHORT"] = cohort
+    env["OUTPUT_TENSOR"] = output_tensor
+    env["OUTCOME_SHORT_NAME"] = outcome_short_name
 
     job = subprocess.Popen(
         f"bash {script}_temp".split(),
@@ -75,7 +86,17 @@ def setup_job(script: str, bootstrap: str, gpu: str) -> subprocess.Popen:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    logging.info(f"Dispatched {script} with bootstrap {bootstrap} on gpu {gpu}")
+
+    append_str = ""
+    if cohort != "":
+        append_str += f", cohort {cohort}"
+    if output_tensor != "":
+        append_str += f", output tensor {output_tensor}"
+    if outcome_short_name != "":
+        append_str += f", outcome short name {outcome_short_name}"
+    logging.info(
+        f"Dispatched {script} with bootstrap {bootstrap} on gpu {gpu}{append_str}",
+    )
     return job
 
 
@@ -89,7 +110,13 @@ def run(args: argparse.Namespace):
         for script in args.scripts:
             with open(script, "r") as original, open(f"{script}_temp", "w") as temp:
                 temp.write(original.read().replace("-t ", ""))
-            for bootstrap in args.bootstraps:
+            for (bootstrap, cohort, output_tensor_and_short_name) in itertools.product(
+                args.bootstraps,
+                args.cohorts,
+                zip(args.output_tensors, args.outcome_short_names),
+            ):
+                output_tensor = output_tensor_and_short_name[0]
+                outcome_short_name = output_tensor_and_short_name[1]
                 assigned = False
                 while not assigned:
                     for gpu, job in gpu_jobs.items():
@@ -97,7 +124,14 @@ def run(args: argparse.Namespace):
                             continue
                         if job is not None:
                             job.kill()
-                        job = setup_job(script=script, bootstrap=bootstrap, gpu=gpu)
+                        job = setup_job(
+                            script=script,
+                            bootstrap=bootstrap,
+                            gpu=gpu,
+                            cohort=cohort,
+                            output_tensor=output_tensor,
+                            outcome_short_name=outcome_short_name,
+                        )
                         gpu_jobs[gpu] = job
                         assigned = True
                         num_dispatched += 1
@@ -116,7 +150,6 @@ def run(args: argparse.Namespace):
             except FileNotFoundError:
                 continue
         logging.info(f"Cleaned up jobs")
-
     logging.info(
         f"Dispatched {num_dispatched} jobs in {time.time() - start:.0f} seconds",
     )
@@ -139,6 +172,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--scripts", nargs="+", required=True, help="list of paths to scripts to run",
     )
+    parser.add_argument(
+        "--cohorts",
+        nargs="+",
+        default=[""],
+        help="List of cohort (strings) to iterate over in bash script",
+    )
+    parser.add_argument(
+        "--output_tensors",
+        nargs="+",
+        default=[""],
+        help="List of output tensors to iterate over in bash script",
+    )
+    parser.add_argument(
+        "--outcome_short_names",
+        nargs="+",
+        default=[""],
+        help="List of outcome short names to iterate over in bash script",
+    )
+
     args = parser.parse_args()
 
     log_formatter = logging.Formatter(
