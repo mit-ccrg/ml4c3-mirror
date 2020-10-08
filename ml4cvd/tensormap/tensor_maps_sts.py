@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 # Imports: first party
-from ml4cvd.normalizer import RobustScaler
+from ml4cvd.normalizer import MinMax, RobustScaler
 from ml4cvd.validators import validator_no_nans, validator_not_all_zero
 from ml4cvd.definitions import (
     ECG_PREFIX,
@@ -92,16 +92,16 @@ sts_features_categorical = {
 # These values are calculated from the entire STS MGH cohort using a Jupyter Notebook
 # fmt: off
 sts_features_continuous = {
-    "age":       {"median": 67, "iqr": 18},
-    "creatlst":  {"median": 1, "iqr": 0.36},
-    "hct":       {"median": 39, "iqr": 8},
-    "hdef":      {"median": 60, "iqr": 16},
-    "heightcm":  {"median": 173, "iqr": 15},
-    "platelets": {"median": 20700, "iqr": 90000},
-    "wbc":       {"median": 7.3, "iqr": 3},
-    "weightkg":  {"median": 82, "iqr": 24},
-    "perfustm":  {"median": 123, "iqr": 72},
-    "xclamptm":  {"median": 90, "iqr": 65},
+    "age":       {"median": 67,    "iqr": 18,    "min": 21,   "max": 110},
+    "creatlst":  {"median": 1,     "iqr": 0.36,  "min": 0.17, "max": 17.89},
+    "hct":       {"median": 39,    "iqr": 8,     "min": 2.3,  "max": 76.766},
+    "hdef":      {"median": 60,    "iqr": 16,    "min": 5,    "max": 102.381},
+    "heightcm":  {"median": 173,   "iqr": 15,    "min": 52.7, "max": 208.3},
+    "platelets": {"median": 20700, "iqr": 90000, "min": 2000, "max": 777277.179},
+    "wbc":       {"median": 7.3,   "iqr": 3,     "min": 0.2,  "max": 99.99},
+    "weightkg":  {"median": 82,    "iqr": 24,    "min": 26.4, "max": 204},
+    "perfustm":  {"median": 123,   "iqr": 72,    "min": 0,    "max": 960},
+    "xclamptm":  {"median": 90,    "iqr": 65,    "min": 0,    "max": 867.168},
 }
 # fmt: on
 
@@ -374,16 +374,19 @@ for tmap_name in sts_features_continuous:
     validator = validator_no_nans
 
     # Make tmaps for both raw and scaled data
-    for standardize in ["", "_scaled"]:
+    for standardize in ["", "_scaled", "_minmax"]:
         channel_map = {tmap_name + standardize: 0}
-        normalizer = (
-            RobustScaler(
+        normalizer = None
+        if standardize == "_scaled":
+            normalizer = RobustScaler(
                 median=sts_features_continuous[tmap_name]["median"],
                 iqr=sts_features_continuous[tmap_name]["iqr"],
             )
-            if standardize == "_scaled"
-            else None
-        )
+        elif standardize == "_minmax":
+            normalizer = MinMax(
+                min=sts_features_continuous[tmap_name]["min"],
+                max=sts_features_continuous[tmap_name]["max"],
+            )
         tmaps[tmap_name + standardize] = TensorMap(
             name=tmap_name + standardize,
             interpretation=interpretation,
