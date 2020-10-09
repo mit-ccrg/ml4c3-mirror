@@ -374,7 +374,7 @@ for tmap_name in sts_features_continuous:
     validator = validator_no_nans
 
     # Make tmaps for both raw and scaled data
-    for standardize in ["", "_scaled", "_minmax"]:
+    for standardize in ["", "_scaled", "_minmaxed"]:
         channel_map = {tmap_name + standardize: 0}
         normalizer = None
         if standardize == "_scaled":
@@ -382,7 +382,7 @@ for tmap_name in sts_features_continuous:
                 median=sts_features_continuous[tmap_name]["median"],
                 iqr=sts_features_continuous[tmap_name]["iqr"],
             )
-        elif standardize == "_minmax":
+        elif standardize == "_minmaxed":
             normalizer = MinMax(
                 min=sts_features_continuous[tmap_name]["min"],
                 max=sts_features_continuous[tmap_name]["max"],
