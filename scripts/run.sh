@@ -156,9 +156,9 @@ if ! docker pull ${DOCKER_IMAGE}; then
     echo "Could not pull the image ${DOCKER_IMAGE}."
 fi
 
-if [[ -d "/storage/shared" ]] ; then
-    echo "Found /storage/shared; will try to mount it."
-    MOUNTS="${MOUNTS} -v /storage/shared/:/storage/shared/"
+if [[ -d "/storage" ]] ; then
+    echo "Found /storage; will try to mount it."
+    MOUNTS="${MOUNTS} -v /storage/:/storage/"
 fi
 
 if [[ -d "/media" ]] ; then
