@@ -49,9 +49,9 @@ def _get_path_to_bootstraps() -> str:
 def _get_path_to_results() -> str:
     """Check the hostname of the machine and return the appropriate path."""
     if "anduril" == socket.gethostname():
-        path = "~/dropbox/sts-ecg/results"
+        path = "~/dropbox/sts-net/results"
     elif "mithril" == socket.gethostname():
-        path = "~/dropbox/sts-ecg/results"
+        path = "~/dropbox/sts-net/results"
     elif "stultzlab" in socket.gethostname():
         path = "~/"
     else:
