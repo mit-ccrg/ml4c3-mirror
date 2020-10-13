@@ -20,36 +20,27 @@ CONTAINER_NAME=""
 
 ################### USERNAME & GROUPS ####################################
 
-# Get group names
-GROUP_NAMES=$(groups ${USER} | sed -e 's/.*:\ //')
-
-# Get group names as array to iterate through
-GROUP_NAMES_ARR=( $GROUP_NAMES )
-
-# Iterate through array, get group ID for each group name, append to string
-GROUP_IDS=""
-for GROUP_TO_ADD in "${GROUP_NAMES_ARR[@]}"; do
-    GROUP_IDS="$GROUP_IDS $(getent group ${GROUP_TO_ADD} | awk -F: '{printf "%d\n",$3}')"
-done
+# Get group ids and names, interleaved: id1 group1 id2 group2 ...
+GROUP_IDS_NAMES=$(id ${USER} | sed 's/.*groups=//g' | awk -F'[,()]' '{for (i=1; i<=NF; i++) {if ($i == "") {continue} print $i}}')
 
 # Export environment variables so they can be passed into Docker and accessed in bash
-export GROUP_NAMES GROUP_IDS
+export GROUP_IDS_NAMES
 
 # Create string to be called in Docker's bash shell via eval;
 # this creates a user, adds groups, adds user to groups, then calls the Python script
 # the 'staff' group is a preloaded group in the docker image which enables access to root owned folders
 SETUP_USER="
     useradd -u $(id -u) -d ${HOME} ${USER};
-    GROUP_NAMES_ARR=( \${GROUP_NAMES} );
-    GROUP_IDS_ARR=( \${GROUP_IDS} );
-    for (( i=0; i<\${#GROUP_NAMES_ARR[@]}; ++i )); do
-        echo \"Creating group\" \${GROUP_NAMES_ARR[i]} \"with gid\" \${GROUP_IDS_ARR[i]};
-        groupadd -f -g \${GROUP_IDS_ARR[i]} \${GROUP_NAMES_ARR[i]};
-        echo \"Adding user ${USER} to group\" \${GROUP_NAMES_ARR[i]}
-        usermod -aG \${GROUP_NAMES_ARR[i]} ${USER}
+    GROUPS_ARR=( \${GROUP_IDS_NAMES} );
+    for (( i=0; i<\${#GROUPS_ARR[@]}; i=i+2 )); do
+        echo \"Creating group\" \${GROUPS_ARR[i+1]} \"with gid\" \${GROUPS_ARR[i]};
+        groupadd -f -g \${GROUPS_ARR[i]} \${GROUPS_ARR[i+1]};
+        echo \"Adding user ${USER} to group\" \${GROUPS_ARR[i+1]}
+        usermod -aG \${GROUPS_ARR[i+1]} ${USER}
     done;
     echo \"Adding user ${USER} to group staff\";
     usermod -aG staff ${USER};
+    echo \"Adding user ${USER} to group sudo\";
     usermod -aG sudo ${USER};
     echo -e \"password\npassword\" | passwd ${USER};
 "
@@ -185,8 +176,7 @@ Attempting to run Docker with
     docker run --rm \
     ${INTERACTIVE} \
     ${GPU_DEVICE} \
-    --env GROUP_NAMES \
-    --env GROUP_IDS \
+    --env GROUP_IDS_NAMES \
     --uts=host \
     --ipc=host \
     -v ${HOME}/:${HOME}/ \
@@ -203,8 +193,7 @@ LAUNCH_MESSAGE
 docker run --rm \
 ${INTERACTIVE} \
 ${GPU_DEVICE} \
---env GROUP_NAMES \
---env GROUP_IDS \
+--env GROUP_IDS_NAMES \
 --uts=host \
 --ipc=host \
 -v ${HOME}/:${HOME}/ \
