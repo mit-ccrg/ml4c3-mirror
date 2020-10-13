@@ -42,8 +42,8 @@ def parse_args() -> argparse.Namespace:
     # Image file format arguments
     parser.add_argument(
         "--image_ext",
-        default=".eps",
-        choices=[".eps", ".svg", ".png"],
+        default=".pdf",
+        choices=[".pdf", ".eps", ".svg", ".png"],
         help="File format extension to save images as. Note this includes a leading period.",
     )
 
