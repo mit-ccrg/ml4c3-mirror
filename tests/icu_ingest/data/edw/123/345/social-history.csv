@@ -1,0 +1,3 @@
+MRN,PatientID,PatientEncounterID,TobaccoPacksPerDayCNT,TobaccoUsageYearNBR,TobaccoCommentTXT,SmokingQuitDTS,TobaccoUserCD,TobaccoUserDSC,AlcoholOuncesPerWeekCNT,AlcoholCommentTXT,AlcoholUseDSC,AlcoholFrequencyCD,AlcoholFrequencyDSC
+123,123,345,,,quit 32 yrs ago - smoked for 6 yrs,,4,Quit,,none for past 2 wks ,,,
+123,123,345,,,,,4,Yes,,occasional beer or shot of liquor,,,

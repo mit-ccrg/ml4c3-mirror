@@ -1,0 +1,23 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: ml4c3-tests
+
+on:
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+
+    runs-on: ubuntu-latest
+    container: ghcr.io/aguirre-lab/ml4c3:latest-gpu
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install repo
+      run: |
+        pip install .
+    - name: Test with pytest
+      run: |
+        pytest -m "not slow" -vks tests
+    timeout-minutes: 10

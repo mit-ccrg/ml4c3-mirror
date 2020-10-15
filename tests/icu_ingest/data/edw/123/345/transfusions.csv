@@ -1,0 +1,7 @@
+MRN,CSN,OrderID,AdministeredProcedureTypeDSC,BloodCodingSystemDSC,BloodProductCD,BloodUnitID,BloodStartInstantDTS,BloodEndInstantDTS,BloodTransfusionOrderAMT,BloodTransfusionOrderUnitDSC,IsBloodFLG,WeightBasedAMT,WeightBasedUnitDSC,ProcedureDSC,StartDTS,EndDTS,OrderStatusDSC
+123,456,,Blood Transfusion,,,,1980-04-01 13:15:00.0000000,1980-04-01 14:00:00.0000000,,,,,,TRANSFUSE RED BLOOD CELLS,,,Canceled
+123,456,,Blood Transfusion,,,,1980-04-02 13:30:00.0000000,1980-04-02 17:15:00.0000000,,,,,,TRANSFUSE PLATELETS,,,Completed
+123,456,,Blood Transfusion,,,,1980-04-03 15:15:00.0000000,1980-04-03 20:15:00.0000000,,,,,,TRANSFUSE RED BLOOD CELLS,,,Completed
+123,456,,Blood Transfusion,,,,1980-04-04 16:15:00.0000000,1980-04-04 21:15:00.0000000,,,,,,TRANSFUSE RED BLOOD CELLS,,,Completed
+123,456,,Blood Transfusion,,,,1980-04-03 17:00:00.0000000,1980-04-03 22:15:00.0000000,,,,,,TRANSFUSE RED BLOOD CELLS,,,Canceled
+123,456,,Blood Transfusion,,,,1980-04-10 08:45:00.0000000,1980-04-10 09:15:00.0000000,,,,,,TRANSFUSE CRYOPRECIPITATE,,,Completed

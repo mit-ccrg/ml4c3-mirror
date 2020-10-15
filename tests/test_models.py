@@ -9,13 +9,13 @@ import pytest
 import tensorflow as tf
 
 # Imports: first party
-from ml4cvd.models import (
+from ml4c3.models import (
     MODEL_EXT,
     ACTIVATION_FUNCTIONS,
     BottleneckType,
     make_multimodal_multitask_model,
 )
-from ml4cvd.tensormap.TensorMap import TensorMap
+from ml4c3.tensormap.TensorMap import TensorMap
 
 MEAN_PRECISION_EPS = 0.02  # how much mean precision degradation is acceptable
 DEFAULT_PARAMS = {
@@ -43,7 +43,7 @@ DEFAULT_PARAMS = {
 }
 
 
-TrainType = Dict[str, np.ndarray]  # TODO: better name
+TrainType = Dict[str, np.ndarray]
 
 
 def make_training_data(

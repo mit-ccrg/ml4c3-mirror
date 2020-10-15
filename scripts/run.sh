@@ -4,8 +4,8 @@
 
 ################### VARIABLES ############################################
 
-DOCKER_IMAGE_GPU="ghcr.io/aguirre-lab/ml:latest-gpu"
-DOCKER_IMAGE_NO_GPU="ghcr.io/aguirre-lab/ml:latest-cpu"
+DOCKER_IMAGE_GPU="ghcr.io/aguirre-lab/ml4c3:latest-gpu"
+DOCKER_IMAGE_NO_GPU="ghcr.io/aguirre-lab/ml4c3:latest-cpu"
 DOCKER_IMAGE=${DOCKER_IMAGE_GPU}
 GPU_DEVICE="--gpus all"
 INTERACTIVE=""
@@ -56,7 +56,7 @@ usage()
 
     Usage: ${SCRIPT_NAME} [-nth] [-i <image>] module [arg ...]
 
-    Example: ./${SCRIPT_NAME} -n -t -i ml4cvd:latest-cpu recipes.py --mode tensorize ...
+    Example: ./${SCRIPT_NAME} -n -t -i ml4c3:latest-cpu recipes.py --mode tensorize ...
 
         -c                  if set use CPU docker image and machine and use the regular 'docker' launcher.
                             By default, we assume the machine is GPU-enabled.

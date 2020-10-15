@@ -11,8 +11,9 @@ import numpy as np
 import pandas as pd
 
 # Imports: first party
-from ml4cvd.datasets import _sample_csv_to_set
-from ml4cvd.definitions import CSV_EXT, ECG_PREFIX, TENSOR_EXT, MRN_COLUMNS
+from ml4c3.datasets import _sample_csv_to_set
+from ml4c3.definitions.ecg import ECG_PREFIX
+from ml4c3.definitions.globals import CSV_EXT, TENSOR_EXT, MRN_COLUMNS
 
 """
 To add a new data source to deidentify:

@@ -8,13 +8,13 @@ import numpy as np
 import pytest
 
 # Imports: first party
-from ml4cvd.datasets import (
+from ml4c3.datasets import (
     BATCH_PATHS_INDEX,
     make_dataset,
     _sample_csv_to_set,
     get_train_valid_test_paths,
 )
-from ml4cvd.definitions import TENSOR_EXT
+from ml4c3.definitions.globals import TENSOR_EXT
 
 
 def _write_samples(csv_path, sample_ids, use_header=False, write_dupes=False):

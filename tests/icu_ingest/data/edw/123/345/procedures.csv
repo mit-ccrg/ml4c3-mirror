@@ -1,0 +1,11 @@
+MRN,CSN,ProcedureDSC,StartDTS,EndDTS,OrderStatusDSC,OrderTypeDSC,ReasonForCancellationDSC,OrderDisplayNM,OrderPriorityDSC,StandingIntervalDSC,ScheduledStartDTS
+123,456,HEMODIALYSIS,1980-04-01 13:15:00.0000000,1980-04-01 17:15:00.0000000,Completed,Dialysis/Apheresis,,Hemodialysis,Routine,,
+123,456,HEMODIALYSIS / ULTRAFILTRATION,1980-04-02 13:30:00.0000000,1980-04-02 18:50:00.0000000,Completed,Dialysis/Apheresis,,Hemodialysis / Ultrafiltration,Routine,,
+123,456,HEMODIALYSIS / ULTRAFILTRATION,1980-04-03 15:15:00.0000000,1980-04-03 20:15:00.0000000,Canceled,Dialysis/Apheresis,,Hemodialysis / Ultrafiltration,Routine,,
+123,456,HEMODIALYSIS / ULTRAFILTRATION,1980-04-03 16:15:00.0000000,1980-04-03 21:15:00.0000000,Canceled,Dialysis/Apheresis,,Hemodialysis / Ultrafiltration,Routine,,
+123,456,HEMODIALYSIS / ULTRAFILTRATION,1980-04-03 17:00:00.0000000,1980-04-03 22:15:00.0000000,Completed,Dialysis/Apheresis,,Hemodialysis / Ultrafiltration,Routine,,
+123,456,HEMODIALYSIS,1980-04-04 08:45:00.0000000,1980-04-04 13:15:00.0000000,Completed,Dialysis/Apheresis,,Hemodialysis,Routine,,
+123,456,HEMODIALYSIS,1980-04-05 22:15:00.0000000,1980-04-06 04:15:00.0000000,Completed,Dialysis/Apheresis,,Hemodialysis,Routine,,
+123,456,HEMODIALYSIS,1980-04-06 13:15:00.0000000,1980-04-06 23:59:00.0000000,Canceled,Dialysis/Apheresis,,Hemodialysis,Routine,,
+123,456,Hemodialysis,1980-04-07 13:15:00.0000000,1980-04-07 17:16:00.0000000,Completed,Dialysis/Apheresis,,Hemodialysis,Routine,,
+123,456,HEMODIALYSIS / ULTRAFILTRATION,1980-04-07 15:32:00.0000000,1980-04-08 19:57:00.0000000,Completed,Dialysis/Apheresis,,Hemodialysis / Ultrafiltration,Routine,,

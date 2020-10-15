@@ -1,0 +1,3 @@
+MRN,PatientID,PatientEncounterID,LineNBR,DiagnosisID,DiagnosisNM,CommentTXT,MedicalHistoryDateTXT,MedicalHistoryStartDTS
+123,123,345,5,3456345,Umbilical hernia without obstruction and without gangrene,,12/4/2019,2019-12-04 00:00:00.0000000
+123,123,345,7,67364,History of shingles,involving neck,,
