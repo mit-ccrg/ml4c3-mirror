@@ -1,0 +1,4 @@
+MRN,PatientID,PatientEncounterID,LineNBR,ProcedureID,ProcedureCD,ProcedureNM,ProcedureDSC,CommentTXT,ProcedureCommentTXT,SurgicalHistoryDateTXT,SurgicalHistoryStartDTS
+123,123,345,1,3413,,,,Vasectomy,,,
+123,123,345,1,34232,SHX196,UMBILICAL HERNIA REPAIR,UMBILICAL HERNIA REPAIR,successful repair 2004 - recurred and repaired 11/2016,,,
+123,123,345,1,23423123,SHX75,VASECTOMY,VASECTOMY,,,,

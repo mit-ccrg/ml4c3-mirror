@@ -13,7 +13,7 @@ endif
 
 help:
 > @echo
-> @echo "ML4CVD Makefile commands"
+> @echo "ml4c3 Makefile commands"
 > @echo
 > @echo "setup       -- creates env and sets up git commit hooks."
 > @echo
@@ -25,7 +25,7 @@ help:
 setup:
 > @echo Setting up the repo...
 > @conda env create -f .pre-commit-env.yml
-> @conda run -n ml pre-commit install
+> @conda run -n ml4c3 pre-commit install
 
 lint_staged:
 > @echo Running hook with staged files...

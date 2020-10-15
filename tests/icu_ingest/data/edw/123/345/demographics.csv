@@ -1,0 +1,2 @@
+PatientRaceCD,PatientRaceDSC,BirthDTS,DeathDTS,EthnicGroupCD,EthnicGroupDSC,MaritalStatusCD,MaritalStatusDSC,PatientStatusCD,PatientStatusDSC,SexCD,SexDSC
+1,White or Caucasian,1941-06-14 00:00:00.0000000,2021-06-12 09:25:00.0000000,43,No Non Hispanic,2,Divorced,2,Deceased,1,Female

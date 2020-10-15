@@ -3,7 +3,7 @@ import pytest
 from tensorflow.keras.losses import logcosh
 
 # Imports: first party
-from ml4cvd.tensormap.TensorMap import TensorMap
+from ml4c3.tensormap.TensorMap import TensorMap
 
 
 class TestTensorMaps:

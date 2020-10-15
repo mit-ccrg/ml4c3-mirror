@@ -7,7 +7,7 @@ set -e
 
 ################### VARIABLES ############################################
 
-REPO="ghcr.io/aguirre-lab/ml"
+REPO="ghcr.io/aguirre-lab/ml4c3"
 CONTEXT="docker/"
 CPU_ONLY="false"
 
@@ -29,11 +29,11 @@ usage()
 {
     cat <<USAGE_MESSAGE
 
-    This script can be used to build and tag a 'ml4cvd' image and to tag the image as 'latest_<gpu|cpu>'.
+    This script can be used to build and tag a 'ml4c3' image and to tag the image as 'latest_<gpu|cpu>'.
 
     Usage: ${SCRIPT_NAME} [-d <path>] [-t <tag>] [-c] [-h]
 
-    Example: ./${SCRIPT_NAME} -d /home/username/ml/ml4cvd/docker -cp
+    Example: ./${SCRIPT_NAME} -d /home/username/ml4c3/ml4c3/docker -cp
 
         -d      <path>      Path to directory where Dockerfile is located. Default: '${CONTEXT}'
 

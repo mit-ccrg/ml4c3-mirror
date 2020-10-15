@@ -143,17 +143,17 @@ if __name__ == "__main__":
     this_script_name = os.path.split(__file__)[1]
     path_to_repo = os.path.abspath(__file__).replace(f"/scripts/{this_script_name}", "")
     path_to_new_script = os.path.join(
-        path_to_repo, "ml4cvd", "tensormap", NEW_SCRIPT_NAME,
+        path_to_repo, "ml4c3", "tensormap", NEW_SCRIPT_NAME,
     )
 
     with open(path_to_new_script, "w") as py_file:
         py_file.write(f"from typing import Dict\n")
-        py_file.write(f"from ml4cvd.TensorMap import TensorMap, Interpretation\n")
-        py_file.write(f"from ml4cvd.definitions import ECG_PREFIX\n")
+        py_file.write(f"from ml4c3.TensorMap import TensorMap, Interpretation\n")
+        py_file.write(f"from ml4c3.definitions import ECG_PREFIX\n")
         py_file.write(
-            f"from ml4cvd.tensor_maps_ecg import {MAKE_TFF_FUNCTION_NAME}, {MAKE_ANY_TFF_FUNCTION_NAME}\n",
+            f"from ml4c3.tensor_maps_ecg import {MAKE_TFF_FUNCTION_NAME}, {MAKE_ANY_TFF_FUNCTION_NAME}\n",
         )
-        py_file.write(f"from ml4cvd.validators import validator_not_all_zero\n\n\n")
+        py_file.write(f"from ml4c3.validators import validator_not_all_zero\n\n\n")
         py_file.write("tmaps: Dict[str, TensorMap] = {}\n")
 
         for file in os.listdir(args.label_maps_dir):
@@ -189,7 +189,7 @@ if __name__ == "__main__":
                     not_found_channel=f"no_{label}",
                 )
 
-                # TODO subclasses
+                # TODO subclasses https://github.com/aguirre-lab/ml4c3/issues/290
                 # for sublevel in df.columns[2:]:
                 #     for sublabel, subgroup in df.groupby(sublevel):
                 #         pass

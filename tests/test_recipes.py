@@ -7,20 +7,17 @@ import pandas as pd
 import pytest
 
 # Imports: first party
-from ml4cvd.recipes import infer_multimodal_multitask, train_multimodal_multitask
-from ml4cvd.explorations import (
+from ml4c3.recipes import infer_multimodal_multitask, train_multimodal_multitask
+from ml4c3.explorations import (
     explore,
     continuous_explore_header,
     categorical_explore_header,
     _tmap_requires_modification_for_explore,
 )
-from ml4cvd.tensormap.TensorMap import TensorMap, Interpretation
+from ml4c3.tensormap.TensorMap import TensorMap, Interpretation
 
 
 class TestRecipes:
-    def test_train(self, default_arguments):
-        train_multimodal_multitask(default_arguments)
-
     def test_infer(self, default_arguments):
         infer_multimodal_multitask(default_arguments)
         path = os.path.join(
@@ -77,3 +74,6 @@ class TestRecipes:
                             row, categorical_explore_header(tm, channel),
                         )
                         assert channel_val == row_expected[idx]
+
+    def test_train(self, default_arguments):
+        train_multimodal_multitask(default_arguments)
