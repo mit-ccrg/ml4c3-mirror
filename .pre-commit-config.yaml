@@ -1,43 +1,66 @@
+default_language_version:
+    python: python3.8
+
+exclude: '^(.mypy_cache|.github)'
+
 repos:
 
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v3.1.0
   hooks:
-    - id: check-executables-have-shebangs
-      exclude: ".py"
-    - id: check-symlinks
-    - id: check-toml
-    - id: check-yaml
-    - id: debug-statements
-    - id: end-of-file-fixer
-    - id: mixed-line-ending
-    - id: no-commit-to-branch
-    - id: trailing-whitespace
+  - id: check-executables-have-shebangs
+    exclude: ".py"
+  - id: check-symlinks
+  - id: check-toml
+  - id: check-yaml
+  - id: debug-statements
+  - id: end-of-file-fixer
+  - id: mixed-line-ending
+    args:
+    - --fix=lf
+  - id: no-commit-to-branch
+  - id: trailing-whitespace
 
 - repo: https://github.com/kynan/nbstripout
   rev: 0.3.9
   hooks:
-    - id: nbstripout
-      files: ".ipynb"
+  - id: nbstripout
+    files: ".ipynb"
 
 - repo: https://github.com/Lucas-C/pre-commit-hooks
   rev: v1.1.7
   hooks:
-    - id: remove-tabs
-      files: ".py"
+  - id: remove-tabs
+    files: ".py"
 
 - repo: https://github.com/asottile/add-trailing-comma
   rev: v2.0.1
   hooks:
-    - id: add-trailing-comma
+  - id: add-trailing-comma
 
 - repo: https://github.com/timothycrosley/isort
   rev: 5.0.5
   hooks:
-    - id: isort
-      additional_dependencies: [toml]
+  - id: isort
+    additional_dependencies: [toml]
 
 - repo: https://github.com/ambv/black
-  rev: 19.10b0
+  rev: 20.8b1
   hooks:
-    - id: black
+  - id: black
+
+- repo: local
+  hooks:
+  - id: pylint
+    name: pylint
+    entry: pylint
+    language: system
+    types: [python]
+
+- repo: git://github.com/luismayta/pre-commit-mypy
+  rev: master
+  hooks:
+  - id: mypy
+    args:
+    - --ignore-missing-imports
+    - --follow-imports=skip
