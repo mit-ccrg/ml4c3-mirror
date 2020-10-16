@@ -31,7 +31,10 @@ class BMReader(h5py.File, Reader):
     """
 
     def __init__(
-        self, file: str, scaling_and_units: Dict = None, summary_stats: BMStats = None,
+        self,
+        file: str,
+        scaling_and_units: Dict = None,
+        summary_stats: BMStats = None,
     ):
         super().__init__(file, "r")
         self.max_segment = {
@@ -155,7 +158,8 @@ class BMReader(h5py.File, Reader):
             signal.samples_per_ts = signal.samples_per_ts[first_non_ol_idx:]
             if signal.source == BM_SOURCES["waveform"]:
                 signal.sample_freq = self.get_sample_freq_from_channel(
-                    channel=signal.channel, first_idx=first_non_ol_idx,
+                    channel=signal.channel,
+                    first_idx=first_non_ol_idx,
                 )
 
         corr_to_apply = self.interbundle_corr[source]["timeCorr"]  # type: ignore
@@ -314,7 +318,9 @@ class BMReader(h5py.File, Reader):
             )
             if self.summary_stats:
                 self.summary_stats.add_signal_stats(
-                    signal_name, "string_value_bundles", source=BM_SOURCES["vitals"],
+                    signal_name,
+                    "string_value_bundles",
+                    source=BM_SOURCES["vitals"],
                 )
 
         if values.ndim >= 2:
@@ -366,7 +372,9 @@ class BMReader(h5py.File, Reader):
             )
             if self.summary_stats:
                 self.summary_stats.add_signal_stats(
-                    signal.name, "total_overlap_bundles", source=signal.source,
+                    signal.name,
+                    "total_overlap_bundles",
+                    source=signal.source,
                 )
             return None
 
@@ -387,7 +395,9 @@ class BMReader(h5py.File, Reader):
             )
             if self.summary_stats:
                 self.summary_stats.add_signal_stats(
-                    signal.name, "defective_signal", source=signal.source,
+                    signal.name,
+                    "defective_signal",
+                    source=signal.source,
                 )
             return None
 
@@ -399,7 +409,9 @@ class BMReader(h5py.File, Reader):
             )
             if self.summary_stats:
                 self.summary_stats.add_signal_stats(
-                    signal.name, "defective_signal", source=signal.source,
+                    signal.name,
+                    "defective_signal",
+                    source=signal.source,
                 )
             return None
 
@@ -483,7 +495,9 @@ class BMReader(h5py.File, Reader):
             )
             if self.summary_stats:
                 self.summary_stats.add_signal_stats(
-                    signal.name, "total_overlap_bundles", source=signal.source,
+                    signal.name,
+                    "total_overlap_bundles",
+                    source=signal.source,
                 )
             return None
 
@@ -512,7 +526,9 @@ class BMReader(h5py.File, Reader):
             )
             if self.summary_stats:
                 self.summary_stats.add_signal_stats(
-                    signal.name, "defective_signal", source=signal.source,
+                    signal.name,
+                    "defective_signal",
+                    source=signal.source,
                 )
             return None
 
@@ -525,7 +541,9 @@ class BMReader(h5py.File, Reader):
             )
             if self.summary_stats:
                 self.summary_stats.add_signal_stats(
-                    signal.name, "defective_signal", source=signal.source,
+                    signal.name,
+                    "defective_signal",
+                    source=signal.source,
                 )
             return None
 
@@ -571,14 +589,15 @@ class BMReader(h5py.File, Reader):
         sf_arr = self["wv_time_original"][channel]["SampleRate"][first_idx:].T[0]
         if sf_arr.shape[0] <= 0:
             logging.info(
-                "Sample frequency array is empty or has different lenght than values "
+                "Sample frequency array is empty or has different length than values "
                 f"array for {channel} on file {self.filename}. No sample frequency "
                 "will be written.",
             )
             return np.array([(np.nan, 0)], dtype="float,int")
         changes = np.concatenate([[-1], np.where(sf_arr[:-1] != sf_arr[1:])[0]])
         return np.fromiter(
-            ((sf_arr[index + 1], index + 1) for index in changes), dtype="float,int",
+            ((sf_arr[index + 1], index + 1) for index in changes),
+            dtype="float,int",
         )
 
     def get_scaling_and_units(self, channel_n, signal_name):
@@ -675,7 +694,10 @@ class BMAlarmsReader(Reader):
         dates = self._ensure_contiguous(dates)
         durations = self._ensure_contiguous(durations)
         return BMAlarm(
-            name=alarm_name, start_date=dates, duration=durations, level=level,
+            name=alarm_name,
+            start_date=dates,
+            duration=durations,
+            level=level,
         )
 
     def _get_alarms_dfs(self) -> List[pd.core.frame.DataFrame]:
@@ -745,7 +767,8 @@ class BMAlarmsReader(Reader):
         # Find local time shift to UTC
         init_dt = datetime.strptime(time_stamp_str[:-1], "%Y-%m-%d %H:%M:%S.%f")
         offset = TIMEZONE.utcoffset(  # type: ignore
-            init_dt, is_dst=True,
+            init_dt,
+            is_dst=True,
         ).total_seconds()
         unix_timestamp = int(local_timestamp) - int(offset)
         return unix_timestamp
