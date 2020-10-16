@@ -116,27 +116,31 @@ class Tensorizer:
     def _main_write(
         self, tensors: str, mrn: str, visits: Dict, scaling_and_units: Dict,
     ):
-        # Open the writer: one file per MRN
-        output_file = os.path.join(tensors, f"{mrn}.hd5")
-        with Writer(output_file) as writer:
-            writer.write_completed_flag("bedmaster", False)
-            writer.write_completed_flag("edw", False)
-            for visit_id, bm_files in visits.items():
-                # Set the visit ID
-                writer.set_visit_id(visit_id)
+        try:
+            # Open the writer: one file per MRN
+            output_file = os.path.join(tensors, f"{mrn}.hd5")
+            with Writer(output_file) as writer:
+                writer.write_completed_flag("bedmaster", False)
+                writer.write_completed_flag("edw", False)
+                for visit_id, bm_files in visits.items():
+                    # Set the visit ID
+                    writer.set_visit_id(visit_id)
 
-                # Write the data
-                self._write_bm_data(
-                    bm_files, writer=writer, scaling_and_units=scaling_and_units,
-                )
-                self._write_bm_alarms_data(
-                    self.alarms_dir, self.edw_dir, mrn, visit_id, writer=writer,
-                )
-                writer.write_completed_flag("bedmaster", True)
-                self._write_edw_data(self.edw_dir, mrn, visit_id, writer=writer)
-                writer.write_completed_flag("edw", True)
-                logging.info(f"Tensorization completed for MRN {mrn}, CSN {visit_id}.")
-            logging.info(f"Tensorization completed for MRN {mrn}.")
+                    # Write the data
+                    self._write_bm_data(
+                        bm_files, writer=writer, scaling_and_units=scaling_and_units,
+                    )
+                    self._write_bm_alarms_data(
+                        self.alarms_dir, self.edw_dir, mrn, visit_id, writer=writer,
+                    )
+                    writer.write_completed_flag("bedmaster", True)
+                    self._write_edw_data(self.edw_dir, mrn, visit_id, writer=writer)
+                    writer.write_completed_flag("edw", True)
+                    logging.info(f"Tensorization completed for MRN {mrn}, CSN {visit_id}.")
+                logging.info(f"Tensorization completed for MRN {mrn}.")
+        except Exception as e:
+            logging.exception(f"Tensorization failed for MRN {mrn} with CSNs {visits}")
+            raise(e)
 
     @staticmethod
     def _write_bm_data(bm_files: List[str], writer: Writer, scaling_and_units: Dict):
