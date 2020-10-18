@@ -236,6 +236,5 @@ def update_tmaps_time_series(
     tmap.name = new_tmap_name
     tmap.time_series_limit = time_series_limit
     tmap.time_series_order = time_series_order
-    tmap.metrics = None
     tmaps[new_tmap_name] = tmap
     return tmaps
