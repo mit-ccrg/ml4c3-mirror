@@ -519,3 +519,57 @@ def concordance_index(prediction, truth, tied_tol=1e-8):
 
     cindex = numerator / denominator
     return cindex, concordant, discordant, tied_risk, tied_time
+
+
+def simclr_loss(_, hidden):
+    """https://arxiv.org/abs/2002.05709"""
+    temperature = 0.1
+    large_num = 1e9  # TODO: why?
+    hidden = tf.math.l2_normalize(hidden, -1)
+    # hidden is created from 2 * batch_size tensors, each set with different augmentations
+    hidden1 = hidden[0::2]
+    hidden2 = hidden[1::2]
+    batch_size = tf.shape(hidden1)[0]
+    labels = tf.one_hot(tf.range(batch_size), batch_size * 2)
+    masks = tf.one_hot(
+        tf.range(batch_size), batch_size,
+    )  # masks diagonals, aka self similarities
+    logits_aa = tf.matmul(hidden1, hidden1, transpose_b=True) / temperature
+    logits_aa = logits_aa - masks * large_num
+    logits_bb = tf.matmul(hidden2, hidden2, transpose_b=True) / temperature
+    logits_bb = logits_bb - masks * large_num
+    logits_ab = tf.matmul(hidden1, hidden2, transpose_b=True) / temperature
+    logits_ba = tf.matmul(hidden2, hidden1, transpose_b=True) / temperature
+    loss_a = tf.compat.v1.losses.softmax_cross_entropy(
+        labels, tf.concat([logits_ab, logits_aa], 1),
+    )
+    loss_b = tf.compat.v1.losses.softmax_cross_entropy(
+        labels, tf.concat([logits_ba, logits_bb], 1),
+    )
+    return loss_a + loss_b
+
+
+def simclr_accuracy(_, hidden):
+    hidden = tf.math.l2_normalize(hidden, -1)
+    large_num = 1e9  # TODO: why?
+    # hidden is created from 2 * batch_size tensors, each set with different augmentations
+    hidden1 = hidden[0::2]
+    hidden2 = hidden[1::2]
+    batch_size = tf.shape(hidden1)[0]
+    labels = tf.one_hot(tf.range(batch_size), batch_size * 2)
+    masks = tf.one_hot(
+        tf.range(batch_size), batch_size,
+    )  # masks diagonals, aka self similarities
+    logits_aa = tf.matmul(hidden1, hidden1, transpose_b=True)
+    logits_aa = logits_aa - masks * large_num
+    logits_bb = tf.matmul(hidden2, hidden2, transpose_b=True)
+    logits_bb = logits_bb - masks * large_num
+    logits_ab = tf.matmul(hidden1, hidden2, transpose_b=True)
+    logits_ba = tf.matmul(hidden2, hidden1, transpose_b=True)
+    loss_a = tf.keras.metrics.categorical_accuracy(
+        labels, tf.concat([logits_ab, logits_aa], 1),
+    )
+    loss_b = tf.keras.metrics.categorical_accuracy(
+        labels, tf.concat([logits_ba, logits_bb], 1),
+    )
+    return tf.add(tf.reduce_mean(loss_a), tf.reduce_mean(loss_b)) / 2

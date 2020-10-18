@@ -58,12 +58,12 @@ def _tensor_worker(
     augment: bool = False,
 ):
     tmaps = input_maps + output_maps
-    is_input_list = [True] * len(input_maps) + [False] * len(output_maps)
     while True:
         start_signal.wait()
         start_signal.clear()
         np.random.shuffle(paths)
         for path in paths:
+            num_linked = 1
             try:
                 # A path may contain many samples. TMaps fetch all the samples from a
                 # path but generator should yield individual samples.
@@ -83,6 +83,8 @@ def _tensor_worker(
                         # wrap in extra dimension to simulate time series with 1 sample
                         if tm.time_series_limit is None:
                             _tensor = np.array([_tensor])
+                        if tm.linked_tensors:
+                            num_linked = len(_tensor)
                         tensors.append(_tensor)
 
                     # individually yield samples
@@ -105,7 +107,9 @@ def _tensor_worker(
                                 augment=augment,
                                 hd5=hd5,
                             )
-                            tensor_queue.put((in_tensors, out_tensors, path))
+                            tensor_queue.put(
+                                ((in_tensors, out_tensors), path, num_linked),
+                            )
                         except (
                             IndexError,
                             KeyError,
@@ -114,12 +118,15 @@ def _tensor_worker(
                             RuntimeError,
                         ) as e:
                             # sample failed postprocessing
-                            tensor_queue.put(SAMPLE_FAILED)
+                            # if sample was linked, fail all samples from this path
+                            if num_linked != 1:
+                                raise ValueError("Linked sample failed")
+                            tensor_queue.put((SAMPLE_FAILED, path, num_linked))
                             continue
-                tensor_queue.put(PATH_SUCCEEDED)
+                tensor_queue.put((PATH_SUCCEEDED, path, num_linked))
             except (IndexError, KeyError, ValueError, OSError, RuntimeError) as e:
                 # could not load samples from path
-                tensor_queue.put(PATH_FAILED)
+                tensor_queue.put((PATH_FAILED, path, num_linked))
 
 
 class StatsWrapper:
@@ -136,7 +143,7 @@ def make_data_generator_factory(
     augment: bool = False,
     keep_paths: bool = False,
 ) -> Tuple[Callable[[], SampleGenerator], StatsWrapper, Cleanup]:
-    tensor_queue = Queue()
+    tensor_queue = Queue(MAX_QUEUE_SIZE)
 
     processes = []
     worker_paths = np.array_split(paths, num_workers)
@@ -179,22 +186,36 @@ def make_data_generator_factory(
 
         stats = Counter()
         num_paths = len(paths)
-        while stats["paths_completed"] < num_paths:
-            sample = tensor_queue.get()
+        linked_tensor_buffer = defaultdict(list)
+        while stats["paths_completed"] < num_paths or len(linked_tensor_buffer) > 0:
+            sample, path, num_linked = tensor_queue.get()
             if sample == PATH_SUCCEEDED:
                 stats["paths_succeeded"] += 1
                 stats["paths_completed"] += 1
             elif sample == PATH_FAILED:
                 stats["paths_failed"] += 1
                 stats["paths_completed"] += 1
+                if path in linked_tensor_buffer:
+                    del linked_tensor_buffer[path]
             elif sample == SAMPLE_FAILED:
                 stats["samples_failed"] += 1
                 stats["samples_completed"] += 1
+            elif num_linked != 1:
+                linked_tensor_buffer[path].append(sample)
+                if len(linked_tensor_buffer[path]) == num_linked:
+                    for sample in linked_tensor_buffer[path]:
+                        stats["samples_succeeded"] += 1
+                        stats["samples_completed"] += 1
+                        _collect_sample_stats(stats, sample, input_maps, output_maps)
+                        yield sample if not keep_paths else sample + (path,)
+                    del linked_tensor_buffer[path]
+                else:
+                    continue
             else:
                 stats["samples_succeeded"] += 1
                 stats["samples_completed"] += 1
                 _collect_sample_stats(stats, sample, input_maps, output_maps)
-                yield sample if keep_paths else sample[:BATCH_PATHS_INDEX]
+                yield sample if not keep_paths else sample + (path,)
 
         logging.info(
             f"{get_stats_string(name, stats, epoch_counter)}"
@@ -363,11 +384,11 @@ def train_valid_test_datasets(
 
 def _collect_sample_stats(
     stats: Counter,
-    sample: Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], str],
+    sample: Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]],
     input_maps: List[TensorMap],
     output_maps: List[TensorMap],
 ) -> None:
-    in_tensors, out_tensors, path = sample
+    in_tensors, out_tensors = sample
 
     def _update_stats(tmaps, tensors, is_input):
         for tm in tmaps:

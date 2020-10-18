@@ -86,6 +86,7 @@ class TensorMap(object):
         time_series_limit: Optional[int] = None,
         time_series_order: Optional[TimeSeriesOrder] = TimeSeriesOrder.NEWEST,
         time_series_lookup: Optional[Dict[int, List[Tuple[str, str]]]] = None,
+        linked_tensors: bool = False,
     ):
         """
         TensorMap constructor
@@ -108,6 +109,7 @@ class TensorMap(object):
         :param time_series_limit: If set, indicates dynamic shaping and sets the maximum number of tensors in a time series to use
         :param time_series_order: When selecting tensors in a time series, use newest, oldest, or randomly ordered tensors
         :param time_series_lookup: Dict of list of time intervals filtering which tensors are used in a time series
+        :param linked_tensors: Bool indicating if tensors in time series returned by this tensor map should be linked
         """
         self.name = name
         self.loss = loss
@@ -128,6 +130,7 @@ class TensorMap(object):
         self.time_series_limit = time_series_limit
         self.time_series_order = time_series_order
         self.time_series_lookup = time_series_lookup
+        self.linked_tensors = linked_tensors
 
         if self.tensor_from_file is None:
             raise ValueError(f"{self.name}: tensor_from_file cannot be None")

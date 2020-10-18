@@ -1467,11 +1467,11 @@ def plot_architecture_diagram(dot: pydot.Dot, image_path: str):
         ).encode()
         with open(image_path, "wb") as f:
             f.write(svg_string)
-
-    elif image_path.endswith("eps"):
-        dot.write(path=image_path, prog="dot", format="eps", encoding=None)
-
     elif image_path.endswith("png"):
         dot.write_png(path=image_path)
+    else:
+        dot.write(
+            path=image_path, prog="dot", format=os.path.splitext(image_path)[-1][1:],
+        )
 
     logging.info("Saved architecture diagram to:{}".format(image_path))
