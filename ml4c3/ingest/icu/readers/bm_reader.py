@@ -47,7 +47,7 @@ class BMReader(h5py.File, Reader):
         }
         if not scaling_and_units:
             scaling_and_units = ICU_SCALE_UNITS
-        self.scaling_and_units: Dict = scaling_and_units
+        self.scaling_and_units = scaling_and_units
         self.summary_stats = summary_stats
         if self.summary_stats:
             self.summary_stats.add_file_stats("total_files")
@@ -316,12 +316,7 @@ class BMReader(h5py.File, Reader):
                 f"In bm_file {self.filename}, {signal_name} has unexpected "
                 "string values.",
             )
-            if self.summary_stats:
-                self.summary_stats.add_signal_stats(
-                    signal_name,
-                    "string_value_bundles",
-                    source=BM_SOURCES["vitals"],
-                )
+            return None
 
         if values.ndim >= 2:
             raise ValueError(
