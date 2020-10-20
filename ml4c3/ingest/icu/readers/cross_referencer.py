@@ -215,7 +215,8 @@ class CrossReferencer:
         xref_mrns_set = set(xref["MRN"].unique())
         try:
             _xref_csns_set = np.array(
-                list(xref["VisitIdentifier"].unique()), dtype=float,
+                list(xref["VisitIdentifier"].unique()),
+                dtype=float,
             )
             xref_csns_set = set(_xref_csns_set.astype(int).astype(str))
         except ValueError:

@@ -60,7 +60,8 @@ def parse_args() -> argparse.Namespace:
         help="Path to directory to store HD5 files that fail tensorization.",
     )
     parser.add_argument(
-        "--xml_folder", help="Path to folder of XMLs of ECG data.",
+        "--xml_folder",
+        help="Path to folder of XMLs of ECG data.",
     )
     parser.add_argument(
         "--overwrite_hd5",
@@ -85,7 +86,9 @@ def parse_args() -> argparse.Namespace:
         help="Directory with Bedmaster alarms .csv files.",
     )
     parser.add_argument(
-        "--path_edw", default="/media/mad3/edw/", help="Directory with EDW .csv files.",
+        "--path_edw",
+        default="/media/mad3/edw/",
+        help="Directory with EDW .csv files.",
     )
     parser.add_argument(
         "--xref_file",
@@ -161,7 +164,8 @@ def parse_args() -> argparse.Namespace:
 
     # Input and Output files and directories
     parser.add_argument(
-        "--sample_csv", help="Path to CSV with Sample IDs to restrict tensor paths",
+        "--sample_csv",
+        help="Path to CSV with Sample IDs to restrict tensor paths",
     )
     parser.add_argument(
         "--tensors",
@@ -173,7 +177,8 @@ def parse_args() -> argparse.Namespace:
         help="Path to output folder for recipes.py runs.",
     )
     parser.add_argument(
-        "--model_file", help="Path to a saved model architecture and weights (hd5).",
+        "--model_file",
+        help="Path to a saved model architecture and weights (hd5).",
     )
     parser.add_argument(
         "--model_files",
@@ -371,7 +376,10 @@ def parse_args() -> argparse.Namespace:
 
     # Training Parameters
     parser.add_argument(
-        "--epochs", default=12, type=int, help="Number of training epochs.",
+        "--epochs",
+        default=12,
+        type=int,
+        help="Number of training epochs.",
     )
     parser.add_argument(
         "--batch_size",
@@ -380,7 +388,8 @@ def parse_args() -> argparse.Namespace:
         help="Mini batch size for stochastic gradient descent algorithms.",
     )
     parser.add_argument(
-        "--train_csv", help="Path to CSV with Sample IDs to reserve for training.",
+        "--train_csv",
+        help="Path to CSV with Sample IDs to reserve for training.",
     )
     parser.add_argument(
         "--valid_csv",
@@ -467,7 +476,10 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--optimizer", default="adam", type=str, help="Optimizer for model training",
+        "--optimizer",
+        default="adam",
+        type=str,
+        help="Optimizer for model training",
     )
     parser.add_argument(
         "--learning_rate_schedule",
@@ -488,7 +500,10 @@ def parse_args() -> argparse.Namespace:
         help="Annealing offset in epochs of loss terms during training",
     )
     parser.add_argument(
-        "--anneal_max", default=2.0, type=float, help="Annealing maximum value",
+        "--anneal_max",
+        default=2.0,
+        type=float,
+        help="Annealing maximum value",
     )
 
     # Hyperoptimize arguments
@@ -703,7 +718,9 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--sts_csv", default=STS_DATA_CSV, help="Path to STS data csv file.",
+        "--sts_csv",
+        default=STS_DATA_CSV,
+        help="Path to STS data csv file.",
     )
 
     args = parser.parse_args()
@@ -714,7 +731,9 @@ def parse_args() -> argparse.Namespace:
 def _process_args(args: argparse.Namespace):
     now_string = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
     args_file = os.path.join(
-        args.output_folder, args.id, "arguments_" + now_string + ".txt",
+        args.output_folder,
+        args.id,
+        "arguments_" + now_string + ".txt",
     )
     command_line = f"\n./scripts/tf.sh {' '.join(sys.argv)}\n"
     if not os.path.exists(os.path.dirname(args_file)):

@@ -3,7 +3,9 @@ from .summary_writer import PreTensorizeSummaryWriter
 
 def pre_tensorize_summary(args):
     summary = PreTensorizeSummaryWriter(
-        args.path_bedmaster, args.path_edw, args.path_xref,
+        args.path_bedmaster,
+        args.path_edw,
+        args.path_xref,
     )
 
     summary.write_pre_tensorize_summary(

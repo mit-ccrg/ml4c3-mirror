@@ -159,10 +159,12 @@ def test_get_vitals(edw_reader):
     assert vitals2.units == "mmHg"
 
     expected_time1 = np.array(
-        [1423742340.0, 1423742360.0, 1423742380.0, 1423742400.0], dtype=float,
+        [1423742340.0, 1423742360.0, 1423742380.0, 1423742400.0],
+        dtype=float,
     )
     expected_time2 = np.array(
-        [1423742350.0, 1423742370.0, 1423742390.0, 1423742410.0], dtype=float,
+        [1423742350.0, 1423742370.0, 1423742390.0, 1423742410.0],
+        dtype=float,
     )
     assert np.array_equal(vitals1.time, expected_time1)
     assert np.array_equal(vitals2.time, expected_time2)
@@ -241,7 +243,8 @@ def test_get_med_doses(edw_reader):
     )
     assert not med1.wt_based_dose
     assert np.array_equal(
-        med3.action, np.array(["Rate Verify", "Rate Verify", "Stopped"], dtype="S"),
+        med3.action,
+        np.array(["Rate Verify", "Rate Verify", "Stopped"], dtype="S"),
     )
 
 
@@ -297,10 +300,12 @@ def test_get_transfusions(edw_reader):
     assert transfuse1.source == EDW_FILES["transfusions_file"]["source"]
     assert transfuse2.source == EDW_FILES["transfusions_file"]["source"]
     assert np.array_equal(
-        transfuse1.start_date, np.array([323640900.0, 323730900.0], dtype=float),
+        transfuse1.start_date,
+        np.array([323640900.0, 323730900.0], dtype=float),
     )
     assert np.array_equal(
-        transfuse1.end_date, np.array([323658900.0, 323748900.0], dtype=float),
+        transfuse1.end_date,
+        np.array([323658900.0, 323748900.0], dtype=float),
     )
     assert np.array_equal(transfuse2.start_date, np.array([323548200.0], dtype=float))
     assert np.array_equal(transfuse2.end_date, np.array([323561700.0], dtype=float))
@@ -337,7 +342,8 @@ def test_get_events(edw_reader):
     assert np.array_equal(
         event2.start_date,
         np.array(
-            [1271896360, 1272673960, 1273278760, 1274142760, 1275006760], dtype=float,
+            [1271896360, 1272673960, 1273278760, 1274142760, 1275006760],
+            dtype=float,
         ),
     )
 

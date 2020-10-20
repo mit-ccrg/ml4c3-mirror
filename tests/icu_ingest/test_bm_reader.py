@@ -44,7 +44,8 @@ def test_get_vs(bm_reader, matfile):
     assert heart_rate.name == "HR"
     assert np.array_equal(heart_rate.value, _linearize(matfile["vs/HR"][()]))
     assert np.array_equal(
-        heart_rate.time, _linearize(matfile["vs_time_corrected/HR/res_vs"][()]),
+        heart_rate.time,
+        _linearize(matfile["vs_time_corrected/HR/res_vs"][()]),
     )
     assert heart_rate.scale_factor == 0.5
     assert heart_rate.units == "Bpm"
@@ -82,7 +83,8 @@ def test_get_wv(bm_reader, matfile):
     assert ecgv.name == "V"
     assert np.array_equal(ecgv.value, linearize(matfile["wv/ch10"][()]))
     assert np.array_equal(
-        ecgv.time, linearize(matfile["wv_time_corrected/ch10/res_wv"][()]),
+        ecgv.time,
+        linearize(matfile["wv_time_corrected/ch10/res_wv"][()]),
     )
     assert ecgv.units == "mV"
     assert ecgv.scale_factor == 0.0243
@@ -102,7 +104,8 @@ def test_get_wv(bm_reader, matfile):
     # Case with multiple sample frequency
     ecg2 = bm_reader.get_wv("ch8", "II")
     assert np.array_equal(
-        ecg2.sample_freq, np.array([(240, 0), (120, 80)], dtype="float,int"),
+        ecg2.sample_freq,
+        np.array([(240, 0), (120, 80)], dtype="float,int"),
     )
 
     # Check that interbundle correction is applied
@@ -117,7 +120,8 @@ def test_get_wv(bm_reader, matfile):
     assert len(ecg2_corr.time) == len(ecgv.time) - overlap
     assert len(ecg2_corr.value) == len(ecgv.value) - values_cut
     assert np.array_equal(
-        ecg2_corr.sample_freq, np.array([(240, 0), (120, 75)], dtype="float,int"),
+        ecg2_corr.sample_freq,
+        np.array([(240, 0), (120, 75)], dtype="float,int"),
     )
 
     # Case with unknown scale factor and unit
@@ -167,13 +171,15 @@ def test_decode_data(bm_reader):
 
     obtained = bm_reader.format_data(codified_data)
     assert np.array_equal(
-        obtained[~np.isnan(obtained)], decoded_data[~np.isnan(decoded_data)],
+        obtained[~np.isnan(obtained)],
+        decoded_data[~np.isnan(decoded_data)],
     )
     assert np.isnan(obtained[3])
     codified_data[3] = [88, 32, 32, 32]
     obtained = bm_reader.format_data(codified_data)
     assert np.array_equal(
-        obtained[~np.isnan(obtained)], decoded_data[~np.isnan(decoded_data)],
+        obtained[~np.isnan(obtained)],
+        decoded_data[~np.isnan(decoded_data)],
     )
     assert np.isnan(obtained[3])
 
@@ -198,10 +204,14 @@ def test_max_segment(bm_reader):
     empty_vs_dict = _create_max_seg_dict(0, -1, "")
     empty_wv_dict = _create_max_seg_dict(0, -1, "")
     expected_wv_max = _create_max_seg_dict(
-        seg_no=6, max_time=1452438403.75, signal_name="ch10",
+        seg_no=6,
+        max_time=1452438403.75,
+        signal_name="ch10",
     )
     expected_vs_max = _create_max_seg_dict(
-        seg_no=6, max_time=1452438402.0, signal_name="CO",
+        seg_no=6,
+        max_time=1452438402.0,
+        signal_name="CO",
     )
 
     assert bm_reader.max_segment["vs"] == empty_vs_dict
@@ -283,11 +293,16 @@ def test_apply_interbundle_correction(bm_reader: BMReader):
         signal.time_corr_arr = np.unpackbits(signal.time_corr_arr)
         signal_original = copy.deepcopy(signal)
         bm_reader.interbundle_corr[sig_type] = _create_ib_corr_dict(
-            signal, cut_idx[sig_type], time_corr[sig_type],
+            signal,
+            cut_idx[sig_type],
+            time_corr[sig_type],
         )
         bm_reader.apply_ibcorr(signal)
         _assert_ib_correction(
-            signal_original, signal, cut_idx[sig_type], time_corr[sig_type],
+            signal_original,
+            signal,
+            cut_idx[sig_type],
+            time_corr[sig_type],
         )
         bm_reader.interbundle_corr[sig_type] = None
 
@@ -339,7 +354,8 @@ def _assert_ib_correction(original, corrected, cut_idx, time_corr):
     expected_sf = np.insert(original.sample_freq, 0, (expected_first_sf, length_cut))
     expected_sf = expected_sf[[sf[1] >= cut_idx for sf in expected_sf]]
     expected_sf = np.fromiter(
-        map(lambda sf: (sf[0], sf[1] - length_cut), expected_sf), dtype="float,int",
+        map(lambda sf: (sf[0], sf[1] - length_cut), expected_sf),
+        dtype="float,int",
     )
     assert np.array_equal(expected_sf, corrected.sample_freq)
 
@@ -349,7 +365,8 @@ def _assert_ib_correction(original, corrected, cut_idx, time_corr):
         dataevent_idx = de[de > cut_idx][0]
         new_de_idx = dataevent_idx - length_cut
         assert np.array_equal(
-            original.time[dataevent_idx:], corrected.time[new_de_idx:],
+            original.time[dataevent_idx:],
+            corrected.time[new_de_idx:],
         )
         assert np.array_equal(
             original.time[length_cut:dataevent_idx] + time_corr,

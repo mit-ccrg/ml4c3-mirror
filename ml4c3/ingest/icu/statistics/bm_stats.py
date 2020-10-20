@@ -148,7 +148,9 @@ class BMStats:
         self.add_signal_stats(signal_name, "min", new_min, overwrite=True)
 
         new_mean = self._update_mean(
-            signal_name, signal.value.mean(), signal.value.size,
+            signal_name,
+            signal.value.mean(),
+            signal.value.size,
         )
         self.add_signal_stats(signal_name, "mean", new_mean, overwrite=True)
 
@@ -174,12 +176,15 @@ class BMStats:
             self.add_percentages(signal_stats_df, column, signal_stats_df["points"])
         self.add_percentages(signal_stats_df, "files", self.file_stats["total_files"])
         self.add_percentages(
-            signal_stats_df, "total_overlap_bundles", signal_stats_df["files"],
+            signal_stats_df,
+            "total_overlap_bundles",
+            signal_stats_df["files"],
         )
         signal_stats_df = signal_stats_df.round(2)
         signal_stats_df = signal_stats_df.rename_axis("signal").reset_index()
         signal_stats_df = signal_stats_df.sort_values(
-            by=["source", "files"], ascending=[False, False],
+            by=["source", "files"],
+            ascending=[False, False],
         )
         signal_stats_df["signal"] = signal_stats_df["signal"].apply(lambda x: x[:-3])
 
@@ -191,7 +196,8 @@ class BMStats:
 
         # Create files dataframe
         file_stats_df = pd.DataFrame(
-            self.file_stats.items(), columns=["issue", "count"],
+            self.file_stats.items(),
+            columns=["issue", "count"],
         )
         self.add_percentages(file_stats_df, "count", self.file_stats["total_files"])
         file_stats_df = file_stats_df.round(2)
