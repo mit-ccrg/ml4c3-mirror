@@ -118,6 +118,9 @@ sts_outcomes = {
     "sts_reoperation":           "reop",
     "sts_long_stay":             "llos",
 }
+# Get keys of outcomes in STS features CSV
+sts_outcomes_raw_keys = [key for outcome, key in sts_outcomes.items()]
+
 sts_operative_types = {
     "opcab":                     "opcab",
     "opvalve":                   "opvalve",
@@ -320,10 +323,6 @@ def str2datetime(
     return datetime.datetime.strptime(input_date, date_format)
 
 
-# Get keys of outcomes in STS features CSV
-outcome_keys = [key for outcome, key in sts_outcomes.items()]
-
-
 # Get STS features from CSV as dict
 sts_data = _get_sts_data()
 date_interval_lookup = dict()
@@ -435,9 +434,12 @@ def tff_any(tm: TensorMap, hd5: h5py.File):
         hd5=hd5,
     )
     tensor = np.zeros(tm.shape, dtype=np.float32)
-    if 1 in [
-        newest_surgery_data[key] for key in newest_surgery_data if key in sts_outcomes
-    ]:
+
+    if 1.0 in {
+        value
+        for key, value in newest_surgery_data.items()
+        if key in sts_outcomes_raw_keys
+    }:
         idx = 1
     else:
         idx = 0
