@@ -203,9 +203,7 @@ def evaluate_predictions(
             y_predictions.shape[2],
         )
         idx = np.random.choice(
-            np.arange(melt_shape[0]),
-            min(melt_shape[0], max_melt),
-            replace=False,
+            np.arange(melt_shape[0]), min(melt_shape[0], max_melt), replace=False,
         )
         y_predictions = y_predictions.reshape(melt_shape)[idx]
         y_truth = y_truth.reshape(melt_shape)[idx]
@@ -247,9 +245,7 @@ def evaluate_predictions(
             y_predictions.shape[3],
         )
         idx = np.random.choice(
-            np.arange(melt_shape[0]),
-            min(melt_shape[0], max_melt),
-            replace=False,
+            np.arange(melt_shape[0]), min(melt_shape[0], max_melt), replace=False,
         )
         y_predictions = y_predictions.reshape(melt_shape)[idx]
         y_truth = y_truth.reshape(melt_shape)[idx]
@@ -294,9 +290,7 @@ def evaluate_predictions(
             y_predictions.shape[4],
         )
         idx = np.random.choice(
-            np.arange(melt_shape[0]),
-            min(melt_shape[0], max_melt),
-            replace=False,
+            np.arange(melt_shape[0]), min(melt_shape[0], max_melt), replace=False,
         )
         y_predictions = y_predictions.reshape(melt_shape)[idx]
         y_truth = y_truth.reshape(melt_shape)[idx]
@@ -393,9 +387,7 @@ def plot_metric_history(
     cols = max(2, int(math.ceil(math.sqrt(total_plots))))
     rows = max(2, int(math.ceil(total_plots / cols)))
     f, axes = plt.subplots(
-        rows,
-        cols,
-        figsize=(int(cols * SUBPLOT_SIZE), int(rows * SUBPLOT_SIZE)),
+        rows, cols, figsize=(int(cols * SUBPLOT_SIZE), int(rows * SUBPLOT_SIZE)),
     )
     for k in sorted(history.history.keys()):
         if not k.startswith("val_") and not k.startswith("no_"):
@@ -409,8 +401,7 @@ def plot_metric_history(
                     for i in range(len(history.history[k]))
                 ]
             axes[row, col].plot(
-                list(range(1, len(history.history[k]) + 1)),
-                history.history[k],
+                list(range(1, len(history.history[k]) + 1)), history.history[k],
             )
             k_split = str(k).replace("output_", "").split("_")
             k_title = " ".join(OrderedDict.fromkeys(k_split))
@@ -481,14 +472,10 @@ def plot_prediction_calibration(
         y_prob = prediction[..., labels[label]]
         color = _hash_string_to_color(label)
         brier_score = brier_score_loss(
-            y_true,
-            prediction[..., labels[label]],
-            pos_label=1,
+            y_true, prediction[..., labels[label]], pos_label=1,
         )
         fraction_of_positives, mean_predicted_value = calibration_curve(
-            y_true,
-            y_prob,
-            n_bins=n_bins,
+            y_true, y_prob, n_bins=n_bins,
         )
         ax3.plot(
             mean_predicted_value,
@@ -535,8 +522,7 @@ def plot_prediction_calibration(
     plt.tight_layout()
 
     figure_path = os.path.join(
-        prefix,
-        "calibrations_" + title + "_" + data_split + image_ext,
+        prefix, "calibrations_" + title + "_" + data_split + image_ext,
     )
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
@@ -591,8 +577,7 @@ def plot_confusion_matrix(
             logging.info(f"{matrix_title}:\n{cm_df}")
 
     figure_path = os.path.join(
-        prefix,
-        f"confusion_matrix_{title}_{data_split}{image_ext}",
+        prefix, f"confusion_matrix_{title}_{data_split}{image_ext}",
     )
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
@@ -617,9 +602,7 @@ def plot_scatter(
     margin = float((np.max(truth) - np.min(truth)) / 100)
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(SUBPLOT_SIZE, 2 * SUBPLOT_SIZE))
     ax1.plot(
-        [np.min(truth), np.max(truth)],
-        [np.min(truth), np.max(truth)],
-        linewidth=2,
+        [np.min(truth), np.max(truth)], [np.min(truth), np.max(truth)], linewidth=2,
     )
     ax1.plot(
         [np.min(prediction), np.max(prediction)],
@@ -627,8 +610,7 @@ def plot_scatter(
         linewidth=4,
     )
     pearson = np.corrcoef(prediction.flatten(), truth.flatten())[
-        1,
-        0,
+        1, 0,
     ]  # corrcoef returns full covariance matrix
     big_r_squared = coefficient_of_determination(truth, prediction)
     logging.info(
@@ -695,14 +677,11 @@ def subplot_scatters(
     cols = max(2, int(math.ceil(math.sqrt(total_plots))))
     rows = max(2, int(math.ceil(total_plots / cols)))
     fig, axes = plt.subplots(
-        rows,
-        cols,
-        figsize=(cols * SUBPLOT_SIZE, rows * SUBPLOT_SIZE),
+        rows, cols, figsize=(cols * SUBPLOT_SIZE, rows * SUBPLOT_SIZE),
     )
     for prediction, truth, title, paths in scatters:
         axes[row, col].plot(
-            [np.min(truth), np.max(truth)],
-            [np.min(truth), np.max(truth)],
+            [np.min(truth), np.max(truth)], [np.min(truth), np.max(truth)],
         )
         axes[row, col].plot(
             [np.min(prediction), np.max(prediction)],
@@ -759,10 +738,7 @@ def subplot_scatters(
 
 
 def _plot_ecg_text(
-    data: Dict[str, Union[np.ndarray, str, Dict]],
-    fig: plt.Figure,
-    w: float,
-    h: float,
+    data: Dict[str, Union[np.ndarray, str, Dict]], fig: plt.Figure, w: float, h: float,
 ) -> None:
     # top text
     dt = datetime.strptime(data["datetime"], ECG_DATETIME_FORMAT)
@@ -776,10 +752,7 @@ def _plot_ecg_text(
     sex = {value: key for key, value in data["sex"].items()}
 
     fig.text(
-        0.17 / w,
-        8.04 / h,
-        f"{data['lastname']}, {data['firstname']}",
-        weight="bold",
+        0.17 / w, 8.04 / h, f"{data['lastname']}, {data['firstname']}", weight="bold",
     )
     fig.text(3.05 / w, 8.04 / h, f"ID:{data['patientid']}", weight="bold")
     fig.text(4.56 / w, 8.04 / h, f"{dt:%d-%b-%Y %H:%M:%S}".upper(), weight="bold")
@@ -1100,11 +1073,7 @@ def _plot_ecg_figure(
     ax.set_yticks(y_minor_ticks, minor=True)
 
     ax.tick_params(
-        which="both",
-        left=False,
-        bottom=False,
-        labelleft=False,
-        labelbottom=False,
+        which="both", left=False, bottom=False, labelleft=False, labelbottom=False,
     )
     ax.grid(b=True, color="r", which="major", lw=0.5)
     ax.grid(b=True, color="r", which="minor", lw=0.2)
@@ -1280,8 +1249,7 @@ def plot_roc_per_class(
     plt.title(f"ROC curve: {title}, n={truth.shape[0]:.0f}\n")
 
     figure_path = os.path.join(
-        prefix,
-        "per_class_roc_" + title + "_" + data_split + image_ext,
+        prefix, "per_class_roc_" + title + "_" + data_split + image_ext,
     )
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
@@ -1305,9 +1273,7 @@ def subplot_rocs(
     cols = max(2, int(math.ceil(math.sqrt(total_plots))))
     rows = max(2, int(math.ceil(total_plots / cols)))
     fig, axes = plt.subplots(
-        rows,
-        cols,
-        figsize=(cols * SUBPLOT_SIZE, rows * SUBPLOT_SIZE),
+        rows, cols, figsize=(cols * SUBPLOT_SIZE, rows * SUBPLOT_SIZE),
     )
     for predicted, truth, labels in rocs:
         true_sums = np.sum(truth, axis=0)
@@ -1376,12 +1342,10 @@ def plot_precision_recall_per_class(
             continue
 
         precision, recall, _ = precision_recall_curve(
-            truth[:, labels[label]],
-            prediction[:, labels[label]],
+            truth[:, labels[label]], prediction[:, labels[label]],
         )
         average_precision = average_precision_score(
-            truth[:, labels[label]],
-            prediction[:, labels[label]],
+            truth[:, labels[label]], prediction[:, labels[label]],
         )
         labels_to_areas[label] = average_precision
         color = _hash_string_to_color(label)
@@ -1400,8 +1364,7 @@ def plot_precision_recall_per_class(
     plt.title(f"PR curve: {title}, n={np.sum(true_sums):.0f}\n")
 
     figure_path = os.path.join(
-        prefix,
-        "precision_recall_" + title + "_" + data_split + image_ext,
+        prefix, "precision_recall_" + title + "_" + data_split + image_ext,
     )
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
@@ -1492,10 +1455,7 @@ def plot_architecture_diagram(dot: pydot.Dot, image_path: str):
 
     for label in legend:
         legend_node = pydot.Node(
-            "legend" + label,
-            label=label,
-            shape="box",
-            fillcolor=legend[label],
+            "legend" + label, label=label, shape="box", fillcolor=legend[label],
         )
         dot.add_node(legend_node)
 
@@ -1503,9 +1463,7 @@ def plot_architecture_diagram(dot: pydot.Dot, image_path: str):
         # pydot svg applies a scale factor that clips the image so unscale it
         svg_string = dot.create_svg().decode()
         svg_string = re.sub(
-            r"scale\(\d+\.?\d+\ \d+\.?\d+\)",
-            "scale(1 1)",
-            svg_string,
+            r"scale\(\d+\.?\d+\ \d+\.?\d+\)", "scale(1 1)", svg_string,
         ).encode()
         with open(image_path, "wb") as f:
             f.write(svg_string)
@@ -1513,9 +1471,7 @@ def plot_architecture_diagram(dot: pydot.Dot, image_path: str):
         dot.write_png(path=image_path)
     else:
         dot.write(
-            path=image_path,
-            prog="dot",
-            format=os.path.splitext(image_path)[-1][1:],
+            path=image_path, prog="dot", format=os.path.splitext(image_path)[-1][1:],
         )
 
     logging.info("Saved architecture diagram to:{}".format(image_path))

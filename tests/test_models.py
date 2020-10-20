@@ -47,8 +47,7 @@ TrainType = Dict[str, np.ndarray]
 
 
 def make_training_data(
-    input_tmaps: List[TensorMap],
-    output_tmaps: List[TensorMap],
+    input_tmaps: List[TensorMap], output_tmaps: List[TensorMap],
 ) -> Iterator[Tuple[TrainType, TrainType, None]]:
     return cycle(
         [
@@ -71,9 +70,7 @@ def assert_model_trains(
 ):
     if m is None:
         m = make_multimodal_multitask_model(
-            input_tmaps,
-            output_tmaps,
-            **DEFAULT_PARAMS,
+            input_tmaps, output_tmaps, **DEFAULT_PARAMS,
         )
     for tmap, tensor in zip(input_tmaps, m.inputs):
         assert tensor.shape[1:] == tmap.shape
@@ -83,11 +80,7 @@ def assert_model_trains(
         assert tensor.shape[1:] == tmap.shape
     data = make_training_data(input_tmaps, output_tmaps)
     history = m.fit(
-        x=data,
-        steps_per_epoch=2,
-        epochs=2,
-        validation_data=data,
-        validation_steps=2,
+        x=data, steps_per_epoch=2, epochs=2, validation_data=data, validation_steps=2,
     )
     for tmap in output_tmaps:
         for metric in tmap.metrics:
@@ -121,60 +114,46 @@ class TestMakeMultimodalMultitaskModel:
 
     @pytest.mark.slow
     @pytest.mark.parametrize(
-        "input_tmaps",
-        pytest.MULTIMODAL_UP_TO_4D,
+        "input_tmaps", pytest.MULTIMODAL_UP_TO_4D,
     )
     @pytest.mark.parametrize(
-        "output_tmaps",
-        pytest.MULTIMODAL_UP_TO_4D,
+        "output_tmaps", pytest.MULTIMODAL_UP_TO_4D,
     )
     def test_multimodal(
-        self,
-        input_tmaps: List[TensorMap],
-        output_tmaps: List[TensorMap],
+        self, input_tmaps: List[TensorMap], output_tmaps: List[TensorMap],
     ):
         assert_model_trains(input_tmaps, output_tmaps)
 
     @pytest.mark.slow
     @pytest.mark.parametrize(
-        "input_tmap",
-        pytest.CONTINUOUS_TMAPS[:-1],
+        "input_tmap", pytest.CONTINUOUS_TMAPS[:-1],
     )
     @pytest.mark.parametrize(
-        "output_tmap",
-        pytest.TMAPS_UP_TO_4D,
+        "output_tmap", pytest.TMAPS_UP_TO_4D,
     )
     def test_unimodal_md_to_nd(self, input_tmap: TensorMap, output_tmap: TensorMap):
         assert_model_trains([input_tmap], [output_tmap])
 
     @pytest.mark.slow
     @pytest.mark.parametrize(
-        "input_tmap",
-        pytest.TMAPS_UP_TO_4D,
+        "input_tmap", pytest.TMAPS_UP_TO_4D,
     )
     @pytest.mark.parametrize(
-        "output_tmap",
-        pytest.TMAPS_UP_TO_4D,
+        "output_tmap", pytest.TMAPS_UP_TO_4D,
     )
     def test_load_unimodal(self, tmpdir, input_tmap, output_tmap):
         m = make_multimodal_multitask_model(
-            [input_tmap],
-            [output_tmap],
-            **DEFAULT_PARAMS,
+            [input_tmap], [output_tmap], **DEFAULT_PARAMS,
         )
         path = os.path.join(tmpdir, f"m{MODEL_EXT}")
         m.save(path)
         make_multimodal_multitask_model(
-            [input_tmap],
-            [output_tmap],
-            model_file=path,
-            **DEFAULT_PARAMS,
+            [input_tmap], [output_tmap], model_file=path, **DEFAULT_PARAMS,
         )
 
     @pytest.mark.slow
     @pytest.mark.parametrize(
-        "activation",
-        ACTIVATION_FUNCTIONS.keys(),
+        "activation", ACTIVATION_FUNCTIONS.keys(),
     )
     def test_load_custom_activations(self, tmpdir, activation):
         inp, out = pytest.CONTINUOUS_TMAPS[:2], pytest.CATEGORICAL_TMAPS[:2]
@@ -184,39 +163,26 @@ class TestMakeMultimodalMultitaskModel:
         path = os.path.join(tmpdir, f"m{MODEL_EXT}")
         m.save(path)
         make_multimodal_multitask_model(
-            inp,
-            out,
-            model_file=path,
-            **params,
+            inp, out, model_file=path, **params,
         )
 
     @pytest.mark.slow
     @pytest.mark.parametrize(
-        "input_tmaps",
-        pytest.MULTIMODAL_UP_TO_4D,
+        "input_tmaps", pytest.MULTIMODAL_UP_TO_4D,
     )
     @pytest.mark.parametrize(
-        "output_tmaps",
-        pytest.MULTIMODAL_UP_TO_4D,
+        "output_tmaps", pytest.MULTIMODAL_UP_TO_4D,
     )
     def test_load_multimodal(
-        self,
-        tmpdir,
-        input_tmaps: List[TensorMap],
-        output_tmaps: List[TensorMap],
+        self, tmpdir, input_tmaps: List[TensorMap], output_tmaps: List[TensorMap],
     ):
         m = make_multimodal_multitask_model(
-            input_tmaps,
-            output_tmaps,
-            **DEFAULT_PARAMS,
+            input_tmaps, output_tmaps, **DEFAULT_PARAMS,
         )
         path = os.path.join(tmpdir, f"m{MODEL_EXT}")
         m.save(path)
         make_multimodal_multitask_model(
-            input_tmaps,
-            output_tmaps,
-            model_file=path,
-            **DEFAULT_PARAMS,
+            input_tmaps, output_tmaps, model_file=path, **DEFAULT_PARAMS,
         )
 
     @pytest.mark.parametrize(

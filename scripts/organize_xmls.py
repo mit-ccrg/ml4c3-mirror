@@ -45,18 +45,15 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--source_xml_folder",
-        help="Path to directory containing source XMLs",
+        "--source_xml_folder", help="Path to directory containing source XMLs",
     )
 
     parser.add_argument(
-        "--destination_xml_folder",
-        help="Path to dir to organize XMLs in yyyy-mm dirs",
+        "--destination_xml_folder", help="Path to dir to organize XMLs in yyyy-mm dirs",
     )
 
     parser.add_argument(
-        "--bad_xml_folder",
-        help="Path to directory in which to store malformed XMLs",
+        "--bad_xml_folder", help="Path to directory in which to store malformed XMLs",
     )
 
     parser.add_argument(
@@ -155,10 +152,7 @@ def run(args):
 
                     # Replace the bad encoding in xml_as_string with ISO-8859-1
                     xml_as_string = re.sub(
-                        verbosePattern,
-                        "ISO-8859-1",
-                        xml_as_string,
-                        count=1,
+                        verbosePattern, "ISO-8859-1", xml_as_string, count=1,
                     )
 
                     # Increment counter to track bad encodings
@@ -197,8 +191,7 @@ def run(args):
                         # Define full path to new directory in yyyy-mm format
                         yyyymm = _format_date(ecg_date, day_flag=False)
                         args.dst_yyyymm = os.path.join(
-                            args.destination_xml_folder,
-                            yyyymm,
+                            args.destination_xml_folder, yyyymm,
                         )
 
                         # If directory does not exist, create it

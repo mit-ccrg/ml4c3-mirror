@@ -38,8 +38,7 @@ def test_get_xref_files(cross_referencer):
     )
     assert (
         cross_referencer.get_xref_files(
-            overwrite_hd5=False,
-            tensors=f"{test_dir}/data/",
+            overwrite_hd5=False, tensors=f"{test_dir}/data/",
         )
         == expected_dic2
     )
@@ -49,9 +48,7 @@ def test_get_xref_files(cross_referencer):
     assert cross_referencer.get_xref_files(mrns=["456"], n_patients=0) == {}
     assert (
         cross_referencer.get_xref_files(
-            starting_time=280,
-            ending_time=420,
-            flag_one_source=False,
+            starting_time=280, ending_time=420, flag_one_source=False,
         )
         == {}
     )

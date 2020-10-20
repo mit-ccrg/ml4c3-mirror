@@ -75,8 +75,7 @@ def hyperoptimize(args: argparse.Namespace):
     # Generate weighted loss tmaps for STS death
     weighted_losses = [val for val in range(1, 10, 2)]
     output_tensors_sets = _generate_weighted_loss_tmaps(
-        base_tmap_name="sts_death",
-        weighted_losses=weighted_losses,
+        base_tmap_name="sts_death", weighted_losses=weighted_losses,
     )
     for tmap_name in output_tensors_sets:
         tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
@@ -218,10 +217,7 @@ def hyperparameter_optimizer(
             auc = {"train": train_auc, "test": test_auc}
             aucs.append(auc)
             plot_metric_history(
-                history,
-                None,
-                "",
-                os.path.join(trials_path, trial_id),
+                history, None, "", os.path.join(trials_path, trial_id),
             )
             logging.info(
                 f"Current architecture:\n{_string_from_architecture_dict(x)}\nCurrent"
@@ -361,10 +357,7 @@ def _generate_conv1D_filter_widths(
 
         # Generate length of filter sizes
         list_len = np.random.randint(
-            low=list_len_bounds[0],
-            high=list_len_bounds[1] + 1,
-            size=1,
-            dtype=int,
+            low=list_len_bounds[0], high=list_len_bounds[1] + 1, size=1, dtype=int,
         )[0]
 
         # Generate first filter size
@@ -381,8 +374,7 @@ def _generate_conv1D_filter_widths(
 
             # Randomly generate filter scale value by which to divide subsequent filter sizes
             vary_filter_scale = np.random.uniform(
-                low=vary_filter_scale_bounds[0],
-                high=vary_filter_scale_bounds[1],
+                low=vary_filter_scale_bounds[0], high=vary_filter_scale_bounds[1],
             )
 
             # Iterate through list of filter sizes
@@ -411,8 +403,7 @@ def _generate_conv1D_filter_widths(
 
 
 def _generate_weighted_loss_tmaps(
-    base_tmap_name: str,
-    weighted_losses: List[int],
+    base_tmap_name: str, weighted_losses: List[int],
 ) -> List[str]:
     new_tmap_names = [
         base_tmap_name + "_weighted_loss_" + str(weight) for weight in weighted_losses
@@ -456,9 +447,7 @@ def _trial_metric_and_param_label(
 
 
 def _trial_parameter_string(
-    trials: hyperopt.Trials,
-    index: int,
-    param_lists: Dict,
+    trials: hyperopt.Trials, index: int, param_lists: Dict,
 ) -> str:
     label = ""
     params = trials.trials[index]["misc"]["vals"]
@@ -558,11 +547,7 @@ def plot_trials(
     colors = ["r" if x == cutoff else "b" for x in lplot]
     plt.plot(lplot)
     trial_metrics_and_params_df = _trial_metrics_and_params_to_df(
-        all_losses,
-        histories,
-        trials,
-        param_lists,
-        aucs,
+        all_losses, histories, trials, param_lists, aucs,
     )
     for col, dtype in trial_metrics_and_params_df.dtypes.items():
         if dtype == float:
@@ -570,19 +555,13 @@ def plot_trials(
                 lambda x: f"{x:.3}",
             )
     metric_and_param_path = os.path.join(
-        figure_path,
-        "metrics_and_hyperparameters.csv",
+        figure_path, "metrics_and_hyperparameters.csv",
     )
     trial_metrics_and_params_df.to_csv(metric_and_param_path)
     logging.info(f"Saved metric and hyperparameter table to {metric_and_param_path}")
     labels = [
         _trial_metric_and_param_label(
-            i,
-            all_losses,
-            histories,
-            trials,
-            param_lists,
-            aucs,
+            i, all_losses, histories, trials, param_lists, aucs,
         )
         for i in range(len(trials.trials))
     ]
@@ -593,10 +572,7 @@ def plot_trials(
     plt.ylim(min(lplot) * 0.95, max(lplot) * 1.05)
     plt.title(f"Hyperparameter Optimization\n")
     plt.axhline(
-        cutoff,
-        label=f"Loss display cutoff at {cutoff:.3f}",
-        color="r",
-        linestyle="--",
+        cutoff, label=f"Loss display cutoff at {cutoff:.3f}", color="r", linestyle="--",
     )
     loss_path = os.path.join(figure_path, "loss_per_trial" + image_ext)
     plt.legend()
@@ -626,17 +602,11 @@ def plot_trials(
         ax2.plot(val_loss, label=label, linestyle=linestyles[i % 4], color=color)
         ax2.text(len(val_loss) - 1, val_loss[-1], str(i))
     ax1.axhline(
-        cutoff,
-        label=f"Loss display cutoff at {cutoff:.3f}",
-        color="k",
-        linestyle="--",
+        cutoff, label=f"Loss display cutoff at {cutoff:.3f}", color="k", linestyle="--",
     )
     ax1.set_title("Training Loss")
     ax2.axhline(
-        cutoff,
-        label=f"Loss display cutoff at {cutoff:.3f}",
-        color="k",
-        linestyle="--",
+        cutoff, label=f"Loss display cutoff at {cutoff:.3f}", color="k", linestyle="--",
     )
     ax2.set_title("Validation Loss")
     ax3.legend(
@@ -675,9 +645,7 @@ def sample_random_hyperparameter(
         sampled_value = np.random.uniform(low=lower_bound, high=upper_bound, size=1)
     elif primitive_type == int:
         sampled_value = np.random.randint(
-            low=lower_bound,
-            high=upper_bound + 1,
-            size=1,
+            low=lower_bound, high=upper_bound + 1, size=1,
         )
     else:
         raise ValueError(f"Invalid primitive type: {primitive_type}")

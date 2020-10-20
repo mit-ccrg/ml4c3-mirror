@@ -242,13 +242,10 @@ class PreTensorizeSummaryWriter:
                     - ((transfer_in.month, transfer_in.day) < (age.month, age.day))
                 )
                 if str(static_data.end_date) != "nan":
-                    length_stay = (
-                        float(
-                            np.datetime64(static_data.end_date)
-                            - transfer_in.to_datetime64(),
-                        )
-                        / (10 ** 9 * 60 * 60)
-                    )
+                    length_stay = float(
+                        np.datetime64(static_data.end_date)
+                        - transfer_in.to_datetime64(),
+                    ) / (10 ** 9 * 60 * 60)
                 else:
                     length_stay = np.nan
 
@@ -272,12 +269,10 @@ class PreTensorizeSummaryWriter:
                             self.summary[f"mean_{key}"] * (count - 1) + value
                         ) / count
                 self.summary["earliest_transfer_in"] = min(
-                    self.summary["earliest_transfer_in"],
-                    transfer_in,
+                    self.summary["earliest_transfer_in"], transfer_in,
                 )
                 self.summary["latest_transfer_in"] = max(
-                    self.summary["latest_transfer_in"],
-                    transfer_in,
+                    self.summary["latest_transfer_in"], transfer_in,
                 )
 
     def _get_xref_df(self):

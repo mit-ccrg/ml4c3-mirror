@@ -187,8 +187,7 @@ class EDWReader(Reader):
                 with the patient
         """
         return self._list_procedures(
-            self.other_procedures_file,
-            "other_procedures_file",
+            self.other_procedures_file, "other_procedures_file",
         )
 
     def list_transfusions(self) -> List[str]:
@@ -370,8 +369,7 @@ class EDWReader(Reader):
                 elif row[duration_unit_column] == "Hours":
                     conversion = 3600
                 start_date = np.append(
-                    start_date,
-                    [time, time + row[duration_column] * conversion],
+                    start_date, [time, time + row[duration_column] * conversion],
                 )
                 action = np.append(action, [row[status_column], "Stopped"])
 
@@ -380,14 +378,7 @@ class EDWReader(Reader):
         action = self._ensure_contiguous(action)
 
         return Medication(
-            med_name,
-            dose,
-            units,
-            start_date,
-            action,
-            route,
-            wt_base_dose,
-            source,
+            med_name, dose, units, start_date, action, route, wt_base_dose, source,
         )
 
     def get_vitals(self, vital_name: str) -> Measurement:
@@ -412,10 +403,7 @@ class EDWReader(Reader):
             vitals_df = vitals_df[vitals_df[time_column] <= end_date]
 
         return self._get_measurements(
-            "vitals_file",
-            vitals_df,
-            vital_name,
-            self.vitals_file,
+            "vitals_file", vitals_df, vital_name, self.vitals_file,
         )
 
     def get_labs(self, lab_name: str) -> Measurement:
@@ -446,9 +434,7 @@ class EDWReader(Reader):
         :return: <Procedure> wrapped list procedures of the input type
         """
         return self._get_procedures(
-            "other_procedures_file",
-            self.other_procedures_file,
-            procedure_type,
+            "other_procedures_file", self.other_procedures_file, procedure_type,
         )
 
     def get_transfusions(self, transfusion_type: str) -> Procedure:
@@ -459,9 +445,7 @@ class EDWReader(Reader):
         :return: <Procedure> Wrapped list of transfusions of the input type.
         """
         return self._get_procedures(
-            "transfusions_file",
-            self.transfusions_file,
-            transfusion_type,
+            "transfusions_file", self.transfusions_file, transfusion_type,
         )
 
     def get_events(self, event_type: str) -> Event:
@@ -498,12 +482,10 @@ class EDWReader(Reader):
         init_dt = datetime.strptime(init_date, "%Y-%m-%d %H:%M:%S.%f")
         end_dt = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S.%f")
         offset_init = self.timezone.utcoffset(  # type: ignore
-            init_dt,
-            is_dst=True,
+            init_dt, is_dst=True,
         ).total_seconds()
         offset_end = self.timezone.utcoffset(  # type: ignore
-            end_dt,
-            is_dst=True,
+            end_dt, is_dst=True,
         ).total_seconds()
         return np.array([offset_init, offset_end], dtype=float)
 
@@ -540,8 +522,7 @@ class EDWReader(Reader):
                 if not pd.isnull(val):
                     ntarray = datetime.utcfromtimestamp(val)
                     offset = self.timezone.utcoffset(  # type: ignore
-                        ntarray,
-                        is_dst=True,
+                        ntarray, is_dst=True,
                     )
                     unix_timestamps[idx] = val - offset.total_seconds()  # type: ignore
                 else:
@@ -625,10 +606,7 @@ class EDWReader(Reader):
         return Measurement(measure_name, source, value, time, units, data_type)
 
     def _get_procedures(
-        self,
-        file_key: str,
-        file_name: str,
-        procedure_type: str,
+        self, file_key: str, file_name: str, procedure_type: str,
     ) -> Procedure:
 
         signal_column, status_column, start_column, end_column = EDW_FILES[file_key][
