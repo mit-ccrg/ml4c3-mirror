@@ -18,12 +18,10 @@ from ml4c3.arguments import parse_args
 def test_tensorizer(temp_dir, monkeypatch, test_scale_units):
     monkeypatch.setattr("ml4c3.definitions.icu.ICU_SCALE_UNITS", test_scale_units)
     monkeypatch.setattr(
-        "ml4c3.ingest.icu.tensorizer.ICU_SCALE_UNITS",
-        test_scale_units,
+        "ml4c3.ingest.icu.tensorizer.ICU_SCALE_UNITS", test_scale_units,
     )
     monkeypatch.setattr(
-        "ml4c3.ingest.icu.readers.bm_reader.ICU_SCALE_UNITS",
-        test_scale_units,
+        "ml4c3.ingest.icu.readers.bm_reader.ICU_SCALE_UNITS", test_scale_units,
     )
 
     test_dir = os.path.dirname(__file__)
@@ -130,8 +128,7 @@ def test_tensorizer(temp_dir, monkeypatch, test_scale_units):
         assert ecg_ii.attrs["units"] == "mV"
         assert ecg_ii.attrs["scale_factor"] == 0.0243
         expected_sf = np.array(
-            [(240.0, 0), (120.0, 80), (240.0, 5760), (120.0, 5808)],
-            dtype="float, int",
+            [(240.0, 0), (120.0, 80), (240.0, 5760), (120.0, 5808)], dtype="float, int",
         )
         assert np.array_equal(ecg_ii["sample_freq"], expected_sf)
 
@@ -157,8 +154,7 @@ def test_tensorizer(temp_dir, monkeypatch, test_scale_units):
                     diff = np.diff(sig_type_dir[signal]["time"][:3349])
                     if signal == "v":
                         assert np.array_equal(
-                            np.where(diff != 0.25)[0],
-                            np.array([113]),
+                            np.where(diff != 0.25)[0], np.array([113]),
                         )
                     else:
                         assert all(diff == 0.25)

@@ -111,9 +111,7 @@ def pytest_configure():
     # EDW
     pytest.edw_dir = os.path.join(pytest.datadir, "edw")
     pytest.edw_patient_dir = os.path.join(
-        pytest.edw_dir,
-        pytest.example_mrn,
-        pytest.example_visit_id,
+        pytest.edw_dir, pytest.example_mrn, pytest.example_visit_id,
     )
 
     # Alarms
@@ -126,9 +124,7 @@ pytest_configure()
 class Utils:
     @staticmethod
     def build_hdf5s(
-        path: str,
-        tensor_maps: List[TensorMap],
-        n=5,
+        path: str, tensor_maps: List[TensorMap], n=5,
     ) -> Dict[Tuple[str, TensorMap], np.ndarray]:
         """
         Builds hdf5s at path given TensorMaps. Only works for Continuous and Categorical TensorMaps.
@@ -274,10 +270,7 @@ def get_edw_reader():
 @pytest.fixture(scope="function")
 def alarms_reader():
     reader = BMAlarmsReader(
-        pytest.alarms_dir,
-        pytest.edw_dir,
-        pytest.example_mrn,
-        pytest.example_visit_id,
+        pytest.alarms_dir, pytest.edw_dir, pytest.example_mrn, pytest.example_visit_id,
     )
     return reader
 
@@ -426,8 +419,7 @@ class FakeSignal:
             time=np.arange(starting_time, starting_time + duration_sec, 0.25),
             units="mmHg",
             sample_freq=np.array(
-                [(sample_freq, 0), (120, n_points / 10)],
-                dtype="float,int",
+                [(sample_freq, 0), (120, n_points / 10)], dtype="float,int",
             ),
             scale_factor=np.random.randint(0, 5),
             time_corr_arr=np.packbits(np.random.randint(0, 2, 100).astype(np.bool)),
@@ -545,8 +537,7 @@ class FakeSignal:
             name="blood_pressure",
             source=EDW_FILES["vitals_file"]["source"],
             value=np.array(
-                [f"{sys[i]}/{dias[i]}" for i in range(0, len(sys))],
-                dtype="S",
+                [f"{sys[i]}/{dias[i]}" for i in range(0, len(sys))], dtype="S",
             ),
             time=np.array(list(range(starting_time, starting_time + 100))),
             units="",
@@ -641,12 +632,10 @@ class FakeSignal:
         sample_freq_2 = 120
         times = np.arange(starting_time, starting_time + duration, 0.25)
         values1 = nk.ecg_simulate(
-            duration=int(duration / 2),
-            sampling_rate=sample_freq_1,
+            duration=int(duration / 2), sampling_rate=sample_freq_1,
         )
         values2 = nk.ecg_simulate(
-            duration=int(duration / 2),
-            sampling_rate=sample_freq_2,
+            duration=int(duration / 2), sampling_rate=sample_freq_2,
         )
         values = np.concatenate([values1, values2])
         n_samples = np.array(
@@ -668,8 +657,7 @@ class FakeSignal:
                 time=times,
                 units="mV",
                 sample_freq=np.array(
-                    [(sample_freq_1, 0), (sample_freq_2, 16)],
-                    dtype="float,int",
+                    [(sample_freq_1, 0), (sample_freq_2, 16)], dtype="float,int",
                 ),
                 scale_factor=np.random.uniform() * 5,
                 time_corr_arr=np.packbits(np.random.randint(0, 2, 100).astype(np.bool)),

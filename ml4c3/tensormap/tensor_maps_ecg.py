@@ -115,9 +115,7 @@ def make_voltage_tff(exact_length=False):
                     path = _make_hd5_path(tm=tm, ecg_date=ecg_date, value_key=cm)
                     voltage = hd5[path][()]
                     path_waveform_samplebase = _make_hd5_path(
-                        tm=tm,
-                        ecg_date=ecg_date,
-                        value_key="waveform_samplebase",
+                        tm=tm, ecg_date=ecg_date, value_key="waveform_samplebase",
                     )
                     try:
                         fs = float(hd5[path_waveform_samplebase][()])
@@ -126,9 +124,7 @@ def make_voltage_tff(exact_length=False):
                     if exact_length:
                         assert len(voltage) == voltage_length
                     voltage = _resample_voltage(
-                        voltage=voltage,
-                        desired_samples=voltage_length,
-                        fs=fs,
+                        voltage=voltage, desired_samples=voltage_length, fs=fs,
                     )
                     slices = (
                         (i, ..., tm.channel_map[cm])
@@ -159,8 +155,7 @@ def _crop_ecg(ecg: np.array):
 def _noise_ecg(ecg: np.array):
     noise_frac = np.random.rand() * 0.1  # max of 10% noise
     return ecg + noise_frac * ecg.mean(axis=0) * np.random.randn(
-        ecg.shape[0],
-        ecg.shape[1],
+        ecg.shape[0], ecg.shape[1],
     )
 
 
@@ -250,9 +245,7 @@ tmaps["voltage_len"] = TensorMap(
 
 
 def make_binary_ecg_label_from_any_read_tff(
-    keys: List[str],
-    channel_terms: Dict[str, Set[str]],
-    not_found_channel: str,
+    keys: List[str], channel_terms: Dict[str, Set[str]], not_found_channel: str,
 ):
     def tensor_from_file(tm, hd5):
         # get all the ecgs in range (time series lookup is set)
@@ -274,8 +267,7 @@ def make_binary_ecg_label_from_any_read_tff(
         if read != "":
             found = False
             for channel, channel_idx in sorted(
-                tm.channel_map.items(),
-                key=lambda cm: cm[1],
+                tm.channel_map.items(), key=lambda cm: cm[1],
             ):
                 if channel not in channel_terms:
                     continue
@@ -295,9 +287,7 @@ def make_binary_ecg_label_from_any_read_tff(
 
 
 def make_ecg_label_from_read_tff(
-    keys: List[str],
-    channel_terms: Dict[str, Set[str]],
-    not_found_channel: str,
+    keys: List[str], channel_terms: Dict[str, Set[str]], not_found_channel: str,
 ):
     def tensor_from_file(tm, hd5):
         ecg_dates = get_ecg_dates(tm, hd5)
@@ -314,8 +304,7 @@ def make_ecg_label_from_read_tff(
 
             found = False
             for channel, channel_idx in sorted(
-                tm.channel_map.items(),
-                key=lambda cm: cm[1],
+                tm.channel_map.items(), key=lambda cm: cm[1],
             ):
                 if channel not in channel_terms:
                     continue
@@ -358,9 +347,7 @@ tmaps[tmap_name] = TensorMap(
 
 
 def make_voltage_len_tff(
-    lead,
-    channel_prefix="_",
-    channel_unknown="other",
+    lead, channel_prefix="_", channel_unknown="other",
 ):
     def tensor_from_file(tm, hd5):
         ecg_dates = get_ecg_dates(tm, hd5)
@@ -413,10 +400,7 @@ for lead in ECG_REST_LEADS_ALL:
 
 
 def make_ecg_tensor(
-    key: str,
-    fill: float = 0,
-    channel_prefix: str = "",
-    channel_unknown: str = "other",
+    key: str, fill: float = 0, channel_prefix: str = "", channel_unknown: str = "other",
 ):
     def get_ecg_tensor(tm, hd5):
         ecg_dates = get_ecg_dates(tm, hd5)
@@ -772,8 +756,7 @@ tmaps[tmap_name] = TensorMap(
     interpretation=Interpretation.CATEGORICAL,
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(
-        key="intervalmeasurementtimeresolution",
-        channel_prefix="_",
+        key="intervalmeasurementtimeresolution", channel_prefix="_",
     ),
     channel_map={"_25": 0, "_50": 1, "_100": 2, "other": 3},
     time_series_limit=0,
@@ -787,8 +770,7 @@ tmaps[tmap_name] = TensorMap(
     interpretation=Interpretation.CATEGORICAL,
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(
-        key="intervalmeasurementamplituderesolution",
-        channel_prefix="_",
+        key="intervalmeasurementamplituderesolution", channel_prefix="_",
     ),
     channel_map={"_10": 0, "_20": 1, "_40": 2, "other": 3},
     time_series_limit=0,
@@ -802,8 +784,7 @@ tmaps[tmap_name] = TensorMap(
     interpretation=Interpretation.CATEGORICAL,
     path_prefix=ECG_PREFIX,
     tensor_from_file=make_ecg_tensor(
-        key="intervalmeasurementfilter",
-        channel_prefix="_",
+        key="intervalmeasurementfilter", channel_prefix="_",
     ),
     time_series_limit=0,
     channel_map={"_None": 0, "_40": 1, "_80": 2, "other": 3},

@@ -20,10 +20,8 @@ def load_config(log_level, log_dir, log_file_basename):
 
     try:
         logging.config.dictConfig(_create_config(log_level, log_file))
-        success_msg = (
-            "Logging configuration was loaded. Log messages can be found at {}.".format(
-                log_file,
-            )
+        success_msg = "Logging configuration was loaded. Log messages can be found at {}.".format(
+            log_file,
         )
         logger.info(success_msg)
     except Exception as e:

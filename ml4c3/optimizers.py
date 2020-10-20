@@ -18,9 +18,7 @@ def get_optimizer(
         optimizer_kwargs = {}
     name = str.lower(name)
     rate_or_schedule = _get_learning_rate_schedule(
-        learning_rate,
-        learning_rate_schedule,
-        steps_per_epoch,
+        learning_rate, learning_rate_schedule, steps_per_epoch,
     )
     try:
         opt = optimizers.get(name)

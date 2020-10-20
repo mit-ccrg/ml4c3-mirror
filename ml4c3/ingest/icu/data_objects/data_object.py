@@ -41,12 +41,7 @@ class ICUContinuousData(ICUDataObject):
     """
 
     def __init__(
-        self,
-        name: str,
-        source: str,
-        value: np.ndarray,
-        time: np.ndarray,
-        units: str,
+        self, name: str, source: str, value: np.ndarray, time: np.ndarray, units: str,
     ):
         """
         Init an ICUContinuousData object.
@@ -80,10 +75,7 @@ class ICUDiscreteData(ICUDataObject):
     """
 
     def __init__(
-        self,
-        name: str,
-        source: str,
-        start_date: np.ndarray,
+        self, name: str, source: str, start_date: np.ndarray,
     ):
         """
         Init an ICUDiscreteData object.

@@ -220,8 +220,7 @@ class TensorMap(object):
             other_attributes = other.__dict__.items()
 
             for (self_field, self_value), (other_field, other_value) in zip(
-                self_attributes,
-                other_attributes,
+                self_attributes, other_attributes,
             ):
                 if self_field != other_field:
                     return False
@@ -273,10 +272,7 @@ class TensorMap(object):
         return size
 
     def postprocess_tensor(
-        self,
-        tensor: np.ndarray,
-        hd5: h5py.File,
-        augment: bool,
+        self, tensor: np.ndarray, hd5: h5py.File, augment: bool,
     ) -> np.ndarray:
         self.validate(tensor, hd5)
         tensor = self.augment(tensor) if augment else tensor
@@ -344,8 +340,7 @@ def outcome_channels(outcome: str):
 
 
 def find_negative_label_and_channel(
-    labels: Dict[str, int],
-    negative_label_prefix: str = "no_",
+    labels: Dict[str, int], negative_label_prefix: str = "no_",
 ) -> Tuple[str, int]:
     """
     Given a dict of labels (e.g. tm.channel_map) and their channel indices,

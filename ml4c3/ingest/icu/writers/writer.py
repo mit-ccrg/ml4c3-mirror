@@ -152,9 +152,7 @@ class Writer(h5py.File):
                 if isinstance(value, np.ndarray):
                     if field == "sample_freq":
                         value = self._aggregate_sample_freq(
-                            signal_dir,
-                            value,
-                            current_length,
+                            signal_dir, value, current_length,
                         )
                     self.concatenate_data(signal_dir, field, value)
 
@@ -162,10 +160,7 @@ class Writer(h5py.File):
     def write_new_data(signal_dir, field, data):
         if isinstance(data, np.ndarray):
             signal_dir.create_dataset(
-                name=field,
-                data=data,
-                maxshape=(None,),
-                compression=32015,
+                name=field, data=data, maxshape=(None,), compression=32015,
             )
         else:
             signal_dir.attrs[field] = data

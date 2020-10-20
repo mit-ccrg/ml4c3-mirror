@@ -170,10 +170,7 @@ def parse_args() -> argparse.Namespace:
         help="List of bootstraps to run on; same specification as gpus. default: 0-9",
     )
     parser.add_argument(
-        "--scripts",
-        nargs="+",
-        required=True,
-        help="list of paths to scripts to run",
+        "--scripts", nargs="+", required=True, help="list of paths to scripts to run",
     )
     parser.add_argument(
         "--cohorts",

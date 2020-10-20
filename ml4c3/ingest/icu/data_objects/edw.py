@@ -195,9 +195,7 @@ class Event(ICUDiscreteData):
     """
 
     def __init__(
-        self,
-        name: str,
-        start_date: np.ndarray,
+        self, name: str, start_date: np.ndarray,
     ):
         """
         Init an Event object.
@@ -223,11 +221,7 @@ class Procedure(ICUDiscreteData):
     """
 
     def __init__(
-        self,
-        name: str,
-        source: str,
-        start_date: np.ndarray,
-        end_date: np.ndarray,
+        self, name: str, source: str, start_date: np.ndarray, end_date: np.ndarray,
     ):
         """
         Init an Event object.

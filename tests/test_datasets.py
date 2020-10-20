@@ -242,12 +242,7 @@ class TestGetTrainValidTestPaths:
     @pytest.mark.parametrize("valid_set", [None, "valid_csv"], indirect=True)
     @pytest.mark.parametrize("test_set", [None, "test_csv"], indirect=True)
     def test_get_paths(
-        self,
-        default_arguments,
-        sample_set,
-        train_set,
-        valid_set,
-        test_set,
+        self, default_arguments, sample_set, train_set, valid_set, test_set,
     ):
         args = default_arguments
 

@@ -79,9 +79,7 @@ def build_multimodal_multitask(args: argparse.Namespace) -> Model:
     plot_architecture_diagram(
         model_to_dot(model, show_shapes=True, expand_nested=True),
         os.path.join(
-            args.output_folder,
-            args.id,
-            "architecture_graph" + args.image_ext,
+            args.output_folder, args.id, "architecture_graph" + args.image_ext,
         ),
     )
     logging.info(f"Model saved to {model_file}")
