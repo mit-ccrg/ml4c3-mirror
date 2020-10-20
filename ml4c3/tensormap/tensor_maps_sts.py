@@ -117,6 +117,8 @@ sts_outcomes = {
     "sts_dsw_infection":         "deepsterninf",
     "sts_reoperation":           "reop",
     "sts_long_stay":             "llos",
+}
+sts_operative_types = {
     "opcab":                     "opcab",
     "opvalve":                   "opvalve",
     "opother":                   "opother",
@@ -165,7 +167,8 @@ def _get_sts_data(
     for surgery_data in df.to_dict(orient="records"):
         mrn = surgery_data[patient_column]
         surgery_date = str2datetime(
-            input_date=surgery_data[date_column], date_format=STS_DATE_FORMAT,
+            input_date=surgery_data[date_column],
+            date_format=STS_DATE_FORMAT,
         )
         date_offset = lambda offset: (
             surgery_date + datetime.timedelta(days=offset)
@@ -175,13 +178,16 @@ def _get_sts_data(
         postop_start_date = date_offset(postop_start)
         postop_end_date = date_offset(postop_end)
         sts_data[mrn][
-            (preop_start_date, preop_end_date), (postop_start_date, postop_end_date),
+            (preop_start_date, preop_end_date),
+            (postop_start_date, postop_end_date),
         ] = surgery_data
     return sts_data
 
 
 def _get_sts_data_for_newest_surgery_with_preop_ecg(
-    sts_data: SampleIntervalData, tm: TensorMap, hd5: h5py.File,
+    sts_data: SampleIntervalData,
+    tm: TensorMap,
+    hd5: h5py.File,
 ) -> Dict[str, Union[str, int, float]]:
     """
     Given a patient, get surgical features and outcomes for the newest surgery for which a patient has a preop ECG
@@ -217,7 +223,9 @@ def _get_sts_data_for_newest_surgery_with_preop_ecg(
 def _make_sts_tff_continuous(sts_data: SampleIntervalData, key: str = "") -> Callable:
     def tensor_from_file(tm: TensorMap, hd5: h5py.File):
         newest_surgery_data = _get_sts_data_for_newest_surgery_with_preop_ecg(
-            sts_data=sts_data, tm=tm, hd5=hd5,
+            sts_data=sts_data,
+            tm=tm,
+            hd5=hd5,
         )
         tensor = np.zeros(tm.shape, dtype=np.float32)
         for feature, idx in tm.channel_map.items():
@@ -248,7 +256,9 @@ def _make_sts_tff_binary(
         # e.g. yes == 1, no == 2, but outcomes are encoded using the usual format of 0/1.
         """
         newest_surgery_data = _get_sts_data_for_newest_surgery_with_preop_ecg(
-            sts_data=sts_data, tm=tm, hd5=hd5,
+            sts_data=sts_data,
+            tm=tm,
+            hd5=hd5,
         )
         tensor = np.zeros(tm.shape, dtype=np.float32)
         if key == "":
@@ -273,7 +283,9 @@ def _make_sts_tff_binary(
 def _make_sts_tff_categorical(sts_data: SampleIntervalData, key: str = "") -> Callable:
     def tensor_from_file(tm: TensorMap, hd5: h5py.File):
         newest_surgery_data = _get_sts_data_for_newest_surgery_with_preop_ecg(
-            sts_data=sts_data, tm=tm, hd5=hd5,
+            sts_data=sts_data,
+            tm=tm,
+            hd5=hd5,
         )
         tensor = np.zeros(tm.shape, dtype=np.float32)
         if key == "":
@@ -302,7 +314,8 @@ def _make_sts_categorical_channel_map(feature: str) -> ChannelMap:
 
 
 def str2datetime(
-    input_date: str, date_format: str = STS_DATE_FORMAT,
+    input_date: str,
+    date_format: str = STS_DATE_FORMAT,
 ) -> datetime.datetime:
     return datetime.datetime.strptime(input_date, date_format)
 
@@ -344,7 +357,10 @@ for tmap_name in sts_features_categorical:
 for tmap_name in sts_features_binary:
     interpretation = Interpretation.CATEGORICAL
     tff = _make_sts_tff_binary(
-        sts_data=sts_data, key=tmap_name, negative_value=2, positive_value=1,
+        sts_data=sts_data,
+        key=tmap_name,
+        negative_value=2,
+        positive_value=1,
     )
     channel_map = outcome_channels(tmap_name)
     validator = validator_no_nans
@@ -395,22 +411,47 @@ for tmap_name in sts_features_continuous:
 
 # Outcomes
 for tmap_name in sts_outcomes:
-    interpretation = Interpretation.CATEGORICAL
     tff = _make_sts_tff_binary(
         sts_data=sts_data,
         key=sts_outcomes[tmap_name],
         negative_value=0,
         positive_value=1,
     )
-    channel_map = outcome_channels(tmap_name)
-    validator = validator_not_all_zero
-
     tmaps[tmap_name] = TensorMap(
         name=tmap_name,
-        interpretation=interpretation,
+        interpretation=Interpretation.CATEGORICAL,
         path_prefix=ECG_PREFIX,
         tensor_from_file=tff,
-        channel_map=channel_map,
-        validators=validator,
+        channel_map=outcome_channels(tmap_name),
+        validators=validator_not_all_zero,
         time_series_lookup=date_interval_lookup["preop"],
     )
+
+# Composite tensor map for any outcome
+def tff_any(tm: TensorMap, hd5: h5py.File):
+    newest_surgery_data = _get_sts_data_for_newest_surgery_with_preop_ecg(
+        sts_data=sts_data,
+        tm=tm,
+        hd5=hd5,
+    )
+    tensor = np.zeros(tm.shape, dtype=np.float32)
+    if 1 in [
+        newest_surgery_data[key] for key in newest_surgery_data if key in sts_outcomes
+    ]:
+        idx = 1
+    else:
+        idx = 0
+    tensor[idx] = 1
+    return tensor
+
+
+tmap_name = "sts_any"
+tmaps[tmap_name] = TensorMap(
+    name=tmap_name,
+    interpretation=Interpretation.CATEGORICAL,
+    path_prefix=ECG_PREFIX,
+    tensor_from_file=tff_any,
+    channel_map=outcome_channels(tmap_name),
+    validators=validator_not_all_zero,
+    time_series_lookup=date_interval_lookup["preop"],
+)
