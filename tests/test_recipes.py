@@ -28,7 +28,9 @@ class TestRecipes:
         predictions = pd.read_csv(path)
         test_samples = pd.read_csv(
             os.path.join(
-                default_arguments.output_folder, default_arguments.id, "test.csv",
+                default_arguments.output_folder,
+                default_arguments.id,
+                "test.csv",
             ),
         )
         assert len(set(predictions["sample_id"])) == len(test_samples)
@@ -52,7 +54,9 @@ class TestRecipes:
         explore(default_arguments)
 
         csv_path = os.path.join(
-            default_arguments.output_folder, default_arguments.id, "tensors_union.csv",
+            default_arguments.output_folder,
+            default_arguments.id,
+            "tensors_union.csv",
         )
         explore_result = pd.read_csv(csv_path)
 
@@ -71,7 +75,8 @@ class TestRecipes:
                 if tm.is_categorical:
                     for channel, idx in tm.channel_map.items():
                         channel_val = getattr(
-                            row, categorical_explore_header(tm, channel),
+                            row,
+                            categorical_explore_header(tm, channel),
                         )
                         assert channel_val == row_expected[idx]
 

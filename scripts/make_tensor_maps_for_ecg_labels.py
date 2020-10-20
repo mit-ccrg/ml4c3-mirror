@@ -143,7 +143,10 @@ if __name__ == "__main__":
     this_script_name = os.path.split(__file__)[1]
     path_to_repo = os.path.abspath(__file__).replace(f"/scripts/{this_script_name}", "")
     path_to_new_script = os.path.join(
-        path_to_repo, "ml4c3", "tensormap", NEW_SCRIPT_NAME,
+        path_to_repo,
+        "ml4c3",
+        "tensormap",
+        NEW_SCRIPT_NAME,
     )
 
     with open(path_to_new_script, "w") as py_file:

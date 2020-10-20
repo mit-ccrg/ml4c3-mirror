@@ -19,7 +19,10 @@ class FileManager:
     """
 
     def __init__(
-        self, xref_file: str, adt_file: str, output_dir: str = "/data/icu",
+        self,
+        xref_file: str,
+        adt_file: str,
+        output_dir: str = "/data/icu",
     ):
         """
         Init File Manager.
@@ -61,7 +64,8 @@ class FileManager:
             ]
             desired_patients = desired_patients[~desired_patients["MRN"].isin(hd5_mrns)]
         desired_patients.to_csv(
-            os.path.join(self.output_dir, "patient_list.csv"), index=False,
+            os.path.join(self.output_dir, "patient_list.csv"),
+            index=False,
         )
 
     def find_save_bm_alarms(
@@ -103,7 +107,8 @@ class FileManager:
             {"Alarm from department": dept_names, "fileStatus": flag_found},
         )
         report.to_csv(
-            os.path.join(self.output_dir, "bm_alarms_temp", "report.csv"), index=False,
+            os.path.join(self.output_dir, "bm_alarms_temp", "report.csv"),
+            index=False,
         )
 
     def find_save_edw_files(
@@ -150,7 +155,8 @@ class FileManager:
 
         with multiprocessing.Pool(processes=n_workers) as pool:
             results_list = pool.starmap(
-                self._copy_files_edw, [(mad3_dir, int(mrn)) for mrn in mrns],
+                self._copy_files_edw,
+                [(mad3_dir, int(mrn)) for mrn in mrns],
             )
 
         # Finally copy adt and filtered xref table
@@ -162,7 +168,8 @@ class FileManager:
         df_xref = pd.read_csv(self.xref_file)
         df_xref_filt = df_xref[df_xref["MRN"].isin(mrns)]
         df_xref_filt.to_csv(
-            os.path.join(self.output_dir, "edw_temp", "xref.csv"), index=False,
+            os.path.join(self.output_dir, "edw_temp", "xref.csv"),
+            index=False,
         )
 
         for result in results_list:
@@ -171,7 +178,8 @@ class FileManager:
         report = pd.DataFrame({"MRN": list_mrns, "fileStatus": flag_found})
         report = report.sort_values(by="MRN", ascending=True)
         report.to_csv(
-            os.path.join(self.output_dir, "edw_temp", "report.csv"), index=False,
+            os.path.join(self.output_dir, "edw_temp", "report.csv"),
+            index=False,
         )
 
     def find_save_bm_files(
@@ -234,7 +242,8 @@ class FileManager:
         )
         report = report.sort_values(by="fileID", ascending=True)
         report.to_csv(
-            os.path.join(self.output_dir, "bedmaster_temp", "report.csv"), index=False,
+            os.path.join(self.output_dir, "bedmaster_temp", "report.csv"),
+            index=False,
         )
 
     def _copy_files_bm(self, lm4_dir, row):

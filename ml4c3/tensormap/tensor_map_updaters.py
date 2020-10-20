@@ -33,7 +33,8 @@ from ml4c3.tensormap.tensor_maps_ecg import (
 
 
 def update_tmaps_ecg_voltage(
-    tmap_name: str, tmaps: Dict[str, TensorMap],
+    tmap_name: str,
+    tmaps: Dict[str, TensorMap],
 ) -> Dict[str, TensorMap]:
     """
     Generates ECG voltage TMaps that are given by the name format:
@@ -93,7 +94,8 @@ def update_tmaps_ecg_voltage(
 
 
 def update_tmaps_model_predictions(
-    tmap_name: str, tmaps: Dict[str, TensorMap],
+    tmap_name: str,
+    tmaps: Dict[str, TensorMap],
 ) -> Dict[str, TensorMap]:
     """
     Create tensor maps to load predictions saved by model inference.
@@ -160,7 +162,8 @@ def update_tmaps_model_predictions(
 
 
 def update_tmaps_weighted_loss(
-    tmap_name: str, tmaps: Dict[str, TensorMap],
+    tmap_name: str,
+    tmaps: Dict[str, TensorMap],
 ) -> Dict[str, TensorMap]:
     """Make new tmap from base name, modifying loss weight"""
     if "_weighted_loss_" not in tmap_name:
@@ -180,7 +183,8 @@ def update_tmaps_weighted_loss(
 
 
 def update_tmaps_sts_window(
-    tmap_name: str, tmaps: Dict[str, TensorMap],
+    tmap_name: str,
+    tmaps: Dict[str, TensorMap],
 ) -> Dict[str, TensorMap]:
     """Make new tmap from base name, making conditional on surgery date"""
 
