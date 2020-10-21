@@ -23,13 +23,19 @@ STRING_METRICS = [
     "logcosh",
 ]
 
+# pylint: disable=exec-used, eval-used, unused-argument
+# pylint: disable=invalid-name, invalid-unary-operand-type
+
 
 def weighted_crossentropy(weights, name="anonymous"):
-    """A weighted version of tensorflow.keras.objectives.categorical_crossentropy
+    """
+    A weighted version of tensorflow.keras.objectives.categorical_crossentropy
 
     Arguments:
-        weights = np.array([0.5,2,10]) # Class one at 0.5, class 2 twice the normal weights, class 3 10x.
-        name: string identifying the loss to differentiate when models have multiple losses
+        weights = np.array([0.5,2,10]) # Class one at 0.5, class 2 twice the
+                                         normal weights, class 3 10x.
+        name: string identifying the loss to differentiate when models have
+              multiple losses
 
     Returns:
         keras loss function named name+'_weighted_loss'
@@ -99,7 +105,8 @@ def _softmax_masked(risk_scores, mask, axis=0, keepdims=None):
 
 @tf.function
 def cox_hazard_loss(y_true, y_pred):
-    # move batch dimension to the end so predictions get broadcast row-wise when multiplying by riskset
+    # move batch dimension to the end so predictions get broadcast row-wise when
+    # multiplying by riskset
     pred_t = K.transpose(y_pred[:, 0])
     events = y_true[:, 0]
     follow_up_times = y_true[:, 1]
@@ -114,7 +121,8 @@ def cox_hazard_loss(y_true, y_pred):
 def survival_likelihood_loss(n_intervals):
     """Create custom Keras loss function for neural network survival model.
 
-    This function is tightly coupled with the function _survival_tensor defined in tensor_from_file.py which builds the y_true tensor.
+    This function is tightly coupled with the function _survival_tensor defined in
+    tensor_from_file.py which builds the y_true tensor.
 
     Arguments
         n_intervals: the number of survival time intervals
@@ -128,12 +136,18 @@ def survival_likelihood_loss(n_intervals):
         However we only consider the first half (n_intervals) of y_pred.
         Arguments
             y_true: Tensor.
-              First half of the values are 1 if individual survived that interval, 0 if not.
-              Second half of the values are for individuals who failed, and are 1 for time interval during which failure occurred, 0 for other intervals.
-              For example given n_intervals = 3 a sample with prevalent disease will have y_true [0, 0, 0, 1, 0, 0]
-              a sample with incident disease occurring in the last time bin will have y_true [1, 1, 0, 0, 0, 1]
-              a sample who is lost to follow up (censored) in middle time bin will have y_true [1, 0, 0, 0, 0, 0]
-            y_pred: Tensor, predicted survival probability (1-hazard probability) for each time interval.
+              First half of the values are 1 if individual survived that interval,
+              0 if not.
+              Second half of the values are for individuals who failed, and are 1
+              for time interval during which failure occurred, 0 for other intervals.
+              For example given n_intervals = 3
+              a sample with prevalent disease will have y_true [0, 0, 0, 1, 0, 0]
+              a sample with incident disease occurring in the last time bin will
+              have y_true [1, 1, 0, 0, 0, 1]
+              a sample who is lost to follow up (censored) in middle time bin will
+              have y_true [1, 0, 0, 0, 0, 0]
+            y_pred: Tensor, predicted survival probability (1-hazard probability)
+                    for each time interval.
         Returns
             Vector of losses for this batch.
         """

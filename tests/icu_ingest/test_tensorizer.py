@@ -1,7 +1,6 @@
 # Imports: standard library
 import os
 import sys
-import logging
 
 # Imports: third party
 import h5py
@@ -18,17 +17,19 @@ from ml4c3.arguments import parse_args
 def test_tensorizer(temp_dir, monkeypatch, test_scale_units):
     monkeypatch.setattr("ml4c3.definitions.icu.ICU_SCALE_UNITS", test_scale_units)
     monkeypatch.setattr(
-        "ml4c3.ingest.icu.tensorizer.ICU_SCALE_UNITS", test_scale_units,
+        "ml4c3.ingest.icu.tensorizer.ICU_SCALE_UNITS",
+        test_scale_units,
     )
     monkeypatch.setattr(
-        "ml4c3.ingest.icu.readers.bm_reader.ICU_SCALE_UNITS", test_scale_units,
+        "ml4c3.ingest.icu.readers.bm_reader.ICU_SCALE_UNITS",
+        test_scale_units,
     )
 
     test_dir = os.path.dirname(__file__)
     sys.argv = f"""
     .
-    --mode tensorize_icu
-    --xref_file {test_dir}/data/xref_file_tensorize.csv
+    tensorize_icu
+    --path_xref {test_dir}/data/xref_file_tensorize.csv
     --path_bedmaster {test_dir}/data/bedmaster
     --path_edw {test_dir}/data/edw
     --path_alarms {test_dir}/data/bedmaster_alarms
@@ -36,6 +37,7 @@ def test_tensorizer(temp_dir, monkeypatch, test_scale_units):
     --id {pytest.run_id}
     --tensors {os.path.join(temp_dir, pytest.run_id)}
     """.split()
+
     args = parse_args()
     output_file = os.path.join(args.tensors, f"{pytest.example_mrn}.hd5")
 
@@ -128,7 +130,8 @@ def test_tensorizer(temp_dir, monkeypatch, test_scale_units):
         assert ecg_ii.attrs["units"] == "mV"
         assert ecg_ii.attrs["scale_factor"] == 0.0243
         expected_sf = np.array(
-            [(240.0, 0), (120.0, 80), (240.0, 5760), (120.0, 5808)], dtype="float, int",
+            [(240.0, 0), (120.0, 80), (240.0, 5760), (120.0, 5808)],
+            dtype="float, int",
         )
         assert np.array_equal(ecg_ii["sample_freq"], expected_sf)
 
@@ -154,7 +157,8 @@ def test_tensorizer(temp_dir, monkeypatch, test_scale_units):
                     diff = np.diff(sig_type_dir[signal]["time"][:3349])
                     if signal == "v":
                         assert np.array_equal(
-                            np.where(diff != 0.25)[0], np.array([113]),
+                            np.where(diff != 0.25)[0],
+                            np.array([113]),
                         )
                     else:
                         assert all(diff == 0.25)

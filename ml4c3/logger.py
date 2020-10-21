@@ -10,23 +10,24 @@ import logging.config
 def load_config(log_level, log_dir, log_file_basename):
     try:
         os.makedirs(log_dir)
-    except OSError as e:
-        if e.errno != errno.EEXIST:
-            raise e
+    except OSError as error:
+        if error.errno != errno.EEXIST:
+            raise error
 
     logger = logging.getLogger(__name__)
 
-    log_file = "{}/{}.log".format(log_dir, log_file_basename)
+    log_file = f"{log_dir}/{log_file_basename}.log"
 
     try:
         logging.config.dictConfig(_create_config(log_level, log_file))
-        success_msg = "Logging configuration was loaded. Log messages can be found at {}.".format(
-            log_file,
+        success_msg = (
+            "Logging configuration was loaded. "
+            f"Log messages can be found at {log_file}."
         )
         logger.info(success_msg)
-    except Exception as e:
+    except Exception as error:
         logger.error("Failed to load logging config!")
-        raise e
+        raise error
 
 
 def _create_config(log_level, log_file):

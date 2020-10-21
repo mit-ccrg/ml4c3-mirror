@@ -28,7 +28,7 @@ from ml4c3.ingest.icu.readers import (
 from ml4c3.ingest.icu.writers import Writer
 from ml4c3.definitions.globals import TENSOR_EXT
 from ml4c3.ingest.icu.matchers import PatientBMMatcher
-from ml4c3.tensormap.TensorMap import TensorMap, Interpretation
+from ml4c3.tensormap.TensorMap import TensorMap, Interpretation, get_local_timestamps
 from ml4c3.ingest.icu.data_objects import (
     Event,
     BMAlarm,
@@ -38,8 +38,15 @@ from ml4c3.ingest.icu.data_objects import (
     StaticData,
     Measurement,
 )
+from ml4c3.ingest.icu.check_icu_structure import BMChecker, EDWChecker
+from ml4c3.tensormap.tensor_maps_icu_alarms import get_tmap as GET_ALARMS_TMAP
+from ml4c3.tensormap.tensor_maps_icu_events import get_tmap as GET_EVENTS_TMAP
+from ml4c3.tensormap.tensor_maps_icu_bm_signals import get_tmap as GET_BM_TMAP
+from ml4c3.tensormap.tensor_maps_icu_medications import get_tmap as GET_MEDS_TMAP
+from ml4c3.tensormap.tensor_maps_icu_list_signals import get_tmap as GET_LIST_TMAP
+from ml4c3.tensormap.tensor_maps_icu_measurements import get_tmap as GET_MEAS_TMAP
 
-# pylint: disable=redefined-outer-name
+# pylint: disable=redefined-outer-name, unused-argument
 
 
 def pytest_configure():
@@ -74,14 +81,14 @@ def pytest_configure():
         for x in product(pytest.CONTINUOUS_TMAPS[:-1], pytest.CATEGORICAL_TMAPS[:-1])
     ]
     pytest.SEGMENT_IN = TensorMap(
-        f"2d_for_segment_in",
+        "2d_for_segment_in",
         shape=(32, 32, 1),
         interpretation=Interpretation.CONTINUOUS,
         metrics=["mse"],
         tensor_from_file=tff,
     )
     pytest.SEGMENT_OUT = TensorMap(
-        f"2d_for_segment_out",
+        "2d_for_segment_out",
         shape=(32, 32, 2),
         interpretation=Interpretation.CATEGORICAL,
         channel_map={"yes": 0, "no": 1},
@@ -111,7 +118,9 @@ def pytest_configure():
     # EDW
     pytest.edw_dir = os.path.join(pytest.datadir, "edw")
     pytest.edw_patient_dir = os.path.join(
-        pytest.edw_dir, pytest.example_mrn, pytest.example_visit_id,
+        pytest.edw_dir,
+        pytest.example_mrn,
+        pytest.example_visit_id,
     )
 
     # Alarms
@@ -124,10 +133,13 @@ pytest_configure()
 class Utils:
     @staticmethod
     def build_hdf5s(
-        path: str, tensor_maps: List[TensorMap], n=5,
+        path: str,
+        tensor_maps: List[TensorMap],
+        n=5,
     ) -> Dict[Tuple[str, TensorMap], np.ndarray]:
         """
-        Builds hdf5s at path given TensorMaps. Only works for Continuous and Categorical TensorMaps.
+        Builds hdf5s at path given TensorMaps. Only works for Continuous and
+        Categorical TensorMaps.
         """
         out = {}
         for i in range(n):
@@ -184,7 +196,8 @@ def default_arguments(tmpdir_factory, utils):
     inp_key = "3d_cont"
     out_key = "1d_cat"
     sys.argv = [
-        "",
+        ".",
+        "train",
         "--output_folder",
         hdf5_dir,
         "--input_tensors",
@@ -205,6 +218,66 @@ def default_arguments(tmpdir_factory, utils):
         "1",
         "--batch_size",
         "2",
+    ]
+    args = parse_args()
+    return args
+
+
+@pytest.fixture(scope="function")
+def default_arguments_infer(tmpdir_factory, utils):
+    temp_dir = tmpdir_factory.mktemp("data")
+    utils.build_hdf5s(temp_dir, pytest.MOCK_TMAPS.values(), n=pytest.N_TENSORS)
+    hdf5_dir = str(temp_dir)
+    inp_key = "3d_cont"
+    out_key = "1d_cat"
+    sys.argv = [
+        ".",
+        "infer",
+        "--output_folder",
+        hdf5_dir,
+        "--input_tensors",
+        inp_key,
+        "--output_tensors",
+        out_key,
+        "--tensors",
+        hdf5_dir,
+        "--pool_x",
+        "1",
+        "--pool_y",
+        "1",
+        "--pool_z",
+        "1",
+        "--epochs",
+        "2",
+        "--num_workers",
+        "1",
+        "--batch_size",
+        "2",
+    ]
+    args = parse_args()
+    return args
+
+
+@pytest.fixture(scope="function")
+def default_arguments_explore(tmpdir_factory, utils):
+    temp_dir = tmpdir_factory.mktemp("data")
+    utils.build_hdf5s(temp_dir, pytest.MOCK_TMAPS.values(), n=pytest.N_TENSORS)
+    hdf5_dir = str(temp_dir)
+    inp_key = "3d_cont"
+    out_key = "1d_cat"
+    sys.argv = [
+        ".",
+        "explore",
+        "--output_folder",
+        hdf5_dir,
+        "--input_tensors",
+        inp_key,
+        "--output_tensors",
+        out_key,
+        "--tensors",
+        hdf5_dir,
+        "--num_workers",
+        "1",
     ]
     args = parse_args()
     return args
@@ -270,7 +343,10 @@ def get_edw_reader():
 @pytest.fixture(scope="function")
 def alarms_reader():
     reader = BMAlarmsReader(
-        pytest.alarms_dir, pytest.edw_dir, pytest.example_mrn, pytest.example_visit_id,
+        pytest.alarms_dir,
+        pytest.edw_dir,
+        pytest.example_mrn,
+        pytest.example_visit_id,
     )
     return reader
 
@@ -419,7 +495,8 @@ class FakeSignal:
             time=np.arange(starting_time, starting_time + duration_sec, 0.25),
             units="mmHg",
             sample_freq=np.array(
-                [(sample_freq, 0), (120, n_points / 10)], dtype="float,int",
+                [(sample_freq, 0), (120, n_points / 10)],
+                dtype="float,int",
             ),
             scale_factor=np.random.randint(0, 5),
             time_corr_arr=np.packbits(np.random.randint(0, 2, 100).astype(np.bool)),
@@ -439,11 +516,11 @@ class FakeSignal:
             weight=np.random.randint(50, 100),
             height=np.random.randint(150, 210) / 100,
             admin_type="testing",
-            admin_date=str(time() - 1000),
-            birth_date=str(time() - 1576801000),
+            admin_date="1995-08-06 00:00:00.0000000",
+            birth_date="1920-05-06 00:00:00.0000000",
             race=str(np.random.choice(["Asian", "Native American", "Black"])),
             sex=str(np.random.choice(["male", "female"])),
-            end_date=str(time()),
+            end_date="2020-07-10 12:00:00.0000000",
             end_stay_type=str(np.random.choice(["discharge", "death"])),
             local_time=["UTC-4:00"],
             medical_hist=np.array(
@@ -537,7 +614,8 @@ class FakeSignal:
             name="blood_pressure",
             source=EDW_FILES["vitals_file"]["source"],
             value=np.array(
-                [f"{sys[i]}/{dias[i]}" for i in range(0, len(sys))], dtype="S",
+                [f"{sys[i]}/{dias[i]}" for i in range(0, len(sys))],
+                dtype="S",
             ),
             time=np.array(list(range(starting_time, starting_time + 100))),
             units="",
@@ -632,10 +710,12 @@ class FakeSignal:
         sample_freq_2 = 120
         times = np.arange(starting_time, starting_time + duration, 0.25)
         values1 = nk.ecg_simulate(
-            duration=int(duration / 2), sampling_rate=sample_freq_1,
+            duration=int(duration / 2),
+            sampling_rate=sample_freq_1,
         )
         values2 = nk.ecg_simulate(
-            duration=int(duration / 2), sampling_rate=sample_freq_2,
+            duration=int(duration / 2),
+            sampling_rate=sample_freq_2,
         )
         values = np.concatenate([values1, values2])
         n_samples = np.array(
@@ -657,7 +737,8 @@ class FakeSignal:
                 time=times,
                 units="mV",
                 sample_freq=np.array(
-                    [(sample_freq_1, 0), (sample_freq_2, 16)], dtype="float,int",
+                    [(sample_freq_1, 0), (sample_freq_2, 16)],
+                    dtype="float,int",
                 ),
                 scale_factor=np.random.uniform() * 5,
                 time_corr_arr=np.packbits(np.random.randint(0, 2, 100).astype(np.bool)),
@@ -687,3 +768,138 @@ class FakeSignal:
             for idx, signal in enumerate(["spo2%", "spo2r"])
         }
         return signals
+
+
+@pytest.fixture(scope="function")
+def get_edw_checker():
+    def _get_checker(directory):
+        if directory == "edw":
+            checker = EDWChecker(pytest.edw_dir)
+        else:
+            checker = EDWChecker(pytest.bm_dir)
+        return checker
+
+    return _get_checker
+
+
+@pytest.fixture(scope="function")
+def get_bm_checker():
+    def _get_checker(directory):
+        if directory == "bm":
+            checker = BMChecker(pytest.bm_dir, pytest.alarms_dir)
+        else:
+            checker = BMChecker(pytest.edw_dir, pytest.alarms_dir)
+        return checker
+
+    return _get_checker
+
+
+@pytest.fixture(scope="function")
+def testing_tmaps():
+    test_tmaps = {}
+
+    bm_tmap_test_names = ["i", "ii", "iii", "v", "spo2", "spo2%", "spo2r"]
+    test_tmaps["bm_signals"] = {
+        name: GET_BM_TMAP(name)
+        for signal in bm_tmap_test_names
+        for name in (
+            f"{signal}_timeseries",
+            f"{signal}_value",
+            f"{signal}_samples_per_ts_timeseries",
+            f"{signal}_samples_per_ts_value",
+            f"{signal}_time_corr_arr_timeseries",
+            f"{signal}_time_corr_arr_value",
+            f"{signal}_sample_freq",
+            f"{signal}_units",
+            f"{signal}_scale_factor",
+            f"{signal}_channel",
+        )
+    }
+
+    alarms_tmap_test_names = ["cpp_low", "v_tach", "apnea"]
+    test_tmaps["alarms"] = {
+        name: GET_ALARMS_TMAP(name)
+        for name in [i + "_init_date" for i in alarms_tmap_test_names]
+        + [i + "_duration" for i in alarms_tmap_test_names]
+        + [i + "_level" for i in alarms_tmap_test_names]
+    }
+
+    meas_tmap_test_names = [
+        "creatinine",
+        "ph,_arterial",
+        "pulse",
+        "blood_pressure_diastolic",
+        "blood_pressure_systolic",
+    ]
+    test_tmaps["measurements"] = {
+        name: GET_MEAS_TMAP(name)
+        for signal in meas_tmap_test_names
+        for name in (
+            f"{signal}_timeseries",
+            f"{signal}_value",
+            f"{signal}_time",
+            f"{signal}_units",
+        )
+    }
+
+    meds_tmap_test_names = [
+        "aspirin_325_mg_tablet",
+        "cefazolin_2_gram|50_ml_in_dextrose_(iso-osmotic)_intravenous_piggyback",
+        "lactated_ringers_iv_bolus",
+        "norepinephrine_infusion_syringe_in_swfi_80_mcg|ml_cmpd_central_mgh",
+        "sodium_chloride_0.9_%_intravenous_solution",
+    ]
+    test_tmaps["meds"] = {
+        name: GET_MEDS_TMAP(name)
+        for signal in meds_tmap_test_names
+        for name in (
+            f"{signal}_timeseries",
+            f"{signal}_dose",
+            f"{signal}_time",
+            f"{signal}_units",
+            f"{signal}_route",
+        )
+    }
+
+    events_tmap_test_names = [
+        "code_start",
+        "rapid_response_start",
+    ]
+    test_tmaps["events"] = {
+        name: GET_EVENTS_TMAP(name)
+        for signal in events_tmap_test_names
+        for name in (f"{signal}_start_date", f"{signal}_double", f"{signal}_single")
+    }
+
+    proce_tmap_test_names = ["colonoscopy", "hemodialysis", "transfuse_red_blood_cells"]
+    test_tmaps["procedures"] = {
+        name: GET_EVENTS_TMAP(name)
+        for signal in proce_tmap_test_names
+        for name in (
+            f"{signal}_start_date",
+            f"{signal}_end_date",
+            f"{signal}_double",
+            f"{signal}_single",
+        )
+    }
+
+    list_signals_tmap_test_names = [
+        "bm_waveform_signals",
+        "bm_vitals_signals",
+        "bm_alarms_signals",
+        "edw_med_signals",
+    ]
+    test_tmaps["list_signals"] = {
+        name: GET_LIST_TMAP(name) for name in list_signals_tmap_test_names
+    }
+
+    return test_tmaps
+
+
+@pytest.fixture(scope="function")
+def test_get_local_time():
+    def _get_local_time(time_array):
+        get_function = get_local_timestamps(time_array)
+        return get_function
+
+    return _get_local_time

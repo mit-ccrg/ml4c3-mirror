@@ -93,7 +93,9 @@ class Tensorizer:
 
         # No options specified: get all the cross-referenced files
         files_per_mrn = CrossReferencer(
-            self.bm_dir, self.edw_dir, self.cross_ref_path,
+            self.bm_dir,
+            self.edw_dir,
+            self.cross_ref_path,
         ).get_xref_files(
             mrns,
             starting_time,
@@ -114,7 +116,11 @@ class Tensorizer:
             )
 
     def _main_write(
-        self, tensors: str, mrn: str, visits: Dict, scaling_and_units: Dict,
+        self,
+        tensors: str,
+        mrn: str,
+        visits: Dict,
+        scaling_and_units: Dict,
     ):
         try:
             # Open the writer: one file per MRN
@@ -128,19 +134,27 @@ class Tensorizer:
 
                     # Write the data
                     self._write_bm_data(
-                        bm_files, writer=writer, scaling_and_units=scaling_and_units,
+                        bm_files,
+                        writer=writer,
+                        scaling_and_units=scaling_and_units,
                     )
                     self._write_bm_alarms_data(
-                        self.alarms_dir, self.edw_dir, mrn, visit_id, writer=writer,
+                        self.alarms_dir,
+                        self.edw_dir,
+                        mrn,
+                        visit_id,
+                        writer=writer,
                     )
                     writer.write_completed_flag("bedmaster", True)
                     self._write_edw_data(self.edw_dir, mrn, visit_id, writer=writer)
                     writer.write_completed_flag("edw", True)
-                    logging.info(f"Tensorization completed for MRN {mrn}, CSN {visit_id}.")
+                    logging.info(
+                        f"Tensorization completed for MRN {mrn}, CSN {visit_id}.",
+                    )
                 logging.info(f"Tensorization completed for MRN {mrn}.")
-        except Exception as e:
+        except Exception as error:
             logging.exception(f"Tensorization failed for MRN {mrn} with CSNs {visits}")
-            raise(e)
+            raise error
 
     @staticmethod
     def _write_bm_data(bm_files: List[str], writer: Writer, scaling_and_units: Dict):
@@ -169,7 +183,11 @@ class Tensorizer:
 
     @staticmethod
     def _write_bm_alarms_data(
-        alarms_path: str, edw_path: str, mrn: str, visit_id: str, writer: Writer,
+        alarms_path: str,
+        edw_path: str,
+        mrn: str,
+        visit_id: str,
+        writer: Writer,
     ):
 
         reader = BMAlarmsReader(alarms_path, edw_path, mrn, visit_id)
@@ -328,7 +346,10 @@ def _copy_hd5(staging_dir, destination_dir, file):
 
 def tensorize(args):
     tens = Tensorizer(
-        args.path_bedmaster, args.path_alarms, args.path_edw, args.xref_file,
+        args.path_bedmaster,
+        args.path_alarms,
+        args.path_edw,
+        args.path_xref,
     )
     tens.tensorize(
         tensors=args.tensors,
@@ -341,7 +362,7 @@ def tensorize(args):
 
 def tensorize_batched(args):
     # Create crossreference table if needed
-    if not os.path.isfile(args.xref_file):
+    if not os.path.isfile(args.path_xref):
         adt_table_name = os.path.split(args.adt_file)[-1]
         # Match bedmaster files from lm4 with adt_file
         matcher = PatientBMMatcher(
@@ -350,7 +371,7 @@ def tensorize_batched(args):
             edw_dir=os.path.join(MAD3_DIR, "cohorts_lists"),
             adt_file=adt_table_name,
         )
-        matcher.match_files(args.xref_file)
+        matcher.match_files(args.path_xref)
 
     # Loop for batch of patients
     patients = range(args.adt_start_index, args.adt_end_index, args.staging_batch_size)
@@ -368,7 +389,7 @@ def tensorize_batched(args):
         create_folders(args.staging_dir)
 
         # Get desired number of patients
-        get_files = FileManager(args.xref_file, args.adt_file, args.staging_dir)
+        get_files = FileManager(args.path_xref, args.adt_file, args.staging_dir)
         get_files.get_patients(
             init_patient=first_patient,
             last_patient=last_patient,

@@ -102,7 +102,7 @@ class PreTensorizeSummaryWriter:
         xref_file = pd.read_csv(self.xref_file)
         xref_file = xref_file.dropna(subset=["MRN"])
         bm_mrns = set(xref_file["MRN"].unique())
-        bm_csns = set(xref_file["VisitIdentifier"].unique())
+        bm_csns = set(xref_file["PatientEncounterID"].unique())
         bm_ids = set(xref_file["fileID"].unique())
         cross_ref_bm_files = set()
         for bm_id in bm_ids:
@@ -170,7 +170,7 @@ class PreTensorizeSummaryWriter:
                 # pylint: disable=cell-var-from-loop
                 csns = set(
                     xref_file[list(map(lambda x: x in bm_file, xref_file["fileID"]))][
-                        "VisitIdentifier"
+                        "PatientEncounterID"
                     ].unique(),
                 )
                 self._update_list_signals(bm_signals, csns)
@@ -242,10 +242,13 @@ class PreTensorizeSummaryWriter:
                     - ((transfer_in.month, transfer_in.day) < (age.month, age.day))
                 )
                 if str(static_data.end_date) != "nan":
-                    length_stay = float(
-                        np.datetime64(static_data.end_date)
-                        - transfer_in.to_datetime64(),
-                    ) / (10 ** 9 * 60 * 60)
+                    length_stay = (
+                        float(
+                            np.datetime64(static_data.end_date)
+                            - transfer_in.to_datetime64(),
+                        )
+                        / (10 ** 9 * 60 * 60)
+                    )
                 else:
                     length_stay = np.nan
 
@@ -269,10 +272,12 @@ class PreTensorizeSummaryWriter:
                             self.summary[f"mean_{key}"] * (count - 1) + value
                         ) / count
                 self.summary["earliest_transfer_in"] = min(
-                    self.summary["earliest_transfer_in"], transfer_in,
+                    self.summary["earliest_transfer_in"],
+                    transfer_in,
                 )
                 self.summary["latest_transfer_in"] = max(
-                    self.summary["latest_transfer_in"], transfer_in,
+                    self.summary["latest_transfer_in"],
+                    transfer_in,
                 )
 
     def _get_xref_df(self):

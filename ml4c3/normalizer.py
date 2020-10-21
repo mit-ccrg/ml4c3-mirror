@@ -7,8 +7,15 @@ import numpy as np
 # Imports: first party
 from ml4c3.definitions.globals import EPS
 
+# pylint: disable=unnecessary-pass, no-self-use, redefined-builtin
+
 
 class Normalizer(ABC):
+    """
+    Normalizer is an abstract class that defines transformations to normalize a
+    tensor.
+    """
+
     @abstractmethod
     def normalize(self, tensor: np.ndarray) -> np.ndarray:
         """Shape preserving transformation"""
@@ -20,6 +27,11 @@ class Normalizer(ABC):
 
 
 class Standardize(Normalizer):
+    """
+    Normalize a tensor by subtracting a constant mean and dividing by a
+    constant standard deviation.
+    """
+
     def __init__(self, mean: float, std: float):
         self.mean, self.std = mean, std
 
@@ -31,6 +43,11 @@ class Standardize(Normalizer):
 
 
 class RobustScaler(Normalizer):
+    """
+    Normalize a tensor by subtracting a constant median and dividing by a
+    constant interquartile range.
+    """
+
     def __init__(self, median: float, iqr: float):
         self.median, self.iqr = median, iqr
 
@@ -42,6 +59,11 @@ class RobustScaler(Normalizer):
 
 
 class ZeroMeanStd1(Normalizer):
+    """
+    Normalize a tensor by subtracting the mean of the tensor and dividing by
+    the standard deviation of the tensor.
+    """
+
     def normalize(self, tensor: np.ndarray) -> np.ndarray:
         tensor -= np.mean(tensor)
         tensor /= np.std(tensor) + EPS
@@ -49,6 +71,11 @@ class ZeroMeanStd1(Normalizer):
 
 
 class MinMax(Normalizer):
+    """
+    Normalize a tensor by subtracting the minimum of the tensor and dividing by
+    the difference between the maximum and the minimum of the tensor.
+    """
+
     def __init__(self, min: float, max: float):
         self.min = min
         self.max = max

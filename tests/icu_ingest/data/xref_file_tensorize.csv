@@ -1,2 +1,2 @@
-StartTime,EndTime,stpIn,tStart,tEnd,tDischarge,tAdmit,fileID,unixFileStartTime,unixFileEndTime,fileStartTime,MRN,VisitIdentifier,grp,ugid
+StartTime,EndTime,stpIn,tStart,tEnd,tDischarge,tAdmit,fileID,unixFileStartTime,unixFileEndTime,fileStartTime,MRN,PatientEncounterID,grp,ugid
 Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,bm_file,100,200,Wrong,123,345,Wrong,Wrong
