@@ -1,5 +1,6 @@
 # Imports: standard library
 import os
+import math
 import time
 import shutil
 import logging
@@ -322,6 +323,7 @@ def copy_hd5(staging_dir: str, destination_tensors: str, workers: int):
     Copy tensorized files to MAD3.
 
     :param staging_dir: <str> Path to temporary local directory.
+    :param destination_tensors: <str> Path to MAD3 directory.
     :param workers: <int> Number of workers to use.
     """
     init_time = time.time()
@@ -374,7 +376,11 @@ def tensorize_batched(args):
         matcher.match_files(args.path_xref)
 
     # Loop for batch of patients
+    missed_patients = []
+    total_files_tensorized = []
     patients = range(args.adt_start_index, args.adt_end_index, args.staging_batch_size)
+    total_files = args.adt_end_index - args.adt_start_index
+    total_batch = math.ceil(total_files / args.staging_batch_size)
     for idx_batch, num_batch in enumerate(patients):
         start_batch_time = time.time()
 
@@ -415,6 +421,17 @@ def tensorize_batched(args):
             flag_one_source=args.allow_one_source,
         )
 
+        # Check tensorized files
+        files_to_tensorize = [int(mrn) for mrn in get_files.mrns]
+        files_tensorized = [
+            int(hd5_mrn.split(".")[0])
+            for hd5_mrn in os.listdir(local_tensors)
+            if hd5_mrn.endswith(".hd5")
+        ]
+        total_files_tensorized.extend(files_tensorized)
+        missed_files = list(set(files_to_tensorize) - set(files_tensorized))
+        missed_patients.extend(missed_files)
+
         # Copy tensorized files to MAD3
         if not os.path.isdir(args.tensors):
             os.makedirs(args.tensors)
@@ -427,6 +444,23 @@ def tensorize_batched(args):
         end_batch_time = time.time()
         elapsed_time = end_batch_time - start_batch_time
         logging.info(
-            f"Processed batch {idx_batch} of {last_patient - first_patient} patients"
-            f" in {elapsed_time:.2f} seconds.",
+            f"Processed batch {idx_batch + 1}/{total_batch} of "
+            f"{last_patient - first_patient} patients in {elapsed_time:.2f} seconds.",
+        )
+        if missed_files:
+            logging.info(
+                f"From {last_patient - first_patient} patients, {len(missed_files)} "
+                f"HD5 files are missing. MRN of those patients: {missed_files}.",
+            )
+        else:
+            logging.info(f"All {last_patient - first_patient} patients are tensorized.")
+
+    logging.info(f"HD5 Files tensorized and moved to {args.tensors}")
+    logging.info(
+        f"{len(total_files_tensorized)} out of {total_files} " f"patients tensorized.",
+    )
+    if missed_patients:
+        logging.warning(
+            f"{len(missed_patients)} HD5 files are missing. MRN of "
+            f"those patients: {missed_patients}",
         )

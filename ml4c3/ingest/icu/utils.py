@@ -36,13 +36,14 @@ class FileManager:
         self.adt_file = adt_file
         self.output_dir = output_dir
         self.mapping_folders: Dict[str, List[str]] = MAPPING_DEPARTMENTS
+        self.mrns: List[str] = []
 
     def get_patients(
         self,
         init_patient: int = 0,
         last_patient: int = None,
         overwrite_hd5: bool = True,
-        hd5_dir: str = None,
+        hd5_dir: str = "/media/mad3/hd5",
     ):
         """
         Get list of patients from xref_file.
@@ -54,8 +55,8 @@ class FileManager:
         """
         df_adt = pd.read_csv(self.adt_file).sort_values(by=["MRN"], ascending=True)
         patients = df_adt[["MRN", "PatientEncounterID"]].drop_duplicates().dropna()
-        mrns = patients["MRN"].drop_duplicates()[init_patient:last_patient]
-        desired_patients = patients[patients["MRN"].isin(mrns)]
+        self.mrns = patients["MRN"].drop_duplicates()[init_patient:last_patient]
+        desired_patients = patients[patients["MRN"].isin(self.mrns)]
         if not overwrite_hd5 and os.path.isdir(hd5_dir):
             hd5_mrns = [
                 int(hd5_mrn.split(".")[0])
