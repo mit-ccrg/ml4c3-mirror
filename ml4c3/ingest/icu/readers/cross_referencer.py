@@ -82,7 +82,7 @@ class CrossReferencer:
         adt = adt[adt_columns].drop_duplicates()
 
         xref = pd.read_csv(self.xref_file)
-        xref = xref.drop_duplicates(subset=["MRN", "VisitIdentifier", "fileID"])
+        xref = xref.drop_duplicates(subset=["MRN", "PatientEncounterID", "fileID"])
         edw_mrns = [
             folder
             for folder in os.listdir(self.edw_dir)
@@ -145,9 +145,9 @@ class CrossReferencer:
             if not flag_one_source and mrn not in edw_mrns:
                 continue
             try:
-                csn = str(int(row.VisitIdentifier))
+                csn = str(int(row.PatientEncounterID))
             except ValueError:
-                csn = str(row.VisitIdentifier)
+                csn = str(row.PatientEncounterID)
             bm_file_id = str(row.fileID)
             bm_path = [
                 os.path.join(self.bm_dir, file)
@@ -215,11 +215,11 @@ class CrossReferencer:
         xref_mrns_set = set(xref["MRN"].unique())
         try:
             _xref_csns_set = np.array(
-                list(xref["VisitIdentifier"].unique()), dtype=float,
+                list(xref["PatientEncounterID"].unique()), dtype=float,
             )
             xref_csns_set = set(_xref_csns_set.astype(int).astype(str))
         except ValueError:
-            xref_csns_set = set(xref["VisitIdentifier"].unique())
+            xref_csns_set = set(xref["PatientEncounterID"].unique())
         xref_bmf_set = set(xref["fileID"].unique())
 
         crossref_mrns_set = set(self.crossref.keys())

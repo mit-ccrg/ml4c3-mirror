@@ -65,7 +65,7 @@ class PatientBMMatcher:
         """
         return {
             "MRN": [],
-            "VisitIdentifier": [],
+            "PatientEncounterID": [],
             "transferIn": [],
             "transferOut": [],
             "fileID": [],
@@ -99,11 +99,13 @@ class PatientBMMatcher:
             k = 3
         return split_info[0], split_info[1], split_info[k]
 
-    def match_files(self, xref_path: str = None):
+    def match_files(self, xref_path: str = None, store_unmatched: bool = False):
         """
         Match BM files with patient's MRN and EncounterID.
 
         :param xref_path: <str> directory of the output xref table.
+        :param store_unmatched: <bool> Bool indicating if the unmatched Bedmaster files
+                                are saved in the xref table.
         """
         # Clear dictionary if it has any information
         if any(self.table_dic[key] for key in self.table_dic.keys()):
@@ -226,14 +228,22 @@ class PatientBMMatcher:
                     t_end = filt_adt_df["TransferOutDTS"].values[0]
 
                     self.table_dic["MRN"].append(mrn)
-                    self.table_dic["VisitIdentifier"].append(csn)
+                    self.table_dic["PatientEncounterID"].append(csn)
                     self.table_dic["transferIn"].append(t_start)
                     self.table_dic["transferOut"].append(t_end)
                     self.table_dic["fileID"].append(bm_file[:-4])
                     self.table_dic["unixFileStartTime"].append(start_time)
                     self.table_dic["unixFileEndTime"].append(t_end)
                     self.table_dic["Department"].append(self.folder_to_dept[dept])
-
+                elif store_unmatched:
+                    self.table_dic["MRN"].append(None)
+                    self.table_dic["PatientEncounterID"].append(None)
+                    self.table_dic["transferIn"].append(None)
+                    self.table_dic["transferOut"].append(None)
+                    self.table_dic["fileID"].append(bm_file[:-4])
+                    self.table_dic["unixFileStartTime"].append(start_time)
+                    self.table_dic["unixFileEndTime"].append(t_end)
+                    self.table_dic["Department"].append(self.folder_to_dept[dept])
                 else:
                     unmatched_files.append(bm_file)
 

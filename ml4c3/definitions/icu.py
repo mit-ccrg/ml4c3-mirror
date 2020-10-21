@@ -322,3 +322,5 @@ ICU_SCALE_UNITS = {
     "TMP2":      {"scaling_factor": 0.1,    "units": "Celcius"},
 }
 # fmt: on
+
+ICU_TMAPS_SUMMARY_PATH = "/media/mad3/hd5_arrests/summary_stats.csv"

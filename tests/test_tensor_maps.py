@@ -5,9 +5,16 @@ from tensorflow.keras.losses import logcosh
 # Imports: first party
 from ml4c3.tensormap.TensorMap import TensorMap
 
+# pylint: disable=no-member
+
 
 class TestTensorMaps:
-    def test_tensor_map_equality(self):
+    """
+    Class to test ECG tensor maps.
+    """
+
+    @staticmethod
+    def test_tensor_map_equality():
         tensor_map_1a = TensorMap(
             name="tm",
             loss="logcosh",

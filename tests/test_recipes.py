@@ -18,24 +18,26 @@ from ml4c3.tensormap.TensorMap import TensorMap, Interpretation
 
 
 class TestRecipes:
-    def test_infer(self, default_arguments):
-        infer_multimodal_multitask(default_arguments)
+    def test_infer(self, default_arguments_infer):
+        infer_multimodal_multitask(default_arguments_infer)
         path = os.path.join(
-            default_arguments.output_folder,
-            default_arguments.id,
+            default_arguments_infer.output_folder,
+            default_arguments_infer.id,
             f"predictions_test.csv",
         )
         predictions = pd.read_csv(path)
         test_samples = pd.read_csv(
             os.path.join(
-                default_arguments.output_folder, default_arguments.id, "test.csv",
+                default_arguments_infer.output_folder,
+                default_arguments_infer.id,
+                "test.csv",
             ),
         )
         assert len(set(predictions["sample_id"])) == len(test_samples)
 
-    def test_explore(self, default_arguments, tmpdir_factory, utils):
+    def test_explore(self, default_arguments_explore, tmpdir_factory, utils):
         temp_dir = tmpdir_factory.mktemp("explore_tensors")
-        default_arguments.tensors = str(temp_dir)
+        default_arguments_explore.tensors = str(temp_dir)
         tmaps = pytest.TMAPS_UP_TO_4D[:]
         tmaps.append(
             TensorMap(
@@ -46,13 +48,15 @@ class TestRecipes:
             ),
         )
         explore_expected = utils.build_hdf5s(temp_dir, tmaps, n=pytest.N_TENSORS)
-        default_arguments.num_workers = 3
-        default_arguments.tensor_maps_in = tmaps
-        default_arguments.explore_export_fpath = True
-        explore(default_arguments)
+        default_arguments_explore.num_workers = 3
+        default_arguments_explore.tensor_maps_in = tmaps
+        default_arguments_explore.explore_export_fpath = True
+        explore(default_arguments_explore)
 
         csv_path = os.path.join(
-            default_arguments.output_folder, default_arguments.id, "tensors_union.csv",
+            default_arguments_explore.output_folder,
+            default_arguments_explore.id,
+            "tensors_union.csv",
         )
         explore_result = pd.read_csv(csv_path)
 

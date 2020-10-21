@@ -28,40 +28,58 @@ from ml4c3.ingest.icu import tensorize_batched as tensorize_icu_batched
 from ml4c3.evaluations import predict_and_evaluate
 from ml4c3.explorations import explore
 from ml4c3.hyperoptimizers import hyperoptimize
+from ml4c3.explorations_icu import explore_icu
+from ml4c3.assess_icu_coverage import assess_icu_coverage
 from ml4c3.definitions.globals import MODEL_EXT
 from ml4c3.tensormap.TensorMap import TensorMap
+from ml4c3.ingest.icu.matchers.match_data import match_data
+from ml4c3.ingest.icu.summarizers.summarizer import pre_tensorize_summary
+from ml4c3.ingest.icu.check_icu_structure.check_icu_structure import check_icu_structure
+
+# pylint: disable=redefined-outer-name, broad-except
 
 
 def run(args: argparse.Namespace):
     start_time = timer()  # Keep track of elapsed execution time
     try:
-        if "train" == args.mode:
+        if args.mode == "train":
             train_multimodal_multitask(args)
-        elif "train_shallow" == args.mode:
+        elif args.mode == "train_shallow":
             train_shallow_model(args)
-        elif "train_simclr" == args.mode:
+        elif args.mode == "train_simclr":
             train_simclr_model(args)
-        elif "infer" == args.mode:
+        elif args.mode == "infer":
             infer_multimodal_multitask(args)
-        elif "hyperoptimize" == args.mode:
+        elif args.mode == "hyperoptimize":
             hyperoptimize(args)
-        elif "tensorize_ecg" == args.mode:
+        elif args.mode == "tensorize_ecg":
             tensorize_ecg(args)
-        elif "tensorize_icu" == args.mode:
-            tensorize_icu(args)
-        elif "tensorize_icu_batched" == args.mode:
-            tensorize_icu_batched(args)
-        elif "explore" == args.mode:
+        elif args.mode == "tensorize_icu":
+            if args.staging_batch_size:
+                tensorize_icu_batched(args)
+            else:
+                tensorize_icu(args)
+        elif args.mode == "explore":
             explore(args=args, disable_saving_output=args.explore_disable_saving_output)
-        elif "plot_ecg" == args.mode:
+        elif args.mode == "explore_icu":
+            explore_icu(args)
+        elif args.mode == "plot_ecg":
             plot_ecg(args)
-        elif "build" == args.mode:
+        elif args.mode == "build":
             build_multimodal_multitask(args)
+        elif args.mode == "assess_icu_coverage":
+            assess_icu_coverage(args)
+        elif args.mode == "check_icu_structure":
+            check_icu_structure(args)
+        elif args.mode == "pre_tensorize_summary":
+            pre_tensorize_summary(args)
+        elif args.mode == "match_patient_bm":
+            match_data(args)
         else:
             raise ValueError("Unknown mode:", args.mode)
 
-    except Exception as e:
-        logging.exception(e)
+    except Exception as error:
+        logging.exception(error)
         for child in mp.active_children():
             child.terminate()
 
@@ -79,7 +97,9 @@ def build_multimodal_multitask(args: argparse.Namespace) -> Model:
     plot_architecture_diagram(
         model_to_dot(model, show_shapes=True, expand_nested=True),
         os.path.join(
-            args.output_folder, args.id, "architecture_graph" + args.image_ext,
+            args.output_folder,
+            args.id,
+            "architecture_graph" + args.image_ext,
         ),
     )
     logging.info(f"Model saved to {model_file}")
@@ -158,7 +178,7 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
 
 
 def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
-    datasets, stats, cleanups = train_valid_test_datasets(
+    datasets, _, cleanups = train_valid_test_datasets(
         tensor_maps_in=args.tensor_maps_in,
         tensor_maps_out=args.tensor_maps_out,
         tensors=args.tensors,
@@ -199,10 +219,11 @@ def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
 
 def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
     """
-    Train shallow model (e.g. linear or logistic regression) and return performance metrics.
+    Train shallow model (e.g. linear or logistic regression) and return
+    performance metrics.
     """
     # Create datasets
-    datasets, stats, cleanups = train_valid_test_datasets(
+    datasets, _, cleanups = train_valid_test_datasets(
         tensor_maps_in=args.tensor_maps_in,
         tensor_maps_out=args.tensor_maps_out,
         tensors=args.tensors,
