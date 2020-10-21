@@ -12,7 +12,8 @@ import pytest
 def test_file_structure_and_atributes(get_patientbm_matcher, temp_dir):
     matcher = get_patientbm_matcher(pytest.bm_matching)
     matcher2 = get_patientbm_matcher(
-        pytest.bm_matching, departments=["MGH BLAKE 8 CARD SICU"],
+        pytest.bm_matching,
+        departments=["MGH BLAKE 8 CARD SICU"],
     )
     expect_des_departments = [
         "MGH BIGELOW 6 PICU",
@@ -79,7 +80,9 @@ def test_xref_file_generation(get_patientbm_matcher, temp_dir):
     def test_xref_file_results(get_patientbm_matcher, temp_dir, lm4, bm_dir):
         matcher = get_patientbm_matcher(bm_dir, lm4_flag=lm4)
         matcher2 = get_patientbm_matcher(
-            bm_dir, lm4_flag=lm4, departments=["MGH BLAKE 8 CARD SICU"],
+            bm_dir,
+            lm4_flag=lm4,
+            departments=["MGH BLAKE 8 CARD SICU"],
         )
 
         expected_df = pd.read_csv(

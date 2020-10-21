@@ -147,7 +147,10 @@ def make_shallow_model(
 
     model = Model(inputs=input_tensors, outputs=outputs)
     model.compile(
-        optimizer=opt, loss=losses, loss_weights=loss_weights, metrics=my_metrics,
+        optimizer=opt,
+        loss=losses,
+        loss_weights=loss_weights,
+        metrics=my_metrics,
     )
     model.summary()
     if donor_layers is not None:
@@ -185,15 +188,22 @@ def make_waveform_model_unet(
 
     neurons = 24
     input_tensor = residual = Input(
-        shape=tensor_maps_in[0].shape, name=tensor_maps_in[0].input_name,
+        shape=tensor_maps_in[0].shape,
+        name=tensor_maps_in[0].input_name,
     )
     x = c600 = Conv1D(
-        filters=neurons, kernel_size=11, activation="relu", padding="same",
+        filters=neurons,
+        kernel_size=11,
+        activation="relu",
+        padding="same",
     )(input_tensor)
     x = Conv1D(filters=neurons, kernel_size=51, activation="relu", padding="same")(x)
     x = MaxPooling1D(2)(x)
     x = c300 = Conv1D(
-        filters=neurons, kernel_size=111, activation="relu", padding="same",
+        filters=neurons,
+        kernel_size=111,
+        activation="relu",
+        padding="same",
     )(x)
     x = Conv1D(filters=neurons, kernel_size=201, activation="relu", padding="same")(x)
     x = MaxPooling1D(2)(x)
@@ -213,13 +223,16 @@ def make_waveform_model_unet(
         activation="linear",
     )(x)
     output_y = Activation(
-        tensor_maps_out[0].activation, name=tensor_maps_out[0].output_name,
+        tensor_maps_out[0].activation,
+        name=tensor_maps_out[0].output_name,
     )(conv_label)
     m = Model(inputs=[input_tensor], outputs=[output_y])
     m.summary()
     opt = Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.0)
     m.compile(
-        optimizer=opt, loss=tensor_maps_out[0].loss, metrics=tensor_maps_out[0].metrics,
+        optimizer=opt,
+        loss=tensor_maps_out[0].loss,
+        metrics=tensor_maps_out[0].metrics,
     )
 
     if donor_layers is not None:
@@ -258,7 +271,8 @@ def _order_layers(
 Tensor = tf.Tensor
 Encoder = Callable[[Tensor], Tuple[Tensor, List[Tensor]]]
 Decoder = Callable[
-    [Tensor, Dict[TensorMap, List[Tensor]], Dict[TensorMap, Tensor]], Tensor,
+    [Tensor, Dict[TensorMap, List[Tensor]], Dict[TensorMap, Tensor]],
+    Tensor,
 ]
 BottleNeck = Callable[[Dict[TensorMap, Tensor]], Dict[TensorMap, Tensor]]
 
@@ -283,7 +297,11 @@ class ResidualBlock:
         block_size = len(filters_per_conv)
         assert len(conv_x) == len(conv_y) == len(conv_z) == block_size
         conv_layer, kernels = _conv_layer_from_kind_and_dimension(
-            dimension, conv_layer_type, conv_x, conv_y, conv_z,
+            dimension,
+            conv_layer_type,
+            conv_x,
+            conv_y,
+            conv_z,
         )
         self.conv_layers = [
             conv_layer(
@@ -303,11 +321,16 @@ class ResidualBlock:
             for _ in range(block_size)
         ]
         residual_conv_layer, _ = _conv_layer_from_kind_and_dimension(
-            dimension, "conv", conv_x, conv_y, conv_z,
+            dimension,
+            "conv",
+            conv_x,
+            conv_y,
+            conv_z,
         )
         self.residual_convs = [
             residual_conv_layer(
-                filters=filters_per_conv[0], kernel_size=_one_by_n_kernel(dimension),
+                filters=filters_per_conv[0],
+                kernel_size=_one_by_n_kernel(dimension),
             )
             for _ in range(block_size - 1)
         ]
@@ -353,7 +376,11 @@ class DenseConvolutionalBlock:
         layer_order: List[str],
     ):
         conv_layer, kernels = _conv_layer_from_kind_and_dimension(
-            dimension, conv_layer_type, conv_x, conv_y, conv_z,
+            dimension,
+            conv_layer_type,
+            conv_x,
+            conv_y,
+            conv_z,
         )
         self.conv_layers = [
             conv_layer(filters=filters, kernel_size=kernel, padding="same")
@@ -436,7 +463,10 @@ class FullyConnectedBlock:
 
     def __call__(self, x: Tensor) -> Union[Tensor, Tuple[Tensor, List[Tensor]]]:
         for dense, normalize, activate, regularize in zip(
-            self.denses, self.norms, self.activations, self.regularizations,
+            self.denses,
+            self.norms,
+            self.activations,
+            self.regularizations,
         ):
             x = _order_layers(self.layer_order, activate, normalize, regularize)(
                 dense(x),
@@ -474,13 +504,15 @@ class VariationalDiagNormal(Layer):
         self.latent_size = latent_size
         super(VariationalDiagNormal, self).__init__(**kwargs)
         self.prior = tfd.MultivariateNormalDiag(
-            loc=tf.zeros([latent_size]), scale_identity_multiplier=1.0,
+            loc=tf.zeros([latent_size]),
+            scale_identity_multiplier=1.0,
         )
 
     def call(self, mu: Tensor, log_sigma: Tensor, **kwargs):
         """mu and sigma must be shape (None, latent_size)"""
         approx_posterior = tfd.MultivariateNormalDiag(
-            loc=mu, scale_diag=tf.math.exp(log_sigma),
+            loc=mu,
+            scale_diag=tf.math.exp(log_sigma),
         )
         kl = tf.reduce_mean(tfd.kl_divergence(approx_posterior, self.prior))
         self.add_loss(kl)
@@ -532,7 +564,8 @@ class VariationalBottleNeck:
         ]
 
     def __call__(
-        self, encoder_outputs: Dict[TensorMap, Tensor],
+        self,
+        encoder_outputs: Dict[TensorMap, Tensor],
     ) -> Dict[TensorMap, Tensor]:
         y = [Flatten()(x) for x in encoder_outputs.values()]
         if len(y) > 1:
@@ -593,7 +626,8 @@ class ConcatenateRestructure:
         self.bottleneck_type = bottleneck_type
 
     def __call__(
-        self, encoder_outputs: Dict[TensorMap, Tensor],
+        self,
+        encoder_outputs: Dict[TensorMap, Tensor],
     ) -> Dict[TensorMap, Tensor]:
         if self.bottleneck_type == BottleneckType.FlattenRestructure:
             y = [Flatten()(x) for x in encoder_outputs.values()]
@@ -705,7 +739,10 @@ class ConvEncoder:
                 layer_order=layer_order,
             )
             for filters, x, y, z in zip(
-                filters_per_dense_block, dense_x, dense_y, dense_z,
+                filters_per_dense_block,
+                dense_x,
+                dense_y,
+                dense_z,
             )
         ]
 
@@ -761,7 +798,8 @@ def _calc_start_shape(
 
 class DenseDecoder:
     def __init__(
-        self, tensor_map_out: TensorMap,
+        self,
+        tensor_map_out: TensorMap,
     ):
         self.dense = Dense(
             units=tensor_map_out.shape[0],
@@ -770,7 +808,10 @@ class DenseDecoder:
         )
 
     def __call__(
-        self, x: Tensor, _, decoder_outputs: Dict[TensorMap, Tensor],
+        self,
+        x: Tensor,
+        _,
+        decoder_outputs: Dict[TensorMap, Tensor],
     ) -> Tensor:
         return self.dense(x)
 
@@ -814,7 +855,11 @@ class ConvDecoder:
             for filters, x, y, z in zip(filters_per_dense_block, conv_x, conv_y, conv_z)
         ]
         conv_layer, _ = _conv_layer_from_kind_and_dimension(
-            dimension, "conv", conv_x, conv_y, conv_z,
+            dimension,
+            "conv",
+            conv_x,
+            conv_y,
+            conv_z,
         )
         self.conv_label = conv_layer(
             tensor_map_out.shape[-1],
@@ -828,7 +873,10 @@ class ConvDecoder:
         ]
 
     def __call__(
-        self, x: Tensor, intermediates: Dict[TensorMap, List[Tensor]], _,
+        self,
+        x: Tensor,
+        intermediates: Dict[TensorMap, List[Tensor]],
+        _,
     ) -> Tensor:
         for i, (dense_block, upsample) in enumerate(
             zip(self.dense_blocks, self.upsamples),
@@ -1106,7 +1154,9 @@ def make_multimodal_multitask_model(
         layer_map = remap_layer or dict()
         try:
             m_other = load_model(
-                donor_layers, custom_objects=custom_dict, compile=False,
+                donor_layers,
+                custom_objects=custom_dict,
+                compile=False,
             )
             for other_layer in m_other.layers:
                 try:
@@ -1149,7 +1199,8 @@ def _make_multimodal_multitask_model(
 ) -> Model:
     inputs: List[Input] = []
     encoder_outputs: Dict[
-        TensorMap, Tuple[Tensor, List[Tensor]],
+        TensorMap,
+        Tuple[Tensor, List[Tensor]],
     ] = {}  # TensorMap -> embed, encoder_intermediates
     encoder_intermediates = {}
     for tm, encoder in encoders.items():
@@ -1175,7 +1226,9 @@ def _make_multimodal_multitask_model(
     decoder_outputs = {}
     for tm, decoder in decoders.items():
         decoder_outputs[tm] = decoder(
-            bottle_neck_outputs[tm], encoder_intermediates, decoder_outputs,
+            bottle_neck_outputs[tm],
+            encoder_intermediates,
+            decoder_outputs,
         )
 
     return Model(inputs=inputs, outputs=list(decoder_outputs.values()))
@@ -1221,7 +1274,9 @@ def train_model_from_datasets(
 
     if plot:
         image_path = os.path.join(
-            output_folder, run_id, "architecture_graph" + image_ext,
+            output_folder,
+            run_id,
+            "architecture_graph" + image_ext,
         )
         plot_architecture_diagram(
             dot=model_to_dot(model, show_shapes=True, expand_nested=True),
@@ -1268,7 +1323,10 @@ def _get_callbacks(
 ) -> List[Callback]:
     callbacks = [
         ModelCheckpoint(
-            filepath=model_file, monitor=monitor, verbose=1, save_best_only=True,
+            filepath=model_file,
+            monitor=monitor,
+            verbose=1,
+            save_best_only=True,
         ),
         EarlyStopping(monitor=monitor, patience=patience, verbose=1),
         ReduceLROnPlateau(
@@ -1318,7 +1376,12 @@ def _conv_layer_from_kind_and_dimension(
 
 
 def _pool_layers_from_kind_and_dimension(
-    dimension, pool_type, pool_number, pool_x, pool_y, pool_z,
+    dimension,
+    pool_type,
+    pool_number,
+    pool_x,
+    pool_y,
+    pool_z,
 ):
     if dimension == 4 and pool_type == "max":
         return [
@@ -1400,7 +1463,10 @@ def _regularization_layer(dimension: int, regularization_type: str, rate: float)
 
 
 def saliency_map(
-    input_tensor: np.ndarray, model: Model, output_layer_name: str, output_index: int,
+    input_tensor: np.ndarray,
+    model: Model,
+    output_layer_name: str,
+    output_index: int,
 ) -> np.ndarray:
     """Compute saliency maps of the given model (presumably already trained) on a batch of inputs with respect to the desired output layer and index.
 

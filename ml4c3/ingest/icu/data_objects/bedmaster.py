@@ -65,7 +65,11 @@ class BMAlarm(ICUDiscreteData):
     """
 
     def __init__(
-        self, name: str, start_date: np.ndarray, duration: np.ndarray, level: int,
+        self,
+        name: str,
+        start_date: np.ndarray,
+        duration: np.ndarray,
+        level: int,
     ):
         """
         Init a BMAlarm object.

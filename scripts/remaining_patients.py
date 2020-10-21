@@ -39,12 +39,16 @@ def parse_arguments():
 
 def run(args: argparse.Namespace):
     remaining_patients = ICUCoverageAssesser._compare(
-        ICUCoverageAssesser, args.cohort_csv, args.input_dir, args.remove,
+        ICUCoverageAssesser,
+        args.cohort_csv,
+        args.input_dir,
+        args.remove,
     )
     if not os.path.isdir(args.output_dir):
         os.makedirs(args.output_dir)
     remaining_patients.to_csv(
-        os.path.join(args.output_dir, "remaining_patients.csv"), index=False,
+        os.path.join(args.output_dir, "remaining_patients.csv"),
+        index=False,
     )
 
 

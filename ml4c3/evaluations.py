@@ -21,7 +21,9 @@ from ml4c3.tensormap.TensorMap import TensorMap, find_negative_label_and_channel
 def predict_and_evaluate(
     model: Model,
     data: Union[
-        tf.data.Dataset, Tuple[Inputs, Outputs], Tuple[Inputs, Outputs, Paths],
+        tf.data.Dataset,
+        Tuple[Inputs, Outputs],
+        Tuple[Inputs, Outputs, Paths],
     ],
     tensor_maps_in: List[TensorMap],
     tensor_maps_out: List[TensorMap],
@@ -86,7 +88,9 @@ def predict_and_evaluate(
         df.round(3).to_csv(path_or_buf=fname, index=False)
 
     y_predictions, output_data, data_paths = _get_predictions_from_data(
-        model=model, data=data, batch_size=batch_size,
+        model=model,
+        data=data,
+        batch_size=batch_size,
     )
 
     if save_predictions:
@@ -141,7 +145,10 @@ def predict_and_evaluate(
 
     if len(rocs) > 1:
         subplot_rocs(
-            rocs=rocs, data_split=data_split, image_ext=image_ext, plot_path=plot_path,
+            rocs=rocs,
+            data_split=data_split,
+            image_ext=image_ext,
+            plot_path=plot_path,
         )
     if len(scatters) > 1:
         subplot_scatters(
@@ -157,7 +164,9 @@ def predict_and_evaluate(
 def _get_predictions_from_data(
     model: Model,
     data: Union[
-        tf.data.Dataset, Tuple[Inputs, Outputs], Tuple[Inputs, Outputs, Paths],
+        tf.data.Dataset,
+        Tuple[Inputs, Outputs],
+        Tuple[Inputs, Outputs, Paths],
     ],
     batch_size: Optional[int],
 ) -> Tuple[Predictions, Outputs, Optional[Paths]]:

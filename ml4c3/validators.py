@@ -40,7 +40,9 @@ def validator_no_negative(tm: TensorMap, tensor: np.ndarray, hd5: h5py.File):
 
 
 def validator_voltage_no_zero_padding(
-    tm: TensorMap, tensor: np.ndarray, hd5: h5py.File,
+    tm: TensorMap,
+    tensor: np.ndarray,
+    hd5: h5py.File,
 ):
     for cm, idx in tm.channel_map.items():
         lead_length = tm.shape[-1]

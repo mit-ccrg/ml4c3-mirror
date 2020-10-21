@@ -66,7 +66,8 @@ def test_write_static_data(temp_file, fake_signal):
         for key in base_dir.attrs.keys():
             if isinstance(base_dir.attrs[key], np.ndarray):
                 assert np.array_equal(
-                    base_dir.attrs[key], getattr(static_data, key.lower()),
+                    base_dir.attrs[key],
+                    getattr(static_data, key.lower()),
                 )
             else:
                 assert base_dir.attrs[key] == getattr(static_data, key.lower())
