@@ -305,10 +305,14 @@ def parse_args():
         help="Path to CSV of MRN -> deidentified ID map.",
     )
     parser.add_argument(
-        "--starting_id", type=int, help="Starting value for new IDs.",
+        "--starting_id",
+        type=int,
+        help="Starting value for new IDs.",
     )
     parser.add_argument(
-        "--ecg_dir", default="/storage/shared/ecg/mgh", help="Path to ECG HD5s.",
+        "--ecg_dir",
+        default="/storage/shared/ecg/mgh",
+        help="Path to ECG HD5s.",
     )
     parser.add_argument(
         "--sts_dir",

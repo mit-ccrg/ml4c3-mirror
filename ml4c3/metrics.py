@@ -546,7 +546,8 @@ def simclr_loss(_, hidden):
     batch_size = tf.shape(hidden1)[0]
     labels = tf.one_hot(tf.range(batch_size), batch_size * 2)
     masks = tf.one_hot(
-        tf.range(batch_size), batch_size,
+        tf.range(batch_size),
+        batch_size,
     )  # masks diagonals, aka self similarities
     logits_aa = tf.matmul(hidden1, hidden1, transpose_b=True) / temperature
     logits_aa = logits_aa - masks * large_num
@@ -555,10 +556,12 @@ def simclr_loss(_, hidden):
     logits_ab = tf.matmul(hidden1, hidden2, transpose_b=True) / temperature
     logits_ba = tf.matmul(hidden2, hidden1, transpose_b=True) / temperature
     loss_a = tf.compat.v1.losses.softmax_cross_entropy(
-        labels, tf.concat([logits_ab, logits_aa], 1),
+        labels,
+        tf.concat([logits_ab, logits_aa], 1),
     )
     loss_b = tf.compat.v1.losses.softmax_cross_entropy(
-        labels, tf.concat([logits_ba, logits_bb], 1),
+        labels,
+        tf.concat([logits_ba, logits_bb], 1),
     )
     return loss_a + loss_b
 
@@ -572,7 +575,8 @@ def simclr_accuracy(_, hidden):
     batch_size = tf.shape(hidden1)[0]
     labels = tf.one_hot(tf.range(batch_size), batch_size * 2)
     masks = tf.one_hot(
-        tf.range(batch_size), batch_size,
+        tf.range(batch_size),
+        batch_size,
     )  # masks diagonals, aka self similarities
     logits_aa = tf.matmul(hidden1, hidden1, transpose_b=True)
     logits_aa = logits_aa - masks * large_num
@@ -581,9 +585,11 @@ def simclr_accuracy(_, hidden):
     logits_ab = tf.matmul(hidden1, hidden2, transpose_b=True)
     logits_ba = tf.matmul(hidden2, hidden1, transpose_b=True)
     loss_a = tf.keras.metrics.categorical_accuracy(
-        labels, tf.concat([logits_ab, logits_aa], 1),
+        labels,
+        tf.concat([logits_ab, logits_aa], 1),
     )
     loss_b = tf.keras.metrics.categorical_accuracy(
-        labels, tf.concat([logits_ba, logits_bb], 1),
+        labels,
+        tf.concat([logits_ba, logits_bb], 1),
     )
     return tf.add(tf.reduce_mean(loss_a), tf.reduce_mean(loss_b)) / 2

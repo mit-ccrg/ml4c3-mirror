@@ -31,7 +31,8 @@ def get_unix_timestamps(time_stamp: np.ndarray) -> np.ndarray:
     def _get_time_shift(t_span):
         dt_span = datetime.utcfromtimestamp(t_span)
         offset = TIMEZONE.utcoffset(  # type: ignore
-            dt_span, is_dst=True,
+            dt_span,
+            is_dst=True,
         ).total_seconds()
         return t_span - offset
 

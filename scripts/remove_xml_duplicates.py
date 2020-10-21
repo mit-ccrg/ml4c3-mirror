@@ -11,7 +11,9 @@ def _parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--src", default="", help="Path to directory containing organized source XMLs",
+        "--src",
+        default="",
+        help="Path to directory containing organized source XMLs",
     )
 
     args = parser.parse_args()

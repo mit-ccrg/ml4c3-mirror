@@ -75,7 +75,8 @@ class TestRecipes:
                 if tm.is_categorical:
                     for channel, idx in tm.channel_map.items():
                         channel_val = getattr(
-                            row, categorical_explore_header(tm, channel),
+                            row,
+                            categorical_explore_header(tm, channel),
                         )
                         assert channel_val == row_expected[idx]
 

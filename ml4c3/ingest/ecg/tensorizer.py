@@ -64,7 +64,8 @@ def tensorize(args: argparse.Namespace):
 
 
 def _get_mrn_from_xml(
-    fpath_xml: str, mrn_key_in_xml: str,
+    fpath_xml: str,
+    mrn_key_in_xml: str,
 ) -> Union[Tuple[str, str], None]:
     with open(fpath_xml, "r") as f:
         for line in f:
@@ -77,7 +78,9 @@ def _get_mrn_from_xml(
 
 
 def _get_mrn_xmls_map(
-    xml_folder: str, num_workers: int, mrn_key_in_xml: str,
+    xml_folder: str,
+    num_workers: int,
+    mrn_key_in_xml: str,
 ) -> Dict[str, List[str]]:
     fpath_xmls = []
     for root, dirs, files in os.walk(xml_folder):
@@ -340,7 +343,9 @@ def _get_voltage_from_lead_tags(
 
 
 def _compress_and_save_data(
-    hd5: h5py.Group, name: str, data: Union[str, np.ndarray],
+    hd5: h5py.Group,
+    name: str,
+    data: Union[str, np.ndarray],
 ) -> h5py.Dataset:
     compression = None
     if isinstance(data, np.ndarray):
@@ -401,7 +406,9 @@ def _convert_xml_to_hd5(fpath_xml: str, fpath_hd5: str, hd5: h5py.Group) -> int:
         voltage = ecg_data.pop("voltage")
         for lead in voltage:
             _compress_and_save_data(
-                hd5=gp, name=lead, data=voltage[lead].astype("int16"),
+                hd5=gp,
+                name=lead,
+                data=voltage[lead].astype("int16"),
             )
 
         # Save everything else
@@ -415,7 +422,9 @@ def _convert_xml_to_hd5(fpath_xml: str, fpath_hd5: str, hd5: h5py.Group) -> int:
         if "patientid" in ecg_data:
             mrn_clean = _clean_mrn(ecg_data["patientid"], fallback="")
             _compress_and_save_data(
-                hd5=gp, name=key_mrn_clean, data=mrn_clean,
+                hd5=gp,
+                name=key_mrn_clean,
+                data=mrn_clean,
             )
 
         # Clean cardiologist read
@@ -424,7 +433,9 @@ def _convert_xml_to_hd5(fpath_xml: str, fpath_hd5: str, hd5: h5py.Group) -> int:
         if key_read_md in ecg_data:
             read_md_clean = _clean_read_text(text=ecg_data[key_read_md])
             _compress_and_save_data(
-                hd5=gp, name=key_read_md_clean, data=read_md_clean,
+                hd5=gp,
+                name=key_read_md_clean,
+                data=read_md_clean,
             )
 
         # Clean MUSE read
@@ -433,7 +444,9 @@ def _convert_xml_to_hd5(fpath_xml: str, fpath_hd5: str, hd5: h5py.Group) -> int:
         if key_read_pc in ecg_data:
             read_pc_clean = _clean_read_text(text=ecg_data[key_read_pc])
             _compress_and_save_data(
-                hd5=gp, name=key_read_pc_clean, data=read_pc_clean,
+                hd5=gp,
+                name=key_read_pc_clean,
+                data=read_pc_clean,
             )
 
         logging.info(f"Wrote {fpath_xml} to {fpath_hd5}")
@@ -441,7 +454,10 @@ def _convert_xml_to_hd5(fpath_xml: str, fpath_hd5: str, hd5: h5py.Group) -> int:
 
 
 def _move_bad_files(
-    fpath_xmls: List[str], fpath_hd5: str, bad_xml_dir: str, bad_hd5_dir: str,
+    fpath_xmls: List[str],
+    fpath_hd5: str,
+    bad_xml_dir: str,
+    bad_hd5_dir: str,
 ):
     # Move XMLs
     for fpath_xml in fpath_xmls:

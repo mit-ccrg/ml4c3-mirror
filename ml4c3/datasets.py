@@ -17,7 +17,9 @@ from ml4c3.definitions.globals import CSV_EXT, TENSOR_EXT, MRN_COLUMNS
 from ml4c3.tensormap.TensorMap import TensorMap, id_from_filename
 
 SampleGenerator = Generator[
-    Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]], None, None,
+    Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]],
+    None,
+    None,
 ]
 Cleanup = Callable[[], None]
 MAX_QUEUE_SIZE = 2048
@@ -43,7 +45,9 @@ def _get_sample(
     for tm in tmaps:
         name = tm.input_name if is_input else tm.output_name
         sample[name] = tm.postprocess_tensor(
-            tensor=sample_tensors[tm.name], hd5=hd5, augment=augment,
+            tensor=sample_tensors[tm.name],
+            hd5=hd5,
+            augment=augment,
         )
     return sample
 
@@ -434,7 +438,9 @@ def get_verbose_stats_string(
         dataframes = _get_stats_as_dataframes(stats, input_maps, output_maps)
     else:
         dataframes = _get_stats_as_dataframes_from_multiple_datasets(
-            split_stats, input_maps, output_maps,
+            split_stats,
+            input_maps,
+            output_maps,
         )
     continuous_tm_df, categorical_tm_df, other_tm_df = dataframes
 
@@ -472,7 +478,9 @@ def get_verbose_stats_string(
 
 
 def _get_stats_as_dataframes(
-    stats: Counter, input_maps: List[TensorMap], output_maps: List[TensorMap],
+    stats: Counter,
+    input_maps: List[TensorMap],
+    output_maps: List[TensorMap],
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     continuous_tmaps = []
     categorical_tmaps = []
@@ -514,7 +522,8 @@ def _get_stats_as_dataframes(
     categorical_tm_df = pd.DataFrame(
         {key: val for key, val in _stats.items() if key in {"count", "percent"}},
         index=pd.MultiIndex.from_tuples(
-            zip(_stats["TensorMap"], _stats["Label"]), names=["TensorMap", "Label"],
+            zip(_stats["TensorMap"], _stats["Label"]),
+            names=["TensorMap", "Label"],
         ),
     )
     categorical_tm_df.index.name = "TensorMap"
@@ -535,7 +544,9 @@ def _get_stats_as_dataframes_from_multiple_datasets(
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     split_to_dataframes = {
         split: _get_stats_as_dataframes(
-            stats=stats, input_maps=input_maps, output_maps=output_maps,
+            stats=stats,
+            input_maps=input_maps,
+            output_maps=output_maps,
         )
         for split, stats in split_stats.items()
     }
@@ -606,7 +617,8 @@ def _get_train_valid_test_discard_ratios(
 
 
 def _sample_csv_to_set(
-    sample_csv: Optional[str] = None, mrn_col_name: Optional[str] = None,
+    sample_csv: Optional[str] = None,
+    mrn_col_name: Optional[str] = None,
 ) -> Union[None, Set[str]]:
 
     if sample_csv is None:
@@ -748,7 +760,8 @@ def get_train_valid_test_paths(
                 test_paths.append(path)
             else:
                 choice = np.random.choice(
-                    [k for k in choices], p=[choices[k][1] for k in choices],
+                    [k for k in choices],
+                    p=[choices[k][1] for k in choices],
                 )
                 choices[choice][0].append(path)
 

@@ -81,7 +81,10 @@ def make_around_event_tensor_from_file(
         event_time = event_time[0][0]
         start, end = get_offset_time(event_time, period, time, time_2)
         time_tensor = signal_time_tm.tensor_from_file(
-            signal_time_tm, hd5, visits=visit, **kwargs,
+            signal_time_tm,
+            hd5,
+            visits=visit,
+            **kwargs,
         )
         indices = np.where(np.logical_and(start < time_tensor, end > time_tensor)[0])[0]
         if imputation_type:

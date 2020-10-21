@@ -36,7 +36,8 @@ from matplotlib import pyplot as plt    # isort:skip
 
 
 def explore(
-    args: argparse.Namespace, disable_saving_output: bool = False,
+    args: argparse.Namespace,
+    disable_saving_output: bool = False,
 ) -> pd.DataFrame:
     cohort_counts = OrderedDict()
 
@@ -177,7 +178,8 @@ def explore(
         # Else, path to reference tensors is file (assume CSV)
         else:
             df_ref = pd.read_csv(
-                filepath_or_buffer=args.reference_tensors, usecols=ref_cols,
+                filepath_or_buffer=args.reference_tensors,
+                usecols=ref_cols,
             )
 
         # Remove rows in df with NaNs for src_join, or type casting fails
@@ -192,24 +194,34 @@ def explore(
 
         # Count total and unique entries in df: source
         cohort_counts = _update_cohort_counts_len_and_unique(
-            cohort_counts=cohort_counts, df=df, name=src_name, join_col=src_join,
+            cohort_counts=cohort_counts,
+            df=df,
+            name=src_name,
+            join_col=src_join,
         )
 
         # Count total and unique entries in df: reference
         cohort_counts = _update_cohort_counts_len_and_unique(
-            cohort_counts=cohort_counts, df=df_ref, name=ref_name, join_col=ref_join,
+            cohort_counts=cohort_counts,
+            df=df_ref,
+            name=ref_name,
+            join_col=ref_join,
         )
 
         # Format datetime cols and remove nan rows
         if use_time:
             df[src_time] = pd.to_datetime(
-                df[src_time], errors="coerce", infer_datetime_format=True,
+                df[src_time],
+                errors="coerce",
+                infer_datetime_format=True,
             )
             df.dropna(subset=[src_time], inplace=True)
 
             for ref_time in _cols_from_time_windows(time_windows):
                 df_ref[ref_time] = pd.to_datetime(
-                    df_ref[ref_time], errors="coerce", infer_datetime_format=True,
+                    df_ref[ref_time],
+                    errors="coerce",
+                    infer_datetime_format=True,
                 )
             df_ref.dropna(subset=_cols_from_time_windows(time_windows), inplace=True)
 
@@ -224,7 +236,10 @@ def explore(
                 start_name_offset = _offset_ref_name(name=name, days=days)
                 ref_cols = _offset_ref_cols(name=name, days=days, ref_cols=ref_cols)
                 df_ref = _offset_ref_df(
-                    name=name, days=days, name_offset=start_name_offset, df=df_ref,
+                    name=name,
+                    days=days,
+                    name_offset=start_name_offset,
+                    df=df_ref,
                 )
 
                 # End time
@@ -232,7 +247,10 @@ def explore(
                 end_name_offset = _offset_ref_name(name=name, days=days)
                 ref_cols = _offset_ref_cols(name=name, days=days, ref_cols=ref_cols)
                 df_ref = _offset_ref_df(
-                    name=name, days=days, name_offset=end_name_offset, df=df_ref,
+                    name=name,
+                    days=days,
+                    name_offset=end_name_offset,
+                    df=df_ref,
                 )
 
                 # Append list with tuple of offset start and end names
@@ -242,7 +260,10 @@ def explore(
 
         # Intersect with input tensors df on specified keys
         df_cross = df.merge(
-            df_ref, how="inner", left_on=src_join, right_on=ref_join,
+            df_ref,
+            how="inner",
+            left_on=src_join,
+            right_on=ref_join,
         ).sort_values(src_cols)
         logging.info("Cross-referenced using src and ref join tensors")
 
@@ -267,7 +288,9 @@ def explore(
 
         # Get list of dfs with >=1 occurrence per time window
         dfs_cross_window = _get_df_per_window(
-            df=df_cross, src_time=src_time, windows=time_windows_parsed,
+            df=df_cross,
+            src_time=src_time,
+            windows=time_windows_parsed,
         )
 
         # Get list of dfs with >=N hits in any time window
@@ -283,7 +306,9 @@ def explore(
         # --------------------------------------------------------------------------- #
         if match_min_window and match_any_window:
             df_aggregated = _aggregate_time_windows(
-                dfs=dfs_n_or_more_hits_any_window, windows=windows, src_cols=src_cols,
+                dfs=dfs_n_or_more_hits_any_window,
+                windows=windows,
+                src_cols=src_cols,
             )
             logging.info(
                 f"Cross-referenced so event occurs {number_per_window}+ times in"
@@ -298,10 +323,13 @@ def explore(
         # isolate rows that have join_tensors across all windows
         if match_min_window and match_every_window:
             dfs = _intersect_time_windows(
-                dfs=dfs_n_or_more_hits_any_window, src_join=src_join,
+                dfs=dfs_n_or_more_hits_any_window,
+                src_join=src_join,
             )
             df_aggregated = _aggregate_time_windows(
-                dfs=dfs, windows=windows, src_cols=src_cols,
+                dfs=dfs,
+                windows=windows,
+                src_cols=src_cols,
             )
             logging.info(
                 f"Cross-referenced so unique event occurs {number_per_window}+ times in"
@@ -324,7 +352,9 @@ def explore(
                     number_per_window=number_per_window,
                 )
                 for df, order, (start, end) in zip(
-                    dfs_n_or_more_hits_any_window, order_in_window, time_windows_parsed,
+                    dfs_n_or_more_hits_any_window,
+                    order_in_window,
+                    time_windows_parsed,
                 )
             ]
             # What do we do if match_exact_window, but not match_any_window?
@@ -332,7 +362,9 @@ def explore(
         # ?
         if match_exact_window and match_any_window:
             df_aggregated = _aggregate_time_windows(
-                dfs=dfs, windows=windows, src_cols=src_cols,
+                dfs=dfs,
+                windows=windows,
+                src_cols=src_cols,
             )
             logging.info(
                 f"Cross-referenced so unique event occurs exactly {number_per_window} times in any window",
@@ -381,7 +413,8 @@ def explore(
 
         # Iterate over union and intersect of df and calculate summary statistics
         for df, union_or_intersect in zip(
-            [df_window, df_window.dropna()], ["union", "intersect"],
+            [df_window, df_window.dropna()],
+            ["union", "intersect"],
         ):
             # Get list of unique labels from df
             labels = ["all"]
@@ -442,7 +475,9 @@ def explore(
                             if binary_channel_map(tm=tm):
                                 key = tm.name
                                 stats = _calculate_summary_stats(
-                                    df=df_label, key=key, interpretation=interpretation,
+                                    df=df_label,
+                                    key=key,
+                                    interpretation=interpretation,
                                 )
                                 stats_all.append(stats)
                                 stats_keys.append(f"{tm.name}{key_suffix}")
@@ -460,7 +495,9 @@ def explore(
                         else:
                             key = tm.name
                             stats = _calculate_summary_stats(
-                                df=df_label, key=key, interpretation=interpretation,
+                                df=df_label,
+                                key=key,
+                                interpretation=interpretation,
                             )
                             stats_all.append(stats)
                             stats_keys.append(f"{tm.name}{key_suffix}")
@@ -503,7 +540,9 @@ def explore(
     # Save cohort counts to CSV
     fpath = os.path.join(args.output_folder, args.id, "cohort_counts.csv")
     df_cohort_counts = pd.DataFrame.from_dict(
-        cohort_counts, orient="index", columns=["count"],
+        cohort_counts,
+        orient="index",
+        columns=["count"],
     )
     df_cohort_counts = df_cohort_counts.rename_axis("description")
     if not disable_saving_output:
@@ -533,7 +572,8 @@ def _remove_redundant_cols(tmaps: List[TensorMap], df: pd.DataFrame) -> pd.DataF
 
                 # Simplify name of positive label column
                 df.rename(
-                    columns={f"{tm.name}_{positive_label}": f"{tm.name}"}, inplace=True,
+                    columns={f"{tm.name}_{positive_label}": f"{tm.name}"},
+                    inplace=True,
                 )
     return df
 
@@ -563,7 +603,9 @@ def _plot_histogram_continuous_tensor(
             data = df[df[stratify_label] == stratify_label_value][tmap_name]
             kde = not np.isclose(data.var(), 0)
             sns.distplot(
-                a=data, label=legend_str, kde=kde,
+                a=data,
+                label=legend_str,
+                kde=kde,
             )
             plt.xlabel("Value")
             plt.ylabel("Probability")
@@ -577,7 +619,9 @@ def _plot_histogram_continuous_tensor(
         plt.xlabel("Value")
         plt.ylabel("Probability")
     fpath = os.path.join(
-        output_folder, output_id, f"histogram_{tmap_name}_{window}{image_ext}",
+        output_folder,
+        output_id,
+        f"histogram_{tmap_name}_{window}{image_ext}",
     )
     plt.savefig(fpath, dpi=150, bbox_inches="tight")
     plt.close()
@@ -683,17 +727,22 @@ def _save_label_distribution(
 
     # Combine lists into dataframe
     df_label_distribution = pd.DataFrame(
-        data=[counts, fractions], index=["count", "fraction"], columns=labels,
+        data=[counts, fractions],
+        index=["count", "fraction"],
+        columns=labels,
     ).T
     fpath = os.path.join(
-        output_folder, output_id, f"label_distribution_{title}_{window}.csv",
+        output_folder,
+        output_id,
+        f"label_distribution_{title}_{window}.csv",
     )
     df_label_distribution.round(3).to_csv(fpath)
     logging.info(f"Saved {fpath}")
 
 
 def _intersect_time_windows(
-    dfs: List[pd.DataFrame], src_join: list,
+    dfs: List[pd.DataFrame],
+    src_join: list,
 ) -> List[pd.DataFrame]:
     for i, df in enumerate(dfs):
         if i == 0:
@@ -710,7 +759,9 @@ def _intersect_time_windows(
 
 
 def _aggregate_time_windows(
-    dfs: List[pd.DataFrame], windows: list, src_cols: list,
+    dfs: List[pd.DataFrame],
+    windows: list,
+    src_cols: list,
 ) -> pd.DataFrame:
     """Aggregate list of dataframes (one per time window) back into one dataframe with column indicating the time window index"""
     # Add time window column and value to each df in list
@@ -719,13 +770,16 @@ def _aggregate_time_windows(
             df["time_window"] = window
     # Concatenate dfs back together
     df_together = pd.concat(dfs, ignore_index=True).sort_values(
-        by=src_cols + ["time_window"], ignore_index=True,
+        by=src_cols + ["time_window"],
+        ignore_index=True,
     )
     return df_together
 
 
 def _get_df_per_window(
-    df: pd.DataFrame, windows: List[Tuple], src_time: str,
+    df: pd.DataFrame,
+    windows: List[Tuple],
+    src_time: str,
 ) -> List[pd.DataFrame]:
     return [
         df[(df[start] < df[src_time]) & (df[src_time] < df[end])]
@@ -746,7 +800,10 @@ def _get_df_n_or_more_hits_any_window(
 
 
 def _update_cohort_counts_len_and_unique(
-    cohort_counts: dict, df: pd.DataFrame, name: str, join_col: str,
+    cohort_counts: dict,
+    df: pd.DataFrame,
+    name: str,
+    join_col: str,
 ) -> dict:
     cohort_counts[f"{name} (total rows)"] = len(df)
     cohort_counts[f'{name} (unique {" + ".join(join_col)})'] = len(
@@ -795,7 +852,10 @@ def _offset_ref_cols(name: str, days: int, ref_cols: list) -> list:
 
 
 def _offset_ref_df(
-    name: str, days: int, name_offset: str, df: pd.DataFrame,
+    name: str,
+    days: int,
+    name_offset: str,
+    df: pd.DataFrame,
 ) -> pd.DataFrame:
     if name_offset not in df:
         df[name_offset] = df[name].apply(lambda x: x + datetime.timedelta(days=days))
@@ -836,7 +896,9 @@ class TensorsToDataFrameParallelWrapper:
         # each worker should write to it's own file
         pid = mp.current_process().pid
         fpath = os.path.join(
-            self.output_folder, self.run_id, f"tensors_all_union_{pid}.csv",
+            self.output_folder,
+            self.run_id,
+            f"tensors_all_union_{pid}.csv",
         )
         write_header = not os.path.isfile(fpath)
 
@@ -854,7 +916,9 @@ class TensorsToDataFrameParallelWrapper:
                                 break
                             try:
                                 tensor = tm.postprocess_tensor(
-                                    tensor, augment=False, hd5=hd5,
+                                    tensor,
+                                    augment=False,
+                                    hd5=hd5,
                                 )
                                 if tm.channel_map:
                                     for cm in tm.channel_map:
@@ -882,7 +946,8 @@ class TensorsToDataFrameParallelWrapper:
                                         ] = np.nan
                                 else:
                                     dict_of_tensor_dicts[i][tm.name] = np.full(
-                                        shape, np.nan,
+                                        shape,
+                                        np.nan,
                                     )[0]
                             if self.export_error:
                                 dict_of_tensor_dicts[i][f"error_type_{tm.name}"] = type(
