@@ -11,6 +11,7 @@ import h5py
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+from tensorflow_probability import distributions as tfd
 
 # Imports: first party
 from ml4c3.definitions.globals import CSV_EXT, TENSOR_EXT, MRN_COLUMNS
@@ -241,6 +242,7 @@ def make_dataset(
     num_workers: int,
     augment: bool = False,
     keep_paths: bool = False,
+    mixup_alpha: float = 0,
 ) -> Tuple[tf.data.Dataset, StatsWrapper, Cleanup]:
     output_types = (
         {tm.input_name: tf.float32 for tm in input_maps},
@@ -272,6 +274,38 @@ def make_dataset(
         .prefetch(16)
     )
 
+    if mixup_alpha != 0:
+        dist = tfd.Beta(mixup_alpha, mixup_alpha)
+
+        def mixup(*batch):
+            """
+            Augments a batch of samples by overlaying consecutive samples weighted by
+            samples taken from a beta distribution.
+            """
+            in_batch, out_batch = batch[BATCH_INPUT_INDEX], batch[BATCH_OUTPUT_INDEX]
+            # last batch in epoch may not be exactly batch_size, get actual _size
+            _size = tf.shape(in_batch[input_maps[0].input_name])[:1]
+            # roll samples for masking [1,2,3] -> [3,1,2]
+            in_roll = {k: tf.roll(in_batch[k], 1, 0) for k in in_batch}
+            out_roll = {k: tf.roll(out_batch[k], 1, 0) for k in out_batch}
+            # sample from beta distribution
+            lambdas = dist.sample(_size)
+            for k in in_batch:
+                # lambdas is shape (_size,), reshape to match rank of tensor for math
+                _dims = [_size, tf.ones(tf.rank(in_batch[k]) - 1, tf.int32)]
+                _shape = tf.concat(_dims, 0)
+                _lambdas = tf.reshape(lambdas, _shape)
+                # augment samples with mixup
+                in_batch[k] = in_batch[k] * _lambdas + in_roll[k] * (1 - _lambdas)
+            for k in out_batch:
+                _dims = [_size, tf.ones(tf.rank(out_batch[k]) - 1, tf.int32)]
+                _shape = tf.concat(_dims, 0)
+                _lambdas = tf.reshape(lambdas, _shape)
+                out_batch[k] = out_batch[k] * _lambdas + out_roll[k] * (1 - _lambdas)
+            return batch
+
+        dataset = dataset.map(mixup)
+
     return dataset, stats_wrapper, cleanup
 
 
@@ -292,6 +326,7 @@ def train_valid_test_datasets(
     no_empty_paths_allowed: bool = True,
     output_folder: str = None,
     run_id: str = None,
+    mixup_alpha: float = 0.0,
 ) -> Tuple[
     Tuple[tf.data.Dataset, tf.data.Dataset, tf.data.Dataset],
     Tuple[StatsWrapper, StatsWrapper, StatsWrapper],
@@ -316,6 +351,7 @@ def train_valid_test_datasets(
     :param no_empty_paths_allowed: if true, all data splits must contain paths, otherwise only one split needs to be non-empty
     :param output_folder: output folder of output files
     :param run_id: id of experiment
+    :param mixup_alpha: If non-zero, mixup batches with this alpha parameter for mixup
     :return: tuple of three tensorflow Datasets, three StatsWrapper objects, and three callbacks to cleanup worker processes
     """
     if len(tensor_maps_in) == 0 or len(tensor_maps_out) == 0:
@@ -357,6 +393,7 @@ def train_valid_test_datasets(
         num_workers=num_workers,
         augment=True,
         keep_paths=keep_paths,
+        mixup_alpha=mixup_alpha,
     )
     valid_dataset, valid_stats, valid_cleanup = make_dataset(
         data_split="valid",

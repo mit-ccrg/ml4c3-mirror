@@ -540,10 +540,7 @@ def parse_args() -> argparse.Namespace:
         "--mixup_alpha",
         default=0,
         type=float,
-        help=(
-            "If positive apply mixup and sample from a Beta with this value as shape"
-            " parameter alpha."
-        ),
+        help="If non-zero, mixup batches with this alpha parameter for mixup.",
     )
     training_parser.add_argument(
         "--patience",

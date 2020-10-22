@@ -121,6 +121,7 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         test_csv=args.test_csv,
         output_folder=args.output_folder,
         run_id=args.id,
+        mixup_alpha=args.mixup_alpha,
     )
     train_dataset, valid_dataset, test_dataset = datasets
     model = make_multimodal_multitask_model(**args.__dict__)
@@ -237,6 +238,7 @@ def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
         test_csv=args.test_csv,
         output_folder=args.output_folder,
         run_id=args.id,
+        mixup_alpha=args.mixup_alpha,
     )
     train_dataset, valid_dataset, test_dataset = datasets
 
@@ -344,6 +346,7 @@ def train_simclr_model(args: argparse.Namespace):
         test_csv=args.test_csv,
         output_folder=args.output_folder,
         run_id=args.id,
+        mixup_alpha=args.mixup_alpha,
     )
     train_dataset, valid_dataset, test_dataset = datasets
     model = make_multimodal_multitask_model(**args.__dict__)
