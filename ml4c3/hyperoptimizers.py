@@ -180,6 +180,7 @@ def hyperparameter_optimizer(
                 test_csv=args.test_csv,
                 output_folder=args.output_folder,
                 run_id=args.id,
+                mixup_alpha=args.mixup_alpha,
             )
             train_dataset, valid_dataset, test_dataset = datasets
             model, history = train_model_from_datasets(
