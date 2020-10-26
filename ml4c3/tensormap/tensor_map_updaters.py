@@ -2,6 +2,7 @@
 import os
 import re
 import copy
+import datetime
 from typing import Dict, Optional
 
 # Imports: third party
@@ -15,9 +16,10 @@ from ml4c3.validators import validator_voltage_no_zero_padding
 from ml4c3.definitions.ecg import (
     ECG_PREFIX,
     ECG_REST_LEADS_ALL,
+    ECG_DATETIME_FORMAT,
     ECG_REST_LEADS_INDEPENDENT,
 )
-from ml4c3.definitions.sts import STS_PREDICTION_DIR
+from ml4c3.definitions.sts import STS_PREFIX, STS_DATE_FORMAT, STS_PREDICTION_DIR
 from ml4c3.tensormap.TensorMap import (
     TensorMap,
     Interpretation,
@@ -25,11 +27,7 @@ from ml4c3.tensormap.TensorMap import (
     id_from_filename,
     find_negative_label_and_channel,
 )
-from ml4c3.tensormap.tensor_maps_ecg import (
-    get_ecg_dates,
-    name2augmenters,
-    make_voltage_tff,
-)
+from ml4c3.tensormap.tensor_maps_ecg import name2augmenters, make_voltage_tff
 
 
 def update_tmaps_ecg_voltage(
@@ -188,25 +186,64 @@ def update_tmaps_sts_window(
 ) -> Dict[str, TensorMap]:
     """Make new tmap from base name, making conditional on surgery date"""
 
-    suffixes = ["preop", "postop"]
-    for suffix in suffixes:
-        if suffix in tmap_name:
-            # fmt: off
-            from ml4c3.tensormap.tensor_maps_sts import date_interval_lookup  # isort:skip
-            # fmt: on
-
-            base_name, _ = tmap_name.split(f"_{suffix}")
+    windows = ["with_preop_ecg", "with_postop_ecg", "preop", "postop"]
+    for window in windows:
+        if window in tmap_name:
+            base_name, _ = tmap_name.split(f"_{window}")
             if base_name not in tmaps:
                 raise ValueError(
-                    f"Base tmap {base_name} not in existing tmaps. Cannot modify STS {suffix} window.",
+                    f"Base tmap {base_name} not in existing tmaps. Cannot modify STS {window} window.",
                 )
-            tmap = copy.deepcopy(tmaps[base_name])
-            new_tmap_name = f"{base_name}_{suffix}"
-            tmap.name = new_tmap_name
-            tmap.time_series_lookup = date_interval_lookup[suffix]
-            tmaps[new_tmap_name] = tmap
+            base_tmap = tmaps[base_name]
+            new_tmap = copy.deepcopy(base_tmap)
+            new_tmap_name = f"{base_name}_{window}"
+
+            def offset_date(
+                sts_date: str,
+                offset: int,
+                date_format: str,
+            ) -> str:
+                return (
+                    datetime.datetime.strptime(sts_date, date_format)
+                    + datetime.timedelta(days=offset)
+                ).strftime(date_format)
+
+            def time_series_filter(hd5):
+                _dates = base_tmap.time_series_filter(hd5)
+
+                if "ecg" in window:
+                    xref_dates = list(hd5[ECG_PREFIX])
+                    date_format = ECG_DATETIME_FORMAT
+                else:
+                    xref_dates = list(hd5[STS_PREFIX])
+                    date_format = STS_DATE_FORMAT
+                dates = []
+                for xref_date in xref_dates:
+                    if window == "preop" or window == "with_postop_ecg":
+                        start_date = offset_date(
+                            xref_date,
+                            -30,
+                            date_format=date_format,
+                        )
+                        end_date = xref_date
+                    elif window == "postop" or window == "with_preop_ecg":
+                        start_date = xref_date
+                        end_date = offset_date(xref_date, 30, date_format=date_format)
+                    else:
+                        raise ValueError(f"Unknown STS window: {window}")
+                    for d in _dates:
+                        if start_date < d < end_date:
+                            dates.append(d)
+                return dates
+
+            new_tmap.name = new_tmap_name
+            new_tmap.time_series_filter = time_series_filter
+            tmaps[new_tmap_name] = new_tmap
             break
     return tmaps
+
+
+random_date_selections = dict()
 
 
 def update_tmaps_time_series(
@@ -235,10 +272,31 @@ def update_tmaps_time_series(
         raise ValueError(
             f"Base tmap {base_name} not in existing tmaps. Cannot modify time series.",
         )
-    tmap = copy.deepcopy(tmaps[base_name])
+    base_tmap = tmaps[base_name]
+
+    def time_series_filter(hd5):
+        _dates = base_tmap.time_series_filter(hd5)
+        _dates = sorted(_dates)
+        tsl = 1 if time_series_limit is None else time_series_limit
+        if time_series_order == TimeSeriesOrder.RANDOM:
+            if hd5.filename in random_date_selections:
+                return random_date_selections[hd5.filename]
+            if len(_dates) < tsl:
+                tsl = len(_dates)
+            _dates = np.random.choice(_dates, tsl, replace=False)
+            random_date_selections[hd5.filename] = _dates
+            return _dates
+        elif time_series_order == TimeSeriesOrder.OLDEST:
+            return _dates[:tsl]
+        elif time_series_order == TimeSeriesOrder.NEWEST:
+            return _dates[-tsl:]
+        else:
+            raise ValueError(f"Unknown time series ordering: {time_series_order}")
+
+    new_tmap = copy.deepcopy(base_tmap)
     new_tmap_name = f"{base_name}{base_split}"
-    tmap.name = new_tmap_name
-    tmap.time_series_limit = time_series_limit
-    tmap.time_series_order = time_series_order
-    tmaps[new_tmap_name] = tmap
+    new_tmap.name = new_tmap_name
+    new_tmap.time_series_limit = time_series_limit
+    new_tmap.time_series_filter = time_series_filter
+    tmaps[new_tmap_name] = new_tmap
     return tmaps

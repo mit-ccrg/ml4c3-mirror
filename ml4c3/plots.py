@@ -39,7 +39,7 @@ from ml4c3.tensormap.TensorMap import (
 
 # fmt: off
 # need matplotlib -> Agg -> pyplot
-import matplotlib  # isort:skip
+import matplotlib      # isort:skip
 matplotlib.use("Agg")  # isort:skip
 from matplotlib import pyplot as plt  # isort:skip
 # fmt: on
@@ -151,10 +151,21 @@ def evaluate_predictions(
     performance_metrics = {}
     if tm.is_categorical and tm.axes == 1:
         logging.info(
-            f"{tm.name} has channel map: {tm.channel_map}"
-            f" with {y_predictions.shape[0]} examples in the test set.\n"
+            f"{data_split} split: {tm.name} has channel map: {tm.channel_map}"
+            f" with {y_predictions.shape[0]} examples.\n"
             f"Sum Truth:{np.sum(y_truth, axis=0)} \nSum pred"
             f" :{np.sum(y_predictions, axis=0)}",
+        )
+        performance_metrics.update(
+            plot_roc_per_class(
+                prediction=y_predictions,
+                truth=y_truth,
+                labels=tm.channel_map,
+                title=title,
+                image_ext=image_ext,
+                prefix=folder,
+                data_split=data_split,
+            ),
         )
         plot_precision_recall_per_class(
             prediction=y_predictions,
@@ -173,17 +184,6 @@ def evaluate_predictions(
             image_ext=image_ext,
             prefix=folder,
             data_split=data_split,
-        )
-        performance_metrics.update(
-            plot_roc_per_class(
-                prediction=y_predictions,
-                truth=y_truth,
-                labels=tm.channel_map,
-                title=title,
-                image_ext=image_ext,
-                prefix=folder,
-                data_split=data_split,
-            ),
         )
         rocs.append((y_predictions, y_truth, tm.channel_map))
         # only plot confusion matrix for non-binary tasks
@@ -541,7 +541,7 @@ def plot_prediction_calibration(
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
     plt.savefig(figure_path, bbox_inches="tight")
-    logging.info(f"Saved calibration plot at: {figure_path}")
+    logging.info(f"{data_split} split: saved calibration plot at: {figure_path}")
     plt.clf()
 
 
@@ -599,7 +599,9 @@ def plot_confusion_matrix(
     plt.tight_layout()
     plt.savefig(figure_path, bbox_inches="tight")
     plt.clf()
-    logging.info("Saved confusion matrix at: {}".format(figure_path))
+    logging.info(
+        "{data_split} split: saved confusion matrix at: {}".format(figure_path),
+    )
     return cms
 
 
@@ -755,7 +757,7 @@ def subplot_scatters(
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
     plt.savefig(figure_path)
-    logging.info(f"Saved scatters together at: {figure_path}")
+    logging.info(f"{data_split} split: saved scatters together at: {figure_path}")
 
 
 def _plot_ecg_text(
@@ -1230,6 +1232,31 @@ def plot_ecg(args):
             logging.exception(f"Broken tensor at: {tp}")
 
 
+def get_fpr_tpr_roc_pred(y_pred, test_truth, labels):
+    # Compute ROC curve and ROC area for each class
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+
+    for k in labels:
+        cur_idx = labels[k]
+        if y_pred.shape[1] == 1:
+            y_pred_this_label = y_pred[:, 0]
+        elif y_pred.shape[1] > 1:
+            if len(labels) > 1:
+                y_pred_this_label = y_pred[
+                    :, cur_idx if len(labels) > 1 else cur_idx + 1
+                ]
+            else:
+                y_pred_this_label = y_pred[:, cur_idx + 1]
+        fpr[cur_idx], tpr[cur_idx], _ = roc_curve(
+            test_truth[:, cur_idx],
+            y_pred_this_label,
+        )
+        roc_auc[cur_idx] = auc(fpr[cur_idx], tpr[cur_idx])
+    return fpr, tpr, roc_auc
+
+
 def plot_roc_per_class(
     prediction: np.array,
     truth: np.array,
@@ -1266,7 +1293,7 @@ def plot_roc_per_class(
             label=label_text,
         )
         logging.info(
-            f"ROC AUC for {label_text}, "
+            f"{data_split} split: ROC AUC for {label_text}, "
             f"Truth shape {truth.shape}, "
             f"True sums {true_sums}",
         )
@@ -1287,7 +1314,7 @@ def plot_roc_per_class(
         os.makedirs(os.path.dirname(figure_path))
     plt.savefig(figure_path, bbox_inches="tight")
     plt.clf()
-    logging.info("Saved ROC curve at: {}".format(figure_path))
+    logging.info(f"{data_split} split: saved ROC curve at: {figure_path}")
     return labels_to_areas
 
 
@@ -1347,7 +1374,7 @@ def subplot_rocs(
             col += 1
             if col >= cols:
                 break
-    figure_path = os.path.join(plot_path, f"roc_together_{data_split}{image_ext}")
+    figure_path = os.path.join(plot_path, f"roc-together-{data_split}{image_ext}")
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
     plt.savefig(figure_path)
@@ -1390,7 +1417,7 @@ def plot_precision_recall_per_class(
             f" n={true_sums[labels[label]]:.0f}"
         )
         plt.plot(recall, precision, lw=lw, color=color, label=label_text)
-        logging.info(f"prAUC Label {label_text}")
+        logging.info(f"{data_split} split: prAUC {label_text}")
 
     plt.xlim([0.0, 1.0])
     plt.ylim([-0.02, 1.03])
@@ -1401,29 +1428,14 @@ def plot_precision_recall_per_class(
 
     figure_path = os.path.join(
         prefix,
-        "precision_recall_" + title + "_" + data_split + image_ext,
+        "precision-recall-" + title + "-" + data_split + image_ext,
     )
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
     plt.savefig(figure_path, bbox_inches="tight")
     plt.clf()
-    logging.info(f"Saved Precision Recall curve at: {figure_path}")
+    logging.info(f"{data_split} split: saved precision-recall curve at: {figure_path}")
     return labels_to_areas
-
-
-def get_fpr_tpr_roc_pred(y_pred, test_truth, labels):
-    # Compute ROC curve and ROC area for each class
-    fpr = dict()
-    tpr = dict()
-    roc_auc = dict()
-
-    for k in labels:
-        cur_idx = labels[k]
-        aser = roc_curve(test_truth[:, cur_idx], y_pred[:, cur_idx])
-        fpr[labels[k]], tpr[labels[k]], _ = aser
-        roc_auc[labels[k]] = auc(fpr[labels[k]], tpr[labels[k]])
-
-    return fpr, tpr, roc_auc
 
 
 def _hash_string_to_color(string):

@@ -4,13 +4,19 @@ import logging
 from enum import Enum, auto
 from typing import Any, Dict, List, Tuple, Union, Callable, Optional, Sequence
 from itertools import chain
+from collections import defaultdict
 
 # Imports: third party
 import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
 import tensorflow_probability as tfp
+from xgboost import XGBClassifier
+from sklearn.svm import LinearSVC
+from sklearn.ensemble import RandomForestClassifier
 from tensorflow.keras import backend as K
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.linear_model import LogisticRegression
 from tensorflow.keras.utils import model_to_dot
 from tensorflow.keras.layers import (
     ELU,
@@ -64,26 +70,39 @@ from tensorflow.keras.regularizers import l1_l2
 # Imports: first party
 from ml4c3.plots import plot_metric_history, plot_architecture_diagram
 from ml4c3.metrics import get_metric_dict
+from ml4c3.datasets import (
+    BATCH_INPUT_INDEX,
+    BATCH_PATHS_INDEX,
+    BATCH_OUTPUT_INDEX,
+    get_array_from_dict_of_arrays,
+    get_dicts_of_arrays_from_dataset,
+)
 from ml4c3.optimizers import NON_KERAS_OPTIMIZERS, get_optimizer
 from ml4c3.definitions.globals import MODEL_EXT
-from ml4c3.tensormap.TensorMap import TensorMap
+from ml4c3.tensormap.TensorMap import TensorMap, find_negative_label_and_channel
 
 CHANNEL_AXIS = -1  # Set to 1 for Theano backend
 LANGUAGE_MODEL_SUFFIX = "_next_character"
+
+SKLEARN_MODELS = Union[
+    LogisticRegression,
+    LinearSVC,
+    RandomForestClassifier,
+    XGBClassifier,
+]
 
 tfd = tfp.distributions
 
 
 class BottleneckType(Enum):
-    FlattenRestructure = (
-        auto()
-    )  # All decoder outputs are flattened to put into embedding
-    GlobalAveragePoolStructured = (
-        auto()
-    )  # Structured (not flat) decoder outputs are global average pooled
-    Variational = (
-        auto()
-    )  # All decoder outputs are flattened then variationally sampled to put into embedding
+    # All decoder outputs are flattened to put into embedding
+    FlattenRestructure = auto()
+
+    # Structured (not flat) decoder outputs are global average pooled
+    GlobalAveragePoolStructured = auto()
+
+    # All decoder outputs are flattened then variationally sampled to put into embedding
+    Variational = auto()
 
 
 def make_shallow_model(
@@ -92,8 +111,6 @@ def make_shallow_model(
     optimizer: str,
     learning_rate: float,
     learning_rate_schedule: str,
-    l1: float,
-    l2: float,
     model_file: str = None,
     donor_layers: str = None,
     **kwargs,
@@ -121,10 +138,14 @@ def make_shallow_model(
     outputs = []
     my_metrics = {}
     loss_weights = []
-    regularizer = l1_l2(l1=l1, l2=l2)
+    regularizer = l1_l2(
+        l1=kwargs.get("l1") if "l1" in kwargs else 0,
+        l2=kwargs.get("l2") if "l2" in kwargs else 0,
+    )
 
     input_tensors = [Input(shape=tm.shape, name=tm.input_name) for tm in tensor_maps_in]
     it = concatenate(input_tensors) if len(input_tensors) > 1 else input_tensors[0]
+
     for ot in tensor_maps_out:
         losses.append(ot.loss)
         loss_weights.append(ot.loss_weight)
@@ -160,6 +181,82 @@ def make_shallow_model(
     return model
 
 
+def make_sklearn_model(
+    model_type: str,
+    hyperparameters: Dict[str, float],
+) -> SKLEARN_MODELS:
+    """
+    Initialize and return a scikit-learn model.
+
+    :param model_type: String defining type of scikit-learn model to initialize
+    :param hyperparameters: Dict of hyperparameter names and values
+
+    """
+    if model_type == "logreg":
+        model = LogisticRegression(
+            penalty="elasticnet",
+            solver="saga",
+            class_weight="balanced",
+            max_iter=5000,
+            C=hyperparameters["c"],
+            l1_ratio=hyperparameters["l1_ratio"],
+        )
+    elif model_type == "svm":
+        model = MySVM(class_weight="balanced", C=hyperparameters["c"])
+    elif model_type == "randomforest":
+        model = RandomForestClassifier(
+            class_weight="balanced",
+            n_estimators=hyperparameters["n_estimators"],
+            max_depth=hyperparameters["max_depth"],
+            min_samples_split=hyperparameters["min_samples_split"],
+            min_samples_leaf=hyperparameters["min_samples_leaf"],
+        )
+    elif model_type == "xgboost":
+        model = XGBClassifier(
+            n_estimators=hyperparameters["n_estimators"],
+            max_depth=hyperparameters["max_depth"],
+        )
+    else:
+        raise ValueError(f"Invalid model name: {model_type}")
+    model.name = model_type
+    return model
+
+
+class MySVM(LinearSVC):
+    def __init__(self, class_weight, C, select_feature_ratio=None):
+        super().__init__(
+            penalty="l2",
+            dual=False,
+            class_weight=class_weight,
+            C=C,
+        )
+
+    def fit(self, x, y):
+        # Fit internal LinearSVC to obtain coefs
+        self.LSVC = LinearSVC(
+            penalty=self.penalty,
+            dual=self.dual,
+            class_weight=self.class_weight,
+            C=self.C,
+        )
+
+        # Fit LinearSVC using all features
+        self.LSVC.fit(x, y)
+
+        # Wrap internal SVC in calibrated model to enable predict_proba
+        self.calibratedmodel = CalibratedClassifierCV(base_estimator=self.LSVC, cv=5)
+
+        # Train calibrated model on top features
+        self.calibratedmodel.fit(x, y)
+        return self
+
+    def predict_proba(self, x):
+        """
+        Call predict_proba on internal linear calibrated SVC
+        """
+        return self.calibratedmodel.predict_proba(x)
+
+
 def make_waveform_model_unet(
     tensor_maps_in: List[TensorMap],
     tensor_maps_out: List[TensorMap],
@@ -172,8 +269,7 @@ def make_waveform_model_unet(
     Input and output tensor maps are set from the command line.
     Model summary printed to output
 
-    :param tensor_maps_in: List of input TensorMaps, only 1 input TensorMap is currently supported,
-                            otherwise there are layer name collisions.
+    :param tensor_maps_in: List of input TensorMaps, only 1 input TensorMap is currently supported, otherwise there are layer name collisions.
     :param tensor_maps_out: List of output TensorMaps
     :param learning_rate: Size of learning steps in SGD optimization
     :param model_file: Optional HD5 model file to load and return.
@@ -1032,7 +1128,7 @@ def make_multimodal_multitask_model(
         for input_layer in nested_model.inputs
     }
 
-    encoders: Dict[TensorMap:Layer] = {}
+    encoders: Dict[TensorMap] = {}
     for tm in tensor_maps_in:
         if any(tm.input_name in input_layer for input_layer in nested_model_inputs):
             continue
@@ -1235,7 +1331,9 @@ def _make_multimodal_multitask_model(
 
 
 def train_model_from_datasets(
-    model: Model,
+    model: Union[Model, SKLEARN_MODELS],
+    tensor_maps_in: List[TensorMap],
+    tensor_maps_out: List[TensorMap],
     train_dataset: tf.data.Dataset,
     valid_dataset: Optional[tf.data.Dataset],
     epochs: int,
@@ -1255,62 +1353,97 @@ def train_model_from_datasets(
     Plots the metric history after training. Creates a directory to save weights, if necessary.
 
     :param model: The model to optimize
+    :param tensor_maps_in: List of input TensorMaps
+    :param tensor_maps_out: List of output TensorMaps
     :param train_dataset: Dataset that yields batches of training data
-    :param valid_dataset: Dataset that yields batches of validation data
+    :param valid_dataset: Dataset that yields batches of validation data.
+           Scikit-learn models do not utilize the validation split.
     :param epochs: Maximum number of epochs to run regardless of Early Stopping
     :param patience: Number of epochs to wait before reducing learning rate
-    :param learning_rate_patience: Number of epochs without validation loss improvement to wait before reducing learning rate
+    :param learning_rate_patience: Number of epochs without validation loss improvement
+           to wait before reducing learning rate
     :param learning_rate_reduction: Scale factor to reduce learning rate by
     :param output_folder: Directory where output file will be stored
     :param run_id: User-chosen string identifying this run
     :param image_ext: File format of saved image
     :param return_history: Whether or not to return history from training
     :param plot: Whether or not to plot metrics from training
-    :return: The optimized model which achieved the best validation loss or training loss if validation data was not provided
+    :return: The optimized model which achieved the best validation loss or training
+             loss if validation data was not provided
     """
     model_file = os.path.join(output_folder, run_id, "model_weights" + MODEL_EXT)
     if not os.path.exists(os.path.dirname(model_file)):
         os.makedirs(os.path.dirname(model_file))
 
-    if plot:
-        image_path = os.path.join(
-            output_folder,
-            run_id,
-            "architecture_graph" + image_ext,
+    # If keras instead of sklearn model
+    if isinstance(model, Model):
+        if plot:
+            image_path = os.path.join(
+                output_folder,
+                run_id,
+                "architecture_graph" + image_ext,
+            )
+            plot_architecture_diagram(
+                dot=model_to_dot(model, show_shapes=True, expand_nested=True),
+                image_path=image_path,
+            )
+        history = model.fit(
+            x=train_dataset,
+            epochs=epochs,
+            verbose=1,
+            validation_data=valid_dataset,
+            callbacks=_get_callbacks(
+                model_file=model_file,
+                patience=patience,
+                learning_rate_patience=learning_rate_patience,
+                learning_rate_reduction=learning_rate_reduction,
+                monitor="loss" if valid_dataset is None else "val_loss",
+            ),
         )
-        plot_architecture_diagram(
-            dot=model_to_dot(model, show_shapes=True, expand_nested=True),
-            image_path=image_path,
+        logging.info(f"Model weights saved at: {model_file}")
+
+        if plot:
+            plot_metric_history(
+                history=history,
+                training_steps=None,
+                title=run_id,
+                image_ext=image_ext,
+                prefix=os.path.dirname(model_file),
+            )
+
+        # load the weights from model which achieved the best validation loss
+        model.load_weights(model_file)
+        if return_history:
+            return model, history
+
+    # If sklearn model
+    elif isinstance(model, SKLEARN_MODELS.__args__):
+
+        # Get dicts of arrays of data keyed by tmap name from the dataset
+        data = get_dicts_of_arrays_from_dataset(
+            dataset=train_dataset,
+        )
+        input_data, output_data = data[BATCH_INPUT_INDEX], data[BATCH_OUTPUT_INDEX]
+
+        # Get desired arrays from dicts of arrays
+        X = get_array_from_dict_of_arrays(
+            tensor_maps=tensor_maps_in,
+            data=input_data,
+            drop_redundant_columns=False,
+        )
+        y = get_array_from_dict_of_arrays(
+            tensor_maps=tensor_maps_out,
+            data=output_data,
+            drop_redundant_columns=True,
         )
 
-    history = model.fit(
-        x=train_dataset,
-        epochs=epochs,
-        verbose=1,
-        validation_data=valid_dataset,
-        callbacks=_get_callbacks(
-            model_file=model_file,
-            patience=patience,
-            learning_rate_patience=learning_rate_patience,
-            learning_rate_reduction=learning_rate_reduction,
-            monitor="loss" if valid_dataset is None else "val_loss",
-        ),
-    )
-
-    logging.info(f"Model weights saved at: {model_file}")
-    if plot:
-        plot_metric_history(
-            history=history,
-            training_steps=None,
-            title=run_id,
-            image_ext=image_ext,
-            prefix=os.path.dirname(model_file),
+        # Fit sklearn model
+        model.fit(X, y)
+        logging.info(f"{model.name} trained on data array with shape {X.shape}")
+    else:
+        raise NotImplementedError(
+            f"Cannot get data for inference from data of type {type(data).__name__}: {data}",
         )
-
-    # load the weights from model which achieved the best validation loss
-    model.load_weights(model_file)
-    if return_history:
-        return model, history
     return model
 
 

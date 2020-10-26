@@ -36,11 +36,11 @@ def _get_path_to_bootstraps() -> str:
     If there is no match found, this function does not return anything, and
     the script ends up with a non-viable path prefix to HD5 files and will fail."""
     if "anduril" == socket.gethostname():
-        path = "~/dropbox/sts-data/bootstraps"
+        path = "~/dropbox/sts-data/bootstraps-ecg"
     elif "mithril" == socket.gethostname():
-        path = "~/dropbox/sts-data/bootstraps"
+        path = "~/dropbox/sts-data/bootstraps-ecg"
     elif "stultzlab" in socket.gethostname():
-        path = "/storage/shared/sts-data-deid/bootstraps"
+        path = "/storage/shared/sts-data-deid/bootstraps-ecg"
     else:
         path = ""
     return os.path.expanduser(path)

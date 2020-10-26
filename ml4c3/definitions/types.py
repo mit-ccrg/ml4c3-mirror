@@ -1,5 +1,5 @@
 # Imports: standard library
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Union
 
 # Imports: third party
 import numpy as np
@@ -11,8 +11,4 @@ Outputs = Inputs
 Path = str
 Paths = List[Path]
 Predictions = List[np.ndarray]
-SampleIntervalData = Dict[
-    int,
-    Dict[Tuple[Tuple[str, str], Tuple[str, str]], Dict[str, Union[str, int, float]]],
-]
 ChannelMap = Dict[str, int]

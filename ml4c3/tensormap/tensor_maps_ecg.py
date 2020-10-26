@@ -2,7 +2,7 @@
 import re
 import logging
 import datetime
-from typing import Set, Dict, List, Tuple
+from typing import Set, Dict, List
 
 # Imports: third party
 import h5py
@@ -22,64 +22,11 @@ from ml4c3.definitions.globals import YEAR_DAYS
 from ml4c3.tensormap.TensorMap import (
     TensorMap,
     Interpretation,
-    TimeSeriesOrder,
-    id_from_filename,
+    make_hd5_path,
+    is_dynamic_shape,
 )
 
 tmaps: Dict[str, TensorMap] = {}
-
-
-def get_ecg_dates(tm: TensorMap, hd5: h5py.File, cache: bool = True) -> List[str]:
-    """
-    Given a tensor map, retrieve the ECG dates from an hd5
-    in the order and in the time series defined by the tensor map.
-
-    Once an initial selection of dates is performed for a given hd5,
-    the selection is saved so that other tensor maps may use the same
-    set of dates. This cache enables multiple tensor maps to select data
-    from the same ECG(s) within an hd5. The saved dates are keyed by MRN.
-    """
-    mrn = id_from_filename(hd5.filename)
-    if cache:
-        if not hasattr(get_ecg_dates, "mrn_lookup"):
-            get_ecg_dates.mrn_lookup = dict()
-        if mrn in get_ecg_dates.mrn_lookup:
-            return get_ecg_dates.mrn_lookup[mrn]
-    dates = list(hd5[tm.path_prefix])
-    if tm.time_series_lookup is not None:
-        dates = [
-            date
-            for date in dates
-            for start, end in tm.time_series_lookup[mrn]
-            if start < date < end
-        ]
-    if tm.time_series_order == TimeSeriesOrder.NEWEST:
-        dates.sort()
-    elif tm.time_series_order == TimeSeriesOrder.OLDEST:
-        dates.sort(reverse=True)
-    elif tm.time_series_order == TimeSeriesOrder.RANDOM:
-        np.random.shuffle(dates)
-    else:
-        raise NotImplementedError(
-            f'Unknown option "{tm.time_series_order}" passed for which tensors to use'
-            " in multi tensor HD5",
-        )
-    start_idx = tm.time_series_limit if tm.time_series_limit is not None else 1
-    dates = dates[-start_idx:]  # If num_tensors is 0, get all tensors
-    dates.sort(reverse=True)
-    if cache:
-        get_ecg_dates.mrn_lookup[mrn] = dates
-    return dates
-
-
-def _is_dynamic_shape(tm: TensorMap, num_ecgs: int) -> Tuple[bool, Tuple[int, ...]]:
-    if tm.time_series_limit is not None:
-        return True, (num_ecgs,) + tm.shape
-    return False, tm.shape
-
-
-def _make_hd5_path(tm: TensorMap, ecg_date: str, value_key: str) -> str:
-    return f"{tm.path_prefix}/{ecg_date}/{value_key}"
 
 
 def _resample_voltage(voltage: np.array, desired_samples: int, fs: float) -> np.array:
@@ -105,18 +52,18 @@ def _resample_voltage(voltage: np.array, desired_samples: int, fs: float) -> np.
 
 def make_voltage_tff(exact_length=False):
     def tensor_from_file(tm, hd5):
-        ecg_dates = get_ecg_dates(tm, hd5)
-        dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
+        ecg_dates = tm.time_series_filter(hd5)
+        dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
         voltage_length = shape[1] if dynamic else shape[0]
         tensor = np.zeros(shape, dtype=np.float32)
         for i, ecg_date in enumerate(ecg_dates):
             for cm in tm.channel_map:
                 try:
-                    path = _make_hd5_path(tm=tm, ecg_date=ecg_date, value_key=cm)
+                    path = make_hd5_path(tm=tm, date_key=ecg_date, value_key=cm)
                     voltage = hd5[path][()]
-                    path_waveform_samplebase = _make_hd5_path(
+                    path_waveform_samplebase = make_hd5_path(
                         tm=tm,
-                        ecg_date=ecg_date,
+                        date_key=ecg_date,
                         value_key="waveform_samplebase",
                     )
                     try:
@@ -186,8 +133,8 @@ name2augmenters = {
 
 
 def voltage_stat(tm, hd5):
-    ecg_dates = get_ecg_dates(tm, hd5)
-    dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
+    ecg_dates = tm.time_series_filter(hd5)
+    dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.zeros(shape, dtype=np.float32)
     for i, ecg_date in enumerate(ecg_dates):
         try:
@@ -196,7 +143,7 @@ def voltage_stat(tm, hd5):
                 if dynamic
                 else (tm.channel_map[stat],)
             )
-            path = lambda lead: _make_hd5_path(tm, ecg_date, lead)
+            path = lambda lead: make_hd5_path(tm, ecg_date, lead)
             voltages = np.array([hd5[path(lead)][()] for lead in ECG_REST_LEADS_ALL])
             tensor[slices("mean")] = np.mean(voltages)
             tensor[slices("std")] = np.std(voltages)
@@ -220,13 +167,13 @@ tmaps["ecg_voltage_stats"] = TensorMap(
 
 def make_voltage_attribute_tff(volt_attr: str = ""):
     def tensor_from_file(tm, hd5):
-        ecg_dates = get_ecg_dates(tm, hd5)
-        dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
+        ecg_dates = tm.time_series_filter(hd5)
+        dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
         tensor = np.zeros(shape, dtype=np.float32)
         for i, ecg_date in enumerate(ecg_dates):
             for cm in tm.channel_map:
                 try:
-                    path = _make_hd5_path(tm, ecg_date, cm)
+                    path = make_hd5_path(tm, ecg_date, cm)
                     slices = (
                         (i, tm.channel_map[cm]) if dynamic else (tm.channel_map[cm],)
                     )
@@ -257,7 +204,7 @@ def make_binary_ecg_label_from_any_read_tff(
     def tensor_from_file(tm, hd5):
         # get all the ecgs in range (time series lookup is set)
         tm.time_series_limit = 0
-        ecg_dates = get_ecg_dates(tm, hd5, cache=False)
+        ecg_dates = tm.time_series_filter(hd5, cache=False)
         tm.time_series_limit = None
 
         tensor = np.zeros(tm.shape, dtype=np.float32)
@@ -265,7 +212,7 @@ def make_binary_ecg_label_from_any_read_tff(
         read = ""
         for ecg_idx, ecg_date in enumerate(ecg_dates):
             for key in keys:
-                path = _make_hd5_path(tm, ecg_date, key)
+                path = make_hd5_path(tm, ecg_date, key)
                 if path not in hd5:
                     continue
                 read += hd5[path][()]
@@ -300,13 +247,13 @@ def make_ecg_label_from_read_tff(
     not_found_channel: str,
 ):
     def tensor_from_file(tm, hd5):
-        ecg_dates = get_ecg_dates(tm, hd5)
-        dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
+        ecg_dates = tm.time_series_filter(hd5)
+        dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
         tensor = np.zeros(shape, dtype=np.float32)
         for ecg_idx, ecg_date in enumerate(ecg_dates):
             read = ""
             for key in keys:
-                path = _make_hd5_path(tm, ecg_date, key)
+                path = make_hd5_path(tm, ecg_date, key)
                 if path not in hd5:
                     continue
                 read += hd5[path][()]
@@ -337,8 +284,8 @@ def make_ecg_label_from_read_tff(
 
 
 def ecg_datetime(tm, hd5):
-    ecg_dates = get_ecg_dates(tm, hd5)
-    dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
+    ecg_dates = tm.time_series_filter(hd5)
+    dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.full(shape, "", dtype=f"<U19")
     for i, ecg_date in enumerate(ecg_dates):
         tensor[i] = ecg_date
@@ -363,11 +310,11 @@ def make_voltage_len_tff(
     channel_unknown="other",
 ):
     def tensor_from_file(tm, hd5):
-        ecg_dates = get_ecg_dates(tm, hd5)
-        dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
+        ecg_dates = tm.time_series_filter(hd5)
+        dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
         tensor = np.zeros(shape, dtype=float)
         for i, ecg_date in enumerate(ecg_dates):
-            path = _make_hd5_path(tm, ecg_date, lead)
+            path = make_hd5_path(tm, ecg_date, lead)
             try:
                 lead_len = hd5[path].attrs["len"]
                 lead_len = f"{channel_prefix}{lead_len}"
@@ -419,8 +366,8 @@ def make_ecg_tensor(
     channel_unknown: str = "other",
 ):
     def get_ecg_tensor(tm, hd5):
-        ecg_dates = get_ecg_dates(tm, hd5)
-        dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
+        ecg_dates = tm.time_series_filter(hd5)
+        dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
         if tm.interpretation == Interpretation.LANGUAGE:
             tensor = np.full(shape, "", dtype=object)
         elif tm.interpretation == Interpretation.CONTINUOUS:
@@ -437,7 +384,7 @@ def make_ecg_tensor(
             )
 
         for i, ecg_date in enumerate(ecg_dates):
-            path = _make_hd5_path(tm, ecg_date, key)
+            path = make_hd5_path(tm, ecg_date, key)
             try:
                 data = hd5[path][()]
                 if tm.interpretation == Interpretation.CATEGORICAL:
@@ -625,14 +572,14 @@ def make_sampling_frequency_from_file(
     fill: int = -1,
 ):
     def sampling_frequency_from_file(tm: TensorMap, hd5: h5py.File):
-        ecg_dates = get_ecg_dates(tm, hd5)
-        dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
+        ecg_dates = tm.time_series_filter(hd5)
+        dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
         if tm.interpretation == Interpretation.CATEGORICAL:
             tensor = np.zeros(shape, dtype=np.float32)
         else:
             tensor = np.full(shape, fill, dtype=np.float32)
         for i, ecg_date in enumerate(ecg_dates):
-            path = _make_hd5_path(tm, ecg_date, lead)
+            path = make_hd5_path(tm, ecg_date, lead)
             lead_length = hd5[path].attrs["len"]
             sampling_frequency = lead_length / duration
             try:
@@ -919,13 +866,13 @@ tmaps[tmap_name] = TensorMap(
 
 
 def get_ecg_age_from_hd5(tm, hd5):
-    ecg_dates = get_ecg_dates(tm, hd5)
-    dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
+    ecg_dates = tm.time_series_filter(hd5)
+    dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.full(shape, fill_value=-1, dtype=float)
     for i, ecg_date in enumerate(ecg_dates):
         if i >= shape[0]:
             break
-        path = lambda key: _make_hd5_path(tm, ecg_date, key)
+        path = lambda key: make_hd5_path(tm, ecg_date, key)
         try:
             birthday = hd5[path("dateofbirth")][()]
             acquisition = hd5[path("acquisitiondate")][()]
@@ -968,11 +915,11 @@ tmaps[tmap_name] = TensorMap(
 
 
 def ecg_acquisition_year(tm, hd5):
-    ecg_dates = get_ecg_dates(tm, hd5)
-    dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
+    ecg_dates = tm.time_series_filter(hd5)
+    dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.zeros(shape, dtype=int)
     for i, ecg_date in enumerate(ecg_dates):
-        path = _make_hd5_path(tm, ecg_date, "acquisitiondate")
+        path = make_hd5_path(tm, ecg_date, "acquisitiondate")
         try:
             acquisition = hd5[path][()]
             tensor[i] = _ecg_str2date(acquisition).year
@@ -992,11 +939,11 @@ tmaps["ecg_acquisition_year"] = TensorMap(
 
 
 def ecg_bmi(tm, hd5):
-    ecg_dates = get_ecg_dates(tm, hd5)
-    dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
+    ecg_dates = tm.time_series_filter(hd5)
+    dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.zeros(shape, dtype=float)
     for i, ecg_date in enumerate(ecg_dates):
-        path = lambda key: _make_hd5_path(tm, ecg_date, key)
+        path = lambda key: make_hd5_path(tm, ecg_date, key)
         try:
             weight_lbs = hd5[path("weightlbs")][()]
             weight_kg = 0.453592 * float(weight_lbs)
@@ -1020,12 +967,12 @@ tmaps["ecg_bmi"] = TensorMap(
 
 
 def voltage_zeros(tm, hd5):
-    ecg_dates = get_ecg_dates(tm, hd5)
-    dynamic, shape = _is_dynamic_shape(tm, len(ecg_dates))
+    ecg_dates = tm.time_series_filter(hd5)
+    dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.zeros(shape, dtype=np.float32)
     for i, ecg_date in enumerate(ecg_dates):
         for cm in tm.channel_map:
-            path = _make_hd5_path(tm, ecg_date, cm)
+            path = make_hd5_path(tm, ecg_date, cm)
             voltage = hd5[path][()]
             slices = (i, tm.channel_map[cm]) if dynamic else (tm.channel_map[cm],)
             tensor[slices] = np.count_nonzero(voltage == 0)
