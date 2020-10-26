@@ -45,6 +45,7 @@ def parse_args() -> argparse.Namespace:
         "\t * plot_ecg: ADD DESCRIPTION. \n"
         "\t * tensorize_ecg: ADD DESCRIPTION. \n"
         "\t * tensorize_icu: ADD DESCRIPTION. \n"
+        "\t * tensorize_sts: ADD DESCRIPTION. \n"
         "\t * assess_icu_coverage: ADD DESCRIPTION. \n"
         "\t * check_icu_structure: ADD DESCRIPTION. \n"
         "\t * pre_tensorize_summary: ADD DESCRIPTION. \n"
@@ -135,6 +136,12 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     run_parser.add_argument(
+        "--cache",
+        action="store_true",
+        help="Cache tf.data.Dataset for faster loading. Best used with small-sized of"
+        " data, e.g. STS features. Not ideal for large data (waveforms) or large batch sizes,",
+    )
+    run_parser.add_argument(
         "--random_seed",
         default=12878,
         type=int,
@@ -154,8 +161,6 @@ def parse_args() -> argparse.Namespace:
         choices=["clinical", "full"],
         help="ECG view to plot.",
     )
-
-    # Config arguments
     run_parser.add_argument(
         "--logging_level",
         default="INFO",
@@ -165,8 +170,6 @@ def parse_args() -> argparse.Namespace:
             " configuration file."
         ),
     )
-
-    # Image file format arguments
     run_parser.add_argument(
         "--image_ext",
         default=".pdf",
@@ -174,8 +177,6 @@ def parse_args() -> argparse.Namespace:
         help="File format extension to save images as."
         "Note this includes a leading period.",
     )
-
-    # Training optimization options
     run_parser.add_argument(
         "--num_workers",
         default=multiprocessing.cpu_count(),
@@ -292,6 +293,13 @@ def parse_args() -> argparse.Namespace:
         ),
     )
 
+    # STS Tensorize arguments
+    sts_tens_parser = subparser.add_parser(
+        name="tensorize_sts",
+        description="TODO",
+        parents=[io_parser, run_parser],
+    )
+
     # Model Architecture Parameters
     model_parser = argparse.ArgumentParser(add_help=False)
     model_parser.add_argument(
@@ -310,6 +318,11 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=list(BOTTLENECK_STR_TO_ENUM)[0],
         choices=list(BOTTLENECK_STR_TO_ENUM),
+    )
+    model_parser.add_argument(
+        "--save_coefficients",
+        action="store_true",
+        help="Save model coefficients to CSV file",
     )
     model_parser.add_argument(
         "--conv_layers",
@@ -612,6 +625,60 @@ def parse_args() -> argparse.Namespace:
         parents=[model_parser, training_parser, io_parser, run_parser, tmap_parser],
     )
 
+    # Train Shallow arguments
+    train_shallow_parser.add_argument(
+        "--sklearn_model_type",
+        nargs="?",
+        choices=["logreg", "svm", "randomforest", "xgboost"],
+        type=str,
+        help=(
+            "Type of scikit-learn algorithm to train. If blank, defaults to"
+            " TensorFlow linear or logistic model (inferred from output tensor maps)."
+        ),
+    )
+    train_shallow_parser.add_argument(
+        "--l1",
+        default=0.01,
+        type=float,
+        help="L1 value for regularization in shallow model.",
+    )
+    train_shallow_parser.add_argument(
+        "--l2",
+        default=0.01,
+        type=float,
+        help="L2 value for regularization in shallow model.",
+    )
+    train_shallow_parser.add_argument(
+        "--c",
+        type=float,
+        default=0.01,
+        help="Regularization strength",
+    )
+    train_shallow_parser.add_argument(
+        "--n_estimators",
+        type=int,
+        default=100,
+        help="Number of estimators",
+    )
+    train_shallow_parser.add_argument(
+        "--max_depth",
+        type=int,
+        default=5,
+        help="Maximum depth of tree-based classifier",
+    )
+    train_shallow_parser.add_argument(
+        "--min_samples_split",
+        type=int,
+        default=5,
+        help="",
+    )
+    train_shallow_parser.add_argument(
+        "--min_samples_leaf",
+        type=int,
+        default=8,
+        help="",
+    )
+
     # Hyperoptimize arguments
     hyperoptimize_parser.add_argument(
         "--max_parameters",
@@ -628,18 +695,6 @@ def parse_args() -> argparse.Namespace:
             "Maximum number of models for the hyperparameter optimizer to evaluate"
             " before returning."
         ),
-    )
-    hyperoptimize_parser.add_argument(
-        "--l1",
-        default=0.0,
-        type=float,
-        help="L1 value for regularization in shallow model.",
-    )
-    hyperoptimize_parser.add_argument(
-        "--l2",
-        default=0.0,
-        type=float,
-        help="L2 value for regularization in shallow model.",
     )
 
     # Explore arguments
@@ -976,8 +1031,6 @@ def _process_args(args: argparse.Namespace):
         os.path.join(args.output_folder, args.id),
         "log_" + now_string,
     )
-
-    ml4c3.definitions.STS_DATA_CSV = args.sts_csv
 
     # Create list of names of all needed TMaps
     if "input_tensors" in args and args.mode != "explore_icu":

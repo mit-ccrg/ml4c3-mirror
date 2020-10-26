@@ -185,6 +185,8 @@ def hyperparameter_optimizer(
             train_dataset, valid_dataset, test_dataset = datasets
             model, history = train_model_from_datasets(
                 model=model,
+                tensor_maps_in=args.tensor_maps_in,
+                tensor_maps_out=args.tensor_maps_out,
                 train_dataset=train_dataset,
                 valid_dataset=valid_dataset,
                 epochs=args.epochs,

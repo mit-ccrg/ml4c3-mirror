@@ -109,8 +109,7 @@ class TensorMap:
         annotation_units: Optional[int] = None,
         tensor_from_file: Optional[Callable] = None,
         time_series_limit: Optional[int] = None,
-        time_series_order: Optional[TimeSeriesOrder] = TimeSeriesOrder.NEWEST,
-        time_series_lookup: Optional[Dict[int, List[Tuple[str, str]]]] = None,
+        time_series_filter: Optional[Callable] = None,
         linked_tensors: bool = False,
     ):
         """
@@ -165,8 +164,7 @@ class TensorMap:
         self.annotation_units = annotation_units
         self.tensor_from_file = tensor_from_file
         self.time_series_limit = time_series_limit
-        self.time_series_order = time_series_order
-        self.time_series_lookup = time_series_lookup
+        self.time_series_filter = time_series_filter
         self.linked_tensors = linked_tensors
 
         if self.tensor_from_file is None:
@@ -242,6 +240,9 @@ class TensorMap:
             self.validators = [self.validators]
         if self.normalizers is not None and not isinstance(self.normalizers, list):
             self.normalizers = [self.normalizers]
+
+        if self.time_series_filter is None:
+            self.time_series_filter = lambda hd5: list(hd5[self.path_prefix])
 
     def __hash__(self):
         return hash((self.name, self.shape, self.interpretation))
@@ -472,6 +473,16 @@ def binary_channel_map(tm: TensorMap) -> bool:
         and (len(tm.channel_map) == 2)
         and (np.any(["no_" in cm for cm in tm.channel_map]))
     )
+
+
+def is_dynamic_shape(tm: TensorMap, num_samples: int) -> Tuple[bool, Tuple[int, ...]]:
+    if tm.time_series_limit is not None:
+        return True, (num_samples,) + tm.shape
+    return False, tm.shape
+
+
+def make_hd5_path(tm: TensorMap, date_key: str, value_key: str) -> str:
+    return f"{tm.path_prefix}/{date_key}/{value_key}"
 
 
 def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, TensorMap]:

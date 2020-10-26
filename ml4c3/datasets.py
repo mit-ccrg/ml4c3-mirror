@@ -15,7 +15,11 @@ from tensorflow_probability import distributions as tfd
 
 # Imports: first party
 from ml4c3.definitions.globals import CSV_EXT, TENSOR_EXT, MRN_COLUMNS
-from ml4c3.tensormap.TensorMap import TensorMap, id_from_filename
+from ml4c3.tensormap.TensorMap import (
+    TensorMap,
+    id_from_filename,
+    find_negative_label_and_channel,
+)
 
 SampleGenerator = Generator[
     Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]],
@@ -242,6 +246,7 @@ def make_dataset(
     num_workers: int,
     augment: bool = False,
     keep_paths: bool = False,
+    cache: bool = False,
     mixup_alpha: float = 0,
 ) -> Tuple[tf.data.Dataset, StatsWrapper, Cleanup]:
     output_types = (
@@ -273,6 +278,8 @@ def make_dataset(
         .batch(batch_size)
         .prefetch(16)
     )
+    if cache:
+        dataset = dataset.cache()
 
     if mixup_alpha != 0:
         dist = tfd.Beta(mixup_alpha, mixup_alpha)
@@ -326,6 +333,7 @@ def train_valid_test_datasets(
     no_empty_paths_allowed: bool = True,
     output_folder: str = None,
     run_id: str = None,
+    cache: bool = False,
     mixup_alpha: float = 0.0,
 ) -> Tuple[
     Tuple[tf.data.Dataset, tf.data.Dataset, tf.data.Dataset],
@@ -393,6 +401,7 @@ def train_valid_test_datasets(
         num_workers=num_workers,
         augment=True,
         keep_paths=keep_paths,
+        cache=cache,
         mixup_alpha=mixup_alpha,
     )
     valid_dataset, valid_stats, valid_cleanup = make_dataset(
@@ -404,6 +413,7 @@ def train_valid_test_datasets(
         num_workers=num_workers,
         augment=False,
         keep_paths=keep_paths,
+        cache=cache,
     )
     test_dataset, test_stats, test_cleanup = make_dataset(
         data_split="test",
@@ -414,6 +424,7 @@ def train_valid_test_datasets(
         num_workers=num_workers,
         augment=False,
         keep_paths=keep_paths or keep_paths_test,
+        cache=cache,
     )
 
     return (
@@ -818,5 +829,75 @@ def get_train_valid_test_paths(
             f" {len(test_paths)} testing tensors\n"
             f"Discarded {len(discard_paths)} tensors",
         )
-
     return train_paths, valid_paths, test_paths
+
+
+def get_dicts_of_arrays_from_dataset(
+    dataset: tf.data.Dataset,
+) -> Union[
+    Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]],
+    Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], np.ndarray],
+]:
+    input_data_batches = defaultdict(list)
+    output_data_batches = defaultdict(list)
+    path_batches = []
+
+    for batch in dataset:
+        input_data_batch = batch[BATCH_INPUT_INDEX]
+        for input_name, input_tensor in input_data_batch.items():
+            input_data_batches[input_name].append(input_tensor.numpy())
+
+        output_data_batch = batch[BATCH_OUTPUT_INDEX]
+        for output_name, output_tensor in output_data_batch.items():
+            output_data_batches[output_name].append(output_tensor.numpy())
+
+        if len(batch) == 3:
+            path_batches.append(batch[BATCH_PATHS_INDEX].numpy().astype(str))
+
+    input_data = {
+        input_name: np.concatenate(input_data_batches[input_name])
+        for input_name in input_data_batches
+    }
+    output_data = {
+        output_name: np.concatenate(output_data_batches[output_name])
+        for output_name in output_data_batches
+    }
+    paths = None if len(path_batches) == 0 else np.concatenate(path_batches).tolist()
+
+    return (input_data, output_data) if not paths else (input_data, output_data, paths)
+
+
+def get_array_from_dict_of_arrays(
+    tensor_maps: List[TensorMap],
+    data: Dict[str, np.ndarray],
+    drop_redundant_columns: bool = False,
+) -> np.ndarray:
+    array = []
+
+    # Determine if we are parsing input or output tensor maps
+    tmap_type = "input" if np.all(["input" in key for key in data]) else "output"
+
+    # Iterate over tmaps
+    for tm in tensor_maps:
+        if tmap_type == "input":
+            tensor = data[tm.input_name]
+        else:
+            tensor = data[tm.output_name]
+
+        # For categorical tmaps, drop the redundant negative column
+        # However, there is no need to do this because we regularize:
+        # https://inmachineswetrust.com/posts/drop-first-columns/
+        if drop_redundant_columns:
+            if tm.is_categorical:
+                _, neg_idx = find_negative_label_and_channel(tm.channel_map)
+                tensor = np.delete(tensor, neg_idx, axis=1)
+        array.append(tensor)
+
+    # Convert list of arrays into n-dimensional array
+    array = np.concatenate(array, axis=1)
+
+    # If the array is 1D, reshape to contiguous flattened array
+    # e.g. change shape from (n, 1) to (n,)
+    if array.shape[1] == 1:
+        array = array.ravel()
+    return array

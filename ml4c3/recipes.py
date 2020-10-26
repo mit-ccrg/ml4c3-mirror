@@ -16,6 +16,7 @@ from tensorflow.keras.models import Model
 from ml4c3.plots import plot_ecg, plot_architecture_diagram
 from ml4c3.models import (
     make_shallow_model,
+    make_sklearn_model,
     train_model_from_datasets,
     make_multimodal_multitask_model,
 )
@@ -25,6 +26,7 @@ from ml4c3.arguments import parse_args
 from ml4c3.ingest.ecg import tensorize as tensorize_ecg
 from ml4c3.ingest.icu import tensorize as tensorize_icu
 from ml4c3.ingest.icu import tensorize_batched as tensorize_icu_batched
+from ml4c3.ingest.sts import tensorize as tensorize_sts
 from ml4c3.evaluations import predict_and_evaluate
 from ml4c3.explorations import explore
 from ml4c3.hyperoptimizers import hyperoptimize
@@ -59,6 +61,8 @@ def run(args: argparse.Namespace):
                 tensorize_icu_batched(args)
             else:
                 tensorize_icu(args)
+        elif args.mode == "tensorize_sts":
+            tensorize_sts(args)
         elif args.mode == "explore":
             explore(args=args, disable_saving_output=args.explore_disable_saving_output)
         elif args.mode == "explore_icu":
@@ -121,12 +125,16 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         test_csv=args.test_csv,
         output_folder=args.output_folder,
         run_id=args.id,
+        cache=args.cache,
         mixup_alpha=args.mixup_alpha,
     )
     train_dataset, valid_dataset, test_dataset = datasets
     model = make_multimodal_multitask_model(**args.__dict__)
+
     model, history = train_model_from_datasets(
         model=model,
+        tensor_maps_in=args.tensor_maps_in,
+        tensor_maps_out=args.tensor_maps_out,
         train_dataset=train_dataset,
         valid_dataset=valid_dataset,
         epochs=args.epochs,
@@ -150,6 +158,7 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         data_split="train",
         image_ext=args.image_ext,
     )
+
     performance_metrics = predict_and_evaluate(
         model=model,
         data=test_dataset,
@@ -158,6 +167,7 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         plot_path=out_path,
         data_split="test",
         image_ext=args.image_ext,
+        save_coefficients=args.save_coefficients,
     )
 
     for cleanup in cleanups:
@@ -191,9 +201,10 @@ def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         train_csv=args.train_csv,
         valid_csv=args.valid_csv,
         test_csv=args.test_csv,
+        no_empty_paths_allowed=False,
         output_folder=args.output_folder,
         run_id=args.id,
-        no_empty_paths_allowed=False,
+        cache=args.cache,
     )
     _, _, test_dataset = datasets
 
@@ -223,6 +234,7 @@ def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
     Train shallow model (e.g. linear or logistic regression) and return
     performance metrics.
     """
+
     # Create datasets
     datasets, _, cleanups = train_valid_test_datasets(
         tensor_maps_in=args.tensor_maps_in,
@@ -238,26 +250,53 @@ def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
         test_csv=args.test_csv,
         output_folder=args.output_folder,
         run_id=args.id,
+        cache=args.cache,
         mixup_alpha=args.mixup_alpha,
     )
     train_dataset, valid_dataset, test_dataset = datasets
 
     # Initialize shallow model
-    model = make_shallow_model(
-        tensor_maps_in=args.tensor_maps_in,
-        tensor_maps_out=args.tensor_maps_out,
-        optimizer=args.optimizer,
-        learning_rate=args.learning_rate,
-        learning_rate_schedule=args.learning_rate_schedule,
-        l1=args.l1,
-        l2=args.l2,
-        model_file=args.model_file,
-        donor_layers=args.donor_layers,
-    )
+    if args.sklearn_model_type is None:
+        model = make_shallow_model(
+            tensor_maps_in=args.tensor_maps_in,
+            tensor_maps_out=args.tensor_maps_out,
+            optimizer=args.optimizer,
+            learning_rate=args.learning_rate,
+            learning_rate_schedule=args.learning_rate_schedule,
+            model_file=args.model_file,
+            donor_layers=args.donor_layers,
+            l1=args.l1,
+            l2=args.l2,
+        )
+    else:
+        # SKLearn only works with one output tmap
+        assert len(args.tensor_maps_out) == 1
+
+        hyperparameters = {}
+        if args.sklearn_model_type == "logreg":
+            c = 1 / (args.l1 + args.l2)
+            hyperparameters["c"] = args.c
+            hyperparameters["l1_ratio"] = args.c * args.l1
+        elif args.sklearn_model_type == "svm":
+            hyperparameters["c"] = args.c
+        elif args.sklearn_model_type == "randomforest":
+            hyperparameters["n_estimators"] = args.n_estimators
+            hyperparameters["max_depth"] = args.max_depth
+            hyperparameters["min_samples_split"] = args.min_samples_split
+            hyperparameters["min_samples_leaf"] = args.min_samples_leaf
+        elif args.sklearn_model_type == "xgboost":
+            hyperparameters["n_estimators"] = args.n_estimators
+            hyperparameters["max_depth"] = args.max_depth
+        model = make_sklearn_model(
+            model_type=args.sklearn_model_type,
+            hyperparameters=hyperparameters,
+        )
 
     # Train model using datasets
     model = train_model_from_datasets(
         model=model,
+        tensor_maps_in=args.tensor_maps_in,
+        tensor_maps_out=args.tensor_maps_out,
         train_dataset=train_dataset,
         valid_dataset=valid_dataset,
         epochs=args.epochs,
@@ -280,6 +319,7 @@ def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
         data_split="train",
         image_ext=args.image_ext,
     )
+
     performance_metrics = predict_and_evaluate(
         model=model,
         data=test_dataset,
@@ -346,12 +386,15 @@ def train_simclr_model(args: argparse.Namespace):
         test_csv=args.test_csv,
         output_folder=args.output_folder,
         run_id=args.id,
+        cache=args.cache,
         mixup_alpha=args.mixup_alpha,
     )
     train_dataset, valid_dataset, test_dataset = datasets
     model = make_multimodal_multitask_model(**args.__dict__)
     model, history = train_model_from_datasets(
         model=model,
+        tensor_maps_in=args.tensor_maps_in,
+        tensor_maps_out=args.tensor_maps_out,
         train_dataset=train_dataset,
         valid_dataset=valid_dataset,
         epochs=args.epochs,
