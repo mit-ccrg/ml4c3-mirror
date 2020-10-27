@@ -323,4 +323,6 @@ ICU_SCALE_UNITS = {
 }
 # fmt: on
 
-ICU_TMAPS_SUMMARY_PATH = "/media/mad3/hd5_arrests/summary_stats.csv"
+ICU_TMAPS_METADATA: Dict[str, Dict[str, Any]] = {
+    #    "TMAP_NAME": {"min": 0, "max": 0, "std": 0, "mean": 0, "median": 0, "iqr": 0}
+}

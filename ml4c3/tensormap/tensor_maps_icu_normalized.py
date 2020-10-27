@@ -1,12 +1,10 @@
+# type: ignore
 # Imports: standard library
 from typing import Optional
 
-# Imports: third party
-import pandas as pd
-
 # Imports: first party
 from ml4c3.normalizer import MinMax, Standardize, RobustScaler, ZeroMeanStd1
-from ml4c3.definitions.icu import ICU_TMAPS_SUMMARY_PATH
+from ml4c3.definitions.icu import ICU_TMAPS_METADATA
 from ml4c3.tensormap.TensorMap import TensorMap
 from ml4c3.tensormap.tensor_maps_icu_around_event import get_tmap as get_around_tmap
 from ml4c3.tensormap.tensor_maps_icu_static_around_event import (
@@ -33,10 +31,9 @@ def get_tmap(tmap_name: str) -> Optional[TensorMap]:
         if tm:
             feature_name = tm.name.replace("_mean_imputation", "")
             tm.name = tm.name + "_standardized"
-            metadata = pd.read_csv(ICU_TMAPS_SUMMARY_PATH, index_col=0)
             normalizer = Standardize(
-                mean=metadata.loc[feature_name]["mean"],
-                std=metadata.loc[feature_name]["std"],
+                mean=ICU_TMAPS_METADATA[feature_name]["mean"],
+                std=ICU_TMAPS_METADATA[feature_name]["std"],
             )
             tm.normalizers = [normalizer]
     elif tmap_name.endswith("_robustscale"):
@@ -44,10 +41,9 @@ def get_tmap(tmap_name: str) -> Optional[TensorMap]:
         if tm:
             feature_name = tm.name.replace("_mean_imputation", "")
             tm.name = tm.name + "_robustscaler"
-            metadata = pd.read_csv(ICU_TMAPS_SUMMARY_PATH, index_col=0)
             normalizer = RobustScaler(
-                median=metadata.loc[feature_name]["median"],
-                iqr=metadata.loc[feature_name]["iqr"],
+                median=ICU_TMAPS_METADATA[feature_name]["median"],
+                iqr=ICU_TMAPS_METADATA[feature_name]["iqr"],
             )
             tm.normalizers = [normalizer]
     elif tmap_name.endswith("_zeromean"):
@@ -55,7 +51,6 @@ def get_tmap(tmap_name: str) -> Optional[TensorMap]:
         if tm:
             feature_name = tm.name.replace("_mean_imputation", "")
             tm.name = tm.name + "_zeromean"
-            metadata = pd.read_csv(ICU_TMAPS_SUMMARY_PATH, index_col=0)
             normalizer = ZeroMeanStd1()
             tm.normalizers = [normalizer]
     elif tmap_name.endswith("_minmax"):
@@ -63,10 +58,9 @@ def get_tmap(tmap_name: str) -> Optional[TensorMap]:
         if tm:
             feature_name = tm.name.replace("_mean_imputation", "")
             tm.name = tm.name + "_minmax"
-            metadata = pd.read_csv(ICU_TMAPS_SUMMARY_PATH, index_col=0)
             normalizer = MinMax(
-                min=metadata.loc[feature_name]["min"],
-                max=metadata.loc[feature_name]["max"],
+                min=ICU_TMAPS_METADATA[feature_name]["min"],
+                max=ICU_TMAPS_METADATA[feature_name]["max"],
             )
             tm.normalizers = [normalizer]
 

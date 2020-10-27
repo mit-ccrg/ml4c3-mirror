@@ -249,12 +249,12 @@ def parse_args() -> argparse.Namespace:
     )
     icu_tens_parser.add_argument(
         "--allow_one_source",
-        action="store_false",
+        action="store_true",
         help="If this parameter is set, patients with just one type of data "
         "will be tensorized.",
     )
     icu_tens_parser.add_argument(
-        "--adt_file",
+        "--path_adt",
         type=str,
         default=f"{os.path.join(MAD3_DIR, 'cohorts_lists', 'adt.csv')}",
         help="Full path of ADT table.",
@@ -972,7 +972,7 @@ def parse_args() -> argparse.Namespace:
         "If --cohort_query is set, this parameter will be ignored.",
     )
     assess_coverage_parser.add_argument(
-        "--adt_csv",
+        "--path_adt",
         type=str,
         default=None,
         help="Full path of the ADT table of the list of patients in --cohort_csv. "
