@@ -43,7 +43,7 @@ class CrossReferencer:
         overwrite_hd5: bool = True,
         n_patients: int = None,
         tensors: str = None,
-        flag_one_source: bool = True,
+        flag_one_source: bool = False,
     ) -> Dict[str, Dict[str, List[str]]]:
         """
         Get the cross-referenced Bedmaster files and EDW files.
@@ -142,7 +142,7 @@ class CrossReferencer:
         # Add elements from cross referencer .csv
         for _, row in xref.iterrows():
             mrn = str(row.MRN)
-            if not flag_one_source and mrn not in edw_mrns:
+            if flag_one_source and mrn not in edw_mrns:
                 continue
             try:
                 csn = str(int(row.PatientEncounterID))
