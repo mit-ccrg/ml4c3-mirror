@@ -13,7 +13,6 @@ from ml4c3.definitions.icu_tmap_list import DEFINED_TMAPS
 def make_first_visit_tensor_from_file():
     def _tensor_from_file(tm, hd5, **kwargs):
         visits = get_visits(tm, hd5, **kwargs)
-
         for visit in visits:
             path = tm.path_prefix.replace("*", visit)
             if path in hd5:
@@ -82,7 +81,7 @@ def get_tmap(tm_name: str) -> Optional[TensorMap]:
             if tm_name.startswith(name):
                 return create_first_visit_tmap(tm_name, name, data_type)
 
-    if tm_name.startswith("arrest"):
+    if tm_name.startswith("arrest_first_visit"):
         return create_arrest_first_visit_tmap(tm_name)
 
     return None

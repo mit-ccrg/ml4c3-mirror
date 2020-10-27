@@ -379,7 +379,7 @@ def assess_icu_coverage(args):
         output_dir=args.output_folder,
         cohort_query=args.cohort_query,
         cohort_csv=args.cohort_csv,
-        adt_csv=args.adt_csv,
+        adt_csv=args.path_adt,
     )
     assesser.assess_coverage(
         path_bm=args.path_bedmaster,

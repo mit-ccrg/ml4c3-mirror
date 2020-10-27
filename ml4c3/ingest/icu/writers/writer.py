@@ -112,8 +112,8 @@ class Writer(h5py.File):
 
         signal_name = signal.name.lower()
         signal_name = signal_name.replace(" ", "_")
-        if "/" in signal_name:
-            signal_name = signal_name.replace("/", "|")
+        signal_name = signal_name.replace(",", "")
+        signal_name = signal_name.replace("/", "|")
 
         if "BM" in signal.source:
             # Check signal exists

@@ -84,7 +84,7 @@ def test_tensorizer(temp_dir, monkeypatch, test_scale_units):
                 "r_phs_ob_bp_systolic_outgoing",
                 "r_phs_ob_pulse_oximetry_outgoing",
             ],
-            "labs": ["creatinine", "lactate,_blood", "magnesium", "ph,_arterial"],
+            "labs": ["creatinine", "lactate_blood", "magnesium", "ph_arterial"],
             "surgery": ["colonoscopy", "coronary_artery_bypass_graft"],
             "procedures": ["hemodialysis", "hemodialysis_|_ultrafiltration"],
             "transfusions": [

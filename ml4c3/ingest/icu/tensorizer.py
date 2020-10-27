@@ -7,6 +7,9 @@ import logging
 import multiprocessing
 from typing import Dict, List
 
+# Imports: third party
+import pandas as pd
+
 # Imports: first party
 from ml4c3.definitions.icu import LM4_DIR, MAD3_DIR, ICU_SCALE_UNITS
 from ml4c3.ingest.icu.utils import FileManager
@@ -365,8 +368,8 @@ def tensorize(args):
 def tensorize_batched(args):
     # Create crossreference table if needed
     if not os.path.isfile(args.path_xref):
-        adt_table_name = os.path.split(args.adt_file)[-1]
-        # Match bedmaster files from lm4 with adt_file
+        adt_table_name = os.path.split(args.path_adt)[-1]
+        # Match bedmaster files from lm4 with path_adt
         matcher = PatientBMMatcher(
             flag_lm4=True,
             bm_dir=LM4_DIR,
@@ -378,6 +381,8 @@ def tensorize_batched(args):
     # Loop for batch of patients
     missed_patients = []
     total_files_tensorized = []
+    if not args.adt_end_index:
+        args.adt_end_index = len(pd.read_csv(args.path_adt)["MRN"].drop_duplicates())
     patients = range(args.adt_start_index, args.adt_end_index, args.staging_batch_size)
     total_files = args.adt_end_index - args.adt_start_index
     total_batch = math.ceil(total_files / args.staging_batch_size)
@@ -395,7 +400,7 @@ def tensorize_batched(args):
         create_folders(args.staging_dir)
 
         # Get desired number of patients
-        get_files = FileManager(args.path_xref, args.adt_file, args.staging_dir)
+        get_files = FileManager(args.path_xref, args.path_adt, args.staging_dir)
         get_files.get_patients(
             init_patient=first_patient,
             last_patient=last_patient,

@@ -593,7 +593,7 @@ class FakeSignal:
         starting_time = int(time())
         measurements_dic = {
             "creatinine": EDW_FILES["lab_file"]["source"],
-            "ph,_arterial": EDW_FILES["lab_file"]["source"],
+            "ph_arterial": EDW_FILES["lab_file"]["source"],
             "pulse": EDW_FILES["vitals_file"]["source"],
             "r_phs_ob_bp_systolic_outgoing": EDW_FILES["vitals_file"]["source"],
         }
@@ -608,8 +608,8 @@ class FakeSignal:
             )
             for measurement_name in measurements_dic
         }
-        sys = np.random.randint(40, 100, 100)
-        dias = np.random.randint(80, 160, 100)
+        sys = np.random.randint(40, 100, 250)
+        dias = np.random.randint(80, 160, 250)
         measurements["blood_pressure"] = Measurement(
             name="blood_pressure",
             source=EDW_FILES["vitals_file"]["source"],
@@ -617,7 +617,7 @@ class FakeSignal:
                 [f"{sys[i]}/{dias[i]}" for i in range(0, len(sys))],
                 dtype="S",
             ),
-            time=np.array(list(range(starting_time, starting_time + 100))),
+            time=np.array(list(range(starting_time - 50000, starting_time, 200))),
             units="",
             data_type="categorical",
         )
@@ -826,7 +826,7 @@ def testing_tmaps():
 
     meas_tmap_test_names = [
         "creatinine",
-        "ph,_arterial",
+        "ph_arterial",
         "pulse",
         "blood_pressure_diastolic",
         "blood_pressure_systolic",
