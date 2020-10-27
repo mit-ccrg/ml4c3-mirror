@@ -51,7 +51,7 @@ def test_get_xref_files(cross_referencer):
         cross_referencer.get_xref_files(
             starting_time=280,
             ending_time=420,
-            flag_one_source=False,
+            flag_one_source=True,
         )
         == {}
     )

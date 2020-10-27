@@ -109,6 +109,7 @@ class Tensorizer:
             tensors,
             flag_one_source,
         )
+
         os.makedirs(tensors, exist_ok=True)
         with multiprocessing.Pool(processes=num_workers) as pool:
             pool.starmap(
