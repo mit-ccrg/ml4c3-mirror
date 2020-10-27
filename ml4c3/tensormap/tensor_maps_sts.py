@@ -94,6 +94,7 @@ sts_features_continuous = {
     "weightkg":  {"median": 82,    "iqr": 24,    "min": 26.4, "max": 204},
     "perfustm":  {"median": 123,   "iqr": 72,    "min": 0,    "max": 960},
     "xclamptm":  {"median": 90,    "iqr": 65,    "min": 0,    "max": 867.168},
+    "predmort":  {"median": 0,     "iqr": 1,     "min": 0,    "max": 1},
 }
 # fmt: on
 
@@ -132,14 +133,13 @@ def _make_sts_tff_continuous(key: str) -> Callable:
         dynamic, shape = is_dynamic_shape(tm, len(surgery_dates))
         tensor = np.zeros(shape, dtype=np.float32)
         for i, surgery_date in enumerate(surgery_dates):
-            for _, idx in tm.channel_map.items():
-                try:
-                    path = make_hd5_path(tm, surgery_date, key)
-                    feature_value = hd5[path][()]
-                    slices = (i, idx) if dynamic else (idx,)
-                    tensor[slices] = feature_value
-                except (KeyError, ValueError):
-                    logging.debug(f"Could not get STS {key} for hd5 {hd5.filename}")
+            try:
+                path = make_hd5_path(tm, surgery_date, key)
+                feature_value = hd5[path][()]
+                slices = (i,) if dynamic else (...,)
+                tensor[slices] = feature_value
+            except (KeyError, ValueError):
+                logging.debug(f"Could not get STS {key} for hd5 {hd5.filename}")
         return tensor
 
     return tensor_from_file
@@ -270,7 +270,6 @@ for tmap_name in sts_features_continuous:
 
     # Make tmaps for both raw and scaled data
     for standardize in ["", "_scaled", "_minmaxed"]:
-        channel_map = {tmap_name + standardize: 0}
         normalizer = None
         if standardize == "_scaled":
             normalizer = RobustScaler(
@@ -284,10 +283,10 @@ for tmap_name in sts_features_continuous:
             )
         tmaps[tmap_name + standardize] = TensorMap(
             name=tmap_name + standardize,
+            shape=(1,),
             interpretation=Interpretation.CONTINUOUS,
             path_prefix=STS_PREFIX,
             tensor_from_file=tff,
-            channel_map=channel_map,
             validators=validator_no_nans,
             normalizers=normalizer,
             time_series_limit=0,
