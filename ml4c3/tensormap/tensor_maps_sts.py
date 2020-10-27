@@ -293,21 +293,20 @@ for tmap_name in sts_features_continuous:
             time_series_limit=0,
         )
 
-# Outcomes
-for tmap_name in sts_outcomes:
+# Outcomes + Operative Types
+for tmap_name, key in {**sts_outcomes, **sts_operative_types}.items():
     tff = _make_sts_tff_binary(
-        key=sts_outcomes[tmap_name],
+        key=key,
         negative_value=0,
         positive_value=1,
     )
-    channel_map = outcome_channels(tmap_name)
 
     tmaps[tmap_name] = TensorMap(
         name=tmap_name,
         interpretation=Interpretation.CATEGORICAL,
         path_prefix=STS_PREFIX,
         tensor_from_file=tff,
-        channel_map=channel_map,
+        channel_map=outcome_channels(tmap_name),
         validators=validator_not_all_zero,
         time_series_limit=0,
     )
