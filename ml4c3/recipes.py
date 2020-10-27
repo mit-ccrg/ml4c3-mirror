@@ -30,7 +30,6 @@ from ml4c3.ingest.sts import tensorize as tensorize_sts
 from ml4c3.evaluations import predict_and_evaluate
 from ml4c3.explorations import explore
 from ml4c3.hyperoptimizers import hyperoptimize
-from ml4c3.explorations_icu import explore_icu
 from ml4c3.assess_icu_coverage import assess_icu_coverage
 from ml4c3.definitions.globals import MODEL_EXT
 from ml4c3.tensormap.TensorMap import TensorMap
@@ -65,8 +64,6 @@ def run(args: argparse.Namespace):
             tensorize_sts(args)
         elif args.mode == "explore":
             explore(args=args, disable_saving_output=args.explore_disable_saving_output)
-        elif args.mode == "explore_icu":
-            explore_icu(args)
         elif args.mode == "plot_ecg":
             plot_ecg(args)
         elif args.mode == "build":

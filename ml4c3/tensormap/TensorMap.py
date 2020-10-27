@@ -140,10 +140,7 @@ class TensorMap:
                                  for this TensorMap
         :param time_series_limit: If set, indicates dynamic shaping and sets the
                                   maximum number of tensors in a time series to use
-        :param time_series_order: When selecting tensors in a time series, use newest,
-                                  oldest, or randomly ordered tensors
-        :param time_series_lookup: Dict of list of time intervals filtering which
-                                   tensors are used in a time series
+        :param time_series_filter: Function that returns the distinct time events to use
         :param linked_tensors: Bool indicating if tensors in time series returned by
                                this tensor map should be linked.
         """
@@ -242,7 +239,7 @@ class TensorMap:
             self.normalizers = [self.normalizers]
 
         if self.time_series_filter is None:
-            self.time_series_filter = lambda hd5: list(hd5[self.path_prefix])
+            self.time_series_filter = lambda hd5: sorted(list(hd5[self.path_prefix]))
 
     def __hash__(self):
         return hash((self.name, self.shape, self.interpretation))

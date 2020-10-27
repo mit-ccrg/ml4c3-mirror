@@ -5,6 +5,9 @@ from typing import Any, Dict, List
 MAD3_DIR = "/media/mad3"
 LM4_DIR = "/media/lm4-bedmaster"
 
+EDW_PREFIX = "edw"
+BEDMASTER_PREFIX = "bedmaster"
+
 MATFILE_EXPECTED_GROUPS: List[str] = [
     "vs",
     "vs_time_corrected",
