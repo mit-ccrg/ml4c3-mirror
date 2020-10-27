@@ -373,7 +373,7 @@ def explore(
 
     # Add aggregated df to list of window dfs and
     # adjust title depending on cross-reference and time windowing
-    if args.reference_tensors == None:
+    if args.reference_tensors is None:
         title = "all"
         dfs = [df]
         windows = ["all"]
@@ -428,6 +428,7 @@ def explore(
                 Interpretation.CONTINUOUS,
                 Interpretation.CATEGORICAL,
                 Interpretation.LANGUAGE,
+                Interpretation.EVENT,
             ]:
                 # Initialize list of summary stats dicts for this interpretation
                 stats_all = []
@@ -655,6 +656,14 @@ def _calculate_summary_stats(df: pd.DataFrame, key: str, interpretation) -> dict
             stats["count_unique"] = 0
         else:
             stats["count_unique"] = len(df[key].value_counts())
+        stats["missing"] = df[key].isna().sum()
+        stats["missing_fraction"] = stats["missing"] / len(df[key])
+        stats["total"] = len(df[key])
+    elif interpretation is Interpretation.EVENT:
+        stats["min"] = df[key].min()
+        stats["max"] = df[key].max()
+        stats["count"] = df[key].count()
+        stats["count_fraction"] = stats["count"] / df[key].shape[0]
         stats["missing"] = df[key].isna().sum()
         stats["missing_fraction"] = stats["missing"] / len(df[key])
         stats["total"] = len(df[key])
@@ -1119,7 +1128,7 @@ def _tmap_requires_modification_for_explore(tmap: TensorMap) -> bool:
         return tmap.shape != (1,)
     if tmap.is_categorical:
         return tmap.axes > 1
-    if tmap.is_language:
+    if tmap.is_language or tmap.is_event:
         return False
     return True
 

@@ -868,23 +868,6 @@ def parse_args() -> argparse.Namespace:
         "structure are verified.",
     )
 
-    # Explore parser
-    explore_icu_parser = subparser.add_parser(
-        "explore_icu",
-        description="Calculate summary statistics after tensorizing.",
-        parents=[io_parser, run_parser, tmap_parser],
-    )
-    explore_icu_parser.add_argument(
-        "--output_files_prefix",
-        default="post_tensorize",
-        help="Base name of the summary stats .csv files. Default: post_tensorize",
-    )
-    explore_icu_parser.add_argument(
-        "--no_csns",
-        action="store_true",
-        help="If the parameter is set, the explore mode won't loop through csns.",
-    )
-
     # Match patient parser
     match_patient_parser = subparser.add_parser(
         "match_patient_bm",
