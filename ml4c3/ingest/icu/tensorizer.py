@@ -435,7 +435,7 @@ def tensorize_batched(args):
             if hd5_mrn.endswith(".hd5")
         ]
         total_files_tensorized.extend(files_tensorized)
-        missed_files = list(set(files_to_tensorize) - set(files_tensorized))
+        missed_files = sorted(set(files_to_tensorize) - set(files_tensorized))
         missed_patients.extend(missed_files)
 
         # Copy tensorized files to MAD3
@@ -456,7 +456,7 @@ def tensorize_batched(args):
         if missed_files:
             logging.info(
                 f"From {last_patient - first_patient} patients, {len(missed_files)} "
-                f"HD5 files are missing. MRN of those patients: {missed_files}.",
+                f"HD5 files are not tensorized. MRN of those patients: {missed_files}.",
             )
         else:
             logging.info(f"All {last_patient - first_patient} patients are tensorized.")
@@ -467,6 +467,6 @@ def tensorize_batched(args):
     )
     if missed_patients:
         logging.warning(
-            f"{len(missed_patients)} HD5 files are missing. MRN of "
-            f"those patients: {missed_patients}",
+            f"{len(missed_patients)} HD5 files are not tensorized. MRN of "
+            f"those patients: {sorted(missed_patients)}",
         )

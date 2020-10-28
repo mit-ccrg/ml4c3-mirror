@@ -371,7 +371,7 @@ class EDWReader(Reader):
                     conversion = 3600
                 start_date = np.append(
                     start_date,
-                    [time, time + row[duration_column] * conversion],
+                    [time, time + float(row[duration_column]) * conversion],
                 )
                 action = np.append(action, [row[status_column], "Stopped"])
 
