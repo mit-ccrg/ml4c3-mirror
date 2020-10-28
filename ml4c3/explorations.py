@@ -344,14 +344,14 @@ def explore(
         if match_exact_window:
             dfs = [
                 _get_df_exactly_n_any_window(
-                    df=df,
+                    df=_df,
                     order=order,
                     start=start,
                     end=end,
                     src_join=src_join,
                     number_per_window=number_per_window,
                 )
-                for df, order, (start, end) in zip(
+                for _df, order, (start, end) in zip(
                     dfs_n_or_more_hits_any_window,
                     order_in_window,
                     time_windows_parsed,
@@ -412,7 +412,7 @@ def explore(
         )
 
         # Iterate over union and intersect of df and calculate summary statistics
-        for df, union_or_intersect in zip(
+        for _df, union_or_intersect in zip(
             [df_window, df_window.dropna()],
             ["union", "intersect"],
         ):
@@ -420,7 +420,7 @@ def explore(
             labels = ["all"]
             if args.explore_stratify_label is not None:
                 labels.extend(
-                    [label for label in df[args.explore_stratify_label].unique()],
+                    [label for label in _df[args.explore_stratify_label].unique()],
                 )
 
             # Iterate through interpretations
@@ -446,7 +446,7 @@ def explore(
                         if not disable_saving_output:
                             _plot_histogram_continuous_tensor(
                                 tmap_name=tm.name,
-                                df=df,
+                                df=_df,
                                 output_folder=args.output_folder,
                                 output_id=args.id,
                                 window=window,
@@ -459,9 +459,9 @@ def explore(
                         if isinstance(label, float) and np.isnan(label):
                             continue
                         df_label = (
-                            df
+                            _df
                             if label == "all"
-                            else df[df[args.explore_stratify_label] == label]
+                            else _df[_df[args.explore_stratify_label] == label]
                         )
                         key_suffix = (
                             ""
