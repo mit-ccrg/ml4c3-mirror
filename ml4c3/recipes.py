@@ -146,15 +146,16 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
     )
 
     out_path = os.path.join(args.output_folder, args.id + "/")
-    predict_and_evaluate(
-        model=model,
-        data=train_dataset,
-        tensor_maps_in=args.tensor_maps_in,
-        tensor_maps_out=args.tensor_maps_out,
-        plot_path=out_path,
-        data_split="train",
-        image_ext=args.image_ext,
-    )
+    if args.mixup_alpha == 0:
+        predict_and_evaluate(
+            model=model,
+            data=train_dataset,
+            tensor_maps_in=args.tensor_maps_in,
+            tensor_maps_out=args.tensor_maps_out,
+            plot_path=out_path,
+            data_split="train",
+            image_ext=args.image_ext,
+        )
 
     performance_metrics = predict_and_evaluate(
         model=model,
