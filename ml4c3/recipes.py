@@ -341,18 +341,20 @@ def train_simclr_model(args: argparse.Namespace):
         raise ValueError("Cannot give output tensors when training SimCLR model.")
     shape = (args.dense_layers[-1],)
 
+    def make_double_tff(tm):
+        def tff(_tm, hd5):
+            tensor = tm.tensor_from_file(tm, hd5)
+            return np.array([tensor, tensor])
+
+        return tff
+
     simclr_tensor_maps_in = []
     for tm in args.tensor_maps_in:
         if tm.time_series_limit is not None:
             raise ValueError("SimCLR inputs should only return 1 sample per path.")
 
         simclr_tm = copy.deepcopy(tm)
-
-        def tff(_tm, hd5):
-            tensor = tm.tensor_from_file(tm, hd5)
-            return np.array([tensor, tensor])
-
-        simclr_tm.tensor_from_file = tff
+        simclr_tm.tensor_from_file = make_double_tff(tm)
         simclr_tm.time_series_limit = 2
         simclr_tm.linked_tensors = True
         simclr_tensor_maps_in.append(simclr_tm)
