@@ -1,5 +1,6 @@
 # Imports: standard library
 import os
+import argparse
 
 # Imports: third party
 import pandas as pd
@@ -95,3 +96,27 @@ class PreProcessBMAlarms:
         beds_df = pd.read_csv(os.path.join(self.input_dir, beds_file[0]))
         beds_df = beds_df[bed_columns].set_index("UnitBedUID")
         return alarms_df.join(beds_df)
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Pre process Bedmaster alarms.")
+    parser.add_argument(
+        "--input_dir",
+        type=str,
+        default="/media/lm4-alarms/2020-09-03",
+        help="Directory where the Bedmaster alarms in raw format are saved. "
+        "Remember to introduce the most recent date.",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default="/media/mad3/bedmaster_alarms",
+        help="Directory where the results will be saved.",
+    )
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_arguments()
+    pre_processer = PreProcessBMAlarms(args.input_dir, args.output_dir)
+    pre_processer.pre_process_alarms()
