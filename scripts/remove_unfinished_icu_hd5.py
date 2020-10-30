@@ -48,7 +48,7 @@ def _check_if_finished(hd5_file, no_bm):
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Remove unfinished hd5 files.")
     parser.add_argument(
-        "--hd5_dir",
+        "--tensors",
         type=str,
         default="/media/mad3/hd5_arrests",
         help="Directory where the completness check of hd5 files is performed.",
@@ -63,4 +63,4 @@ def parse_arguments():
 
 if __name__ == "__main__":
     args = parse_arguments()
-    remove_unfinished_hd5(args.hd5_dir, args.no_bm)
+    remove_unfinished_hd5(args.tensors, args.no_bm)
