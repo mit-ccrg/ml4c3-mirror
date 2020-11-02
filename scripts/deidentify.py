@@ -182,7 +182,7 @@ def _deidentify_ecg(old_new_path):
 
     with h5py.File(new_path, "r+") as hd5:
         # Only delete PHI keys from HD5s that lack 'deidentified' flag
-        if "deidentified" not in hd5:
+        if ECG_PREFIX in hd5 and "deidentified" not in hd5:
             for ecg_date in hd5[ECG_PREFIX]:
                 for key in hd5[ECG_PREFIX][ecg_date]:
                     if key in phi_keys:

@@ -638,13 +638,13 @@ def parse_args() -> argparse.Namespace:
     )
     train_shallow_parser.add_argument(
         "--l1",
-        default=0.01,
+        default=0.0,
         type=float,
         help="L1 value for regularization in shallow model.",
     )
     train_shallow_parser.add_argument(
         "--l2",
-        default=0.01,
+        default=0.0,
         type=float,
         help="L2 value for regularization in shallow model.",
     )
