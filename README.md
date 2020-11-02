@@ -2,344 +2,63 @@
 Machine Learning for Cardiology and Critical Care
 
 ## Contents
+- [Documentation](#documentation)
+- [Contributing](#contributing)
 - [Setup](#setup)
-- [Modes](#modes)
-- [Jupyer Lab](#jupyter-lab)
-- [Run scripts](#run-scripts)
-- [Tests](#tests)
-- [TensorMaps](#tensormaps)
-- [Work with ECG XML files](#work-with-ecg-xml-files): remove duplicates, organize files, and tensorize to `.hd5`
+- [Run mode example](#run-mode-example)
+
+## Documentation
+You can find the doumentation related to this repo on our [Wiki](https://github.com/aguirre-lab/ml4c3/wiki).
+There, information about data sources, flows and storage, as well as all modes, tools and scripts is presented.
+
+### Other documentation
+GE documentation is stored in a shared Partners Dropbox folder ([link](https://www.dropbox.com/sh/aocdkcw71ehdem1/AAB2ZX7JENEAaeDarZ_Y68Ila?dl=0)) and includes:
+1. Physician's guide to the Marquette 12SL ECG analysis program
+2. Guide to MuseDB search
+3. Muse v9 XML developer's guide
+
+## Contributing
+If you are interested in working with ml4c3 group take a look at our workflow in the general aguirre-lab
+[README](https://github.com/aguirre-lab/aguirre-lab/blob/master/README.md).
 
 ## Setup
-1. install [docker](https://docs.docker.com/get-docker/) and [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/)
-2. add user to group to run docker
+1. Install [docker](https://docs.docker.com/get-docker/) and [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/)
+2. Add user to group to run docker
     ```bash
     sudo usermod -aG docker $USER
     ```
-3. build docker image
+3. Build docker image
     ```bash
     ./docker/build.sh [-c for CPU image]
     ```
-4. setup conda environment to install pre-commit into
+4. Setup conda environment to install pre-commit into
     ```bash
     make setup
     ```
     > On macOS, you can install [`gmake`](https://formulae.brew.sh/formula/make) to call `setup`
 
-5. activate conda environment so that pre-commit hooks are run
+5. Activate conda environment so that pre-commit hooks are run
     ```bash
     conda activate ml4c3
     ```
 
-## Modes
-
-Modes are either within `recipes.py` or a standalone script in `/scripts`. Either are run from Bash inside of a Docker container that has the necessary environment.
-
-### `explore`
-`explore` mode in `recipes.py` extracts data specified by `--input_tensors` from all HD5 files at `--tensors` and calculates summary statistics. The specified tensors are saved to a large CSV file, and histograms of continous tensors are generated for data in all time windows.
-
-This mode also lets you cross-reference data in `--tensors` against data in `--reference_tensors` which must be a path to a `.csv` file (we do not yet support cross-referencing two sets of `.hd5` files against each other). The column on which the source and reference data are joined is specified via `--reference_join_tensors`; this argument accepts multiple values.
-
-Analyses can be further substratified by a binary or categorical tensor specified via `--explore_stratify_label`.
-
-```bash
-./scripts/run.sh -c -t $PWD/ml4c3/recipes.py \
---mode explore \
---tensors /storage/shared/ecg/mgh \
---sample_csv ~/dropbox/sts-data/sts-mgh.csv \
---source_name ecg \
---join_tensors ecg_patientid_clean_sts_newest \
---time_tensor  ecg_datetime_sts_newest \
---reference_tensors ~/dropbox/sts-data/sts-mgh.csv \
---reference_name sts \
---reference_join_tensors medrecn \
---input_tensors \
-    ecg_rate_md_preop_newest \
-    ecg_qrs_md_preop_newest \
-    ecg_pr_md_preop_newest \
-    ecg_qt_md_preop_newest \
-    ecg_qtc_md_preop_newest \
-    ecg_paxis_md_preop_newest \
-    ecg_raxis_md_preop_newest \
-    ecg_taxis_md_preop_newest \
-    ecg_ponset_md_preop_newest \
-    ecg_poffset_md_preop_newest \
-    ecg_qonset_md_preop_newest \
-    ecg_qoffset_md_preop_newest \
-    ecg_toffset_md_preop_newest \
---output_folder ~/dropbox/sts-ecg \
---explore_save_output \
---id explore
+## Run mode example
+Modes are run from terminal and their options are set with arguments.
+An example running `tensorize_icu` mode in Docker is shown below:
 ```
-
-You can further stratify summary statistics tables and histograms of continuous tensors by a categorical tensor map. Just specificy its name:
-
-```bash
---explore_stratify_label sts_death \
-```
-
-Support for stratifying categorical tensors does not yet exist.
-
-#### `train`
-Train and evaluate a deep learning model with smart defaults.
-```bash
-./scripts/run.sh -t $PWD/ml4c3/recipes.py \
---mode train \
---tensors /storage/shared/ecg/mgh \
---input_tensors ecg_signal \
---output_tensors patient_outcome \
---output_folder results \
---id my-experiment
-```
-
-#### `infer`
-Evaluate model performance and save model predictions for inspection.
-```bash
-./scripts/run.sh -t $PWD/ml4c3/recipes.py \
---mode infer \
---tensors /storage/shared/ecg \
---input_tensors ecg_signal \
---output_tensors patient_outcome \
---batch_size 64 \
---output_folder results \
---id my-inference
-```
-
-#### `plot_ecg`
-Plot ECGs generated by the GE Muse system that have been tensorized to HD5 format. Supports plotting in two modes: `clinical` which plots the a composite view of the 12 leads that the GE Muse system would print and `full` which plots each lead individually for all 10 seconds.
-```bash
 ./scripts/run.sh -c $PWD/ml4c3/recipes.py \
---mode plot_ecg \
---plot_mode clinical \
---tensors /path/to/ecgs \
---output_folder results \
---id my-plots
+tensorize_icu \
+--tensors /media/mad3/hd5_cabg \
+--path_adt /media/mad3/cohorts_lists/adt_cabg>
+--path_xref /media/mad3/cohorts_lists/xref_ca>
+--adt_start_index 0 \
+--adt_end_index 1000 \
+--staging_dir ~/data/icu \
+--staging_batch_size 200 \
+--allow_one_source \
 ```
 
-### `deidentify`
-Some compute resources may not be allowed to store Protected Health Information (PHI). Therefore we sometimes need to deidentify data before using those resources.
-
-The script at [scripts/deidentify.py](../scripts/deidentify.py) currently supports deidentification of ECG HD5s and STS CSV files (including both feature & outcome spreadsheets, and bootstrap lists of MRNs). Deidenfication of additional data sources can be implemented using the modular approach documented in the script itself.
-
-To deidentify data from different institutions, the `starting_id` for each institution should be far apart. For example, if deidentifying MGH and BWH ECGs for the first time, use `starting_id 1` for MGH and `5000001` for BWH.
-
-To deidentify ECG and STS data for MGH for the first time:
-```bash
-./scripts/run.sh -c -t \
-    $PWD/scripts/deidentify.py \
-    --starting_id 1 \
-    --mrn_map $HOME/dropbox/ecg/mgh-deid-map.csv \
-    \
-    --ecg_dir /storage/shared/ecg/mgh \
-    --new_ecg_dir /storage/shared/ecg-deid/mgh \
-    \
-    --sts_dir $HOME/dropbox/sts-data \
-    --new_sts_dir $HOME/dropbox/sts-data-deid
-```
-
-To deidentify ECG data for BWH for the first time:
-```bash
-./scripts/run.sh -c -t \
-    $PWD/scripts/deidentify.py \
-    --starting_id 50000001 \
-    --mrn_map $HOME/dropbox/ecg/bwh-deid-map.csv \
-    \
-    --ecg_dir /storage/shared/ecg/bwh \
-    --new_ecg_dir /storage/shared/ecg-deid/bwh
-```
-
-To incrementally de-identify data for an institution (e.g. to deidentify additional HD5 files without having to repeat the de-identification process), do not specificy `starting_id`. The pipeline uses the existing MRN mapping; `starting_id` is inferred from the existing data:
-```bash
-./scripts/run.sh -c -t \
-    $PWD/scripts/deidentify.py \
-    --mrn_map $HOME/dropbox/ecg/mgh-deid-map.csv \
-    --ecg_dir /storage/shared/ecg/mgh \
-    --new_ecg_dir /storage/shared/ecg-deid/mgh
-```
-
-If incrementally updating the mapping for an institution, `starting_id` can be explicitly set but take care it does not collide with any existing IDs.
-
-## Jupyter Lab
-
-> JupyterLab is a web-based interactive development environment for Jupyter notebooks, code, and data. [`source`](https://jupyter.org)
-
-A Jupyter Lab instance can be run inside Docker containers with `ml4c3` installed:
-
-```bash
-./scripts/run.sh -j [-p PORT, default is 8888]
-```
-
-If the notebook docker container is running locally, navigate to the link generated by the Jupyter server.
-
-If the container is running remotely, you can either 1) connect to the notebook via the remote server address (e.g. `http://mithril:1234/?token=asdf`), or 2) map a local to the remote port using an ssh tunnel so you can navigate to `http://localhost:1234/?token=asdf`:
-
-```bash
-ssh -NL PORT:localhost:PORT USER@HOST
-```
-
-If changes to the code are made after a Jupyter Lab instance is launched, update the package within the Jupyter notebook by reinstalling and reimporting `ml4c3`. The following code is run inside the notebook.
-```bash
-! pip install --user ~/ml
-import ml4c3
-```
-
-> replace `~/ml` with the path to the repo on your machine
-
-## Run scripts
-Run scripts with commonly used calls are stored in [this Dropbox folder](https://www.dropbox.com/sh/hjz7adj01x1erfs/AABnZifp1mUqs7Z_26zm4ly9a?dl=0).
-
-### Script dispatcher
-
-To distribute `train` calls across bootstraps, GPUs, and scripts, use [`scripts/dispatch.py`](https://github.com/aguirre-lab/ml/blob/er_dispatcher/scripts/dispatch.py):
-
-```bash
-python scripts/dispatch.py \
---gpus 0-3 \
---bootstraps 0-9 \
---scripts \
-    ~/dropbox/ml4c3_run_scripts/sts_ecg/train-simple.sh
-    ~/dropbox/ml4c3_run_scripts/sts_ecg/train-varied.sh
-    ~/dropbox/ml4c3_run_scripts/sts_ecg/train-deeper.sh
-```
-
-You can also pass in string values to the scripts you run. This enables you to iterate over cohorts, output tensor maps, and short names (paired with output tensor maps), e.g.:
-```bash
-python scripts/dispatch.py \
---gpus 0-3 \
---bootstraps 0-9 \
---scripts ~/dropbox/ml-run-scripts/infer-outcome-tmap-cohort.sh \
---cohorts cabg valve cabg-valve major other office \
---output_tensors sts_death sts_renal_failure \
---outcome_short_names death renal
-```
-
-Each of these extra arguments are optional, and the script(s) you call at `--scripts` must be written to use the values:
-
-```
-| arg in dispatch.py    | env variable name in script.sh |
-|-----------------------|--------------------------------|
-| --cohorts             | COHORT                         |
-| --output_tensors      | OUTPUT_TENSOR                  |
-| --outcome_short_names | OUTCOME_SHORT_NAME             |
-```
-
-
-### Tests
-To run unit tests in Docker:
-```bash
-bash scripts/run.sh -T $PWD/tests
-```
-
-Some of the unit tests are slow due to creating, saving and loading `tensorflow` models.
-To skip those tests to move quickly, run
-```bash
-./scripts/run.sh -T $PWD/tests -m '"not slow"'
-```
-Ensure you wrap `"not slow"` in single quotes.
-
-pytest can also run specific tests using `::`. For example
-```bash
-./scripts/run.sh -T $PWD/tests/test_recipes.py::TestRecipes::test_explore -m '"not slow"'
-```
-
-For more pytest usage information, checkout the [usage guide](https://docs.pytest.org/en/latest/usage.html).
-
-
-## TensorMaps
-
-TensorMaps are the bridge between our hd5 data files and the downstream application of those data. They handle data loading and processing while also tagging each tensor with a semantic interpretation, a static shape, and information about `tensors` in a time series.
-
-Every `tensor` encoded by a TensorMap is a `numpy.ndarray`.
-
-TensorMaps load data through a function called `tensor_from_file`. The definition of each TensorMap is paired with a `tensor_from_file` function that takes as input the `TensorMap` and the `hd5` file. This function is responsible for understanding where the data lives in the `hd5` and can execute logic to derive the location of the data. For example, within a patient's `hd5` file, they may have more than 1 patient encounter. However, the downstream application may only need the newest patient encounter. In this case, a step in the logic of the `tensor_from_file` function may be to isolate only the data for the newest patient encounter within a given `hd5` file. More on how `tensor_from_file` should handle time series data is described below.
-
-TensorMaps process data through three sets of functions called `validators`, `augmenters`, and `normalizers`. They are invoked in that order by the function `postprocess_tensor` which takes as input the `tensor`, `hd5`, and a boolean flag `augment`. During training, data is randomly augmented so that the model sees different data every training epoch; augmentations should not change the shape of the `tensor`. During validation and testing, `augment` should be false. If a `tensor` should fail validation, a `validator` should throw an error. The validation error is caught by our data loading pipeline and the path that yielded the badly formed `tensor` is skipped. A few standard normalization strategies are provided including `zero mean std one (across all samples)`, `zero mean std one (within a sample)`, `robust scaling`, and `min-max scaling` but we are always looking for more - please contribute!
-
-Semantic interpretations of each `tensor`, encoded by its TensorMap, are used by other parts of the pipeline to determine model architecture and data loading strategies. For example, `tensors` with `continuous` vs `categorical` interpretations have different `loss` functions. The shape of an input `tensor` encoded by the TensorMap determines if the input feature is fed through convolutional layers or directly to fully connected layers.
-
-`time_series_limit` is an important attribute encoded by the TensorMap. Data for a given patient may exist at multiple time points; a TensorMap should load data from at most `time_series_limit` time points. If `time_series_limit` is `None`, this indicates that the TensorMap does not yield data at distinct time points and it should only return one `tensor` with the same `shape` as the TensorMap. If `time_series_limit` is `0`, this indicates no limit. If `time_series_limit` is any non-negative integer, a TensorMap's `tensor_from_file` function should return a numpy array with an extra, dynamic first dimension. However the semantic shape of each `tensor` should not include this first "time" dimension. For example, if a patient has 2 ECGs of shape `(2500, 8)` and a TensorMap loads data for both ECGs, then 1) `time_series_limit` should be `0` or `> 2`, 2) `shape` should be `(2500, 8)`, and 3) `tensor_from_file` should return a numpy array of size `(2, 2500, 8)`. `time_series_limit` indicates that there are potentially `tensors` in a time series and each should have a `shape` that is `(2500, 8)`. The actual numpy array of shape `(2, 2500, 8)` is then parsed as `2` distinct `tensors`. Additional attributes `time_series_order` and `time_series_lookup` may be useful in the logic of `tensor_from_file` for selecting the time points to retrieve.
-
-If there is a desire to link multiple `tensors` from the same patient together, TensorMap includes the `linked_tensors` boolean. This is parsed by the `dataset` pipeline which consecutively yields all the `tensors` from a given patient. Otherwise, `dataset` randomly shuffles data and makes no guarantee on the order of `tensors`. Because `tensors` are batched, there is a possibility that the `tensors` from a given patient may be split across two batches unless the precise number of linked `tensors` per patient is known. This feature is currently used by the `simclr` recipe which links two distinct random augmentations of the same `tensor` and performs self-supervised contrastive learning.
-
-### Build TMaps for labels from ECG reads
-ECG reads contain valuable information that can be parsed into labels via TMaps. For example, one can train a model to classify an ECG as AFib or not by using a TMap that looks for matching phrases in the ECG read.
-
-Our system involves a number of `c_$TASK.xlsx` files stored in Dropbox (under the `ecg/labeling` folder). We call these spreadsheets "label maps". They are simple for clinical collaborators (most of whom are nontechnical) to revise. The first column contains source phrases, e.g. `atrial fibrillation`. The second through N'th column contain the string of the label, e.g. `afib`.
-
-The script `scripts/make_tensor_maps_for_ecg_labels.py` parses label maps into code, resulting in the creation of `ml4c3/tensor_maps_ecg_labels.py`.
-
-Whenever label maps are updated, re-run the generating script to update the TMaps; note the `-c` flag to use the CPU image, and the `-t` flag for interactive mode in case you need to place breakpoints and debug.
-
-```bash
-./scripts/run.sh -c -t $PWD/scripts/make_tensor_maps_for_ecg_labels.py
-```
-
-The generated script is not initially formatted with `Black`. However, `pre-commit` should fix that prior to the script being committed to the repo.
-
-## Work with ECG XML files
-
-### Remove duplicate XMLs
-`scripts/remove_xml_duplicates.py` finds and removes exact duplicate XML files, as defined by every bit of two files being identical, determined via SHA-256 hashing.
-
-```bash
-./scripts/run.sh -c $PWD/scripts/remove_xml_duplicates.py \
---src /path/to/xmls-to-dedup
-```
-
-### Organize XMLs into `yyyy-mm` subdirectories
-`scripts/organize_xmls.py` moves XML files from a single directory into the appropriate `yyyy-mm` directory:
-
-```bash
-./scripts/run.sh -c $PWD/scripts/organize_xmls.py \
---source_xml_folder /path/to/xmls-to-organize \
---destination_xml_folder /media/2tb/ecg_xmls \
---method copy \ # can be also be 'move'
---verbose
-```
-
-If a date cannot be obtainedi from the XML, that file is considered bad and it will be moved to `/bad_xml_folder`. This path can be set with `--bad_xml_folder PATH_YOU_SET`
-
-### Tensorize XMLs to HD5
-`tensorize` mode in `recipes.py` extracts ECG data from XML files and saves as [HD5 files](https://www.hdfgroup.org). Tensorization also removes duplicates that contain nearly the same information, except for minor differences, for example minor version changes in acquisition software. This duplicate detection is done by matching patient-date-time fields.
-
-This mode is called with the following arguments:
-`--xml_folder` to specify the directory containing ECG XMLs.
-`--tensors` to specify the directory where tensorized HD5 files should be saved.
-
-```bash
-./scripts/run.sh -c $PWD/ml4c3/recipes.py \
---mode tensorize \
---xml_folder /path/to/xml-files \
---tensors /path/to/hd5-files
-```
-
-All the ECGs belonging to one patient, identified by medical record number (MRN), will be saved to one HD5, indexed by ECG acquisition date and time:
-```
-<MRN>.hd5
-└--ecg
-   |--date_1
-   |  └--ECG Data
-   └--date_2
-      └--ECG Data
-```
-
-### ECG data structure
-TODO revise description of voltage https://github.com/aguirre-lab/ml4c3/issues/576
-TODO compression adn decompression
-
-Voltage is saved from XMLs as a dictionary of numpy arrays indexed by leads in the set `("I", "II", "V1", "V2", "V3", "V4", "V5", "V6")`, e.g.:
-
-```
-voltage = {'I': array([0, -4, -2, ..., 7]),
-          {'II': array([2, -9, 0, ..., 5]),
-          ...
-          {'V6': array([1, -4, -3, ..., 4]),
-```
-
-Every other element extracted from the XML is returned as a string, even if the underlying primitive type is a number (e.g. age).
-
-### Other documentation
-GE documentation is stored in a shared Partners Dropbox folder ([link](https://www.dropbox.com/sh/aocdkcw71ehdem1/AAB2ZX7JENEAaeDarZ_Y68Ila?dl=0)) and includes:
-1. physician's guide to the Marquette 12SL ECG analysis program
-2. guide to MuseDB search
-3. muse v9 XML developer's guide
+Information and arguments of all modes, tools and scripts available from our repo are described in
+[Recipes](https://github.com/aguirre-lab/ml4c3/wiki/Recipes),
+[Tools](https://github.com/aguirre-lab/ml4c3/wiki/Tools) and
+[Scripts](https://github.com/aguirre-lab/ml4c3/wiki/Scripts), respectively.
