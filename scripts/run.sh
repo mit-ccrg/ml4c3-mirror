@@ -162,7 +162,8 @@ if [[ "$PYTHON_COMMAND" == "$JUPYTER_COMMAND" ]] ; then
     if [[ "${PORT_FLAG}" == "" ]] ; then
         PORT_FLAG="-p ${PORT}:${PORT}"
     fi
-    PYTHON_ARGS="--port ${PORT} --ip 0.0.0.0 --no-browser"
+    FQDN=$(hostname -A | awk '{for(i=1;i<=NF;i++) print length($i), $i}' | sort -nr | head -1 | awk '{print $2}')
+    PYTHON_ARGS="--port ${PORT} --ip 0.0.0.0 --no-browser --NotebookApp.custom_display_url http://${FQDN}:${PORT}"
     CONTAINER_NAME="--name ${USER}-notebook-${PORT}"
 fi
 
