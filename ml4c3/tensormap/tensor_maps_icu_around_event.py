@@ -63,12 +63,13 @@ def make_around_event_tensor_from_file(
         if len(indices) == 0 and not imputation_type:
             raise KeyError(f"Not in all windows {tm.name}.")
         tensor = compute_feature(
-            signal_tm,
-            hd5,
-            visit,
-            indices,
-            feature,
-            imputation_type,
+            tm=signal_tm,
+            hd5=hd5,
+            visit=visit,
+            indices=indices,
+            feature=feature,
+            imputation_type=imputation_type,
+            period=period,
             **kwargs,
         )
         return tensor

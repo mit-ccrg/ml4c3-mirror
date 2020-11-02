@@ -3,7 +3,6 @@
 # Imports: third party
 import numpy as np
 import pandas as pd
-import pytest
 
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
@@ -695,9 +694,10 @@ def test_signal_metrics_tmaps(hd5_data):
     assert np.array_equal(original2, tensor2)
 
     tensor3 = tm3.tensor_from_file(tm3, hd5)
-    indice = np.where(values_array[indices1] == np.nanmedian(values_array[indices1]))[
-        0
-    ][-1]
+    indice = abs(
+        np.flip(values_array[indices1] - np.nanmedian(values_array[indices1])),
+    ).argmin()
+    indice = len(indices1) - indice - 1
     original3 = np.array(
         [np.nanmedian(values_array[indices1]), time_array[indices1][indice]],
     )

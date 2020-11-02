@@ -1,5 +1,5 @@
 # Imports: standard library
-from typing import Dict, Optional
+from typing import Optional
 
 # Imports: third party
 import numpy as np
@@ -13,8 +13,6 @@ from ml4c3.tensormap.TensorMap import (
     get_local_timestamps,
 )
 from ml4c3.definitions.icu_tmap_list import DEFINED_TMAPS
-
-TMAPS: Dict[str, TensorMap] = {}
 
 
 def make_measurement_array_tensor_from_file():

@@ -17,6 +17,7 @@ def compute_feature(
     indices: List[int],
     feature: str,
     imputation_type: str = None,
+    period: str = None,
     **kwargs,
 ):
     if len(indices) == 0:
@@ -93,14 +94,35 @@ def compute_feature(
     tensor = missing_imputation(tm.name, tensor, imputation_type)
 
     if tm.name.endswith("_timeseries") and feature != "raw":
-        sample_time = np.where(
-            tm.tensor_from_file(tm, hd5, visits=visit, **kwargs)[0][0, indices]
-            == tensor,
-        )[0]
-        if len(sample_time) == 0:
-            raise KeyError("Unable to compute feature {feature}.")
+        # Obtain time indice where the feature is found
+        if feature in ("last", "first"):
+            sample_time = -1 if feature == "last" else 0
+        else:  # min, max, median
+            # We obtain the argmin of the absolute value of the difference, that is
+            # the index of the sample that has the closest value to the feature
+            # If there are more than two values with the feature value,
+            # this approach will return the first one. If the period is pre event,
+            # we want the last one (closest to the event) so the array is reversed
+            if period == "pre":
+                sample_time = abs(
+                    np.flip(
+                        tm.tensor_from_file(tm, hd5, visits=visit, **kwargs)[0][
+                            0,
+                            indices,
+                        ]
+                        - tensor,
+                    ),
+                ).argmin()
+                # As we reversed the array, we recompute the original indice
+                sample_time = len(indices) - sample_time - 1
+            else:
+                sample_time = abs(
+                    tm.tensor_from_file(tm, hd5, visits=visit, **kwargs)[0][0, indices]
+                    - tensor,
+                ).argmin()
+
         time = tm.tensor_from_file(tm, hd5, visits=visit, **kwargs)[0][1, indices][
-            sample_time[-1]
+            sample_time
         ]
         tensor = np.array([tensor, time])
 
