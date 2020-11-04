@@ -8,7 +8,6 @@ DOCKER_IMAGE_GPU="ghcr.io/aguirre-lab/ml4c3:latest-gpu"
 DOCKER_IMAGE_NO_GPU="ghcr.io/aguirre-lab/ml4c3:latest-cpu"
 DOCKER_IMAGE=${DOCKER_IMAGE_GPU}
 GPU_DEVICE="--gpus all"
-INTERACTIVE=""
 MOUNTS=""
 PORT="8888"
 PORT_FLAG=""
@@ -69,8 +68,6 @@ usage()
 
         -p                  Ports to map between docker container and host
 
-        -t                  Run Docker container interactively.
-
         -r                  Call Python script as root. If this flag is not specified,
                             the owner and group of the output directory will be those
                             of the user who called the script.
@@ -110,9 +107,6 @@ while getopts ":i:d:m:p:cjtrhT" opt ; do
         c)
             DOCKER_IMAGE=${DOCKER_IMAGE_NO_GPU}
             GPU_DEVICE=
-            ;;
-        t)
-            INTERACTIVE="-it"
             ;;
         r) # Output owned by root
             SETUP_USER=""
@@ -174,8 +168,7 @@ fi
 
 cat <<LAUNCH_MESSAGE
 Attempting to run Docker with
-    docker run --rm \
-    ${INTERACTIVE} \
+    docker run --rm -it \
     ${GPU_DEVICE} \
     --env GROUP_IDS_NAMES \
     --uts=host \
@@ -191,8 +184,7 @@ Attempting to run Docker with
     ${CALL_AS_USER} ${PYTHON_COMMAND} ${PYTHON_ARGS}"
 LAUNCH_MESSAGE
 
-docker run --rm \
-${INTERACTIVE} \
+docker run --rm -it \
 ${GPU_DEVICE} \
 --env GROUP_IDS_NAMES \
 --uts=host \
