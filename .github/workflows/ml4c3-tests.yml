@@ -11,6 +11,7 @@ jobs:
   test:
 
     runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
     container: ghcr.io/aguirre-lab/ml4c3:latest-gpu
     steps:
     - uses: actions/checkout@v2
