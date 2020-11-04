@@ -444,15 +444,19 @@ def explore(
                         interpretation is Interpretation.CONTINUOUS
                     ):
                         if not disable_saving_output:
-                            _plot_histogram_continuous_tensor(
-                                tmap_name=tm.name,
-                                df=_df,
-                                output_folder=args.output_folder,
-                                output_id=args.id,
-                                window=window,
-                                stratify_label=args.explore_stratify_label,
-                                image_ext=args.image_ext,
-                            )
+                            names = [tm.name]
+                            if tm.channel_map:
+                                names = [f"{tm.name}_{cm}" for cm in tm.channel_map]
+                            for name in names:
+                                _plot_histogram_continuous_tensor(
+                                    tmap_name=name,
+                                    df=_df,
+                                    output_folder=args.output_folder,
+                                    output_id=args.id,
+                                    window=window,
+                                    stratify_label=args.explore_stratify_label,
+                                    image_ext=args.image_ext,
+                                )
 
                     # Iterate over label and isolate those df rows if stratified
                     for label in labels:
@@ -1125,7 +1129,7 @@ def _modify_tmap_to_return_mean(tmap: TensorMap) -> TensorMap:
 def _tmap_requires_modification_for_explore(tmap: TensorMap) -> bool:
     """Whether a tmap has to be modified to be used in explore"""
     if tmap.is_continuous:
-        return tmap.shape != (1,)
+        return tmap.axes > 1 or (tmap.shape != (1,) and tmap.channel_map is None)
     if tmap.is_categorical:
         return tmap.axes > 1
     if tmap.is_language or tmap.is_event:
