@@ -33,6 +33,7 @@ from ml4c3.hyperoptimizers import hyperoptimize
 from ml4c3.assess_icu_coverage import assess_icu_coverage
 from ml4c3.definitions.globals import MODEL_EXT
 from ml4c3.tensormap.TensorMap import TensorMap
+from ml4c3.ecg_features_extraction import extract_ecg_features
 from ml4c3.ingest.icu.matchers.match_data import match_data
 from ml4c3.ingest.icu.summarizers.summarizer import pre_tensorize_summary
 from ml4c3.ingest.icu.check_icu_structure.check_icu_structure import check_icu_structure
@@ -76,6 +77,8 @@ def run(args: argparse.Namespace):
             pre_tensorize_summary(args)
         elif args.mode == "match_patient_bm":
             match_data(args)
+        elif args.mode == "extract_ecg_features":
+            extract_ecg_features(args)
         else:
             raise ValueError("Unknown mode:", args.mode)
 
@@ -375,7 +378,7 @@ def train_simclr_model(args: argparse.Namespace):
     )
     args.tensor_maps_out = [projection_tm]
 
-    datasets, stats, cleanups = train_valid_test_datasets(
+    datasets, _, cleanups = train_valid_test_datasets(
         tensor_maps_in=args.tensor_maps_in,
         tensor_maps_out=args.tensor_maps_out,
         tensors=args.tensors,
@@ -392,7 +395,7 @@ def train_simclr_model(args: argparse.Namespace):
         cache=args.cache,
         mixup_alpha=args.mixup_alpha,
     )
-    train_dataset, valid_dataset, test_dataset = datasets
+    train_dataset, valid_dataset, _ = datasets
     model = make_multimodal_multitask_model(**args.__dict__)
     model, history = train_model_from_datasets(
         model=model,
