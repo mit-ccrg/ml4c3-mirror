@@ -46,7 +46,7 @@ from ml4c3.tensormap.tensor_maps_icu_medications import get_tmap as GET_MEDS_TMA
 from ml4c3.tensormap.tensor_maps_icu_list_signals import get_tmap as GET_LIST_TMAP
 from ml4c3.tensormap.tensor_maps_icu_measurements import get_tmap as GET_MEAS_TMAP
 
-# pylint: disable=redefined-outer-name, unused-argument
+# pylint: disable=redefined-outer-name, unused-argument, missing-class-docstring
 
 
 def pytest_configure():

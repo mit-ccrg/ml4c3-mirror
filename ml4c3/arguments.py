@@ -12,7 +12,6 @@ from typing import Dict
 import numpy as np
 
 # Imports: first party
-import ml4c3.definitions
 from ml4c3.logger import load_config
 from ml4c3.models import BottleneckType
 from ml4c3.definitions.icu import MAD3_DIR
@@ -32,7 +31,7 @@ BOTTLENECK_STR_TO_ENUM = {
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     subparser = parser.add_subparsers(
-        title="ml4c3 modes",
+        title="ml4c3 modes",  # TODO add descriptions
         description="Select one of the following modes: \n"
         "\t * train: ADD DESCRIPTION. \n"
         "\t * train_shallow: ADD DESCRIPTION. \n"
@@ -49,7 +48,8 @@ def parse_args() -> argparse.Namespace:
         "\t * assess_icu_coverage: ADD DESCRIPTION. \n"
         "\t * check_icu_structure: ADD DESCRIPTION. \n"
         "\t * pre_tensorize_summary: ADD DESCRIPTION. \n"
-        "\t * match_patient_bm: ADD DESCRIPTION. \n",
+        "\t * match_patient_bm: ADD DESCRIPTION. \n"
+        "\t * extract_ecg_features: ADD DESCRIPTION. \n",
         dest="mode",
     )
 
@@ -139,7 +139,8 @@ def parse_args() -> argparse.Namespace:
         "--cache",
         action="store_true",
         help="Cache tf.data.Dataset for faster loading. Best used with small-sized of"
-        " data, e.g. STS features. Not ideal for large data (waveforms) or large batch sizes,",
+        " data, e.g. STS features. Not ideal for large data (waveforms) or large "
+        "batch sizes",
     )
     run_parser.add_argument(
         "--random_seed",
@@ -973,6 +974,29 @@ def parse_args() -> argparse.Namespace:
         help="Count the number of unique rows (events) in --cohort_query/--cohort_csv.",
     )
 
+    # ECG feature extraction parser
+    ecg_features_parser = subparser.add_parser(
+        "extract_ecg_features",
+        description="Extract basic ECG features from hd5 files.",
+        parents=[io_parser, run_parser, tmap_parser],
+    )
+    ecg_features_parser.add_argument(
+        "--r_method",
+        type=str,
+        default="neurokit",
+        help="The algorithm to be used for R-peak detection. Can be one "
+        "of neurokit (default), pantompkins1985, hamilton2002, "
+        "christov2004, gamboa2008, elgendi2010, engzeemod2012 "
+        "or kalidas2017.",
+    )
+    ecg_features_parser.add_argument(
+        "--wave_method",
+        type=str,
+        default="dwt",
+        help="Can be one of dwt (default) for discrete wavelet transform "
+        "or cwt for continuous wavelet transform.",
+    )
+
     # Additional subparsers
     infer_parser = subparser.add_parser(
         name="infer",
@@ -989,7 +1013,6 @@ def parse_args() -> argparse.Namespace:
         description="TODO",
         parents=[model_parser, training_parser, io_parser, run_parser, tmap_parser],
     )
-
     args = parser.parse_args()
     _process_args(args)
     return args
