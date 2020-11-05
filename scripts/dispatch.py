@@ -109,7 +109,7 @@ def run(args: argparse.Namespace):
     try:
         for script in args.scripts:
             with open(script, "r") as original, open(f"{script}_temp", "w") as temp:
-                temp.write(original.read().replace("-t ", ""))
+                temp.write(original.read().replace("run.sh", "run.sh -n"))
             for (bootstrap, cohort, output_tensor_and_short_name) in itertools.product(
                 args.bootstraps,
                 args.cohorts,
