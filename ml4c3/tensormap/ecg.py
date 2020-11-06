@@ -16,8 +16,14 @@ from ml4c3.validators import (
     validator_clean_mrn,
     validator_no_negative,
     validator_not_all_zero,
+    validator_voltage_no_zero_padding,
 )
-from ml4c3.definitions.ecg import ECG_PREFIX, ECG_DATE_FORMAT, ECG_REST_LEADS_ALL
+from ml4c3.definitions.ecg import (
+    ECG_PREFIX,
+    ECG_DATE_FORMAT,
+    ECG_REST_LEADS_ALL,
+    ECG_REST_LEADS_INDEPENDENT,
+)
 from ml4c3.definitions.globals import YEAR_DAYS
 from ml4c3.tensormap.TensorMap import (
     TensorMap,
@@ -130,6 +136,67 @@ name2augmenters = {
     "noise": _noise_ecg,
     "warp": _warp_ecg,
 }
+
+
+def update_tmaps_ecg_voltage(
+    tmap_name: str,
+    tmaps: Dict[str, TensorMap],
+) -> Dict[str, TensorMap]:
+    """
+    Generates ECG voltage TMaps that are given by the name format:
+        [12_lead_]ecg_{length}[_exact][_std][_augmentations]
+
+    Required:
+        length: the number of samples present in each lead.
+
+    Optional:
+        12_lead: use the 12 clinical leads.
+        exact: only return voltages when raw data has exactly {length} samples in each lead.
+        std: standardize voltages using mean = 0, std = 2000.
+        augmentations: apply crop, noise, and warp transformations to voltages.
+
+    Examples:
+        valid: ecg_2500_exact_std
+        valid: 12_lead_ecg_625_crop_warp
+        invalid: ecg_2500_noise_std
+
+    Note: if additional modifiers are present after the name format, e.g.
+        ecg_2500_std_newest_sts, the matched part of the tmap name, e.g.
+        ecg_2500_std, will be used to construct a tmap and save it to the dict.
+        Later, a function will find the tmap name ending in _newest, and modify the
+        tmap appropriately.
+    """
+    voltage_tm_pattern = re.compile(
+        r"^(12_lead_)?ecg_\d+(_exact)?(_std)?(_warp|_crop|_noise)*",
+    )
+    match = voltage_tm_pattern.match(tmap_name)
+    if match is None:
+        return tmaps
+
+    # Isolate matching components of tmap name and build it
+    match_tmap_name = match[0]
+    leads = ECG_REST_LEADS_ALL if "12_lead" in tmap_name else ECG_REST_LEADS_INDEPENDENT
+    length = int(tmap_name.split("ecg_")[1].split("_")[0])
+    exact = "exact" in tmap_name
+    normalizer = Standardize(mean=0, std=2000) if "std" in tmap_name else None
+    augmenters = [
+        augment_function
+        for augment_option, augment_function in name2augmenters.items()
+        if augment_option in tmap_name
+    ]
+    tmap = TensorMap(
+        name=match_tmap_name,
+        shape=(length, len(leads)),
+        path_prefix=ECG_PREFIX,
+        tensor_from_file=make_voltage_tff(exact_length=exact),
+        normalizers=normalizer,
+        channel_map=leads,
+        time_series_limit=0,
+        validators=validator_voltage_no_zero_padding,
+        augmenters=augmenters,
+    )
+    tmaps[match_tmap_name] = tmap
+    return tmaps
 
 
 def voltage_stat(tm, hd5):

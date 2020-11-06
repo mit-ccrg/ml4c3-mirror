@@ -600,31 +600,31 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
         return tmaps
 
     # Base tmaps: ECG voltage
-    from ml4c3.tensormap.tensor_map_updaters import update_tmaps_ecg_voltage  # isort:skip
+    from ml4c3.tensormap.ecg import update_tmaps_ecg_voltage  # isort:skip
     tmaps = update_tmaps_ecg_voltage(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps
 
     # Modify: weighted loss
-    from ml4c3.tensormap.tensor_map_updaters import update_tmaps_weighted_loss  # isort:skip
+    from ml4c3.tensormap.updaters import update_tmaps_weighted_loss  # isort:skip
     tmaps = update_tmaps_weighted_loss(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps
 
     # Modify: STS window (e.g. preop)
-    from ml4c3.tensormap.tensor_map_updaters import update_tmaps_sts_window  # isort:skip
+    from ml4c3.tensormap.sts import update_tmaps_sts_window  # isort:skip
     tmaps = update_tmaps_sts_window(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps
 
     # Modify: time series
-    from ml4c3.tensormap.tensor_map_updaters import update_tmaps_time_series  # isort:skip
+    from ml4c3.tensormap.updaters import update_tmaps_time_series  # isort:skip
     tmaps = update_tmaps_time_series(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps
 
     # Modify: load predictions
-    from ml4c3.tensormap.tensor_map_updaters import update_tmaps_model_predictions  # isort:skip
+    from ml4c3.tensormap.updaters import update_tmaps_model_predictions  # isort:skip
     tmaps = update_tmaps_model_predictions(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps

@@ -53,7 +53,7 @@ JOIN_CHAR = "_"
 MAKE_TFF_FUNCTION_NAME = "make_ecg_label_from_read_tff"
 MAKE_ANY_TFF_FUNCTION_NAME = "make_binary_ecg_label_from_any_read_tff"
 TENSOR_PATH_PREFIX = "ECG_PREFIX"
-NEW_SCRIPT_NAME = "tensor_maps_ecg_labels.py"
+NEW_SCRIPT_NAME = "ecg_labels.py"
 
 
 def _clean_label(label: str) -> str:
@@ -154,7 +154,7 @@ if __name__ == "__main__":
         py_file.write(f"from ml4c3.TensorMap import TensorMap, Interpretation\n")
         py_file.write(f"from ml4c3.definitions import ECG_PREFIX\n")
         py_file.write(
-            f"from ml4c3.tensor_maps_ecg import {MAKE_TFF_FUNCTION_NAME}, {MAKE_ANY_TFF_FUNCTION_NAME}\n",
+            f"from ml4c3.tensormap.ecg import {MAKE_TFF_FUNCTION_NAME}, {MAKE_ANY_TFF_FUNCTION_NAME}\n",
         )
         py_file.write(f"from ml4c3.validators import validator_not_all_zero\n\n\n")
         py_file.write("tmaps: Dict[str, TensorMap] = {}\n")
