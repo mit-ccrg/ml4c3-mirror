@@ -7,11 +7,10 @@ import numpy as np
 import pandas as pd
 
 # Imports: first party
-from ml4c3.definitions.icu import BM_SOURCES
-from ml4c3.ingest.icu.data_objects import BMSignal
+from ml4c3.ingest.icu.data_objects import BedmasterSignal
 
 
-class BMStats:
+class BedmasterStats:
     """
     Class that gets together the summary data from all the writers.
 
@@ -70,9 +69,7 @@ class BMStats:
 
     def add_signal_stats(self, signal, key, value=1, overwrite=False, source=None):
         if source:
-            signal = (
-                f"{signal}_vs" if source == BM_SOURCES["vitals"] else f"{signal}_wv"
-            )
+            signal = f"{signal}_vs" if source == "vitals" else f"{signal}_wv"
 
         if signal not in self.signal_stats:
             self.signal_stats[signal] = self.init_signal_dict()
@@ -120,11 +117,9 @@ class BMStats:
 
         return new_mean
 
-    def add_from_signal(self, signal: BMSignal):
+    def add_from_signal(self, signal: BedmasterSignal):
         signal_name = (
-            f"{signal.name}_vs"
-            if signal.source == BM_SOURCES["vitals"]
-            else f"{signal.name}_wv"
+            f"{signal.name}_vs" if signal.source == "vitals" else f"{signal.name}_wv"
         )
 
         if signal_name not in self.signal_stats:
@@ -190,7 +185,7 @@ class BMStats:
 
         # Save DF to csv
         signal_stats_df.to_csv(
-            os.path.join(output_dir, f"{files_base_name}_bm_signal_stats.csv"),
+            os.path.join(output_dir, f"{files_base_name}_bedmaster_signal_stats.csv"),
             index=False,
         )
 
@@ -204,6 +199,6 @@ class BMStats:
 
         # Save df to csv
         file_stats_df.to_csv(
-            os.path.join(output_dir, f"{files_base_name}_bm_files_stats.csv"),
+            os.path.join(output_dir, f"{files_base_name}_bedmaster_files_stats.csv"),
             index=False,
         )

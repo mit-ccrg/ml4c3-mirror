@@ -8,33 +8,33 @@ import numpy as np
 import pandas as pd
 
 # Imports: first party
-from ml4c3.definitions.icu import EDW_FILES, BM_SOURCES
-from ml4c3.ingest.icu.readers import BMReader, EDWReader
-from ml4c3.ingest.icu.statistics import BMStats
+from ml4c3.definitions.types import EDWType, BedmasterType
+from ml4c3.ingest.icu.readers import EDWReader, BedmasterReader
+from ml4c3.ingest.icu.statistics import BedmasterStats
 
 
 class PreTensorizeSummaryWriter:
     """
-    Class that creates summary data for a set of bm and edw data.
+    Class that creates summary data for a set of Bedmaster and edw data.
 
     It is used to organize this data and create a csv with all the
     information.
     """
 
-    def __init__(self, bm_dir: str, edw_dir: str, xref_file: str):
-        self.bm_dir = bm_dir
+    def __init__(self, bedmaster_dir: str, edw_dir: str, xref_file: str):
+        self.bedmaster_dir = bedmaster_dir
         self.edw_dir = edw_dir
         self.xref_file = xref_file
         self.reset()
         self.xref_fields = [
             "edw_mrns",
-            "bm_mrns",
+            "bedmaster_mrns",
             "common_mrns",
             "edw_csns",
-            "bm_csns",
+            "bedmaster_csns",
             "common_csns",
-            "bm_files",
-            "cross_referenced_bm_files",
+            "bedmaster_files",
+            "cross_referenced_bedmaster_files",
         ]
         self.edw_fields = [
             "Male",
@@ -98,37 +98,40 @@ class PreTensorizeSummaryWriter:
         """
         Assess coverage between EDW and Bedmaster datasets.
         """
-
         xref_file = pd.read_csv(self.xref_file)
         xref_file = xref_file.dropna(subset=["MRN"])
-        bm_mrns = set(xref_file["MRN"].unique())
-        bm_csns = set(xref_file["PatientEncounterID"].unique())
-        bm_ids = set(xref_file["fileID"].unique())
-        cross_ref_bm_files = set()
-        for bm_id in bm_ids:
-            cross_ref_bm_files = cross_ref_bm_files.union(
+        bedmaster_mrns = set(xref_file["MRN"].unique())
+        bedmaster_csns = set(xref_file["PatientEncounterID"].unique())
+        bedmaster_ids = set(xref_file["fileID"].unique())
+        cross_ref_bedmaster_files = set()
+        for bedmaster_id in bedmaster_ids:
+            cross_ref_bedmaster_files = cross_ref_bedmaster_files.union(
                 {
-                    bm_file
-                    for bm_file in os.listdir(self.bm_dir)
-                    if bm_file.startswith(bm_id)
+                    bedmaster_file
+                    for bedmaster_file in os.listdir(self.bedmaster_dir)
+                    if bedmaster_file.startswith(bedmaster_id)
                 },
             )
-        bm_files = [
-            bm_file for bm_file in os.listdir(self.bm_dir) if bm_file.endswith(".mat")
+        bedmaster_files = [
+            bedmaster_file
+            for bedmaster_file in os.listdir(self.bedmaster_dir)
+            if bedmaster_file.endswith(".mat")
         ]
 
         edw_mrns, edw_csns = self.get_mrns_and_csns()
 
         self.summary["edw_mrns"] = len(edw_mrns)
         self.summary["edw_csns"] = len(edw_csns)
-        self.summary["bm_mrns"] = len(bm_mrns)
-        self.summary["bm_csns"] = len(bm_csns)
-        self.summary["bm_files"] = len(bm_files)
-        self.summary["common_mrns"] = len(edw_mrns.intersection(bm_mrns))
-        self.summary["common_csns"] = len(edw_csns.intersection(bm_csns))
-        self.summary["cross_referenced_mrns"] = len(edw_mrns.union(bm_mrns))
-        self.summary["cross_referenced_csns"] = len(edw_csns.union(bm_csns))
-        self.summary["cross_referenced_bm_files"] = len(cross_ref_bm_files)
+        self.summary["bedmaster_mrns"] = len(bedmaster_mrns)
+        self.summary["bedmaster_csns"] = len(bedmaster_csns)
+        self.summary["bedmaster_files"] = len(bedmaster_files)
+        self.summary["common_mrns"] = len(edw_mrns.intersection(bedmaster_mrns))
+        self.summary["common_csns"] = len(edw_csns.intersection(bedmaster_csns))
+        self.summary["cross_referenced_mrns"] = len(edw_mrns.union(bedmaster_mrns))
+        self.summary["cross_referenced_csns"] = len(edw_csns.union(bedmaster_csns))
+        self.summary["cross_referenced_bedmaster_files"] = len(
+            cross_ref_bedmaster_files,
+        )
 
     def _update_list_signals(self, signals, csn):
         """
@@ -136,7 +139,8 @@ class PreTensorizeSummaryWriter:
         """
         for source in signals:
             for signal in signals[source]:
-                if "EDW" in source or signal in self.signals or self.signals == ["all"]:
+                if isinstance(signal, EDWType):
+                    # if "EDW" in source or signal in self.signals or self.signals == ["all"]:
                     csn = csn.copy()
                     if source not in self.signals_summary:
                         self.signals_summary[source] = {signal: csn}
@@ -147,35 +151,36 @@ class PreTensorizeSummaryWriter:
 
     def _get_signals_stats(self):
         """
-        Obtain list of signals for every file in edw_dir and bm_dir and update
+        Obtain list of signals for every file in edw_dir and bedmaster_dir and update
         the corresponding counter using _update_list_signals.
         """
         if self.signals:
             xref_file = pd.read_csv(self.xref_file)
             xref_file = xref_file.dropna(subset=["MRN"])
-            bm_files = [
-                bm_file
-                for bm_file in os.listdir(self.bm_dir)
-                if bm_file.endswith(".mat")
+            bedmaster_files = [
+                bedmaster_file
+                for bedmaster_file in os.listdir(self.bedmaster_dir)
+                if bedmaster_file.endswith(".mat")
             ]
             k = 0
-            for bm_file in bm_files:
+            for bedmaster_file in bedmaster_files:
                 k += 1
-                bm_file_path = os.path.join(self.bm_dir, bm_file)
-                reader = BMReader(bm_file_path)
-                bm_signals = {
-                    BM_SOURCES["vitals"]: reader.list_vs(),
-                    BM_SOURCES["waveform"]: list(reader.list_wv()),
+                bedmaster_file_path = os.path.join(self.bedmaster_dir, bedmaster_file)
+                reader = BedmasterReader(bedmaster_file_path)
+                bedmaster_signals = {
+                    "vitals": reader.list_vs(),
+                    "waveform": list(reader.list_wv()),
                 }
                 # pylint: disable=cell-var-from-loop
                 csns = set(
-                    xref_file[list(map(lambda x: x in bm_file, xref_file["fileID"]))][
-                        "PatientEncounterID"
-                    ].unique(),
+                    xref_file[
+                        list(map(lambda x: x in bedmaster_file, xref_file["fileID"]))
+                    ]["PatientEncounterID"].unique(),
                 )
-                self._update_list_signals(bm_signals, csns)
+                self._update_list_signals(bedmaster_signals, csns)
                 logging.info(
-                    "Obtained statistics from bm file number " f"{k}/{len(bm_files)}",
+                    "Obtained statistics from Bedmaster file number "
+                    f"{k}/{len(bedmaster_files)}",
                 )
 
         mrns = [
@@ -197,14 +202,12 @@ class PreTensorizeSummaryWriter:
             k += 1
             reader = EDWReader(self.edw_dir, mrn, csn)
             edw_signals = {
-                EDW_FILES["med_file"]["source"]: reader.list_medications(),
-                EDW_FILES["vitals_file"]["source"]: reader.list_vitals(),
-                EDW_FILES["lab_file"]["source"]: reader.list_labs(),
-                EDW_FILES["surgery_file"]["source"]: reader.list_surgery(),
-                EDW_FILES["other_procedures_file"][
-                    "source"
-                ]: reader.list_other_procedures(),
-                EDW_FILES["transfusions_file"]["source"]: reader.list_transfusions(),
+                "med": reader.list_medications(),
+                "flowsheet": reader.list_vitals(),
+                "labs": reader.list_labs(),
+                "surgery_file": reader.list_surgery(),
+                "procedures": reader.list_other_procedures(),
+                "transfusions": reader.list_transfusions(),
             }
             self._update_list_signals(edw_signals, {int(csn)})
             logging.info(
@@ -356,10 +359,13 @@ class PreTensorizeSummaryWriter:
         logging.info("Signals stats obtained.")
         signals_summary: List[Dict[str, Any]] = []
         for source in self.signals_summary:
-            if "EDW" in source:
+            if isinstance(self.signals, EDWType):
+                # if "EDW" in source:
                 total = self.summary["edw_csns"]
+            elif isinstance(self.signals, BedmasterType):
+                total = self.summary["bedmaster_csns"]
             else:
-                total = self.summary["bm_csns"]
+                raise ValueError(f"{type(self)} is not EDWType or BedmasterType")
             for signal in self.signals_summary[source]:
                 count = len(self.signals_summary[source][signal])
                 percent = count / total * 100 if total else 0
@@ -372,45 +378,48 @@ class PreTensorizeSummaryWriter:
                         "source": source,
                     },
                 )
-
         columns = ["signal", "count", "total", "%", "source"]
         signals_summary_df = pd.DataFrame(signals_summary, columns=columns).round(3)
         signals_summary_df = signals_summary_df.sort_values(by=["signal"])
         return signals_summary_df
 
-    def _get_bm_files(self):
+    def _get_bedmaster_files(self):
         file_ids = {
-            "_".join(bm_file.split("_")[:2])
-            for bm_file in os.listdir(self.bm_dir)
-            if bm_file.endswith(".mat")
+            "_".join(bedmaster_file.split("_")[:2])
+            for bedmaster_file in os.listdir(self.bedmaster_dir)
+            if bedmaster_file.endswith(".mat")
         }
-        bm_files = {}
+        bedmaster_files = {}
         for file_id in file_ids:
             files = [
-                file for file in os.listdir(self.bm_dir) if file.startswith(file_id)
+                file
+                for file in os.listdir(self.bedmaster_dir)
+                if file.startswith(file_id)
             ]
             files.sort(key=lambda x: int(x.split("_")[-2]))
-            bm_files[file_id] = files
+            bedmaster_files[file_id] = files
+        return bedmaster_files
 
-        return bm_files
-
-    def get_detailed_bm_stats(self, detailed_bm_writer):
+    def get_detailed_bedmaster_stats(self, detailed_bedmaster_writer):
         """
         Creates an additional stats file with detailed Bedmaster information.
         """
-        bm_files = self._get_bm_files()
-        total_bm_files_ids = len(bm_files)
+        bedmaster_files = self._get_bedmaster_files()
+        total_bedmaster_files_ids = len(bedmaster_files)
 
-        for idx, file_id in enumerate(bm_files):
-            logging.info(f"Analyzing fileID {idx} of {total_bm_files_ids}...")
-            total_files = len(bm_files[file_id])
+        for idx, file_id in enumerate(bedmaster_files):
+            logging.info(f"Analyzing fileID {idx} of {total_bedmaster_files_ids}...")
+            total_files = len(bedmaster_files[file_id])
 
             previous_max = None
-            for file_idx, file in enumerate(bm_files[file_id]):
+            for file_idx, file in enumerate(bedmaster_files[file_id]):
                 logging.info(f"... file {file} : {file_idx+1} of {total_files}")
-                bm_file_path = os.path.join(self.bm_dir, file)
+                bedmaster_file_path = os.path.join(self.bedmaster_dir, file)
 
-                with BMReader(bm_file_path, summary_stats=detailed_bm_writer) as reader:
+                with BedmasterReader(
+                    bedmaster_file_path,
+                    summary_stats=detailed_bedmaster_writer,
+                ) as reader:
                     if previous_max:
                         reader.get_interbundle_correction(previous_max)
 
@@ -429,20 +438,19 @@ class PreTensorizeSummaryWriter:
         output_dir: str = "./results",
         output_files_base_name: str = "pre_tensorize",
         signals: Optional[List[str]] = None,
-        detailed_bm: bool = False,
+        detailed_bedmaster: bool = False,
         ignore_xref: bool = False,
     ):
         """
-        Creates csv files with summary statistics of the date before
-        tensorization.
+        Creates csv files with summary statistics of the date before tensorization.
 
         :param output_dir: <str> directory where output files will be saved.
         :param output_files_base_name: <str> base name of the output files.
                                        By default: pre_tensorize_summary
-        :param signals: <List> list of signals to calculate bm statistics.
-        :param detailed_bm: <Bool> Generate detailed Bedmaster statistics.
+        :param signals: <List> list of signals to calculate Bedmaster statistics.
+        :param detailed_bedmaster: <Bool> Generate detailed Bedmaster statistics.
         :param ignore_xref: <Bool> Don't use crossreference data. Enable along
-                                   with detailed_bm to create  bm_statistics
+                                   with detailed_bedmaster to create  bedmaster_statistics
                                    without using edw_dir or  xref_file.
         """
         self.reset(signals)
@@ -450,9 +458,9 @@ class PreTensorizeSummaryWriter:
         if not os.path.isdir(output_dir):
             os.mkdir(output_dir)
 
-        if ignore_xref and not detailed_bm:
+        if ignore_xref and not detailed_bedmaster:
             logging.warning(
-                "Option --no_xref requires --detailed_bm which "
+                "Option --no_xref requires --detailed_bedmaster which "
                 "is not set. Ignoring --no_xref setting",
             )
             ignore_xref = False
@@ -464,7 +472,7 @@ class PreTensorizeSummaryWriter:
             logging.info(f"Demographics stats saved as {file_name}.")
 
             xref_df = self._get_xref_df()
-            file_name = f"{output_files_base_name}_mrn_csn_coverage_edw_bm.csv"
+            file_name = f"{output_files_base_name}_mrn_csn_coverage_edw_bedmaster.csv"
             xref_df.to_csv(os.path.join(output_dir, file_name), index=False)
             logging.info(f"Cross reference stats saved as {file_name}.")
 
@@ -473,8 +481,8 @@ class PreTensorizeSummaryWriter:
             signals_summary_df.to_csv(os.path.join(output_dir, file_name), index=False)
             logging.info(f"Signals stats saved as {file_name}.")
 
-        if detailed_bm:
+        if detailed_bedmaster:
             logging.info("Starting detailed report. This might take a long time")
-            detailed_bm_writer = BMStats()
-            self.get_detailed_bm_stats(detailed_bm_writer)
-            detailed_bm_writer.to_csv(output_dir, output_files_base_name)
+            detailed_bedmaster_writer = BedmasterStats()
+            self.get_detailed_bedmaster_stats(detailed_bedmaster_writer)
+            detailed_bedmaster_writer.to_csv(output_dir, output_files_base_name)

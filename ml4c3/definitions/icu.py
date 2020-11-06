@@ -20,12 +20,6 @@ MATFILE_EXPECTED_GROUPS: List[str] = [
     "wv_time_original",
 ]
 
-BM_SOURCES = {
-    "vitals": "BM_vitals",
-    "waveform": "BM_waveform",
-    "ecg_features": "BM_ecg_features",
-}
-
 # TODO list more departments names https://github.com/aguirre-lab/ml4c3/issues/575
 MAPPING_DEPARTMENTS: Dict[str, List[Any]] = {
     # EDW dept name: [possible file name]
@@ -91,7 +85,7 @@ ALARMS_FILES: Dict[str, Any] = {
         "Unit",
     ],
     "names": MAPPING_DEPARTMENTS,
-    "source": "BM_alarms",
+    "source": "alarms",
 }
 EDW_FILES: Dict[str, Dict[str, Any]] = {
     "adt_file": {
@@ -108,12 +102,12 @@ EDW_FILES: Dict[str, Dict[str, Any]] = {
     },
     "move_file": {
         "name": "movements.csv",
-        "source": "EDW_static",
+        "source": "static",
         "columns": ["TransferInDTS", "DepartmentID", "DepartmentDSC", "BedLabelNM"],
     },
     "adm_file": {
         "name": "admission-vitals.csv",
-        "source": "EDW_static",
+        "source": "static",
         "columns": [
             "WeightPoundNBR",
             "HeightTXT",
@@ -125,12 +119,12 @@ EDW_FILES: Dict[str, Dict[str, Any]] = {
     },
     "demo_file": {
         "name": "demographics.csv",
-        "source": "EDW_static",
+        "source": "static",
         "columns": ["BirthDTS", "PatientRaceDSC", "SexDSC", "DeathDTS"],
     },
     "med_file": {
         "name": "medications.csv",
-        "source": "EDW_med",
+        "source": "med",
         "columns": [
             "MedicationDSC",  # signal_column
             "MARActionDSC",  # status_column
@@ -147,7 +141,7 @@ EDW_FILES: Dict[str, Dict[str, Any]] = {
     },
     "vitals_file": {
         "name": "flowsheet.csv",
-        "source": "EDW_flowsheet",
+        "source": "flowsheet",
         "columns": [
             "FlowsheetMeasureNM",  # signal_column
             "MeasureTXT",  # result_column
@@ -157,7 +151,7 @@ EDW_FILES: Dict[str, Dict[str, Any]] = {
     },
     "lab_file": {
         "name": "labs.csv",
-        "source": "EDW_labs",
+        "source": "labs",
         "columns": [
             "ComponentCommonNM",  # signal_column
             "ResultTXT",  # result_column
@@ -167,7 +161,7 @@ EDW_FILES: Dict[str, Dict[str, Any]] = {
     },
     "surgery_file": {
         "name": "surgery.csv",
-        "source": "EDW_surgery",
+        "source": "surgery",
         "columns": [
             "ProcedureNM",  # signal_column
             "ProgressDSC",  # status_column
@@ -177,7 +171,7 @@ EDW_FILES: Dict[str, Dict[str, Any]] = {
     },
     "other_procedures_file": {
         "name": "procedures.csv",
-        "source": "EDW_procedures",
+        "source": "procedures",
         "columns": [
             "ProcedureDSC",  # signal_column
             "OrderStatusDSC",  # status_column
@@ -187,7 +181,7 @@ EDW_FILES: Dict[str, Dict[str, Any]] = {
     },
     "transfusions_file": {
         "name": "transfusions.csv",
-        "source": "EDW_transfusions",
+        "source": "transfusions",
         "columns": [
             "ProcedureDSC",  # signal_column
             "OrderStatusDSC",  # status_column
@@ -197,12 +191,12 @@ EDW_FILES: Dict[str, Dict[str, Any]] = {
     },
     "events_file": {
         "name": "events.csv",
-        "source": "EDW_events",
+        "source": "events",
         "columns": ["EventNM", "EventDTS"],  # signal_column  # time_column
     },
     "medhist_file": {
         "name": "medical-history.csv",
-        "source": "EDW_static",
+        "source": "static",
         "columns": [
             "DiagnosisID",  # id_column
             "DiagnosisNM",  # name_column
@@ -212,7 +206,7 @@ EDW_FILES: Dict[str, Dict[str, Any]] = {
     },
     "surghist_file": {
         "name": "surgical-history.csv",
-        "source": "EDW_static",
+        "source": "static",
         "columns": [
             "ProcedureID",  # id_column
             "ProcedureNM",  # name_column
@@ -222,7 +216,7 @@ EDW_FILES: Dict[str, Dict[str, Any]] = {
     },
     "socialhist_file": {
         "name": "social-history.csv",
-        "source": "EDW_static",
+        "source": "static",
         "columns": [
             "TobaccoUserDSC",  # stat_tob_column
             "TobaccoCommentTXT",  # comment_tob_column

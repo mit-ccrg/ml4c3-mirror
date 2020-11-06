@@ -1,1 +1,1 @@
-from .bm_stats import BMStats
+from .bedmaster_stats import BedmasterStats

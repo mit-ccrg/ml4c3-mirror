@@ -14,7 +14,7 @@ from ml4c3.definitions.icu import MAPPING_DEPARTMENTS
 
 class FileManager:
     """
-    Class to find the desired EDW and BM Files in LM4 related with a list of
+    Class to find the desired EDW and Bedmaster Files in LM4 related with a list of
     patients (MRNs) and copy back the resulting tensorized files to MAD3.
     """
 
@@ -28,7 +28,7 @@ class FileManager:
         Init File Manager.
 
         :param xref_file: <str> File containing the cross-referenced MRNs
-                                and BM files.
+                                and Bedmaster files.
         :param adt_file: <str> File containing the ADT table.
         :param output_dir: <str> Directory where the output files will be saved.
         """
@@ -69,17 +69,17 @@ class FileManager:
             index=False,
         )
 
-    def find_save_bm_alarms(
+    def find_save_bedmaster_alarms(
         self,
         mad3_dir: str = "/media/mad3/bedmaster_alarms",
         patient_list: str = "/data/icu/patient_list.csv",
     ):
         """
-        Find bm alarms and copy them to local folder.
+        Find Bedmaster alarms and copy them to local folder.
 
         :param mad3_dir: <str> Path to MAD3 directory.
         :param patient_list: <str> List of desired patients to take their respective
-                            BM alarms (.csv).
+                            Bedmaster alarms (.csv).
         """
         df_adt = pd.read_csv(self.adt_file).sort_values(by=["MRN"], ascending=True)
         df_patient = pd.read_csv(patient_list)
@@ -96,8 +96,14 @@ class FileManager:
                 continue
             for short_name in short_names:
                 dept_names.append(short_name)
-                source_path = os.path.join(mad3_dir, f"bm_alarms_{short_name}.csv")
-                destination_path = os.path.join(self.output_dir, "bm_alarms_temp")
+                source_path = os.path.join(
+                    mad3_dir,
+                    f"bedmaster_alarms_{short_name}.csv",
+                )
+                destination_path = os.path.join(
+                    self.output_dir,
+                    "bedmaster_alarms_temp",
+                )
                 try:
                     shutil.copy(source_path, destination_path)
                     flag_found.append("FOUND")
@@ -108,7 +114,7 @@ class FileManager:
             {"Alarm from department": dept_names, "fileStatus": flag_found},
         )
         report.to_csv(
-            os.path.join(self.output_dir, "bm_alarms_temp", "report.csv"),
+            os.path.join(self.output_dir, "bedmaster_alarms_temp", "report.csv"),
             index=False,
         )
 
@@ -125,10 +131,10 @@ class FileManager:
         :param mad3_dir: <str> Path to MAD3 directory.
         :param patient_list: <str> List of desired patients to take their respective
                             EDW files (.csv).
-        :param parallelize: <bool> bool indicating whether the bm files copy
+        :param parallelize: <bool> bool indicating whether the Bedmaster files copy
                             process is parallelized or not.
         :param n_workers: <int> Integer indicating the number of cores used in
-                            the bm files copy process when parallelized.
+                            the Bedmaster files copy process when parallelized.
         """
         df_patient = pd.read_csv(patient_list)
         mrns = list(df_patient["MRN"].drop_duplicates())
@@ -183,7 +189,7 @@ class FileManager:
             index=False,
         )
 
-    def find_save_bm_files(
+    def find_save_bedmaster_files(
         self,
         lm4_dir: str = "/media/lm4-bedmaster",
         patient_list: str = "/data/icu/blake8/bedmaster/patient_list.csv",
@@ -191,22 +197,22 @@ class FileManager:
         n_workers: int = None,
     ):
         """
-        Find bm files and copy them to local folder.
+        Find Bedmaster files and copy them to local folder.
 
         :param lm4_dir: <str> Path to LM4 directory.
         :param patient_list: <str> List of desired patients to take their respective
-                            BM files (.csv).
-        :param parallelize: <bool> bool indicating whether the bm files copy
+                            Bedmaster files (.csv).
+        :param parallelize: <bool> bool indicating whether the Bedmaster files copy
                             process is parallelized or not.
         :param n_workers: <int> Integer indicating the number of cores used in
-                            the bm files copy process when parallelized.
+                            the Bedmaster files copy process when parallelized.
         """
         df_xref = pd.read_csv(self.xref_file).sort_values(by=["MRN"], ascending=True)
         df_patient = pd.read_csv(patient_list)
         mrns = df_patient["MRN"].drop_duplicates()
         df_xref_filt = df_xref[df_xref["MRN"].isin(mrns)]
 
-        list_bm_files = []
+        list_bedmaster_files = []
         folder = []
         flag_found = []
 
@@ -230,16 +236,20 @@ class FileManager:
 
         with multiprocessing.Pool(processes=n_workers) as pool:
             results_list = pool.starmap(
-                self._copy_files_bm,
+                self._copy_files_bedmaster,
                 [(lm4_dir, row) for _, row in df_xref_filt.iterrows()],
             )
 
         for result in results_list:
-            list_bm_files.extend(result[0])
+            list_bedmaster_files.extend(result[0])
             folder.extend(result[1])
             flag_found.extend(result[2])
         report = pd.DataFrame(
-            {"fileID": list_bm_files, "folder": folder, "fileStatus": flag_found},
+            {
+                "fileID": list_bedmaster_files,
+                "folder": folder,
+                "fileStatus": flag_found,
+            },
         )
         report = report.sort_values(by="fileID", ascending=True)
         report.to_csv(
@@ -247,23 +257,23 @@ class FileManager:
             index=False,
         )
 
-    def _copy_files_bm(self, lm4_dir, row):
+    def _copy_files_bedmaster(self, lm4_dir, row):
         flag_found = []
-        list_bm_files = []
+        list_bedmaster_files = []
         folder = []
         subfolders = self.mapping_folders[row.Department]
         for subfolder in subfolders:
             if os.path.isdir(os.path.join(lm4_dir, subfolder)):
                 source_path = os.path.join(lm4_dir, subfolder, row.fileID + ".mat")
                 destination_path = os.path.join(self.output_dir, "bedmaster_temp")
-                list_bm_files.append(row.fileID)
+                list_bedmaster_files.append(row.fileID)
                 folder.append(os.path.join(lm4_dir, subfolder))
                 try:
                     shutil.copy(source_path, destination_path)
                     flag_found.append("FOUND")
                 except FileNotFoundError:
                     flag_found.append("NOT FOUND")
-        return list_bm_files, folder, flag_found
+        return list_bedmaster_files, folder, flag_found
 
     def _copy_files_edw(self, mad3_dir, mrn):
         source_path = os.path.join(mad3_dir, str(mrn))

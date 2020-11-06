@@ -15,7 +15,7 @@ from ml4c3.definitions.icu import EDW_FILES, MAPPING_DEPARTMENTS
 # pylint: disable=too-many-branches
 
 
-class PatientBMMatcher:
+class PatientBedmasterMatcher:
     """
     Implementation of Patient Bedmaster matching algorithm.
     """
@@ -23,25 +23,25 @@ class PatientBMMatcher:
     def __init__(
         self,
         flag_lm4: bool,
-        bm_dir: str,
+        bedmaster_dir: str,
         edw_dir: str,
         des_depts: List[str] = None,
         adt_file: str = EDW_FILES["adt_file"]["name"],
     ):
         """
-        Init Patient BM matcher.
+        Init Patient Bedmaster matcher.
 
         :param flag_lm4: <bool> If True, the matching is performed with all subfolders
-                         in bm_dir. If False, matching is performed with all .mat files
-                         in bm_dir.
-        :param bm_dir: <str> Directory containing all the BM .mat data.
+                         in bedmaster_dir. If False, matching is performed with all .mat files
+                         in bedmaster_dir.
+        :param bedmaster_dir: <str> Directory containing all the Bedmaster .mat data.
         :param edw_dir: <str> Directory containing the adt_file.
         :param des_depts: <List[str]> List of all desired departments.
         :param adt_file: <str> File containing the admission, transfer and
                          discharge from patients (.csv).
         """
         self.flag_lm4 = flag_lm4
-        self.bm_dir = bm_dir
+        self.bedmaster_dir = bedmaster_dir
         self.edw_dir = edw_dir
         self.adt_file = adt_file
         if not des_depts:
@@ -75,25 +75,25 @@ class PatientBMMatcher:
         }
 
     @staticmethod
-    def _take_bmfile_info(bm_file: str) -> Tuple[str, ...]:
+    def _take_bedmaster_file_info(bedmaster_file: str) -> Tuple[str, ...]:
         """
-        Take information from BM files name.
+        Take information from Bedmaster files name.
 
-        :param bm_file: <str> bedmaster file name.
+        :param bedmaster_file: <str> bedmaster file name.
         :return: <Tuple[str]> array with all the info from the name. Element 0
                               is department, element 1 is room, element 2 is
                               starting time.
         """
-        # Split BM file name into fields:
+        # Split Bedmaster file name into fields:
         # <department>_<roomBed>-<start_t>-#_v4.mat --> department, roomBed, start_time.
-        split_info = re.split("[^a-zA-Z0-9]", bm_file)
+        split_info = re.split("[^a-zA-Z0-9]", bedmaster_file)
         # If department name contains a hyphen, rejoin the name again:
         # ELL-7 --> ELL, 7 --> ELL-7
         if split_info[0].isalpha() and len(split_info[1]) == 1:
             split_info[0] = split_info[0] + "-" + split_info[1]
             del split_info[1]
         k = 2
-        # If BM file name contains a "+" or "~" sign, take next field as it will contain
+        # If Bedmaster file name contains a "+" or "~" sign, take next field as it will contain
         # an empty one.
         if split_info[k] == "":
             k = 3
@@ -101,7 +101,7 @@ class PatientBMMatcher:
 
     def match_files(self, xref_path: str = None, store_unmatched: bool = False):
         """
-        Match BM files with patient's MRN and EncounterID.
+        Match Bedmaster files with patient's MRN and EncounterID.
 
         :param xref_path: <str> directory of the output xref table.
         :param store_unmatched: <bool> Bool indicating if the unmatched Bedmaster files
@@ -142,25 +142,25 @@ class PatientBMMatcher:
         if self.flag_lm4 and (
             not any(
                 folder in self.folder_to_dept.keys()
-                for folder in os.listdir(self.bm_dir)
+                for folder in os.listdir(self.bedmaster_dir)
             )
         ):
             raise OSError(
-                "No BM subfolders in this LM4 directory. If you wanted to "
+                "No Bedmaster subfolders in this LM4 directory. If you wanted to "
                 "use a personal folder, do not set the --lm4 argument.",
             )
         if not self.flag_lm4 and (
-            not any(file.endswith(".mat") for file in os.listdir(self.bm_dir))
+            not any(file.endswith(".mat") for file in os.listdir(self.bedmaster_dir))
         ):
             raise OSError(
                 "No .mat files encountered in this directory. If you wanted "
-                "to match patients with BM files in LM4, set the --lm4 "
+                "to match patients with Bedmaster files in LM4, set the --lm4 "
                 "argument.",
             )
 
         # Get names of all the files
         if self.flag_lm4:
-            bm_files = []
+            bedmaster_files = []
             for dept in sorted(set(self.des_depts) & set(adt_departments)):
                 try:
                     folders = self.dept_to_folder[dept]
@@ -168,8 +168,12 @@ class PatientBMMatcher:
                         if folder is None:
                             continue
                         try:
-                            bm_files.extend(
-                                sorted(os.listdir(os.path.join(self.bm_dir, folder))),
+                            bedmaster_files.extend(
+                                sorted(
+                                    os.listdir(
+                                        os.path.join(self.bedmaster_dir, folder),
+                                    ),
+                                ),
                             )
                         except FileNotFoundError:
                             logging.info(
@@ -184,19 +188,21 @@ class PatientBMMatcher:
                         "in MAPPING_DEPARTMENTS (ml4c3/definitions.py).",
                     )
         else:
-            bm_files = sorted(os.listdir(self.bm_dir))
-        if not all(file.endswith(".mat") for file in bm_files):
+            bedmaster_files = sorted(os.listdir(self.bedmaster_dir))
+        if not all(file.endswith(".mat") for file in bedmaster_files):
             logging.warning(
                 "Not all listed files end with .mat extension. They are "
                 "going to be removed from the list.",
             )
-            bm_files = [file for file in bm_files if file.endswith(".mat")]
+            bedmaster_files = [
+                file for file in bedmaster_files if file.endswith(".mat")
+            ]
 
-        # Iterate over bm_files and match them to the corresponding
+        # Iterate over bedmaster_files and match them to the corresponding
         # patient in the ADT table
         unmatched_files = []
-        for _, bm_file in enumerate(bm_files):
-            dept, room_bed, start_time = self._take_bmfile_info(bm_file)
+        for _, bedmaster_file in enumerate(bedmaster_files):
+            dept, room_bed, start_time = self._take_bedmaster_file_info(bedmaster_file)
             if self.folder_to_dept[dept] in self.des_depts:
                 # Set room and bed string properly, if it has no room already, add
                 # letter A (default in ADT)
@@ -212,7 +218,7 @@ class PatientBMMatcher:
                 # Filter by department and room
                 filt_adt_df = adt_df[adt_df["BedLabelNM"] == room_bed_nm]
                 # Filter by transfer in and out times (note that one hour
-                # margin is considered as BM files sometimes start a little
+                # margin is considered as Bedmaster files sometimes start a little
                 # before than the transfer of the patient)
                 filt_adt_df = filt_adt_df[
                     (filt_adt_df["TransferInDTS"] - 3600) <= float(start_time)
@@ -231,7 +237,7 @@ class PatientBMMatcher:
                     self.table_dic["PatientEncounterID"].append(csn)
                     self.table_dic["transferIn"].append(t_start)
                     self.table_dic["transferOut"].append(t_end)
-                    self.table_dic["fileID"].append(bm_file[:-4])
+                    self.table_dic["fileID"].append(bedmaster_file[:-4])
                     self.table_dic["unixFileStartTime"].append(start_time)
                     self.table_dic["unixFileEndTime"].append(t_end)
                     self.table_dic["Department"].append(self.folder_to_dept[dept])
@@ -240,12 +246,12 @@ class PatientBMMatcher:
                     self.table_dic["PatientEncounterID"].append(None)
                     self.table_dic["transferIn"].append(None)
                     self.table_dic["transferOut"].append(None)
-                    self.table_dic["fileID"].append(bm_file[:-4])
+                    self.table_dic["fileID"].append(bedmaster_file[:-4])
                     self.table_dic["unixFileStartTime"].append(start_time)
                     self.table_dic["unixFileEndTime"].append(t_end)
                     self.table_dic["Department"].append(self.folder_to_dept[dept])
                 else:
-                    unmatched_files.append(bm_file)
+                    unmatched_files.append(bedmaster_file)
 
         if len(unmatched_files) > 0:
             logging.warning(

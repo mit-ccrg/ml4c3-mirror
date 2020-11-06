@@ -12,17 +12,15 @@ import neurokit2 as nk
 
 # Imports: first party
 from ml4c3.tensormap.TensorMap import TensorMap
-from ml4c3.tensormap.tensor_maps_icu_events import get_tmap as get_event_tmap
-from ml4c3.tensormap.tensor_maps_icu_static import get_tmap as GET_STATIC_TMAP
-from ml4c3.tensormap.tensor_maps_icu_bm_signals import get_tmap as GET_BM_TMAP
-from ml4c3.tensormap.tensor_maps_icu_list_signals import get_tmap as GET_LIST_TMAP
-from ml4c3.tensormap.tensor_maps_icu_first_visit_with_signal import (
-    get_tmap as get_visit_tmap,
-)
+from ml4c3.tensormap.icu_events import get_tmap as get_event_tmap
+from ml4c3.tensormap.icu_static import get_tmap as GET_STATIC_TMAP
+from ml4c3.tensormap.icu_list_signals import get_tmap as GET_LIST_TMAP
+from ml4c3.tensormap.icu_bedmaster_signals import get_tmap as GET_BEDMASTER_TMAP
+from ml4c3.tensormap.icu_first_visit_with_signal import get_tmap as get_visit_tmap
 
 LEADS = ["i", "ii", "iii", "v"]
 ECG_TMAPS = {
-    NAME: GET_BM_TMAP(NAME)
+    NAME: GET_BEDMASTER_TMAP(NAME)
     for LEAD in LEADS
     for NAME in (f"{LEAD}_value", f"{LEAD}_sample_freq")
 }
@@ -115,8 +113,8 @@ class ECGFeatureFileExtractor(h5py.File):
         :return: <List[str]> List with the name of the available leads.
         """
         try:
-            signals = GET_LIST_TMAP("bm_waveform_signals").tensor_from_file(
-                GET_LIST_TMAP("bm_waveform_signals"),
+            signals = GET_LIST_TMAP("bedmaster_waveform_signals").tensor_from_file(
+                GET_LIST_TMAP("bedmaster_waveform_signals"),
                 self,
                 visits=self.visit,
             )[0]

@@ -6,7 +6,6 @@ from typing import Optional
 import numpy as np
 
 # Imports: first party
-from ml4c3.definitions.icu import BM_SOURCES
 from ml4c3.tensormap.TensorMap import (
     TensorMap,
     Interpretation,
@@ -14,7 +13,7 @@ from ml4c3.tensormap.TensorMap import (
     get_local_timestamps,
 )
 from ml4c3.definitions.icu_tmap_list import DEFINED_TMAPS
-from ml4c3.tensormap.tensor_maps_icu_bm_signals import get_tmap as get_bm_tmap
+from ml4c3.tensormap.icu_bedmaster_signals import get_tmap as get_bedmaster_tmap
 
 
 def make_ecg_peak_tensor_from_file(lead):
@@ -34,7 +33,7 @@ def make_ecg_peak_tensor_from_file(lead):
             indices = hd5[path][()]
             is_nan_indices = np.isnan(indices)
             no_nan_indices = indices[~is_nan_indices].astype(int)
-            ecg_tm = get_bm_tmap(f"{lead}_time")
+            ecg_tm = get_bedmaster_tmap(f"{lead}_time")
             data = ecg_tm.tensor_from_file(ecg_tm, hd5, visit=visit)[0][no_nan_indices]
             nan_indices = np.where(is_nan_indices)[0]
             nan_indices -= np.array(range(nan_indices.shape[0]))
@@ -156,7 +155,7 @@ def create_ecg_feature_tmap(tm_name: str):
 
 def get_tmap(tm_name: str) -> Optional[TensorMap]:
     tm = None
-    for name in DEFINED_TMAPS[BM_SOURCES["ecg_features"][3:]]:
+    for name in DEFINED_TMAPS["ecg_features"]:
         if tm_name.startswith(name):
             tm = create_ecg_feature_tmap(tm_name)
             break

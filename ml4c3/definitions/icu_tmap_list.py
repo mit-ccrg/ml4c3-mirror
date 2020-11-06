@@ -1,28 +1,8 @@
 # Imports: standard library
 from typing import Any, Dict
 
-# Imports: first party
-from ml4c3.definitions.icu import EDW_FILES, BM_SOURCES, ALARMS_FILES
-
-# fmt: off
-SOURCES = [
-    BM_SOURCES["waveform"][3:],                             # 0
-    BM_SOURCES["vitals"][3:],                               # 1
-    BM_SOURCES["ecg_features"][3:],                         # 2
-    ALARMS_FILES["source"][3:],                             # 3
-    EDW_FILES["events_file"]["source"][4:],                 # 4
-    EDW_FILES["med_file"]["source"][4:],                    # 5
-    EDW_FILES["surgery_file"]["source"][4:],                # 6
-    EDW_FILES["other_procedures_file"]["source"][4:],       # 7
-    EDW_FILES["transfusions_file"]["source"][4:],           # 8
-    EDW_FILES["lab_file"]["source"][4:],                    # 9
-    EDW_FILES["vitals_file"]["source"][4:],                 # 10
-    EDW_FILES["demo_file"]["source"][4:],                   # 11
-]
-# fmt: on
-
 DEFINED_TMAPS: Dict[str, Any] = {
-    SOURCES[0]: [
+    "waveform": [
         "i",
         "ii",
         "iii",
@@ -36,7 +16,7 @@ DEFINED_TMAPS: Dict[str, Any] = {
         "fem4",
         "rr",
     ],
-    SOURCES[1]: [
+    "vitals": [
         "art1d",
         "art1m",
         "art1r",
@@ -91,7 +71,7 @@ DEFINED_TMAPS: Dict[str, Any] = {
         "tv",
         "vent rate",
     ],
-    SOURCES[2]: [
+    "ecg_features": [
         "r_peaks",
         "p_peaks",
         "q_peaks",
@@ -113,25 +93,25 @@ DEFINED_TMAPS: Dict[str, Any] = {
         "st_height",
         "qrs_amplitude",
     ],
-    SOURCES[3]: ["cpp_low", "v_tach", "apnea"],
-    SOURCES[4]: ["code_start", "rapid_response_start"],
-    SOURCES[5]: [
+    "alarms": ["cpp_low", "v_tach", "apnea"],
+    "events": ["code_start", "rapid_response_start"],
+    "med": [
         "aspirin_325_mg_tablet",
         "cefazolin_2_gram|50_ml_in_dextrose_(iso-osmotic)_intravenous_piggyback",
         "lactated_ringers_iv_bolus",
         "norepinephrine_infusion_syringe_in_swfi_80_mcg|ml_cmpd_central_mgh",
         "sodium_chloride_0.9_%_intravenous_solution",
     ],
-    SOURCES[6]: ["colonoscopy", "coronary_artery_bypass_graft"],
-    SOURCES[7]: ["hemodialysis", "hemodialysis_|_ultrafiltration"],
-    SOURCES[8]: [
+    "surgery": ["colonoscopy", "coronary_artery_bypass_graft"],
+    "procedures": ["hemodialysis", "hemodialysis_|_ultrafiltration"],
+    "transfusions": [
         "transfuse_red_blood_cells",
         "transfuse_platelets",
         "transfuse_cryoprecipitate",
         "transfuse_fresh_frozen_plasma",
         "massive_transfusion_protocol",
     ],
-    SOURCES[9]: [
+    "labs": [
         "creatinine",
         "magnesium",
         "potassium",
@@ -168,7 +148,7 @@ DEFINED_TMAPS: Dict[str, Any] = {
         "albumin",
         "platelets",
     ],
-    SOURCES[10]: [
+    "flowsheet": [
         "pulse",
         "r_phs_ob_bp_systolic_outgoing",
         "blood_pressure",
@@ -180,7 +160,7 @@ DEFINED_TMAPS: Dict[str, Any] = {
         "respirations",
         "urine_output",
     ],
-    f"{SOURCES[11]}_language": {
+    "static_language": {
         "admin_diag",
         "admin_type",
         "alcohol_hist",
@@ -189,16 +169,9 @@ DEFINED_TMAPS: Dict[str, Any] = {
         "source",
         "tobacco_hist",
     },
-    f"{SOURCES[11]}_continuous": {
-        "height",
-        "weight",
-    },
-    f"{SOURCES[11]}_event": {
-        "admin_date",
-        "birth_date",
-        "end_date",
-    },
-    f"{SOURCES[11]}_timeseries": {
+    "static_continuous": {"height", "weight"},
+    "static_event": {"admin_date", "birth_date", "end_date"},
+    "static_timeseries": {
         "department_id",
         "department_nm",
         "medical_hist",
@@ -206,11 +179,25 @@ DEFINED_TMAPS: Dict[str, Any] = {
         "room_bed",
         "surgical_hist",
     },
-    f"{SOURCES[11]}_categorical": {
+    "static_categorical": {
         "sex": {"male": 0, "female": 1},
         "end_stay_type": {"alive": 0, "deceased": 1},
     },
     "other": ["mrn", "visits", "length_of_stay"],
-    "bm_signals": SOURCES[:4],
-    "edw_signals": SOURCES[4:],
+    "bedmaster_signals": [
+        "waveform",
+        "vitals",
+        "ecg_features",
+        "alarms",
+    ],
+    "edw_signals": [
+        "events",
+        "med",
+        "surgery",
+        "procedures",
+        "transfusions",
+        "labs",
+        "flowsheet",
+        "static",
+    ],
 }

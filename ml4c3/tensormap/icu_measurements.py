@@ -231,14 +231,8 @@ def create_measurement_tmap(tm_name: str, measurement_name: str, measurement_typ
     return tm
 
 
-TM_TYPES = [
-    EDW_FILES["lab_file"]["source"][4:],
-    EDW_FILES["vitals_file"]["source"][4:],
-]
-
-
 def get_tmap(tm_name: str) -> Optional[TensorMap]:
-    for data_type in TM_TYPES:
+    for data_type in ["labs", "flowsheet"]:
         for name in DEFINED_TMAPS[data_type]:
             if tm_name.startswith(name):
                 return create_measurement_tmap(tm_name, name, data_type)

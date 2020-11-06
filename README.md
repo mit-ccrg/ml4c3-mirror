@@ -43,11 +43,9 @@ If you are interested in working with ml4c3 group take a look at our workflow in
     ```
 
 ## Run mode example
-Modes are run from terminal and their options are set with arguments.
-An example running `tensorize_icu` mode in Docker is shown below:
+Modes are run from the command line. Here is an example of how to call `tensorize_icu` mode:
 ```
-./scripts/run.sh -c $PWD/ml4c3/recipes.py \
-tensorize_icu \
+./scripts/run.sh -c $PWD/ml4c3/recipes.py tensorize_icu \
 --tensors /media/mad3/hd5_cabg \
 --path_adt /media/mad3/cohorts_lists/adt_cabg>
 --path_xref /media/mad3/cohorts_lists/xref_ca>

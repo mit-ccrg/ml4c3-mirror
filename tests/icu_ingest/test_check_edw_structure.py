@@ -40,7 +40,7 @@ def test_check_edw_structure(get_edw_checker):
     log = unittest.TestCase()
     try:
         with log.assertLogs() as log_messages:
-            edw_checker = get_edw_checker("bm")
+            edw_checker = get_edw_checker("bedmaster")
             logging.getLogger(edw_checker.check_structure())
     except AssertionError:
         pass

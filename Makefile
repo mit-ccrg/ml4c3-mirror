@@ -32,7 +32,10 @@ setup:
 
 clean:
 > @echo Cleaning files...
-> @rm -ft .mypy_cache ml4c3.egg-info
+> @rm -rf .mypy_cache
+> @rm -rf .pytest_cache
+> @rm -rf ml4c3.egg-info
+> @find . -iname "__pycache__" -print0 | xargs -0 rm -rf
 
 lint_staged:
 > @echo Running hook with staged files...

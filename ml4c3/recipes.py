@@ -75,7 +75,7 @@ def run(args: argparse.Namespace):
             check_icu_structure(args)
         elif args.mode == "pre_tensorize_summary":
             pre_tensorize_summary(args)
-        elif args.mode == "match_patient_bm":
+        elif args.mode == "match_patient_bedmaster":
             match_data(args)
         elif args.mode == "extract_ecg_features":
             extract_ecg_features(args)

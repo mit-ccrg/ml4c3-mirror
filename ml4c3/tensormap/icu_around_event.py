@@ -8,16 +8,14 @@ import numpy as np
 
 # Imports: first party
 from ml4c3.tensormap.TensorMap import Axis, TensorMap
-from ml4c3.tensormap.tensor_maps_icu_alarms import get_tmap as get_alarm_tmap
-from ml4c3.tensormap.tensor_maps_icu_events import get_tmap as get_event_tmap
-from ml4c3.tensormap.tensor_maps_icu_bm_signals import get_tmap as get_bm_tmap
-from ml4c3.tensormap.tensor_maps_icu_medications import get_tmap as get_med_tmap
-from ml4c3.tensormap.tensor_maps_icu_ecg_features import get_tmap as get_ecg_tmap
-from ml4c3.tensormap.tensor_maps_icu_measurements import get_tmap as get_measure_tmap
-from ml4c3.tensormap.tensor_maps_icu_signal_metrics import compute_feature
-from ml4c3.tensormap.tensor_maps_icu_first_visit_with_signal import (
-    get_tmap as get_visit_tmap,
-)
+from ml4c3.tensormap.icu_alarms import get_tmap as get_alarm_tmap
+from ml4c3.tensormap.icu_events import get_tmap as get_event_tmap
+from ml4c3.tensormap.icu_medications import get_tmap as get_med_tmap
+from ml4c3.tensormap.icu_ecg_features import get_tmap as get_ecg_tmap
+from ml4c3.tensormap.icu_measurements import get_tmap as get_measure_tmap
+from ml4c3.tensormap.icu_signal_metrics import compute_feature
+from ml4c3.tensormap.icu_bedmaster_signals import get_tmap as get_bedmaster_tmap
+from ml4c3.tensormap.icu_first_visit_with_signal import get_tmap as get_visit_tmap
 
 # pylint: disable=unused-argument
 
@@ -220,7 +218,7 @@ def get_tmap(tmap_name: str) -> Optional[TensorMap]:
     def _get_tmap(_tmap_name):
         _tm = None
         for _get in [
-            get_bm_tmap,
+            get_bedmaster_tmap,
             get_med_tmap,
             get_ecg_tmap,
             get_alarm_tmap,

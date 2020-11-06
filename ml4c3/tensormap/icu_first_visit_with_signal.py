@@ -67,16 +67,8 @@ def create_arrest_first_visit_tmap(tm_name: str):
     return tm
 
 
-TM_TYPES = [
-    EDW_FILES["events_file"]["source"][4:],
-    EDW_FILES["surgery_file"]["source"][4:],
-    EDW_FILES["other_procedures_file"]["source"][4:],
-    EDW_FILES["transfusions_file"]["source"][4:],
-]
-
-
 def get_tmap(tm_name: str) -> Optional[TensorMap]:
-    for data_type in TM_TYPES:
+    for data_type in ["events", "surgery", "procedures", "transfusions"]:
         for name in DEFINED_TMAPS[data_type]:
             if tm_name.startswith(name):
                 return create_first_visit_tmap(tm_name, name, data_type)

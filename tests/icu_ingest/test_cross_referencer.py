@@ -68,8 +68,8 @@ def test_stats(cross_referencer):
         f"CSNs in {test_dir}/data/xref_file.csv: 3\n"
         f"Union CSNs: 1\n"
         f"Intersect CSNs: 3\n"
-        f"Bm files IDs in {test_dir}/data/xref_file.csv: 3\n"
-        f"Intersect bm files: 5\n",
+        f"Bedmaster files IDs in {test_dir}/data/xref_file.csv: 3\n"
+        f"Intersect Bedmaster files: 5\n",
     ]
     log = unittest.TestCase()
     cross_referencer.get_xref_files()

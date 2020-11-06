@@ -21,7 +21,7 @@ def test_tensorizer(temp_dir, monkeypatch, test_scale_units):
         test_scale_units,
     )
     monkeypatch.setattr(
-        "ml4c3.ingest.icu.readers.bm_reader.ICU_SCALE_UNITS",
+        "ml4c3.ingest.icu.readers.bedmaster_reader.ICU_SCALE_UNITS",
         test_scale_units,
     )
 
@@ -51,7 +51,7 @@ def test_tensorizer(temp_dir, monkeypatch, test_scale_units):
     with h5py.File(output_file, "r") as tens_file:
         assert sorted(list(tens_file.keys())) == ["bedmaster", "edw"]
 
-        bm_signals = {
+        bedmaster_signals = {
             "waveform": ["i", "ii", "iii", "resp", "spo2", "v"],
             "vitals": ["co", "cuff", "hr", "spo2r", "spo2%"],
             "alarms": [
@@ -99,25 +99,25 @@ def test_tensorizer(temp_dir, monkeypatch, test_scale_units):
         assert tens_file["edw"].attrs["completed"]
 
         assert sorted(tens_file["bedmaster/345"].keys()) == sorted(
-            list(bm_signals.keys()),
+            list(bedmaster_signals.keys()),
         )
         assert sorted(tens_file["edw/345"].keys()) == sorted(list(edw_signals.keys()))
 
-        bm_attrs = [
+        bedmaster_attrs = [
             "channel",
             "name",
             "scale_factor",
             "source",
             "units",
         ]
-        bm_sig_keys = [
+        bedmaster_sig_keys = [
             "time",
             "time_corr_arr",
             "value",
             "samples_per_ts",
             "sample_freq",
         ]
-        bm_alarms_keys = ["duration", "start_date"]
+        bedmaster_alarms_keys = ["duration", "start_date"]
 
         # Test units, scaling factor and sample_freq
         hr_dir = tens_file["bedmaster/345/vitals/hr"]
@@ -135,14 +135,18 @@ def test_tensorizer(temp_dir, monkeypatch, test_scale_units):
         )
         assert np.array_equal(ecg_ii["sample_freq"], expected_sf)
 
-        for sig_type, signals in bm_signals.items():
+        for sig_type, signals in bedmaster_signals.items():
             sig_type_dir = tens_file["bedmaster/345"][sig_type]
-            assert sorted(sig_type_dir.keys()) == sorted(bm_signals[sig_type])
+            assert sorted(sig_type_dir.keys()) == sorted(bedmaster_signals[sig_type])
             for signal in signals:
                 # Test interbundle correction
                 if sig_type == "vitals":
-                    assert sorted(sig_type_dir[signal].keys()) == sorted(bm_sig_keys)
-                    assert sorted(sig_type_dir[signal].attrs.keys()) == sorted(bm_attrs)
+                    assert sorted(sig_type_dir[signal].keys()) == sorted(
+                        bedmaster_sig_keys,
+                    )
+                    assert sorted(sig_type_dir[signal].attrs.keys()) == sorted(
+                        bedmaster_attrs,
+                    )
                     diff = np.diff(sig_type_dir[signal]["time"][()])
                     if signal == "hr":  # Signal has a data event 1
                         assert np.array_equal(np.where(diff != 2)[0], np.array([18]))
@@ -152,8 +156,12 @@ def test_tensorizer(temp_dir, monkeypatch, test_scale_units):
                         assert all(diff == 2)
 
                 elif sig_type == "waveform":
-                    assert sorted(sig_type_dir[signal].keys()) == sorted(bm_sig_keys)
-                    assert sorted(sig_type_dir[signal].attrs.keys()) == sorted(bm_attrs)
+                    assert sorted(sig_type_dir[signal].keys()) == sorted(
+                        bedmaster_sig_keys,
+                    )
+                    assert sorted(sig_type_dir[signal].attrs.keys()) == sorted(
+                        bedmaster_attrs,
+                    )
                     diff = np.diff(sig_type_dir[signal]["time"][:3349])
                     if signal == "v":
                         assert np.array_equal(
@@ -165,7 +173,9 @@ def test_tensorizer(temp_dir, monkeypatch, test_scale_units):
                         length = 32 if signal == "resp" else 160
                         assert len(sig_type_dir[signal]["time"]) == length
                 else:
-                    assert sorted(sig_type_dir[signal].keys()) == sorted(bm_alarms_keys)
+                    assert sorted(sig_type_dir[signal].keys()) == sorted(
+                        bedmaster_alarms_keys,
+                    )
 
         for key in edw_signals:
             assert sorted(tens_file[f"edw/345/{key}"].keys()) == sorted(

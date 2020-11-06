@@ -6,7 +6,7 @@ from typing import Tuple, Optional
 import numpy as np
 
 # Imports: first party
-from ml4c3.definitions.icu import BM_SOURCES, ICU_SCALE_UNITS
+from ml4c3.definitions.icu import ICU_SCALE_UNITS
 from ml4c3.tensormap.TensorMap import (
     TensorMap,
     Interpretation,
@@ -122,7 +122,7 @@ def get_value(hd5, signal_path, **kwargs) -> np.ndarray:
     return hd5[f"{signal_path}/value"][()]
 
 
-def make_bm_signal_tensor_from_file(field: str, dtype=None):
+def make_bedmaster_signal_tensor_from_file(field: str, dtype=None):
     def _tensor_from_file(tm, hd5, **kwargs) -> np.ndarray:
         visit_ids = get_visits(tm, hd5, **kwargs)
         base_path = tm.path_prefix
@@ -197,7 +197,7 @@ def make_bm_signal_tensor_from_file(field: str, dtype=None):
     return _tensor_from_file
 
 
-def make_bm_metadata_tensor_from_file(field: str, numeric: bool = True):
+def make_bedmaster_metadata_tensor_from_file(field: str, numeric: bool = True):
     def _tensor_from_file(tm, hd5, **kwargs):
         visits = get_visits(tm, hd5, **kwargs)
         base_path = tm.path_prefix
@@ -226,9 +226,9 @@ def make_bm_metadata_tensor_from_file(field: str, numeric: bool = True):
     return _tensor_from_file
 
 
-def create_bm_signal_tmap(
-    sig_name: str,
-    sig_type: str,
+def create_bedmaster_signal_tmap(
+    signal_name: str,
+    signal_type: str,
     tmap_name: str,
     field: str,
     interpretation: Interpretation,
@@ -238,125 +238,128 @@ def create_bm_signal_tmap(
         name=tmap_name,
         shape=(None, None, None),
         interpretation=interpretation,
-        tensor_from_file=make_bm_signal_tensor_from_file(field, dtype),
-        path_prefix=f"bedmaster/*/{sig_type}/{sig_name}",
+        tensor_from_file=make_bedmaster_signal_tensor_from_file(field, dtype),
+        path_prefix=f"bedmaster/*/{signal_type}/{signal_name}",
     )
     return tmap
 
 
-def create_bm_signal_metadata_tmap(
-    sig_name: str,
-    sig_type: str,
+def create_bedmaster_signal_metadata_tmap(
+    signal_name: str,
+    signal_type: str,
     field: str,
     numeric: bool = True,
 ):
     tmap = TensorMap(
-        name=f"{sig_name}_{field}",
+        name=f"{signal_name}_{field}",
         shape=(None,),
         interpretation=Interpretation.CONTINUOUS
         if numeric
         else Interpretation.LANGUAGE,
-        tensor_from_file=make_bm_metadata_tensor_from_file(field, numeric),
-        path_prefix=f"bedmaster/*/{sig_type}/{sig_name}",
+        tensor_from_file=make_bedmaster_metadata_tensor_from_file(field, numeric),
+        path_prefix=f"bedmaster/*/{signal_type}/{signal_name}",
     )
     return tmap
 
 
-def get_bm_signal_tmap(tm_name: str, sig_name: str, sig_type: str):
+def get_bedmaster_signal_tmap(tmap_name: str, signal_name: str, signal_type: str):
     tm = None
-    if tm_name == f"{sig_name}_timeseries":
-        tm = create_bm_signal_tmap(
-            sig_name,
-            sig_type,
-            tm_name,
-            "value",
+    if tmap_name == f"{signal_name}_timeseries":
+        tm = create_bedmaster_signal_tmap(
+            signal_name=signal_name,
+            signal_type=signal_type,
+            tmap_name=tmap_name,
+            field="value",
             interpretation=Interpretation.TIMESERIES,
         )
-    elif tm_name == f"{sig_name}_value":
-        tm = create_bm_signal_tmap(
-            sig_name,
-            sig_type,
-            tm_name,
-            "value",
+    elif tmap_name == f"{signal_name}_value":
+        tm = create_bedmaster_signal_tmap(
+            signal_name=signal_name,
+            signal_type=signal_type,
+            tmap_name=tmap_name,
+            field="value",
             interpretation=Interpretation.CONTINUOUS,
         )
-    elif tm_name == f"{sig_name}_time":
-        tm = create_bm_signal_tmap(
-            sig_name,
-            sig_type,
-            tm_name,
-            "time",
+    elif tmap_name == f"{signal_name}_time":
+        tm = create_bedmaster_signal_tmap(
+            signal_name=signal_name,
+            signal_type=signal_type,
+            tmap_name=tmap_name,
+            field="time",
             interpretation=Interpretation.EVENT,
         )
-    elif tm_name == f"{sig_name}_time_corr_arr_timeseries":
-        tm = create_bm_signal_tmap(
-            sig_name,
-            sig_type,
-            tm_name,
-            "time_corr_arr",
+    elif tmap_name == f"{signal_name}_time_corr_arr_timeseries":
+        tm = create_bedmaster_signal_tmap(
+            signal_name=signal_name,
+            signal_type=signal_type,
+            tmap_name=tmap_name,
+            field="time_corr_arr",
             interpretation=Interpretation.TIMESERIES,
         )
-    elif tm_name == f"{sig_name}_time_corr_arr_value":
-        tm = create_bm_signal_tmap(
-            sig_name,
-            sig_type,
-            tm_name,
-            "time_corr_arr",
+    elif tmap_name == f"{signal_name}_time_corr_arr_value":
+        tm = create_bedmaster_signal_tmap(
+            signal_name=signal_name,
+            signal_type=signal_type,
+            tmap_name=tmap_name,
+            field="time_corr_arr",
             interpretation=Interpretation.CONTINUOUS,
         )
-    elif tm_name == f"{sig_name}_samples_per_ts_timeseries":
-        tm = create_bm_signal_tmap(
-            sig_name,
-            sig_type,
-            tm_name,
-            "samples_per_ts",
+    elif tmap_name == f"{signal_name}_samples_per_ts_timeseries":
+        tm = create_bedmaster_signal_tmap(
+            signal_name=signal_name,
+            signal_type=signal_type,
+            tmap_name=tmap_name,
+            field="samples_per_ts",
             interpretation=Interpretation.TIMESERIES,
         )
-    elif tm_name == f"{sig_name}_samples_per_ts_value":
-        tm = create_bm_signal_tmap(
-            sig_name,
-            sig_type,
-            tm_name,
-            "samples_per_ts",
+    elif tmap_name == f"{signal_name}_samples_per_ts_value":
+        tm = create_bedmaster_signal_tmap(
+            signal_name=signal_name,
+            signal_type=signal_type,
+            tmap_name=tmap_name,
+            field="samples_per_ts",
             interpretation=Interpretation.CONTINUOUS,
         )
-    elif tm_name == f"{sig_name}_sample_freq":
-        tm = create_bm_signal_tmap(
-            sig_name,
-            sig_type,
-            tm_name,
-            "sample_freq",
+    elif tmap_name == f"{signal_name}_sample_freq":
+        tm = create_bedmaster_signal_tmap(
+            signal_name=signal_name,
+            signal_type=signal_type,
+            tmap_name=tmap_name,
+            field="sample_freq",
             dtype="float,int",
             interpretation=Interpretation.CONTINUOUS,
         )
-    elif tm_name == f"{sig_name}_units":
-        tm = create_bm_signal_metadata_tmap(sig_name, sig_type, "units", numeric=False)
-    elif tm_name == f"{sig_name}_scale_factor":
-        tm = create_bm_signal_metadata_tmap(
-            sig_name,
-            sig_type,
-            "scale_factor",
+    elif tmap_name == f"{signal_name}_units":
+        tm = create_bedmaster_signal_metadata_tmap(
+            signal_name=signal_name,
+            signal_type=signal_type,
+            field="units",
+            numeric=False,
+        )
+    elif tmap_name == f"{signal_name}_scale_factor":
+        tm = create_bedmaster_signal_metadata_tmap(
+            signal_name=signal_name,
+            signal_type=signal_type,
+            field="scale_factor",
             numeric=True,
         )
-    elif tm_name == f"{sig_name}_channel":
-        tm = create_bm_signal_metadata_tmap(
-            sig_name,
-            sig_type,
-            "channel",
+    elif tmap_name == f"{signal_name}_channel":
+        tm = create_bedmaster_signal_metadata_tmap(
+            signal_name=signal_name,
+            signal_type=signal_type,
+            field="channel",
             numeric=False,
         )
     return tm
 
 
-TM_TYPES = [
-    BM_SOURCES["waveform"][3:],
-    BM_SOURCES["vitals"][3:],
-]
-
-
-def get_tmap(tm_name: str) -> Optional[TensorMap]:
-    for data_type in TM_TYPES:
-        for name in DEFINED_TMAPS[data_type]:
-            if tm_name.startswith(f"{name}_"):
-                return get_bm_signal_tmap(tm_name, name, data_type)
+def get_tmap(tmap_name: str) -> Optional[TensorMap]:
+    for signal_type in ["vitals", "waveform"]:
+        for signal_name in DEFINED_TMAPS[signal_type]:
+            if tmap_name.startswith(f"{signal_name}_"):
+                return get_bedmaster_signal_tmap(
+                    tmap_name=tmap_name,
+                    signal_name=signal_name,
+                    signal_type=signal_type,
+                )
     return None

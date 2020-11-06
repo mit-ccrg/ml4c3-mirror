@@ -7,11 +7,9 @@ import numpy as np
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
 from ml4c3.tensormap.TensorMap import TensorMap, Interpretation
-from ml4c3.tensormap.tensor_maps_icu_events import get_tmap as GET_EVENT_TMAP
-from ml4c3.tensormap.tensor_maps_icu_static import admin_age_tensor_from_file
-from ml4c3.tensormap.tensor_maps_icu_first_visit_with_signal import (
-    get_tmap as GET_FIRST_VISIT_TMAP,
-)
+from ml4c3.tensormap.icu_events import get_tmap as GET_EVENT_TMAP
+from ml4c3.tensormap.icu_static import admin_age_tensor_from_file
+from ml4c3.tensormap.icu_first_visit_with_signal import get_tmap as GET_FIRST_VISIT_TMAP
 
 
 def length_of_stay_event_tensor_from_file(visit_tm, event_tm, hrs_to_event, period):

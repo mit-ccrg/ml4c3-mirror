@@ -57,8 +57,8 @@ def create_list_signals_tmap(sig_name: str, sig_type: str, root: str):
 
 
 def get_tmap(tm_name: str) -> Optional[TensorMap]:
-    for signal in DEFINED_TMAPS["bm_signals"]:
-        signal_name = f"bm_{signal}_signals"
+    for signal in DEFINED_TMAPS["bedmaster_signals"]:
+        signal_name = f"bedmaster_{signal}_signals"
         if tm_name.startswith(signal_name):
             return create_list_signals_tmap(signal_name, signal, "bedmaster")
 

@@ -1,16 +1,19 @@
 # type: ignore
 # pylint: disable=import-error
+# Imports: standard library
+from typing import Dict, Tuple
+
 # Imports: third party
 import numpy as np
 import pandas as pd
 
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
-from ml4c3.tensormap.tensor_maps_icu_static import get_tmap as get_static_tmap
-from ml4c3.tensormap.tensor_maps_icu_around_event import get_tmap as get_around_tmap
+from ml4c3.tensormap.icu_static import get_tmap as get_static_tmap
+from ml4c3.tensormap.icu_around_event import get_tmap as get_around_tmap
 
 
-def test_alarms_tmaps(hd5_data, testing_tmaps):
+def test_alarms_tmaps(hd5_data: Tuple, testing_tmaps: Dict):
     hd5, data = hd5_data
     data = data["alarms"]
     testing_tmaps = testing_tmaps["alarms"]
@@ -38,7 +41,7 @@ def test_alarms_tmaps(hd5_data, testing_tmaps):
             raise AssertionError(f"TMap {tm.name} couldn't be tested.")
 
 
-def test_events_tmaps(hd5_data, testing_tmaps):
+def test_events_tmaps(hd5_data: Tuple, testing_tmaps: Dict):
     hd5, data = hd5_data
 
     def _test_event_tmaps(data, testing_tmaps):
@@ -81,7 +84,7 @@ def test_events_tmaps(hd5_data, testing_tmaps):
     _test_event_tmaps(data["procedures"], testing_tmaps["procedures"])
 
 
-def test_measurements_tmaps(hd5_data, testing_tmaps):
+def test_measurements_tmaps(hd5_data: Tuple, testing_tmaps: Dict):
     hd5, data = hd5_data
     data = data["measurements"]
     testing_tmaps = testing_tmaps["measurements"]
@@ -154,7 +157,7 @@ def test_measurements_tmaps(hd5_data, testing_tmaps):
             raise AssertionError(f"TMap {tm.name} couldn't be tested.")
 
 
-def test_medications_tmaps(hd5_data, testing_tmaps):
+def test_medications_tmaps(hd5_data: Tuple, testing_tmaps: Dict):
     hd5, data = hd5_data
     data = data["meds"]
     testing_tmaps = testing_tmaps["meds"]
@@ -200,19 +203,16 @@ def test_medications_tmaps(hd5_data, testing_tmaps):
             raise AssertionError(f"TMap {tm.name} couldn't be tested.")
 
 
-def test_visits_tmap(hd5_data):
+def test_visits_tmap(hd5_data: Tuple):
     hd5, data = hd5_data
-
     visits = data["visits"]
-
-    # call tff without visits, get tensor from all visits
     tm = get_static_tmap("visits")
     original = np.array(visits)[:, None]
     tensor = tm.tensor_from_file(tm, hd5)
     assert np.array_equal(original, tensor)
 
 
-def test_sex_tmap(hd5_data):
+def test_sex_tmap(hd5_data: Tuple):
     hd5, data = hd5_data
     data = data["demo"]
 
@@ -222,7 +222,7 @@ def test_sex_tmap(hd5_data):
     assert np.array_equal(original, tensor)
 
 
-def test_length_of_stay_tmap(hd5_data):
+def test_length_of_stay_tmap(hd5_data: Tuple):
     hd5, data = hd5_data
     data = data["demo"]
 
@@ -235,7 +235,7 @@ def test_length_of_stay_tmap(hd5_data):
     assert np.array_equal(original, tensor)
 
 
-def test_age_tmap(hd5_data):
+def test_age_tmap(hd5_data: Tuple):
     hd5, data = hd5_data
     data = data["demo"]
 
@@ -248,18 +248,18 @@ def test_age_tmap(hd5_data):
     assert np.array_equal(original, tensor)
 
 
-def test_named_bm_signals_tmaps(testing_tmaps):
-    assert len(testing_tmaps["bm_signals"]) != 0
+def test_named_bedmaster_signals_tmaps(testing_tmaps: Dict):
+    assert len(testing_tmaps["bedmaster_signals"]) != 0
 
 
-def test_array_tmaps(hd5_data, testing_tmaps):
+def test_array_tmaps(hd5_data: Tuple, testing_tmaps: Dict):
     hd5, data = hd5_data
-    data = data["bm_signals"]
+    data = data["signals"]
 
     def test_tm_array(field):
         value_tmaps = {
             tmap_name: tmap
-            for tmap_name, tmap in testing_tmaps["bm_signals"].items()
+            for tmap_name, tmap in testing_tmaps["bedmaster_signals"].items()
             if tmap_name.endswith(f"_{field}")
         }
         assert len(value_tmaps) != 0
@@ -284,12 +284,12 @@ def test_array_tmaps(hd5_data, testing_tmaps):
     test_tm_array("value")
 
 
-def test_bm_time_interpolation(hd5_data, testing_tmaps):
+def test_bedmaster_time_interpolation(hd5_data: Tuple, testing_tmaps: Dict):
     hd5, data = hd5_data
-    data = data["bm_signals"]
+    data = data["signals"]
     value_tmaps = {
         tmap_name: tmap
-        for tmap_name, tmap in testing_tmaps["bm_signals"].items()
+        for tmap_name, tmap in testing_tmaps["bedmaster_signals"].items()
         if tmap_name.endswith("_timeseries") and len(tmap_name.split("_")) == 2
     }
     assert len(value_tmaps) != 0
@@ -316,7 +316,7 @@ def test_bm_time_interpolation(hd5_data, testing_tmaps):
         assert ((original == tensor) | (pd.isnull(original) & pd.isnull(tensor))).all()
 
         # Just interpolate waveforms, not vitals
-        if data[0][name].source != "BM_waveform":
+        if data[0][name].source != "bedmaster_waveform":
             continue
 
         # Linspace
@@ -363,14 +363,14 @@ def test_bm_time_interpolation(hd5_data, testing_tmaps):
             )
 
 
-def test_metadata_tmaps(hd5_data, testing_tmaps):
+def test_metadata_tmaps(hd5_data: Tuple, testing_tmaps: Dict):
     hd5, data = hd5_data
-    data = data["bm_signals"]
+    data = data["signals"]
 
     def test_tm_metadata(field):
         tmaps = {
             tmap_name: tmap
-            for tmap_name, tmap in testing_tmaps["bm_signals"].items()
+            for tmap_name, tmap in testing_tmaps["bedmaster_signals"].items()
             if tmap_name.endswith(f"_{field}")
         }
         assert len(tmaps) != 0
@@ -397,13 +397,13 @@ def test_metadata_tmaps(hd5_data, testing_tmaps):
     test_tm_metadata("scale_factor")
 
 
-def test_scaled_values(hd5_data, testing_tmaps):
+def test_scaled_values(hd5_data: Tuple, testing_tmaps: Dict):
     hd5, data = hd5_data
-    data = data["bm_signals"]
+    data = data["signals"]
 
     tmaps_continuous = {
         tmap_name: tmap
-        for tmap_name, tmap in testing_tmaps["bm_signals"].items()
+        for tmap_name, tmap in testing_tmaps["bedmaster_signals"].items()
         if tmap_name.endswith("_value") and len(tmap_name.split("_")) == 2
     }
     assert len(tmaps_continuous) != 0
@@ -421,7 +421,7 @@ def test_scaled_values(hd5_data, testing_tmaps):
 
     tmaps_timeseries = {
         tmap_name: tmap
-        for tmap_name, tmap in testing_tmaps["bm_signals"].items()
+        for tmap_name, tmap in testing_tmaps["bedmaster_signals"].items()
         if tmap_name.endswith("_timeseries") and len(tmap_name.split("_")) == 2
     }
     assert len(tmaps_timeseries) != 0
@@ -442,19 +442,19 @@ def test_scaled_values(hd5_data, testing_tmaps):
         assert np.array_equal(expected, tensor[0][0])
 
 
-def test_named_list_signals_tmaps(testing_tmaps):
+def test_named_list_signals_tmaps(testing_tmaps: Dict):
     assert len(testing_tmaps["list_signals"]) != 0
 
 
 def test_list_signals_tmaps(hd5_data, testing_tmaps):
     hd5, data = hd5_data
-    data1 = data["bm_signals"]
+    data1 = data["signals"]
     data2 = data["alarms"]
     data3 = data["meds"]
 
-    tm_wv = testing_tmaps["list_signals"]["bm_waveform_signals"]
-    tm_vs = testing_tmaps["list_signals"]["bm_vitals_signals"]
-    tm_alarms = testing_tmaps["list_signals"]["bm_alarms_signals"]
+    tm_wv = testing_tmaps["list_signals"]["bedmaster_waveform_signals"]
+    tm_vs = testing_tmaps["list_signals"]["bedmaster_vitals_signals"]
+    tm_alarms = testing_tmaps["list_signals"]["bedmaster_alarms_signals"]
     tm_med = testing_tmaps["list_signals"]["edw_med_signals"]
 
     # Check default tensormap
@@ -532,9 +532,9 @@ def test_localtime_tmaps(hd5_data, testing_tmaps, test_get_local_time):
 
     hd5, data = hd5_data
     data1 = data["alarms"]
-    data2 = data["bm_signals"]
+    data2 = data["signals"]
     tm1 = testing_tmaps["alarms"]["apnea_init_date"]
-    tm2 = testing_tmaps["bm_signals"]["i_timeseries"]
+    tm2 = testing_tmaps["bedmaster_signals"]["i_timeseries"]
 
     original1 = np.array([d["apnea"].start_date for d in data1])
     original2 = np.array(
@@ -565,7 +565,7 @@ def test_localtime_tmaps(hd5_data, testing_tmaps, test_get_local_time):
     ).all()
 
 
-def test_around_event_tmaps(hd5_data):
+def test_around_event_tmaps(hd5_data: Tuple):
     hd5, data = hd5_data
     measurements = data["measurements"]
     events = data["events"]
@@ -633,7 +633,7 @@ def test_around_event_tmaps(hd5_data):
     assert np.array_equal(original4, tensor4)
 
 
-def test_signal_metrics_tmaps(hd5_data):
+def test_signal_metrics_tmaps(hd5_data: Tuple):
     hd5, data = hd5_data
     measurements = data["measurements"]
     events = data["events"]

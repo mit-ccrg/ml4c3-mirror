@@ -11,22 +11,22 @@ import numpy as np
 import pandas as pd
 
 # Imports: first party
-from ml4c3.definitions.icu import EDW_FILES, BM_SOURCES, ALARMS_FILES, ICU_SCALE_UNITS
+from ml4c3.definitions.icu import EDW_FILES, ALARMS_FILES, ICU_SCALE_UNITS
 from ml4c3.definitions.globals import TIMEZONE
-from ml4c3.ingest.icu.statistics import BMStats
-from ml4c3.ingest.icu.data_objects import BMAlarm, BMSignal
+from ml4c3.ingest.icu.statistics import BedmasterStats
+from ml4c3.ingest.icu.data_objects import BedmasterAlarm, BedmasterSignal
 
 from .reader import Reader
 
 # pylint: disable=too-many-branches
 
 
-class BMReader(h5py.File, Reader):
+class BedmasterReader(h5py.File, Reader):
     """
-    Implementation of the Reader for BM data.
+    Implementation of the Reader for Bedmaster data.
 
     Usage:
-    >>> reader = BMReader('file.mat')
+    >>> reader = BedmasterReader('file.mat')
     >>> hr = reader.get_vs('HR')
     """
 
@@ -34,7 +34,7 @@ class BMReader(h5py.File, Reader):
         self,
         file: str,
         scaling_and_units: Dict = None,
-        summary_stats: BMStats = None,
+        summary_stats: BedmasterStats = None,
     ):
         super().__init__(file, "r")
         self.max_segment = {
@@ -121,7 +121,7 @@ class BMReader(h5py.File, Reader):
         self.interbundle_corr["vs"] = vs_corr
         self.interbundle_corr["wv"] = wv_corr
 
-    def apply_ibcorr(self, signal: BMSignal):
+    def apply_ibcorr(self, signal: BedmasterSignal):
         """
         Apply inter-bundle correction on a given signal.
 
@@ -136,7 +136,7 @@ class BMReader(h5py.File, Reader):
 
         Note that this shifting will occur until a dataevent 1 or 5 is found.
 
-        :param signal: <BMSignal> a Bedmaster signal.
+        :param signal: <BedmasterSignal> a Bedmaster signal.
         """
         source = "vs" if signal._source_type == "vitals" else "wv"
         if not self.interbundle_corr[source]:
@@ -156,7 +156,7 @@ class BMReader(h5py.File, Reader):
             )
             signal.value = signal.value[value_cut_idx:]
             signal.samples_per_ts = signal.samples_per_ts[first_non_ol_idx:]
-            if signal.source == BM_SOURCES["waveform"]:
+            if signal.source == "waveform":
                 signal.sample_freq = self.get_sample_freq_from_channel(
                     channel=signal.channel,
                     first_idx=first_non_ol_idx,
@@ -264,7 +264,7 @@ class BMReader(h5py.File, Reader):
                [48, 46, 50],
                [48, 46, 50]])
 
-        >>> BMReader.decode_data(data)
+        >>> BedmasterReader.decode_data(data)
         array([0.2, 0.2, 0.2, 0.2])
 
         :param data: <np.ndarray> Data to decode
@@ -290,19 +290,19 @@ class BMReader(h5py.File, Reader):
         data = data.astype(dtype)
         return data
 
-    def get_vs(self, signal_name: str) -> Optional[BMSignal]:
+    def get_vs(self, signal_name: str) -> Optional[BedmasterSignal]:
         """
         Get the corrected vs signal from the.mat file.
 
         2. Applies corrections on the signal
-        3. Wraps the corrected signal and its metadata on a BMDataObject
+        3. Wraps the corrected signal and its metadata on a BedmasterDataObject
 
         :param signal_name: <string> name of the signal
-        :return: <BMSignal> wrapped corrected signal
+        :return: <BedmasterSignal> wrapped corrected signal
         """
         if signal_name not in self["vs"].keys():
             raise ValueError(
-                f"In bm_file {self.filename}, the signal {signal_name} was not found.",
+                f"In bedmaster_file {self.filename}, the signal {signal_name} was not found.",
             )
 
         # Get values and time
@@ -313,7 +313,7 @@ class BMReader(h5py.File, Reader):
 
         if values.dtype.char == "S":
             logging.warning(
-                f"In bm_file {self.filename}, {signal_name} has unexpected "
+                f"In bedmaster_file {self.filename}, {signal_name} has unexpected "
                 "string values.",
             )
             return None
@@ -343,9 +343,9 @@ class BMReader(h5py.File, Reader):
         # Samples per timespan
         samples_per_ts = np.array([1] * len(time))
 
-        signal = BMSignal(
+        signal = BedmasterSignal(
             name=signal_name,
-            source=BM_SOURCES["vitals"],
+            source="vitals",
             channel=signal_name,
             value=self._ensure_contiguous(values),
             time=self._ensure_contiguous(time),
@@ -362,7 +362,7 @@ class BMReader(h5py.File, Reader):
 
         if signal.time.size == 0:
             logging.info(
-                f"In bm_file {self.filename}, {signal} is completely overlapped, "
+                f"In bedmaster_file {self.filename}, {signal} is completely overlapped, "
                 "it won't be written.",
             )
             if self.summary_stats:
@@ -415,21 +415,25 @@ class BMReader(h5py.File, Reader):
 
         return signal
 
-    def get_wv(self, channel_n: str, signal_name: str = None) -> Optional[BMSignal]:
+    def get_wv(
+        self,
+        channel_n: str,
+        signal_name: str = None,
+    ) -> Optional[BedmasterSignal]:
         """
         Get the corrected wv signal from the.mat file.
 
         1. Gets the signal and its metadata from the .mat file
         2. Applies corrections on the signal
-        3. Wraps the corrected signal and its metadata on a BMDataObject
+        3. Wraps the corrected signal and its metadata on a BedmasterDataObject
 
         :param channel_n: <string> channel where the signal is
         :param signal_name: <string> name of the signal
-        :return: <BMSignal> wrapped corrected signal
+        :return: <BedmasterSignal> wrapped corrected signal
         """
         if channel_n not in self["wv"].keys():
             raise ValueError(
-                f"In bm_file {self.filename}, the signal {channel_n} was not found.",
+                f"In bedmaster_file {self.filename}, the signal {channel_n} was not found.",
             )
 
         if not signal_name:
@@ -466,9 +470,9 @@ class BMReader(h5py.File, Reader):
         if samples_per_ts.ndim == 2:
             samples_per_ts = self.format_data(samples_per_ts)
 
-        signal = BMSignal(
+        signal = BedmasterSignal(
             name=signal_name,
-            source=BM_SOURCES["waveform"],
+            source="waveform",
             channel=channel_n,
             value=values[:],
             time=time[:],
@@ -485,7 +489,7 @@ class BMReader(h5py.File, Reader):
 
         if signal.time.size == 0:
             logging.info(
-                f"In bm_file {self.filename}, {signal} is completely overlapped, "
+                f"In bedmaster_file {self.filename}, {signal} is completely overlapped, "
                 "it won't be written.",
             )
             if self.summary_stats:
@@ -621,9 +625,9 @@ class BMReader(h5py.File, Reader):
         return float(scaling_factor), units
 
 
-class BMAlarmsReader(Reader):
+class BedmasterAlarmsReader(Reader):
     """
-    Implementation of the Reader for BM Alarms data.
+    Implementation of the Reader for Bedmaster Alarms data.
     """
 
     def __init__(
@@ -635,9 +639,9 @@ class BMAlarmsReader(Reader):
         move_file: str = EDW_FILES["move_file"]["name"],
     ):
         """
-        Iinit BM Alarms Reader.
+        Iinit Bedmaster Alarms Reader.
 
-        :param alarms_path: Absolute path of bm alarms directory.
+        :param alarms_path: Absolute path of Bedmaster alarms directory.
         :param edw_path: Absolute path of edw directory.
         :param mrn: MRN of the patient.
         :param csn: CSN of the patient visit.
@@ -667,11 +671,11 @@ class BMAlarmsReader(Reader):
             alarms = alarms.union(set(alarms_df[alarm_name_column].str.upper()))
         return list(alarms)
 
-    def get_alarm(self, alarm_name: str) -> BMAlarm:
+    def get_alarm(self, alarm_name: str) -> BedmasterAlarm:
         """
-        Get the Bedmaster alarms data from the BM Alarms .csv files.
+        Get the Bedmaster alarms data from the Bedmaster Alarms .csv files.
 
-        :return: <BMAlarm> wrapped information.
+        :return: <BedmasterAlarm> wrapped information.
         """
         dates = np.array([])
         durations = np.array([])
@@ -688,7 +692,7 @@ class BMAlarmsReader(Reader):
                 level = np.array(alarm_df[level_column])[idx[0]]
         dates = self._ensure_contiguous(dates)
         durations = self._ensure_contiguous(durations)
-        return BMAlarm(
+        return BedmasterAlarm(
             name=alarm_name,
             start_date=dates,
             duration=durations,
@@ -728,11 +732,11 @@ class BMAlarmsReader(Reader):
                 bed = room_bed[i][-5:-2] + room_bed[i][-1]
             for csv_name in names:
                 if not os.path.isfile(
-                    os.path.join(self.alarms_path, f"bm_alarms_{csv_name}.csv"),
+                    os.path.join(self.alarms_path, f"bedmaster_alarms_{csv_name}.csv"),
                 ):
                     continue
                 alarms_df = pd.read_csv(
-                    os.path.join(self.alarms_path, f"bm_alarms_{csv_name}.csv"),
+                    os.path.join(self.alarms_path, f"bedmaster_alarms_{csv_name}.csv"),
                     low_memory=False,
                 )
                 alarms_df = alarms_df[alarms_df["Bed"].astype(str) == bed]
