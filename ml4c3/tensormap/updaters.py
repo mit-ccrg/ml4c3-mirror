@@ -1,8 +1,6 @@
 # Imports: standard library
 import os
-import re
 import copy
-import datetime
 from typing import Dict, Optional
 
 # Imports: third party
@@ -11,16 +9,7 @@ import pandas as pd
 
 # Imports: first party
 from ml4c3.metrics import weighted_crossentropy
-from ml4c3.normalizer import Standardize
-from ml4c3.validators import validator_voltage_no_zero_padding
-from ml4c3.tensormap.ecg import name2augmenters, make_voltage_tff
-from ml4c3.definitions.ecg import (
-    ECG_PREFIX,
-    ECG_REST_LEADS_ALL,
-    ECG_DATETIME_FORMAT,
-    ECG_REST_LEADS_INDEPENDENT,
-)
-from ml4c3.definitions.sts import STS_PREFIX, STS_DATE_FORMAT, STS_PREDICTION_DIR
+from ml4c3.definitions.sts import STS_PREDICTION_DIR
 from ml4c3.tensormap.TensorMap import (
     TensorMap,
     Interpretation,
@@ -28,67 +17,6 @@ from ml4c3.tensormap.TensorMap import (
     id_from_filename,
     find_negative_label_and_channel,
 )
-
-
-def update_tmaps_ecg_voltage(
-    tmap_name: str,
-    tmaps: Dict[str, TensorMap],
-) -> Dict[str, TensorMap]:
-    """
-    Generates ECG voltage TMaps that are given by the name format:
-        [12_lead_]ecg_{length}[_exact][_std][_augmentations]
-
-    Required:
-        length: the number of samples present in each lead.
-
-    Optional:
-        12_lead: use the 12 clinical leads.
-        exact: only return voltages when raw data has exactly {length} samples in each lead.
-        std: standardize voltages using mean = 0, std = 2000.
-        augmentations: apply crop, noise, and warp transformations to voltages.
-
-    Examples:
-        valid: ecg_2500_exact_std
-        valid: 12_lead_ecg_625_crop_warp
-        invalid: ecg_2500_noise_std
-
-    Note: if additional modifiers are present after the name format, e.g.
-        ecg_2500_std_newest_sts, the matched part of the tmap name, e.g.
-        ecg_2500_std, will be used to construct a tmap and save it to the dict.
-        Later, a function will find the tmap name ending in _newest, and modify the
-        tmap appropriately.
-    """
-    voltage_tm_pattern = re.compile(
-        r"^(12_lead_)?ecg_\d+(_exact)?(_std)?(_warp|_crop|_noise)*",
-    )
-    match = voltage_tm_pattern.match(tmap_name)
-    if match is None:
-        return tmaps
-
-    # Isolate matching components of tmap name and build it
-    match_tmap_name = match[0]
-    leads = ECG_REST_LEADS_ALL if "12_lead" in tmap_name else ECG_REST_LEADS_INDEPENDENT
-    length = int(tmap_name.split("ecg_")[1].split("_")[0])
-    exact = "exact" in tmap_name
-    normalizer = Standardize(mean=0, std=2000) if "std" in tmap_name else None
-    augmenters = [
-        augment_function
-        for augment_option, augment_function in name2augmenters.items()
-        if augment_option in tmap_name
-    ]
-    tmap = TensorMap(
-        name=match_tmap_name,
-        shape=(length, len(leads)),
-        path_prefix=ECG_PREFIX,
-        tensor_from_file=make_voltage_tff(exact_length=exact),
-        normalizers=normalizer,
-        channel_map=leads,
-        time_series_limit=0,
-        validators=validator_voltage_no_zero_padding,
-        augmenters=augmenters,
-    )
-    tmaps[match_tmap_name] = tmap
-    return tmaps
 
 
 def update_tmaps_model_predictions(
@@ -177,69 +105,6 @@ def update_tmaps_weighted_loss(
     tmap.name = new_tmap_name
     tmap.loss = weighted_crossentropy([1.0, float(weight)], new_tmap_name)
     tmaps[new_tmap_name] = tmap
-    return tmaps
-
-
-def update_tmaps_sts_window(
-    tmap_name: str,
-    tmaps: Dict[str, TensorMap],
-) -> Dict[str, TensorMap]:
-    """Make new tmap from base name, making conditional on surgery date"""
-
-    windows = ["with_preop_ecg", "with_postop_ecg", "preop", "postop"]
-    for window in windows:
-        if window in tmap_name:
-            base_name, _ = tmap_name.split(f"_{window}")
-            if base_name not in tmaps:
-                raise ValueError(
-                    f"Base tmap {base_name} not in existing tmaps. Cannot modify STS {window} window.",
-                )
-            base_tmap = tmaps[base_name]
-            new_tmap = copy.deepcopy(base_tmap)
-            new_tmap_name = f"{base_name}_{window}"
-
-            def offset_date(
-                sts_date: str,
-                offset: int,
-                date_format: str,
-            ) -> str:
-                return (
-                    datetime.datetime.strptime(sts_date, date_format)
-                    + datetime.timedelta(days=offset)
-                ).strftime(date_format)
-
-            def time_series_filter(hd5):
-                _dates = base_tmap.time_series_filter(hd5)
-
-                if "ecg" in window:
-                    xref_dates = list(hd5[ECG_PREFIX])
-                    date_format = ECG_DATETIME_FORMAT
-                else:
-                    xref_dates = list(hd5[STS_PREFIX])
-                    date_format = STS_DATE_FORMAT
-                dates = []
-                for xref_date in xref_dates:
-                    if window == "preop" or window == "with_postop_ecg":
-                        start_date = offset_date(
-                            xref_date,
-                            -30,
-                            date_format=date_format,
-                        )
-                        end_date = xref_date
-                    elif window == "postop" or window == "with_preop_ecg":
-                        start_date = xref_date
-                        end_date = offset_date(xref_date, 30, date_format=date_format)
-                    else:
-                        raise ValueError(f"Unknown STS window: {window}")
-                    for d in _dates:
-                        if start_date < d < end_date:
-                            dates.append(d)
-                return dates
-
-            new_tmap.name = new_tmap_name
-            new_tmap.time_series_filter = time_series_filter
-            tmaps[new_tmap_name] = new_tmap
-            break
     return tmaps
 
 
