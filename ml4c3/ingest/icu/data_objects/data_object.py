@@ -35,7 +35,7 @@ class ICUContinuousData(ICUDataObject):
     """
     Parent class for the wrappers of continuous data.
 
-    Continuous data objects are BMObject and MeasurementObject. It
+    Continuous data objects are BedmasterObject and MeasurementObject. It
     shouldn't be instanced directly, instance through its children
     instead.
     """

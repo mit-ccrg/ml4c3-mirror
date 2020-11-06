@@ -251,7 +251,7 @@ def create_categorical_tmap(key: str, channel_map: Dict[str, int]) -> TensorMap:
 
 
 def get_tmap(tm_name: str) -> Optional[TensorMap]:
-    source = EDW_FILES["demo_file"]["source"][4:]
+    source = "static"
 
     if tm_name in DEFINED_TMAPS[f"{source}_language"]:
         return create_language_tmap(tm_name)

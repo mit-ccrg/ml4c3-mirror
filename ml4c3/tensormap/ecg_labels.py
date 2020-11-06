@@ -3,12 +3,12 @@ from typing import Dict
 
 # Imports: first party
 from ml4c3.validators import validator_not_all_zero
-from ml4c3.definitions.ecg import ECG_PREFIX
-from ml4c3.tensormap.TensorMap import TensorMap, Interpretation
-from ml4c3.tensormap.tensor_maps_ecg import (
+from ml4c3.tensormap.ecg import (
     make_ecg_label_from_read_tff,
     make_binary_ecg_label_from_any_read_tff,
 )
+from ml4c3.definitions.ecg import ECG_PREFIX
+from ml4c3.tensormap.TensorMap import TensorMap, Interpretation
 
 tmaps: Dict[str, TensorMap] = {}
 tmaps["asystole"] = TensorMap(

@@ -12,8 +12,8 @@ import pandas as pd
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
 from ml4c3.definitions.icu import EDW_FILES, MAPPING_DEPARTMENTS
-from ml4c3.tensormap.tensor_maps_icu_static import get_tmap as GET_STATIC_TMAP
-from ml4c3.ingest.icu.matchers.match_patient_bm import PatientBMMatcher
+from ml4c3.tensormap.icu_static import get_tmap as GET_STATIC_TMAP
+from ml4c3.ingest.icu.matchers.match_patient_bedmaster import PatientBedmasterMatcher
 
 EXPECTED_FILES = []
 for file_type in EDW_FILES:
@@ -23,7 +23,7 @@ for file_type in EDW_FILES:
 
 class ICUCoverageAssesser:
     """
-    Assesses the coverage of BM files for a given cohort of patients.
+    Assesses the coverage of Bedmaster files for a given cohort of patients.
     """
 
     def __init__(
@@ -172,12 +172,12 @@ class ICUCoverageAssesser:
         :param count: <int> Event counts (if any) to be added in data.
         """
         if "fileID" in csv.columns:
-            data["Bm files [u]"].append(len(csv["fileID"].unique()))
+            data["Bedmaster files [u]"].append(len(csv["fileID"].unique()))
             csv = csv.drop_duplicates(
                 subset=["PatientEncounterID", "unixFileStartTime", "unixFileEndTime"],
             )
         else:
-            data["Bm files [u]"].append(np.nan)
+            data["Bedmaster files [u]"].append(np.nan)
         if count:
             data["Count [u]"].append(count)
             data["Count [%]"].append(data["Count [u]"][-1] / data["Count [u]"][0] * 100)
@@ -226,7 +226,7 @@ class ICUCoverageAssesser:
                     )
 
         if len(new_csv) == 0:
-            data["Bm files [u]"].append(np.nan)
+            data["Bedmaster files [u]"].append(np.nan)
             if count:
                 data["Count [u]"].append(0)
                 data["Count [%]"].append(np.nan)
@@ -236,7 +236,7 @@ class ICUCoverageAssesser:
             data["Unique CSNs [%]"].append(np.nan)
             return data
 
-        data["Bm files [u]"].append(np.nan)
+        data["Bedmaster files [u]"].append(np.nan)
         if count:
             data["Count [u]"].append(len(new_csv))
             data["Count [%]"].append(data["Count [u]"][-1] / data["Count [u]"][0] * 100)
@@ -252,7 +252,7 @@ class ICUCoverageAssesser:
 
     def assess_coverage(
         self,
-        path_bm: str,
+        path_bedmaster: str,
         path_edw: str,
         path_hd5: str,
         desired_depts: List[str] = None,
@@ -265,7 +265,7 @@ class ICUCoverageAssesser:
         and CSNs available in EDW, Bedmaster and HD5 and a second .csv file
         listing the MRNs and CSNs from EDW that haven't been downloaded yet.
 
-        :param path_bm: <str> Directory with Bedmaster .mat files.
+        :param path_bedmaster: <str> Directory with Bedmaster .mat files.
         :param path_edw: <str> Directory with EDW .csv files.
         :param path_hd5: <str> Directory with .hd5 files.
         :param desired_depts: <List[str]> List of department names.
@@ -300,7 +300,7 @@ class ICUCoverageAssesser:
         columns = []
         for key in departments:
             columns.append(departments[key])
-            columns.append(f"{departments[key]} with BM data")
+            columns.append(f"{departments[key]} with Bedmaster data")
             columns.append(f"{departments[key]} with HD5 file")
 
         # Execute matching algorithm
@@ -308,8 +308,13 @@ class ICUCoverageAssesser:
         for key in departments:
             if key:
                 matching_depts.append(key)
-        bm_matcher = PatientBMMatcher(True, path_bm, self.output_dir, matching_depts)
-        bm_matcher.match_files(os.path.join(self.output_dir, "xref.csv"))
+        bedmaster_matcher = PatientBedmasterMatcher(
+            True,
+            path_bedmaster,
+            self.output_dir,
+            matching_depts,
+        )
+        bedmaster_matcher.match_files(os.path.join(self.output_dir, "xref.csv"))
 
         # Initialize empty table
         data: Dict[str, Any] = {}
@@ -321,7 +326,7 @@ class ICUCoverageAssesser:
                 "Unique MRNs [%]": [],
                 "Unique CSNs [u]": [],
                 "Unique CSNs [%]": [],
-                "Bm files [u]": [],
+                "Bedmaster files [u]": [],
             },
         )
 
@@ -382,7 +387,7 @@ def assess_icu_coverage(args):
         adt_csv=args.path_adt,
     )
     assesser.assess_coverage(
-        path_bm=args.path_bedmaster,
+        path_bedmaster=args.path_bedmaster,
         path_edw=args.path_edw,
         path_hd5=args.tensors,
         desired_depts=args.desired_depts,

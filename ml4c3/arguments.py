@@ -48,7 +48,7 @@ def parse_args() -> argparse.Namespace:
         "\t * assess_icu_coverage: ADD DESCRIPTION. \n"
         "\t * check_icu_structure: ADD DESCRIPTION. \n"
         "\t * pre_tensorize_summary: ADD DESCRIPTION. \n"
-        "\t * match_patient_bm: ADD DESCRIPTION. \n"
+        "\t * match_patient_bedmaster: ADD DESCRIPTION. \n"
         "\t * extract_ecg_features: ADD DESCRIPTION. \n",
         dest="mode",
     )
@@ -852,7 +852,7 @@ def parse_args() -> argparse.Namespace:
     # Check structure parser
     check_structure_parser = subparser.add_parser(
         "check_structure",
-        description="Verify EDW and BM files and directories structure "
+        description="Verify EDW and Bedmaster files and directories structure "
         "before tensorizing.",
         parents=[icu_parser],
     )
@@ -863,7 +863,7 @@ def parse_args() -> argparse.Namespace:
         "are verified.",
     )
     check_structure_parser.add_argument(
-        "--check_bm",
+        "--check_bedmaster",
         action="store_true",
         help="If this parameter is set, the Bedmaster files and directory "
         "structure are verified.",
@@ -871,9 +871,9 @@ def parse_args() -> argparse.Namespace:
 
     # Match patient parser
     match_patient_parser = subparser.add_parser(
-        "match_patient_bm",
+        "match_patient_bedmaster",
         description="Create a cross-reference "
-        "table between the available BM files and EDW data from an ADT table.",
+        "table between the available Bedmaster files and EDW data from an ADT table.",
         parents=[io_parser, run_parser, icu_parser],
     )
     match_patient_parser.add_argument(
@@ -904,12 +904,12 @@ def parse_args() -> argparse.Namespace:
         "--signals",
         nargs="+",
         default=None,
-        help="List of BM signals to calculate their summary_statistics. To "
+        help="List of Bedmaster signals to calculate their summary_statistics. To "
         "calculate statistics for all signals select 'all'. It always "
         "calculates statistics for all EDW signals.",
     )
     pre_tensorize_summary_parser.add_argument(
-        "--detailed_bm",
+        "--detailed_bedmaster",
         action="store_true",
         help="Generate detailed statistics for Bedmaster, like time "
         "irregularities frequence. This option can take some time"
@@ -918,7 +918,7 @@ def parse_args() -> argparse.Namespace:
     pre_tensorize_summary_parser.add_argument(
         "--no_xref",
         action="store_true",
-        help="Don't cross-reference files. Enable along with --detailed_bm "
+        help="Don't cross-reference files. Enable along with --detailed_bedmaster "
         "to get statistics from bedmaster files without needing "
         "an edw and xref path.",
     )
@@ -926,7 +926,7 @@ def parse_args() -> argparse.Namespace:
     # Assess coverage parser
     assess_coverage_parser = subparser.add_parser(
         "assess_coverage",
-        description="Assess BM and HD5 coverage by means of MRNs and CSNs.",
+        description="Assess Bedmaster and HD5 coverage by means of MRNs and CSNs.",
         parents=[io_parser, run_parser, icu_parser],
     )
     assess_coverage_parser.add_argument(

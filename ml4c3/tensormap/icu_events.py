@@ -13,9 +13,7 @@ from ml4c3.tensormap.TensorMap import (
     get_local_timestamps,
 )
 from ml4c3.definitions.icu_tmap_list import DEFINED_TMAPS
-from ml4c3.tensormap.tensor_maps_icu_first_visit_with_signal import (
-    get_tmap as get_visit_tmap,
-)
+from ml4c3.tensormap.icu_first_visit_with_signal import get_tmap as get_visit_tmap
 
 # pylint: disable=pointless-statement
 
@@ -231,21 +229,11 @@ def create_arrest_tmap(tm_name: str):
     return tm
 
 
-TM_TYPES = [
-    EDW_FILES["surgery_file"]["source"][4:],
-    EDW_FILES["other_procedures_file"]["source"][4:],
-    EDW_FILES["transfusions_file"]["source"][4:],
-    EDW_FILES["events_file"]["source"][4:],
-]
-
-
 def get_tmap(tm_name: str) -> Optional[TensorMap]:
-    for data_type in TM_TYPES:
+    for data_type in ["surgery", "procedures", "transfusions", "events"]:
         for name in DEFINED_TMAPS[data_type]:
             if tm_name.startswith(name):
                 return create_event_tmap(tm_name, name, data_type)
-
     if tm_name.startswith("arrest"):
         return create_arrest_tmap(tm_name)
-
     return None

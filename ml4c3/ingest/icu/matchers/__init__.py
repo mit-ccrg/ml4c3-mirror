@@ -1,1 +1,1 @@
-from .match_patient_bm import PatientBMMatcher
+from .match_patient_bedmaster import PatientBedmasterMatcher

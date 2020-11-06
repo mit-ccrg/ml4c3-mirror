@@ -16,12 +16,11 @@ from ml4c3.arguments import parse_args
 
 
 def test_pre_tensorize_summary(temp_dir):
-
     logging.disable(logging.CRITICAL)
 
-    for file in os.listdir(pytest.bm_dir):
-        if file.startswith("bm_file_"):
-            copy2(os.path.join(pytest.bm_dir, file), temp_dir)
+    for file in os.listdir(pytest.bedmaster_dir):
+        if file.startswith("bedmaster_file_"):
+            copy2(os.path.join(pytest.bedmaster_dir, file), temp_dir)
 
     sys.argv = [
         ".",
@@ -34,17 +33,17 @@ def test_pre_tensorize_summary(temp_dir):
         pytest.cross_ref_file,
         "--output_folder",
         temp_dir,
-        "--detailed_bm",
+        "--detailed_bedmaster",
     ]
     args = parse_args()
     run(args)
 
     expected_files = [
         f"{args.summary_stats_base_name}_edw_demographics.csv",
-        f"{args.summary_stats_base_name}_mrn_csn_coverage_edw_bm.csv",
+        f"{args.summary_stats_base_name}_mrn_csn_coverage_edw_bedmaster.csv",
         f"{args.summary_stats_base_name}_signals_summary.csv",
-        f"{args.summary_stats_base_name}_bm_signal_stats.csv",
-        f"{args.summary_stats_base_name}_bm_files_stats.csv",
+        f"{args.summary_stats_base_name}_bedmaster_signal_stats.csv",
+        f"{args.summary_stats_base_name}_bedmaster_files_stats.csv",
     ]
 
     output_files = [
@@ -52,17 +51,18 @@ def test_pre_tensorize_summary(temp_dir):
         for file_name in os.listdir(args.output_folder)
         if file_name.endswith(".csv")
     ]
-
     assert sorted(expected_files) == sorted(output_files)
 
     edw_df = pd.read_csv(os.path.join(args.output_folder, expected_files[0]))
     cross_ref_df = pd.read_csv(os.path.join(args.output_folder, expected_files[1]))
     signals_df = pd.read_csv(os.path.join(args.output_folder, expected_files[2]))
-    bm_signals_df = pd.read_csv(
+    bedmaster_signals_df = pd.read_csv(
         os.path.join(args.output_folder, expected_files[3]),
         index_col=0,
     )
-    bm_files_df = pd.read_csv(os.path.join(args.output_folder, expected_files[4]))
+    bedmaster_files_df = pd.read_csv(
+        os.path.join(args.output_folder, expected_files[4]),
+    )
 
     assert len(edw_df.index) == 9
     assert sorted(edw_df.columns) == sorted(
@@ -82,8 +82,8 @@ def test_pre_tensorize_summary(temp_dir):
         ["field", "count", "min", "max", "mean", "total", "%"],
     )
 
-    assert len(bm_signals_df.index) == 11
-    assert sorted(bm_signals_df.columns) == sorted(
+    assert len(bedmaster_signals_df.index) == 11
+    assert sorted(bedmaster_signals_df.columns) == sorted(
         [
             "channel",
             "total_overlap_bundles",
@@ -111,14 +111,14 @@ def test_pre_tensorize_summary(temp_dir):
         ],
     )
 
-    assert len(bm_files_df.index) == 5
-    assert sorted(bm_files_df.columns) == sorted(["issue", "count", "count_%"])
+    assert len(bedmaster_files_df.index) == 5
+    assert sorted(bedmaster_files_df.columns) == sorted(["issue", "count", "count_%"])
 
 
 def test_independent_args(temp_dir):
-    for file in os.listdir(pytest.bm_dir):
-        if file.startswith("bm_file_"):
-            copy2(os.path.join(pytest.bm_dir, file), temp_dir)
+    for file in os.listdir(pytest.bedmaster_dir):
+        if file.startswith("bedmaster_file_"):
+            copy2(os.path.join(pytest.bedmaster_dir, file), temp_dir)
 
     def _get_output_files():
         return [
@@ -135,10 +135,10 @@ def test_independent_args(temp_dir):
     base_name = "pre_tensorize"
     expected_files = [
         f"{base_name}_edw_demographics.csv",
-        f"{base_name}_mrn_csn_coverage_edw_bm.csv",
+        f"{base_name}_mrn_csn_coverage_edw_bedmaster.csv",
         f"{base_name}_signals_summary.csv",
-        f"{base_name}_bm_signal_stats.csv",
-        f"{base_name}_bm_files_stats.csv",
+        f"{base_name}_bedmaster_signal_stats.csv",
+        f"{base_name}_bedmaster_files_stats.csv",
     ]
 
     # Test standard
@@ -159,15 +159,15 @@ def test_independent_args(temp_dir):
     run(parsed_args)
     assert sorted(expected_files[:3]) == sorted(_get_output_files())
 
-    # Test bm detailed
-    sys.argv.append("--detailed_bm")
+    # Test Bedmaster detailed
+    sys.argv.append("--detailed_bedmaster")
     parsed_args = parse_args()
     _reset_dir()
     run(parsed_args)
 
     assert sorted(expected_files) == sorted(_get_output_files())
 
-    # Test just bm
+    # Test just Bedmaster
     sys.argv.append("--no_xref")
     parsed_args = parse_args()
     _reset_dir()
@@ -176,7 +176,7 @@ def test_independent_args(temp_dir):
     assert sorted(expected_files[3:5]) == sorted(_get_output_files())
 
     # Test no_xref and no detailed
-    sys.argv.remove("--detailed_bm")
+    sys.argv.remove("--detailed_bedmaster")
     _reset_dir()
     parsed_args = parse_args()
     run(parsed_args)

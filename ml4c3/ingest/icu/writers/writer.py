@@ -7,6 +7,7 @@ import h5py
 import numpy as np
 
 # Imports: first party
+from ml4c3.definitions.types import EDWType, BedmasterType
 from ml4c3.ingest.icu.data_objects import StaticData, ICUDataObject
 
 # pylint: disable=too-many-branches
@@ -24,13 +25,13 @@ class Writer(h5py.File):
 
     The structure of the output file will be:
 
-    <BedMaster>
+    <bedmaster>
         <visitID>/
             <signal name>/
                 data and metadata
             ...
         ...
-    <EDW>
+    <edw>
         <visitID>/
             <signal name>/
                 data and metadata
@@ -115,8 +116,7 @@ class Writer(h5py.File):
         signal_name = signal_name.replace(",", "")
         signal_name = signal_name.replace("/", "|")
 
-        if "BM" in signal.source:
-            # Check signal exists
+        if isinstance(signal, BedmasterType):
             if "alarms" in signal.source:
                 pass
             elif signal.value.size == 0 or signal.time.size == 0:
@@ -124,9 +124,8 @@ class Writer(h5py.File):
                     f"Signal {signal.name} not written: time or value is empty",
                 )
                 return
-
             source = self.bedmaster_dir
-        elif "EDW" in signal.source:
+        elif isinstance(signal, EDWType):
             source = self.edw_dir
         else:
             raise ValueError(f"Source {signal} not recognized")
@@ -142,7 +141,7 @@ class Writer(h5py.File):
             signal_dir = base_dir.create_group(signal_name)
             for field, value in signal.__dict__.items():
                 self.write_new_data(signal_dir, field, value)
-        else:  # Concatenate data into existing signal (just for BM)
+        else:  # Concatenate data into existing signal (just for Bedmaster)
             if source == self.edw_dir:
                 raise ValueError(f"EDW signal {signal} already exists")
 

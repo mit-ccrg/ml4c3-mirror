@@ -11,70 +11,72 @@ import pandas as pd
 from ml4c3.definitions.icu import ALARMS_FILES, MATFILE_EXPECTED_GROUPS
 
 
-class BMChecker:
+class BedmasterChecker:
     """
-    Implementation of Checker for BM.
+    Implementation of Checker for Bedmaster.
     """
 
-    def __init__(self, bm_dir: str, alarms_dir: str):
+    def __init__(self, bedmaster_dir: str, alarms_dir: str):
         """
-        Init BM Checker.
+        Init Bedmaster Checker.
 
-        :param bm_dir: <str> directory containing all the Bedmaster data.
+        :param bedmaster_dir: <str> directory containing all the Bedmaster data.
         """
-        self.bm_dir = bm_dir
+        self.bedmaster_dir = bedmaster_dir
         self.alarms_dir = alarms_dir
 
     def check_mat_files_structure(self):
         """
-        Checks if bm_dir is structured properly.
+        Checks if bedmaster_dir is structured properly.
 
-        Checks that the .mat files in bm_dir are in the right format and
+        Checks that the .mat files in bedmaster_dir are in the right format and
         it doesn't have any unexpected file.
         """
-        bm_files_paths = [
-            os.path.join(self.bm_dir, bm_file_name)
-            for bm_file_name in os.listdir(self.bm_dir)
-            if bm_file_name.endswith(".mat")
+        bedmaster_files_paths = [
+            os.path.join(self.bedmaster_dir, bedmaster_file_name)
+            for bedmaster_file_name in os.listdir(self.bedmaster_dir)
+            if bedmaster_file_name.endswith(".mat")
         ]
         unexpected_files = [
-            os.path.join(self.bm_dir, unexpected_file_name)
-            for unexpected_file_name in os.listdir(self.bm_dir)
+            os.path.join(self.bedmaster_dir, unexpected_file_name)
+            for unexpected_file_name in os.listdir(self.bedmaster_dir)
             if not unexpected_file_name.endswith(".mat")
         ]
-        # Check if there are any unexpected file in bm_dir
+        # Check if there are any unexpected file in bedmaster_dir
         if len(unexpected_files) > 0:
             logging.warning(
                 f"Unexpected files: {sorted(unexpected_files)}. "
-                f"Just .mat files should be stored in {self.bm_dir}.",
+                f"Just .mat files should be stored in {self.bedmaster_dir}.",
             )
 
-        for bm_file_path in bm_files_paths:
-            bm_file = h5py.File(bm_file_path, "r")
+        for bedmaster_file_path in bedmaster_files_paths:
+            bedmaster_file = h5py.File(bedmaster_file_path, "r")
             groups = set(MATFILE_EXPECTED_GROUPS)
-            missing_groups = groups.difference(set(bm_file.keys()))
-            # Check missing groups in each bm file
+            missing_groups = groups.difference(set(bedmaster_file.keys()))
+            # Check missing groups in each Bedmaster file
             if len(missing_groups) > 0:
                 logging.error(
-                    f"Wrong file format: the grups {sorted(missing_groups)} "
-                    f"were not found in the input file {bm_file_path}.",
+                    f"Wrong file format: the groups {sorted(missing_groups)} "
+                    f"were not found in the input file {bedmaster_file_path}.",
                 )
-            # For each bm file, check each group content
-            for group in groups.intersection(set(bm_file.keys())):
-                if not isinstance(bm_file[group], h5py.Group):
+            # For each Bedmaster file, check each group content
+            for group in groups.intersection(set(bedmaster_file.keys())):
+                if not isinstance(bedmaster_file[group], h5py.Group):
                     logging.error(
-                        f"{group} from input file {bm_file_path} seems to be "
+                        f"{group} from input file {bedmaster_file_path} seems to be "
                         "empty or in a wrong format.",
                     )
-                elif not bm_file[group].keys():
-                    logging.error(f"{group} from input file {bm_file_path} is empty.")
+                elif not bedmaster_file[group].keys():
+                    logging.error(
+                        f"{group} from input file {bedmaster_file_path} is empty.",
+                    )
 
     def check_alarms_files_structure(self):
         expected_columns = set(ALARMS_FILES["columns"][1:])
         expected_files: Set[str] = set()
         for key_list in ALARMS_FILES["names"]:
             for file_key in ALARMS_FILES["names"][key_list]:
-                file_name = f"bm_alarms_{file_key}.csv"
+                file_name = f"bedmaster_alarms_{file_key}.csv"
                 expected_files.add(os.path.join(self.alarms_dir, file_name))
         alarms_files_path = [
             os.path.join(self.alarms_dir, alarms_file)

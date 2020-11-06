@@ -14,13 +14,13 @@ import pandas as pd
 from ml4c3.definitions.icu import LM4_DIR, MAD3_DIR, ICU_SCALE_UNITS
 from ml4c3.ingest.icu.utils import FileManager
 from ml4c3.ingest.icu.readers import (
-    BMReader,
     EDWReader,
-    BMAlarmsReader,
+    BedmasterReader,
     CrossReferencer,
+    BedmasterAlarmsReader,
 )
 from ml4c3.ingest.icu.writers import Writer
-from ml4c3.ingest.icu.matchers import PatientBMMatcher
+from ml4c3.ingest.icu.matchers import PatientBedmasterMatcher
 
 
 class Tensorizer:
@@ -28,17 +28,23 @@ class Tensorizer:
     Main class to tensorize the Bedmaster data and the EDW data.
     """
 
-    def __init__(self, bm_dir: str, alarms_dir: str, edw_dir: str, cross_ref_path: str):
+    def __init__(
+        self,
+        bedmaster_dir: str,
+        alarms_dir: str,
+        edw_dir: str,
+        cross_ref_path: str,
+    ):
         """
         Init a Tensorizer object.
 
-        :param bm_dir: <str> Directory containing all the Bedmaster data.
+        :param bedmaster_dir: <str> Directory containing all the Bedmaster data.
         :param alarms_dir: <str> Directory containing all the Bedmaster alarms data.
         :param edw_dir: <str> Directory containing all the EDW data.
         :param cross_ref_path: <str> Full path of the file containing
                               cross reference between EDW and Bedmaster.
         """
-        self.bm_dir = bm_dir
+        self.bedmaster_dir = bedmaster_dir
         self.alarms_dir = alarms_dir
         self.edw_dir = edw_dir
         self.cross_ref_path = cross_ref_path
@@ -97,7 +103,7 @@ class Tensorizer:
 
         # No options specified: get all the cross-referenced files
         files_per_mrn = CrossReferencer(
-            self.bm_dir,
+            self.bedmaster_dir,
             self.edw_dir,
             self.cross_ref_path,
         ).get_xref_files(
@@ -133,17 +139,17 @@ class Tensorizer:
             with Writer(output_file) as writer:
                 writer.write_completed_flag("bedmaster", False)
                 writer.write_completed_flag("edw", False)
-                for visit_id, bm_files in visits.items():
+                for visit_id, bedmaster_files in visits.items():
                     # Set the visit ID
                     writer.set_visit_id(visit_id)
 
                     # Write the data
-                    self._write_bm_data(
-                        bm_files,
+                    self._write_bedmaster_data(
+                        bedmaster_files,
                         writer=writer,
                         scaling_and_units=scaling_and_units,
                     )
-                    self._write_bm_alarms_data(
+                    self._write_bedmaster_alarms_data(
                         self.alarms_dir,
                         self.edw_dir,
                         mrn,
@@ -162,11 +168,15 @@ class Tensorizer:
             raise error
 
     @staticmethod
-    def _write_bm_data(bm_files: List[str], writer: Writer, scaling_and_units: Dict):
+    def _write_bedmaster_data(
+        bedmaster_files: List[str],
+        writer: Writer,
+        scaling_and_units: Dict,
+    ):
 
         previous_max = None
-        for bm_file in bm_files:
-            with BMReader(bm_file, scaling_and_units) as reader:
+        for bedmaster_file in bedmaster_files:
+            with BedmasterReader(bedmaster_file, scaling_and_units) as reader:
                 if previous_max:
                     reader.get_interbundle_correction(previous_max)
                 # These blocks can be easily parallelized with MPI:
@@ -187,7 +197,7 @@ class Tensorizer:
                 previous_max = reader.max_segment
 
     @staticmethod
-    def _write_bm_alarms_data(
+    def _write_bedmaster_alarms_data(
         alarms_path: str,
         edw_path: str,
         mrn: str,
@@ -195,7 +205,7 @@ class Tensorizer:
         writer: Writer,
     ):
 
-        reader = BMAlarmsReader(alarms_path, edw_path, mrn, visit_id)
+        reader = BedmasterAlarmsReader(alarms_path, edw_path, mrn, visit_id)
         alarms = reader.list_alarms()
         for alarm in alarms:
             alarm_instance = reader.get_alarm(alarm)
@@ -264,7 +274,7 @@ def create_folders(staging_dir: str):
     :param staging_dir: <str> Path to temporary local directory.
     """
     os.makedirs(staging_dir, exist_ok=True)
-    os.makedirs(os.path.join(staging_dir, "bm_alarms_temp"), exist_ok=True)
+    os.makedirs(os.path.join(staging_dir, "bedmaster_alarms_temp"), exist_ok=True)
     os.makedirs(os.path.join(staging_dir, "edw_temp"), exist_ok=True)
     os.makedirs(os.path.join(staging_dir, "bedmaster_temp"), exist_ok=True)
 
@@ -275,7 +285,7 @@ def remove_folders(staging_dir: str):
 
     :param staging_dir: <str> Path to temporary local directory.
     """
-    shutil.rmtree(os.path.join(staging_dir, "bm_alarms_temp"))
+    shutil.rmtree(os.path.join(staging_dir, "bedmaster_alarms_temp"))
     shutil.rmtree(os.path.join(staging_dir, "edw_temp"))
     shutil.rmtree(os.path.join(staging_dir, "bedmaster_temp"))
     shutil.rmtree(os.path.join(staging_dir, "results_temp"))
@@ -290,9 +300,9 @@ def copy_source_data(file_manager: FileManager, staging_dir: str, workers: int):
     :param staging_dir: <str> Path to temporary local directory.
     :param workers: <int> Number of workers for parallelization.
     """
-    # Copy BM alarms from those patients
+    # Copy Bedmaster alarms from those patients
     init = time.time()
-    file_manager.find_save_bm_alarms(
+    file_manager.find_save_bedmaster_alarms(
         os.path.join(MAD3_DIR, "bedmaster_alarms"),
         os.path.join(staging_dir, "patient_list.csv"),
     )
@@ -310,16 +320,18 @@ def copy_source_data(file_manager: FileManager, staging_dir: str, workers: int):
     elapsed_time = time.time() - init
     logging.info(f"EDW files copied. Process took {round(elapsed_time/60, 4)} minutes.")
 
-    # Copy BM files from those patients
+    # Copy Bedmaster files from those patients
     init = time.time()
-    file_manager.find_save_bm_files(
+    file_manager.find_save_bedmaster_files(
         LM4_DIR,
         os.path.join(staging_dir, "patient_list.csv"),
         parallelize=True,
         n_workers=workers,
     )
     elapsed_time = time.time() - init
-    logging.info(f"BM files copied. Process took {round(elapsed_time/60, 4)} minutes.")
+    logging.info(
+        f"Bedmaster files copied. Process took {round(elapsed_time/60, 4)} minutes.",
+    )
 
 
 def copy_hd5(staging_dir: str, destination_tensors: str, workers: int):
@@ -371,9 +383,9 @@ def tensorize_batched(args):
     if not os.path.isfile(args.path_xref):
         adt_table_name = os.path.split(args.path_adt)[-1]
         # Match bedmaster files from lm4 with path_adt
-        matcher = PatientBMMatcher(
+        matcher = PatientBedmasterMatcher(
             flag_lm4=True,
-            bm_dir=LM4_DIR,
+            bedmaster_dir=LM4_DIR,
             edw_dir=os.path.join(MAD3_DIR, "cohorts_lists"),
             adt_file=adt_table_name,
         )
@@ -416,7 +428,7 @@ def tensorize_batched(args):
         local_path = lambda f: os.path.join(args.staging_dir, f)
         path_bedmaster = local_path("bedmaster_temp")
         path_edw = local_path("edw_temp")
-        path_alarms = local_path("bm_alarms_temp")
+        path_alarms = local_path("bedmaster_alarms_temp")
         xref_file = local_path("edw_temp/xref.csv")
         local_tensors = local_path("results_temp")
 

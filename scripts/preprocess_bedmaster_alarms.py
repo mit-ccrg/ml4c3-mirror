@@ -24,14 +24,14 @@ BEDS_COLUMNS = [
 ]
 
 
-class PreProcessBMAlarms:
+class PreProcessBedmasterAlarms:
     """
-    Reduce size bm alarms files and save them in .csv files by departments.
+    Reduce size bedmaster alarms files and save them in .csv files by departments.
     """
 
     def __init__(self, input_dir: str, output_dir: str = "./"):
         """
-        Init Pre-Process BM Alarms.
+        Init Pre-Process Bedmaster Alarms.
 
         :param input_dir: <str> Directory where alarms files (.csv) are saved.
         :param output_dir: <str> Full path where the resulting data frames are saved.
@@ -66,7 +66,10 @@ class PreProcessBMAlarms:
         print("Saving data by department...")
         for department in data["Unit"].unique():
             dept_data = data[data["Unit"] == department]
-            output_file = os.path.join(self.output_dir, f"bm_alarms_{department}.csv")
+            output_file = os.path.join(
+                self.output_dir,
+                f"bedmaster_alarms_{department}.csv",
+            )
             dept_data.to_csv(output_file)
 
     def _read_files(self, alarms_file, beds_files):
@@ -118,5 +121,5 @@ def parse_arguments():
 
 if __name__ == "__main__":
     args = parse_arguments()
-    pre_processer = PreProcessBMAlarms(args.input_dir, args.output_dir)
+    pre_processer = PreProcessBedmasterAlarms(args.input_dir, args.output_dir)
     pre_processer.pre_process_alarms()

@@ -7,7 +7,7 @@ from ml4c3.definitions.icu import ALARMS_FILES
 from .data_object import ICUDiscreteData, ICUContinuousData
 
 
-class BMSignal(ICUContinuousData):
+class BedmasterSignal(ICUContinuousData):
     """
     Implementation of the parent ICU Continuous Data Object class for Bedmaster
     data.
@@ -27,7 +27,7 @@ class BMSignal(ICUContinuousData):
         samples_per_ts: np.ndarray,
     ):
         """
-        Init a BMSignal object.
+        Init a BedmasterSignal object.
 
         :param name: <str> Signal name.
         :param source: <str> Database from which the signal is extracted.
@@ -55,10 +55,10 @@ class BMSignal(ICUContinuousData):
 
     @property
     def _source_type(self):
-        return self.source.replace("BM_", "")
+        return self.source.replace("Bedmaster_", "")
 
 
-class BMAlarm(ICUDiscreteData):
+class BedmasterAlarm(ICUDiscreteData):
     """
     Implementation of the parent ICU Discrete Data Object class for Bedmaster
     alarms data.
@@ -72,7 +72,7 @@ class BMAlarm(ICUDiscreteData):
         level: int,
     ):
         """
-        Init a BMAlarm object.
+        Init a BedmasterAlarm object.
 
         :param name: <str> Alarm name.
         :param start_date: <np.ndarray> List of unix timestamps when the alarm is
@@ -86,4 +86,4 @@ class BMAlarm(ICUDiscreteData):
 
     @property
     def _source_type(self):
-        return self.source.replace("BM_", "")
+        return self.source.replace("Bedmaster_", "")

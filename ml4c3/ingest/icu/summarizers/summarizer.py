@@ -12,6 +12,6 @@ def pre_tensorize_summary(args):
         args.output_folder,
         args.summary_stats_base_name,
         args.signals,
-        args.detailed_bm,
+        args.detailed_bedmaster,
         args.no_xref,
     )

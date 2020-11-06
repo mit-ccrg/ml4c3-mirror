@@ -127,7 +127,7 @@ def create_med_tmap(tm_name: str, med_name: str):
 
 def get_tmap(tm_name: str) -> Optional[TensorMap]:
     tm = None
-    for name in DEFINED_TMAPS[EDW_FILES["med_file"]["source"][4:]]:
+    for name in DEFINED_TMAPS["med"]:
         if tm_name.startswith(name):
             tm = create_med_tmap(tm_name, name)
             break

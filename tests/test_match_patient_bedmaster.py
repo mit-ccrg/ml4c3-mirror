@@ -9,10 +9,10 @@ import pytest
 # pylint: disable=no-member
 
 
-def test_file_structure_and_atributes(get_patientbm_matcher, temp_dir):
-    matcher = get_patientbm_matcher(pytest.bm_matching)
-    matcher2 = get_patientbm_matcher(
-        pytest.bm_matching,
+def test_file_structure_and_atributes(get_patient_bedmaster_matcher, temp_dir):
+    matcher = get_patient_bedmaster_matcher(pytest.bedmaster_matching)
+    matcher2 = get_patient_bedmaster_matcher(
+        pytest.bedmaster_matching,
         departments=["MGH BLAKE 8 CARD SICU"],
     )
     expect_des_departments = [
@@ -76,11 +76,16 @@ def test_file_structure_and_atributes(get_patientbm_matcher, temp_dir):
     assert np.array_equal(expected_df.keys(), obt_df.keys())
 
 
-def test_xref_file_generation(get_patientbm_matcher, temp_dir):
-    def test_xref_file_results(get_patientbm_matcher, temp_dir, lm4, bm_dir):
-        matcher = get_patientbm_matcher(bm_dir, lm4_flag=lm4)
-        matcher2 = get_patientbm_matcher(
-            bm_dir,
+def test_xref_file_generation(get_patient_bedmaster_matcher, temp_dir):
+    def test_xref_file_results(
+        get_patient_bedmaster_matcher,
+        temp_dir,
+        lm4,
+        bedmaster_dir,
+    ):
+        matcher = get_patient_bedmaster_matcher(bedmaster_dir, lm4_flag=lm4)
+        matcher2 = get_patient_bedmaster_matcher(
+            bedmaster_dir,
             lm4_flag=lm4,
             departments=["MGH BLAKE 8 CARD SICU"],
         )
@@ -156,8 +161,8 @@ def test_xref_file_generation(get_patientbm_matcher, temp_dir):
         )
 
     lm4 = False
-    folder = pytest.bm_matching
-    test_xref_file_results(get_patientbm_matcher, temp_dir, lm4, folder)
+    folder = pytest.bedmaster_matching
+    test_xref_file_results(get_patient_bedmaster_matcher, temp_dir, lm4, folder)
     lm4 = True
     folder = pytest.lm4_matching
-    test_xref_file_results(get_patientbm_matcher, temp_dir, lm4, folder)
+    test_xref_file_results(get_patient_bedmaster_matcher, temp_dir, lm4, folder)

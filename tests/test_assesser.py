@@ -17,7 +17,7 @@ def test_assesser(temp_dir):
         adt_csv=os.path.join(pytest.edw_dir, "adt.csv"),
     )
     assesser.assess_coverage(
-        path_bm=pytest.lm4_matching,
+        path_bedmaster=pytest.lm4_matching,
         path_edw=pytest.edw_dir,
         path_hd5=temp_dir,
     )

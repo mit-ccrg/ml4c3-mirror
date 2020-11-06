@@ -18,33 +18,33 @@ import neurokit2 as nk
 # Imports: first party
 import ml4c3
 from ml4c3.arguments import parse_args
-from ml4c3.definitions.icu import EDW_FILES, BM_SOURCES
+from ml4c3.definitions.icu import EDW_FILES
 from ml4c3.ingest.icu.readers import (
-    BMReader,
     EDWReader,
-    BMAlarmsReader,
+    BedmasterReader,
     CrossReferencer,
+    BedmasterAlarmsReader,
 )
 from ml4c3.ingest.icu.writers import Writer
 from ml4c3.definitions.globals import TENSOR_EXT
-from ml4c3.ingest.icu.matchers import PatientBMMatcher
+from ml4c3.ingest.icu.matchers import PatientBedmasterMatcher
 from ml4c3.tensormap.TensorMap import TensorMap, Interpretation, get_local_timestamps
+from ml4c3.tensormap.icu_alarms import get_tmap as GET_ALARMS_TMAP
+from ml4c3.tensormap.icu_events import get_tmap as GET_EVENTS_TMAP
 from ml4c3.ingest.icu.data_objects import (
     Event,
-    BMAlarm,
-    BMSignal,
     Procedure,
     Medication,
     StaticData,
     Measurement,
+    BedmasterAlarm,
+    BedmasterSignal,
 )
-from ml4c3.ingest.icu.check_icu_structure import BMChecker, EDWChecker
-from ml4c3.tensormap.tensor_maps_icu_alarms import get_tmap as GET_ALARMS_TMAP
-from ml4c3.tensormap.tensor_maps_icu_events import get_tmap as GET_EVENTS_TMAP
-from ml4c3.tensormap.tensor_maps_icu_bm_signals import get_tmap as GET_BM_TMAP
-from ml4c3.tensormap.tensor_maps_icu_medications import get_tmap as GET_MEDS_TMAP
-from ml4c3.tensormap.tensor_maps_icu_list_signals import get_tmap as GET_LIST_TMAP
-from ml4c3.tensormap.tensor_maps_icu_measurements import get_tmap as GET_MEAS_TMAP
+from ml4c3.tensormap.icu_medications import get_tmap as GET_MEDS_TMAP
+from ml4c3.tensormap.icu_list_signals import get_tmap as GET_LIST_TMAP
+from ml4c3.tensormap.icu_measurements import get_tmap as GET_MEAS_TMAP
+from ml4c3.ingest.icu.check_icu_structure import EDWChecker, BedmasterChecker
+from ml4c3.tensormap.icu_bedmaster_signals import get_tmap as GET_BEDMASTER_TMAP
 
 # pylint: disable=redefined-outer-name, unused-argument, missing-class-docstring
 
@@ -110,10 +110,10 @@ def pytest_configure():
     pytest.cross_ref_file_tens = os.path.join(pytest.datadir, "xref_file_tensorize.csv")
 
     # BedMaster
-    pytest.bm_dir = os.path.join(pytest.datadir, "bedmaster")
-    pytest.mat_file = os.path.join(pytest.bm_dir, "bm_file_5_v4.mat")
-    pytest.bm_matching = os.path.join(pytest.datadir, "bedmaster_matching_files")
-    pytest.lm4_matching = os.path.join(pytest.bm_matching, "lm4-bedmaster")
+    pytest.bedmaster_dir = os.path.join(pytest.datadir, "bedmaster")
+    pytest.mat_file = os.path.join(pytest.bedmaster_dir, "bedmaster_file_5_v4.mat")
+    pytest.bedmaster_matching = os.path.join(pytest.datadir, "bedmaster_matching_files")
+    pytest.lm4_matching = os.path.join(pytest.bedmaster_matching, "lm4-bedmaster")
 
     # EDW
     pytest.edw_dir = os.path.join(pytest.datadir, "edw")
@@ -290,14 +290,18 @@ def pytest_exception_interact(node, call, report):
 
 @pytest.yield_fixture(scope="function")
 def cross_referencer():
-    reader = CrossReferencer(pytest.bm_dir, pytest.edw_dir, pytest.cross_ref_file)
+    reader = CrossReferencer(
+        pytest.bedmaster_dir,
+        pytest.edw_dir,
+        pytest.cross_ref_file,
+    )
     yield reader
 
 
 @pytest.yield_fixture(scope="function")
-def bm_reader(test_scale_units):
+def bedmaster_reader(test_scale_units):
     with h5py.File(pytest.mat_file, "r") as mat_file:
-        reader = BMReader(mat_file.filename, test_scale_units)
+        reader = BedmasterReader(mat_file.filename, test_scale_units)
         yield reader
 
 
@@ -342,7 +346,7 @@ def get_edw_reader():
 
 @pytest.fixture(scope="function")
 def alarms_reader():
-    reader = BMAlarmsReader(
+    reader = BedmasterAlarmsReader(
         pytest.alarms_dir,
         pytest.edw_dir,
         pytest.example_mrn,
@@ -354,7 +358,7 @@ def alarms_reader():
 @pytest.fixture(scope="function")
 def get_alarms_reader():
     def _get_reader():
-        reader = BMAlarmsReader(
+        reader = BedmasterAlarmsReader(
             pytest.alarms_dir,
             pytest.edw_dir,
             pytest.example_mrn,
@@ -409,7 +413,7 @@ def hd5_data(temp_file, fake_signal):
         "procedures": [],
         "meds": [],
         "demo": [],
-        "bm_signals": [],
+        "signals": [],
         "events": [],
         "alarms": [],
         "visits": visits,
@@ -426,9 +430,9 @@ def hd5_data(temp_file, fake_signal):
             data["meds"].append(meds)
             demo = fake_signal.get_demo()
             data["demo"].append(demo)
-            waveforms = fake_signal.get_bm_waveforms()
-            vitals = fake_signal.get_bm_vitals()
-            data["bm_signals"].append({**waveforms, **vitals})
+            waveforms = fake_signal.get_bedmaster_waveforms()
+            vitals = fake_signal.get_bedmaster_vitals()
+            data["signals"].append({**waveforms, **vitals})
             events = fake_signal.get_events()
             data["events"].append(events)
             alarms = fake_signal.get_alarms()
@@ -459,11 +463,11 @@ def hd5_data(temp_file, fake_signal):
 
 
 @pytest.fixture(scope="function")
-def get_patientbm_matcher():
-    def _get_matcher(bm_folder, lm4_flag=False, departments=None):
-        matcher = PatientBMMatcher(
+def get_patient_bedmaster_matcher():
+    def _get_matcher(bedmaster_folder, lm4_flag=False, departments=None):
+        matcher = PatientBedmasterMatcher(
             lm4_flag,
-            bm_folder,
+            bedmaster_folder,
             pytest.edw_dir,
             des_depts=departments,
             adt_file="adt.csv",
@@ -482,14 +486,14 @@ class FakeSignal:
         self.today = datetime.date.today()
 
     @staticmethod
-    def get_bm_signal():
+    def get_bedmaster_signal():
         starting_time = int(time())
         sample_freq = 60
         duration_sec = 10
         n_points = duration_sec * sample_freq
-        m_signal = BMSignal(
+        m_signal = BedmasterSignal(
             name="Some_signal",
-            source=BM_SOURCES["waveform"],
+            source="waveform",
             channel="ch10",
             value=np.array(np.random.randint(40, 100, n_points)),
             time=np.arange(starting_time, starting_time + duration_sec, 0.25),
@@ -692,7 +696,7 @@ class FakeSignal:
         start_times = np.array(list(range(starting_time, starting_time + 1000, 100)))
         alarms_names = ["cpp_low", "v_tach", "apnea"]
         alarms = {
-            alarm_name: BMAlarm(
+            alarm_name: BedmasterAlarm(
                 name=alarm_name,
                 start_date=start_times,
                 duration=np.random.randint(0, 21, size=len(start_times)),
@@ -703,7 +707,7 @@ class FakeSignal:
         return alarms
 
     @staticmethod
-    def get_bm_waveforms():
+    def get_bedmaster_waveforms():
         starting_time = int(time())
         duration = 8
         sample_freq_1 = 240
@@ -729,9 +733,9 @@ class FakeSignal:
         n_samples[5] = 59
 
         leads = {
-            lead: BMSignal(
+            lead: BedmasterSignal(
                 name=lead,
-                source=BM_SOURCES["waveform"],
+                source="waveform",
                 channel=f"ch{idx}",
                 value=values,
                 time=times,
@@ -749,13 +753,13 @@ class FakeSignal:
         return leads
 
     @staticmethod
-    def get_bm_vitals():
+    def get_bedmaster_vitals():
         starting_time = int(time())
         times = np.array(list(range(starting_time, starting_time + 100)))
         signals = {
-            signal: BMSignal(
+            signal: BedmasterSignal(
                 name=signal,
-                source=BM_SOURCES["vitals"],
+                source="vitals",
                 channel=signal,
                 value=np.array(np.random.randint(40, 100, 100)),
                 time=times,
@@ -776,19 +780,19 @@ def get_edw_checker():
         if directory == "edw":
             checker = EDWChecker(pytest.edw_dir)
         else:
-            checker = EDWChecker(pytest.bm_dir)
+            checker = EDWChecker(pytest.bedmaster_dir)
         return checker
 
     return _get_checker
 
 
 @pytest.fixture(scope="function")
-def get_bm_checker():
+def get_bedmaster_checker():
     def _get_checker(directory):
-        if directory == "bm":
-            checker = BMChecker(pytest.bm_dir, pytest.alarms_dir)
+        if directory == "bedmaster":
+            checker = BedmasterChecker(pytest.bedmaster_dir, pytest.alarms_dir)
         else:
-            checker = BMChecker(pytest.edw_dir, pytest.alarms_dir)
+            checker = BedmasterChecker(pytest.edw_dir, pytest.alarms_dir)
         return checker
 
     return _get_checker
@@ -798,10 +802,10 @@ def get_bm_checker():
 def testing_tmaps():
     test_tmaps = {}
 
-    bm_tmap_test_names = ["i", "ii", "iii", "v", "spo2", "spo2%", "spo2r"]
-    test_tmaps["bm_signals"] = {
-        name: GET_BM_TMAP(name)
-        for signal in bm_tmap_test_names
+    bedmaster_tmap_test_names = ["i", "ii", "iii", "v", "spo2", "spo2%", "spo2r"]
+    test_tmaps["bedmaster_signals"] = {
+        name: GET_BEDMASTER_TMAP(name)
+        for signal in bedmaster_tmap_test_names
         for name in (
             f"{signal}_timeseries",
             f"{signal}_value",
@@ -815,7 +819,6 @@ def testing_tmaps():
             f"{signal}_channel",
         )
     }
-
     alarms_tmap_test_names = ["cpp_low", "v_tach", "apnea"]
     test_tmaps["alarms"] = {
         name: GET_ALARMS_TMAP(name)
@@ -823,7 +826,6 @@ def testing_tmaps():
         + [i + "_duration" for i in alarms_tmap_test_names]
         + [i + "_level" for i in alarms_tmap_test_names]
     }
-
     meas_tmap_test_names = [
         "creatinine",
         "ph_arterial",
@@ -841,7 +843,6 @@ def testing_tmaps():
             f"{signal}_units",
         )
     }
-
     meds_tmap_test_names = [
         "aspirin_325_mg_tablet",
         "cefazolin_2_gram|50_ml_in_dextrose_(iso-osmotic)_intravenous_piggyback",
@@ -860,7 +861,6 @@ def testing_tmaps():
             f"{signal}_route",
         )
     }
-
     events_tmap_test_names = [
         "code_start",
         "rapid_response_start",
@@ -870,7 +870,6 @@ def testing_tmaps():
         for signal in events_tmap_test_names
         for name in (f"{signal}_start_date", f"{signal}_double", f"{signal}_single")
     }
-
     proce_tmap_test_names = ["colonoscopy", "hemodialysis", "transfuse_red_blood_cells"]
     test_tmaps["procedures"] = {
         name: GET_EVENTS_TMAP(name)
@@ -882,11 +881,10 @@ def testing_tmaps():
             f"{signal}_single",
         )
     }
-
     list_signals_tmap_test_names = [
-        "bm_waveform_signals",
-        "bm_vitals_signals",
-        "bm_alarms_signals",
+        "bedmaster_waveform_signals",
+        "bedmaster_vitals_signals",
+        "bedmaster_alarms_signals",
         "edw_med_signals",
     ]
     test_tmaps["list_signals"] = {

@@ -18,9 +18,7 @@ from ml4c3.definitions.icu_tmap_list import DEFINED_TMAPS
 def make_alarm_array_tensor_from_file():
     def _tensor_from_file(tm, hd5, **kwargs):
         visits = get_visits(tm, hd5, **kwargs)
-
         flag_dates = kwargs.get("readable_dates")
-
         max_size = max(hd5[tm.path_prefix.replace("*", v)].size for v in visits)
         shape = (len(visits), max_size)
         if tm.path_prefix.endswith("start_date") and flag_dates:
@@ -89,7 +87,7 @@ def create_alarm_tmap(tm_name: str, alarm_name: str) -> Optional[TensorMap]:
 
 def get_tmap(tm_name: str) -> Optional[TensorMap]:
     tm = None
-    for alarm_name in DEFINED_TMAPS[ALARMS_FILES["source"][3:]]:
+    for alarm_name in DEFINED_TMAPS["alarms"]:
         if tm_name.startswith(alarm_name):
             tm = create_alarm_tmap(tm_name, alarm_name)
     return tm

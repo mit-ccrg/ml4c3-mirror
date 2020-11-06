@@ -10,7 +10,7 @@ import pandas as pd
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
 from ml4c3.definitions.icu import EDW_FILES
-from ml4c3.ingest.icu.matchers import PatientBMMatcher
+from ml4c3.ingest.icu.matchers import PatientBedmasterMatcher
 
 
 class CrossReferencer:
@@ -22,12 +22,12 @@ class CrossReferencer:
 
     def __init__(
         self,
-        bm_dir: str,
+        bedmaster_dir: str,
         edw_dir: str,
         xref_file: str,
         adt_file: str = EDW_FILES["adt_file"]["name"],
     ):
-        self.bm_dir = bm_dir
+        self.bedmaster_dir = bedmaster_dir
         self.edw_dir = edw_dir
         self.xref_file = xref_file
         if not adt_file.endswith(".csv"):
@@ -50,7 +50,7 @@ class CrossReferencer:
 
         The output dictionary will have the format:
 
-        {"MRN1": {"visitID":[bm_files],
+        {"MRN1": {"visitID":[bedmaster_files],
                   "visitID2": ...,
                   ...
                   }
@@ -70,12 +70,16 @@ class CrossReferencer:
         :param tensors: <str> directory to check for existing hd5 files.
         :param flag_one_source: <bool> bool indicating whether a patient with
                                 just one type of data will be tensorized or not.
-        :return: <dict> a dictionary with the MRNs, visit ID and BM files.
+        :return: <dict> a dictionary with the MRNs, visit ID and Bedmaster files.
         """
         self.crossref = {}
         if not os.path.exists(self.xref_file):
-            bm_matcher = PatientBMMatcher(False, self.bm_dir, self.edw_dir)
-            bm_matcher.match_files(self.xref_file)
+            bedmaster_matcher = PatientBedmasterMatcher(
+                False,
+                self.bedmaster_dir,
+                self.edw_dir,
+            )
+            bedmaster_matcher.match_files(self.xref_file)
 
         adt = pd.read_csv(self.adt_file)
         adt_columns = EDW_FILES["adt_file"]["columns"]
@@ -120,7 +124,7 @@ class CrossReferencer:
                 "going to be overwritten.",
             )
 
-        self.add_bm_elements(xref, edw_mrns, flag_one_source)
+        self.add_bedmaster_elements(xref, edw_mrns, flag_one_source)
         if flag_one_source:
             self.add_edw_elements(edw_mrns)
         self.assess_coverage()
@@ -138,7 +142,7 @@ class CrossReferencer:
 
         return dict(list(self.crossref.items())[:n_patients])
 
-    def add_bm_elements(self, xref, edw_mrns, flag_one_source):
+    def add_bedmaster_elements(self, xref, edw_mrns, flag_one_source):
         # Add elements from cross referencer .csv
         for _, row in xref.iterrows():
             mrn = str(row.MRN)
@@ -148,21 +152,21 @@ class CrossReferencer:
                 csn = str(int(row.PatientEncounterID))
             except ValueError:
                 csn = str(row.PatientEncounterID)
-            bm_file_id = str(row.fileID)
-            bm_path = [
-                os.path.join(self.bm_dir, file)
-                for file in os.listdir(self.bm_dir)
-                if file.startswith(bm_file_id)
+            bedmaster_file_id = str(row.fileID)
+            bedmaster_path = [
+                os.path.join(self.bedmaster_dir, file)
+                for file in os.listdir(self.bedmaster_dir)
+                if file.startswith(bedmaster_file_id)
             ]
             if mrn not in self.crossref:
-                self.crossref[mrn] = {csn: bm_path}
+                self.crossref[mrn] = {csn: bedmaster_path}
             elif csn not in self.crossref[mrn]:
-                self.crossref[mrn][csn] = bm_path
+                self.crossref[mrn][csn] = bedmaster_path
             else:
-                self.crossref[mrn][csn].extend(bm_path)
+                self.crossref[mrn][csn].extend(bedmaster_path)
         for _mrn, visits in self.crossref.items():
-            for _csn, bm_files in visits.items():
-                bm_files.sort(key=lambda x: int(x.split("_")[-2]))
+            for _csn, bedmaster_files in visits.items():
+                bedmaster_files.sort(key=lambda x: int(x.split("_")[-2]))
 
     def add_edw_elements(self, edw_mrns):
         # Add elements from EDW folders
@@ -184,9 +188,9 @@ class CrossReferencer:
     def assess_coverage(self):
         for mrn in self.crossref:
             for csn in self.crossref[mrn]:
-                # Check if there exist BM data for this mrn-csn pair
+                # Check if there exist Bedmaster data for this mrn-csn pair
                 if not self.crossref[mrn][csn]:
-                    logging.warning(f"No BM data for MRN: {mrn}, CSN: {csn}.")
+                    logging.warning(f"No Bedmaster data for MRN: {mrn}, CSN: {csn}.")
                 # Check if there exist EDW data for this mrn-csn pair
                 edw_file_path = os.path.join(self.edw_dir, mrn, csn)
                 if (
@@ -197,7 +201,7 @@ class CrossReferencer:
 
     def stats(self):
         """
-        :param crossref: <dict> a dictionary with the MRNs, visit ID and BM files.
+        :param crossref: <dict> a dictionary with the MRNs, visit ID and Bedmaster files.
         """
         edw_mrns_set = {
             mrn
@@ -221,16 +225,16 @@ class CrossReferencer:
             xref_csns_set = set(_xref_csns_set.astype(int).astype(str))
         except ValueError:
             xref_csns_set = set(xref["PatientEncounterID"].unique())
-        xref_bmf_set = set(xref["fileID"].unique())
+        xref_bedmaster_files_set = set(xref["fileID"].unique())
 
         crossref_mrns_set = set(self.crossref.keys())
         crossref_csns_set = set()
-        crossref_bmf_set = set()
+        crossref_bedmaster_files_set = set()
         for _, visits in self.crossref.items():
-            for visit_id, bmfiles in visits.items():
+            for visit_id, bedmaster_files in visits.items():
                 crossref_csns_set.add(visit_id)
-                for bmfile in bmfiles:
-                    crossref_bmf_set.add(bmfile)
+                for bedmaster_file in bedmaster_files:
+                    crossref_bedmaster_files_set.add(bedmaster_file)
         logging.info(
             f"MRNs in {self.edw_dir}: {len(edw_mrns_set)}\n"
             f"MRNs in {self.xref_file}: {len(xref_mrns_set)}\n"
@@ -240,6 +244,6 @@ class CrossReferencer:
             f"CSNs in {self.xref_file}: {len(xref_csns_set)}\n"
             f"Union CSNs: {len(edw_csns_set.intersection(xref_csns_set))}\n"
             f"Intersect CSNs: {len(crossref_csns_set)}\n"
-            f"Bm files IDs in {self.xref_file}: {len(xref_bmf_set)}\n"
-            f"Intersect bm files: {len(crossref_bmf_set)}\n",
+            f"Bedmaster files IDs in {self.xref_file}: {len(xref_bedmaster_files_set)}\n"
+            f"Intersect Bedmaster files: {len(crossref_bedmaster_files_set)}\n",
         )

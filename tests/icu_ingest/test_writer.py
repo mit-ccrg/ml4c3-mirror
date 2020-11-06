@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 # Imports: first party
+from ml4c3.definitions.types import EDWType, BedmasterType
 from ml4c3.ingest.icu.writers import Writer
 
 # pylint: disable=protected-access
@@ -46,7 +47,6 @@ def test_set_visit_id(temp_file, fake_signal):
         assert str(e_info.value) == expected_error_message
 
         writer.set_visit_id(visit_id)
-
         writer.write_static_data(static_data)
         writer.write_signal(measurement)
 
@@ -77,7 +77,7 @@ def test_write_data(temp_file, fake_signal):
     measurement = fake_signal.get_measurement()
     medication = fake_signal.get_medication()
     procedure = fake_signal.get_procedure()
-    bm_signal = fake_signal.get_bm_signal()
+    bedmaster_signal = fake_signal.get_bedmaster_signal()
 
     visit_id = get_visit_id()
     with Writer(temp_file.name) as writer:
@@ -92,14 +92,19 @@ def test_write_data(temp_file, fake_signal):
         arrays, attrs = get_attributes(measurement)
         assert_dir(signal_dir, measurement, arrays, attrs)
 
-    signals = [medication, procedure, bm_signal]
+    signals = [medication, procedure, bedmaster_signal]
     with Writer(temp_file.name, visit_id=visit_id) as writer:
         for signal in signals:
             writer.write_signal(signal)
 
     with h5py.File(temp_file.name, "r") as output_file:
         for signal in signals:
-            signal_source = "bedmaster" if "BM" in signal.source else "edw"
+            if isinstance(signal, BedmasterType):
+                signal_source = "bedmaster"
+            elif isinstance(signal, EDWType):
+                signal_source = "edw"
+            else:
+                raise ValueError(f"Signal type {type(signal)} not Bedmaster or EDW")
             base_dir = output_file[signal_source][visit_id]
             signal_base_dir = base_dir[signal._source_type.lower()]
             signal_name = signal.name.replace("/", "|").lower()
@@ -151,8 +156,8 @@ def test_name_conflict(temp_file, fake_signal):
 def test_write_multiple_files(temp_file, fake_signal):
     visit_id = get_visit_id()
 
-    wv_signal1 = fake_signal.get_bm_signal()
-    wv_signal2 = fake_signal.get_bm_signal()
+    wv_signal1 = fake_signal.get_bedmaster_signal()
+    wv_signal2 = fake_signal.get_bedmaster_signal()
     wv_arrays, wv_attr = get_attributes(wv_signal1)
 
     with Writer(temp_file.name, visit_id=visit_id) as writer:

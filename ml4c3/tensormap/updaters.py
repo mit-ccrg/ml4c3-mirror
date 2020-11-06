@@ -13,6 +13,7 @@ import pandas as pd
 from ml4c3.metrics import weighted_crossentropy
 from ml4c3.normalizer import Standardize
 from ml4c3.validators import validator_voltage_no_zero_padding
+from ml4c3.tensormap.ecg import name2augmenters, make_voltage_tff
 from ml4c3.definitions.ecg import (
     ECG_PREFIX,
     ECG_REST_LEADS_ALL,
@@ -27,7 +28,6 @@ from ml4c3.tensormap.TensorMap import (
     id_from_filename,
     find_negative_label_and_channel,
 )
-from ml4c3.tensormap.tensor_maps_ecg import name2augmenters, make_voltage_tff
 
 
 def update_tmaps_ecg_voltage(
