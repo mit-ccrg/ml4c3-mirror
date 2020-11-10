@@ -13,8 +13,8 @@ import pandas as pd
 # Imports: first party
 from ml4c3.definitions.icu import EDW_FILES, ALARMS_FILES, ICU_SCALE_UNITS
 from ml4c3.definitions.globals import TIMEZONE
-from ml4c3.ingest.icu.statistics import BedmasterStats
 from ml4c3.ingest.icu.data_objects import BedmasterAlarm, BedmasterSignal
+from ml4c3.ingest.icu.explorations import BedmasterStats
 
 from .reader import Reader
 
@@ -302,7 +302,8 @@ class BedmasterReader(h5py.File, Reader):
         """
         if signal_name not in self["vs"].keys():
             raise ValueError(
-                f"In bedmaster_file {self.filename}, the signal {signal_name} was not found.",
+                f"In bedmaster_file {self.filename}, the signal {signal_name} "
+                "was not found.",
             )
 
         # Get values and time
@@ -362,8 +363,8 @@ class BedmasterReader(h5py.File, Reader):
 
         if signal.time.size == 0:
             logging.info(
-                f"In bedmaster_file {self.filename}, {signal} is completely overlapped, "
-                "it won't be written.",
+                f"In bedmaster_file {self.filename}, {signal} is completely "
+                "overlapped, it won't be written.",
             )
             if self.summary_stats:
                 self.summary_stats.add_signal_stats(
@@ -384,9 +385,9 @@ class BedmasterReader(h5py.File, Reader):
         # Quality check on data
         if not signal.time.shape[0] == signal.value.shape[0]:
             logging.warning(
-                f"Something went wrong with signal {signal.name}  "
-                f"on file: {self.filename}. Time vector doesn't "
-                f"have the same length than values vector. The signal won't be written.",
+                f"Something went wrong with signal {signal.name} on file: "
+                f"{self.filename}. Time vector doesn't have the same length than "
+                f"values vector. The signal won't be written.",
             )
             if self.summary_stats:
                 self.summary_stats.add_signal_stats(
@@ -398,9 +399,9 @@ class BedmasterReader(h5py.File, Reader):
 
         if not signal.samples_per_ts.shape[0] == signal.time.shape[0]:
             logging.warning(
-                f"Something went wrong with signal {signal.name} "
-                f"on file: {self.filename}. Time vector doesn't "
-                f"have the same length than values vector. The signal won't be written.",
+                f"Something went wrong with signal {signal.name} on file: "
+                f"{self.filename}. Time vector doesn't have the same length than "
+                f"values vector. The signal won't be written.",
             )
             if self.summary_stats:
                 self.summary_stats.add_signal_stats(
@@ -433,7 +434,8 @@ class BedmasterReader(h5py.File, Reader):
         """
         if channel_n not in self["wv"].keys():
             raise ValueError(
-                f"In bedmaster_file {self.filename}, the signal {channel_n} was not found.",
+                f"In bedmaster_file {self.filename}, the signal {channel_n} was "
+                "not found.",
             )
 
         if not signal_name:
@@ -489,8 +491,8 @@ class BedmasterReader(h5py.File, Reader):
 
         if signal.time.size == 0:
             logging.info(
-                f"In bedmaster_file {self.filename}, {signal} is completely overlapped, "
-                "it won't be written.",
+                f"In bedmaster_file {self.filename}, {signal} is completely "
+                "overlapped, it won't be written.",
             )
             if self.summary_stats:
                 self.summary_stats.add_signal_stats(

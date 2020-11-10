@@ -47,7 +47,7 @@ def parse_args() -> argparse.Namespace:
         "\t * tensorize_sts: ADD DESCRIPTION. \n"
         "\t * assess_icu_coverage: ADD DESCRIPTION. \n"
         "\t * check_icu_structure: ADD DESCRIPTION. \n"
-        "\t * pre_tensorize_summary: ADD DESCRIPTION. \n"
+        "\t * pre_tensorize_explore: ADD DESCRIPTION. \n"
         "\t * match_patient_bedmaster: ADD DESCRIPTION. \n"
         "\t * extract_ecg_features: ADD DESCRIPTION. \n",
         dest="mode",
@@ -890,17 +890,17 @@ def parse_args() -> argparse.Namespace:
     )
 
     # Pre tensorize summary parser
-    pre_tensorize_summary_parser = subparser.add_parser(
-        "pre_tensorize_summary",
+    pre_tensorize_explorer_parser = subparser.add_parser(
+        "pre_tensorize_explore",
         description="Calculate summary statistics before tensorizing.",
         parents=[io_parser, run_parser, icu_parser],
     )
-    pre_tensorize_summary_parser.add_argument(
+    pre_tensorize_explorer_parser.add_argument(
         "--summary_stats_base_name",
         default="pre_tensorize",
         help="Base name of the summary stats .csv files. " "By default: pre_tensorize",
     )
-    pre_tensorize_summary_parser.add_argument(
+    pre_tensorize_explorer_parser.add_argument(
         "--signals",
         nargs="+",
         default=None,
@@ -908,14 +908,14 @@ def parse_args() -> argparse.Namespace:
         "calculate statistics for all signals select 'all'. It always "
         "calculates statistics for all EDW signals.",
     )
-    pre_tensorize_summary_parser.add_argument(
+    pre_tensorize_explorer_parser.add_argument(
         "--detailed_bedmaster",
         action="store_true",
         help="Generate detailed statistics for Bedmaster, like time "
         "irregularities frequence. This option can take some time"
         "to complete.",
     )
-    pre_tensorize_summary_parser.add_argument(
+    pre_tensorize_explorer_parser.add_argument(
         "--no_xref",
         action="store_true",
         help="Don't cross-reference files. Enable along with --detailed_bedmaster "

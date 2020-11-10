@@ -6,6 +6,7 @@ import logging
 import pandas as pd
 
 # Imports: first party
+from ml4c3.datasets import _sample_csv_to_set
 from ml4c3.definitions.icu import EDW_FILES
 
 
@@ -59,9 +60,11 @@ class EDWChecker:
                 f"table and mrns folders should be stored in {self.edw_dir}.",
             )
 
-    def check_structure(self):
+    def check_structure(self, sample_csv: str = None):
         """
         Checks if edw_dir is structured properly.
+
+        :param sample_csv: <str> Path to CSV with Sample IDs to restrict MRNs.
         """
         self._check_adt()
 
@@ -78,8 +81,11 @@ class EDWChecker:
             for folder in os.listdir(self.edw_dir)
             if os.path.isdir(os.path.join(self.edw_dir, folder))
         ]
-
+        if sample_csv:
+            mrns = _sample_csv_to_set(sample_csv)
         for mrn_folder in mrns_folders:
+            if sample_csv and mrn_folder not in mrns:
+                continue
             csns_folders = [
                 os.path.join(mrn_folder, folder)
                 for folder in os.listdir(mrn_folder)

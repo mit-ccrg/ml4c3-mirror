@@ -10,10 +10,11 @@ import pandas as pd
 # Imports: first party
 from ml4c3.definitions.types import EDWType, BedmasterType
 from ml4c3.ingest.icu.readers import EDWReader, BedmasterReader
-from ml4c3.ingest.icu.statistics import BedmasterStats
+
+from .bedmaster_stats import BedmasterStats
 
 
-class PreTensorizeSummaryWriter:
+class PreTensorizeExplorer:
     """
     Class that creates summary data for a set of Bedmaster and edw data.
 
@@ -21,7 +22,13 @@ class PreTensorizeSummaryWriter:
     information.
     """
 
-    def __init__(self, bedmaster_dir: str, edw_dir: str, xref_file: str):
+    def __init__(
+        self,
+        bedmaster_dir: str,
+        edw_dir: str,
+        xref_file: str,
+        sample_csv: str,
+    ):
         self.bedmaster_dir = bedmaster_dir
         self.edw_dir = edw_dir
         self.xref_file = xref_file
@@ -48,6 +55,7 @@ class PreTensorizeSummaryWriter:
             "transfer_in",
         ]
         self.signal_fields = ["signal", "count", "total", "%", "source"]
+        self.mrns = list(pd.read_csv(sample_csv)["MRN"].unique())
 
     def reset(self, signals: Any = None):
         """
@@ -84,7 +92,7 @@ class PreTensorizeSummaryWriter:
         edw_mrns = {
             int(mrn)
             for mrn in os.listdir(self.edw_dir)
-            if os.path.isdir(os.path.join(self.edw_dir, mrn))
+            if os.path.isdir(os.path.join(self.edw_dir, mrn)) and int(mrn) in self.mrns
         }
         edw_csns = {
             int(csn)
@@ -140,7 +148,6 @@ class PreTensorizeSummaryWriter:
         for source in signals:
             for signal in signals[source]:
                 if isinstance(signal, EDWType):
-                    # if "EDW" in source or signal in self.signals or self.signals == ["all"]:
                     csn = csn.copy()
                     if source not in self.signals_summary:
                         self.signals_summary[source] = {signal: csn}
@@ -166,7 +173,10 @@ class PreTensorizeSummaryWriter:
             for bedmaster_file in bedmaster_files:
                 k += 1
                 bedmaster_file_path = os.path.join(self.bedmaster_dir, bedmaster_file)
-                reader = BedmasterReader(bedmaster_file_path)
+                try:
+                    reader = BedmasterReader(bedmaster_file_path)
+                except OSError:
+                    continue
                 bedmaster_signals = {
                     "vitals": reader.list_vs(),
                     "waveform": list(reader.list_wv()),
@@ -186,7 +196,7 @@ class PreTensorizeSummaryWriter:
         mrns = [
             mrn
             for mrn in os.listdir(self.edw_dir)
-            if os.path.isdir(os.path.join(self.edw_dir, mrn))
+            if os.path.isdir(os.path.join(self.edw_dir, mrn)) and int(mrn) in self.mrns
         ]
         mrns_csns = []
         for mrn in mrns:
@@ -222,7 +232,7 @@ class PreTensorizeSummaryWriter:
         mrns = [
             mrn
             for mrn in os.listdir(self.edw_dir)
-            if os.path.isdir(os.path.join(self.edw_dir, mrn))
+            if os.path.isdir(os.path.join(self.edw_dir, mrn)) and int(mrn) in self.mrns
         ]
         for mrn in mrns:
             csns = [
@@ -449,8 +459,8 @@ class PreTensorizeSummaryWriter:
                                        By default: pre_tensorize_summary
         :param signals: <List> list of signals to calculate Bedmaster statistics.
         :param detailed_bedmaster: <Bool> Generate detailed Bedmaster statistics.
-        :param ignore_xref: <Bool> Don't use crossreference data. Enable along
-                                   with detailed_bedmaster to create  bedmaster_statistics
+        :param ignore_xref: <Bool> Don't use crossreference data. Enable along with
+                                   detailed_bedmaster to create  bedmaster_statistics
                                    without using edw_dir or  xref_file.
         """
         self.reset(signals)
@@ -461,7 +471,7 @@ class PreTensorizeSummaryWriter:
         if ignore_xref and not detailed_bedmaster:
             logging.warning(
                 "Option --no_xref requires --detailed_bedmaster which "
-                "is not set. Ignoring --no_xref setting",
+                "is not set. Ignoring --no_xref setting.",
             )
             ignore_xref = False
 
@@ -472,7 +482,7 @@ class PreTensorizeSummaryWriter:
             logging.info(f"Demographics stats saved as {file_name}.")
 
             xref_df = self._get_xref_df()
-            file_name = f"{output_files_base_name}_mrn_csn_coverage_edw_bedmaster.csv"
+            file_name = f"{output_files_base_name}_coverage.csv"
             xref_df.to_csv(os.path.join(output_dir, file_name), index=False)
             logging.info(f"Cross reference stats saved as {file_name}.")
 
@@ -486,3 +496,19 @@ class PreTensorizeSummaryWriter:
             detailed_bedmaster_writer = BedmasterStats()
             self.get_detailed_bedmaster_stats(detailed_bedmaster_writer)
             detailed_bedmaster_writer.to_csv(output_dir, output_files_base_name)
+
+
+def pre_tensorize_explore(args):
+    explorer = PreTensorizeExplorer(
+        args.path_bedmaster,
+        args.path_edw,
+        args.path_xref,
+        args.sample_csv,
+    )
+    explorer.write_pre_tensorize_summary(
+        args.output_folder,
+        args.summary_stats_base_name,
+        args.signals,
+        args.detailed_bedmaster,
+        args.no_xref,
+    )

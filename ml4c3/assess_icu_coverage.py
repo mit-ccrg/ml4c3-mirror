@@ -285,12 +285,10 @@ class ICUCoverageAssesser:
             for department in desired_depts:
                 dept_name = department.upper()
                 pattern = re.compile("([a-zA-Z]+)([0-9]+)")
-                dept_name = " ".join(pattern.findall(dept_name)[0])
+                dept_name = " ".join(pattern.findall(dept_name)[0]).upper()
                 for key in MAPPING_DEPARTMENTS:
-                    if dept_name in key:
-                        departments[MAPPING_DEPARTMENTS[key]] = MAPPING_DEPARTMENTS[
-                            key
-                        ][0].lower()
+                    if dept_name in key or dept_name.replace(" ", "") in key:
+                        departments[key] = MAPPING_DEPARTMENTS[key][0].lower()
                         break
                 else:
                     logging.warning(
