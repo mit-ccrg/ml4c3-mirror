@@ -385,7 +385,7 @@ def parse_args() -> argparse.Namespace:
     )
     model_parser.add_argument(
         "--conv_normalize",
-        choices=["", "batch_norm"],
+        choices=["", "batch_norm", "layer_norm", "instance_norm", "poincare_norm"],
         help="Type of normalization layer for convolutions",
     )
     model_parser.add_argument(
