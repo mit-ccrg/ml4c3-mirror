@@ -9,4 +9,6 @@ setup(
     python_requires=">=3.6",
     install_requires=[],
     packages=find_packages(),
+    package_data={"ml4c3": ["visualizer/*", "visualizer/assets/*"]},
+    include_package_data=True,
 )

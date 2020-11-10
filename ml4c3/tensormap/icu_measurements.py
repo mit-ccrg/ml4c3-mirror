@@ -5,7 +5,6 @@ from typing import Optional
 import numpy as np
 
 # Imports: first party
-from ml4c3.definitions.icu import EDW_FILES
 from ml4c3.tensormap.TensorMap import (
     TensorMap,
     Interpretation,
@@ -162,6 +161,9 @@ def create_measurement_tmap(tm_name: str, measurement_name: str, measurement_typ
         elif "diastolic" in tm_name:
             key = "diastolic"
             position = -1
+        else:
+            return None
+
         if tm_name == f"{measurement_name}_{key}_timeseries":
             tm = TensorMap(
                 name=tm_name,

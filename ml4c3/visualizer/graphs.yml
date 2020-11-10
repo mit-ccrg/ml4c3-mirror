@@ -1,0 +1,111 @@
+graphs:
+  medical:
+    title: Medical graph
+    optimized: False
+    top_dropdowns:
+      waveforms: bedmaster_waveform
+      vitals: bedmaster_vitals
+      flowsheets: edw_flowsheet
+      labs: edw_labs
+      medicines: edw_med
+    side_dropdowns:
+      surgery: edw_surgery
+      transfusions: edw_transfusions
+      events: edw_events
+      alarms: bedmaster_alarms
+      movements: static
+    props:
+      down_sampler: True
+      markers_choice: False
+      time_range: True
+      time_graph: False
+      xaxis_choice: False
+
+  ecgs:
+    title: Optimized graph - for large signals
+    optimized: True
+    top_dropdowns:
+      waveforms: bedmaster_waveform
+      vitals: bedmaster_vitals
+      flowsheets: edw_flowsheet
+      labs: edw_labs
+    side_dropdowns:
+      medicines: edw_med
+      surgery: edw_surgery
+      transfusions: edw_transfusions
+      events: edw_events
+      alarms: bedmaster_alarms
+      movements: static
+    props:
+      down_sampler: True
+      markers_choice: False
+      time_range: True
+      time_graph: False
+      xaxis_choice: False
+
+  debug:
+    title: Debug graph - for debugging
+    optimized: False
+    top_dropdowns:
+      waveforms: bedmaster_waveform
+      vitals: bedmaster_vitals
+      flowsheets: edw_flowsheet
+      labs: edw_labs
+    side_dropdowns:
+      medicines: edw_med
+      surgery: edw_surgery
+      transfusions: edw_transfusions
+      events: edw_events
+      alarms: bedmaster_alarms
+      movements: static
+    props:
+      down_sampler: True
+      markers_choice: True
+      time_range: True
+      time_graph: True
+      xaxis_choice: True
+statics:
+  Patient:
+    type: key-val
+    fields:
+      - birth_date
+      - sex
+      - height
+      - weight
+      - race
+  Admission:
+    type: key-val
+    fields:
+      - admin_date
+      - admin_type
+      - admin_diag
+      - local_time
+      - end_date
+      - end_stay_type
+  Movements:
+    type: table-mov
+    fields:
+      - department_id
+      - department_nm
+      - move_time
+      - room_bed
+
+  Health records:
+    type: table-hist
+    fields:
+      - tobacco_hist
+      - alcohol_hist
+
+  Hospital records:
+    type: table-hist
+    fields:
+      - medical_hist
+      - surgical_hist
+
+options:
+  signal_too_large: 2000000
+  special_signals:
+    - pattern: "blood_pressure"
+      suffix:
+        - systolic
+        - diastolic

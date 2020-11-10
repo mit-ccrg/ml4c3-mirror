@@ -15,6 +15,7 @@ PORT_FLAG=""
 PYTHON_COMMAND="python"
 TEST_COMMAND="python -m pytest"
 JUPYTER_COMMAND="jupyter lab --allow-root"
+VISUALIZER_COMMAND="python $PWD/ml4c3/recipes.py visualize --debug"
 SCRIPT_NAME=$( echo $0 | sed 's#.*/##g' )
 CONTAINER_NAME=""
 
@@ -84,7 +85,7 @@ USAGE_MESSAGE
 
 ################### OPTION PARSING #######################################
 
-while getopts ":i:d:m:p:cjnrhT" opt ; do
+while getopts ":i:d:m:p:cjnrhTv" opt ; do
     case ${opt} in
         h)
             usage
@@ -98,9 +99,13 @@ while getopts ":i:d:m:p:cjnrhT" opt ; do
             ;;
         m)
             MOUNTS="${MOUNTS} -v ${OPTARG}:${OPTARG}"
+            MOUNTED_DIR=${OPTARG}
             ;;
         j)
             PYTHON_COMMAND=${JUPYTER_COMMAND}
+            ;;
+        v)
+            PYTHON_COMMAND=${VISUALIZER_COMMAND}
             ;;
         p)
             PORT="${OPTARG}"
@@ -134,7 +139,7 @@ while getopts ":i:d:m:p:cjnrhT" opt ; do
 done
 shift $((OPTIND - 1))
 
-if [[ $# -eq 0 && "$PYTHON_COMMAND" != "$JUPYTER_COMMAND" ]]; then
+if [[ $# -eq 0 && "$PYTHON_COMMAND" != "$JUPYTER_COMMAND" && "$PYTHON_COMMAND" != "$VISUALIZER_COMMAND" ]]; then
     echo "ERROR: No Python module was specified." 1>&2
     usage
     exit 1
@@ -164,6 +169,13 @@ if [[ "$PYTHON_COMMAND" == "$JUPYTER_COMMAND" ]] ; then
     FQDN=$(hostname -A | awk '{for(i=1;i<=NF;i++) print length($i), $i}' | sort -nr | head -1 | awk '{print $2}')
     PYTHON_ARGS="--port ${PORT} --ip 0.0.0.0 --no-browser --NotebookApp.custom_display_url http://${FQDN}:${PORT}"
     CONTAINER_NAME="--name ${USER}-notebook-${PORT}"
+fi
+if [[ "$PYTHON_COMMAND" == "$VISUALIZER_COMMAND" ]] ; then
+    if [[ "${PORT_FLAG}" == "" ]] ; then
+        PORT_FLAG="-p ${PORT}:${PORT}"
+    fi
+    PYTHON_ARGS="${PYTHON_ARGS} --port ${PORT} --address 0.0.0.0 --tensors ${MOUNTED_DIR}"
+    CONTAINER_NAME="--name ${USER}-visualizer-${PORT}"
 fi
 
 PYTHON_PACKAGES="$PWD"

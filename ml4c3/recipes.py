@@ -29,6 +29,7 @@ from ml4c3.ingest.icu import tensorize_batched as tensorize_icu_batched
 from ml4c3.ingest.sts import tensorize as tensorize_sts
 from ml4c3.evaluations import predict_and_evaluate
 from ml4c3.explorations import explore
+from ml4c3.visualizer.run import run_server
 from ml4c3.hyperoptimizers import hyperoptimize
 from ml4c3.assess_icu_coverage import assess_icu_coverage
 from ml4c3.definitions.globals import MODEL_EXT
@@ -77,6 +78,8 @@ def run(args: argparse.Namespace):
             pre_tensorize_summary(args)
         elif args.mode == "match_patient_bedmaster":
             match_data(args)
+        elif args.mode == "visualize":
+            run_server(args)
         elif args.mode == "extract_ecg_features":
             extract_ecg_features(args)
         else:
