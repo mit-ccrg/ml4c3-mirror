@@ -111,7 +111,7 @@ def pytest_configure():
 
     # BedMaster
     pytest.bedmaster_dir = os.path.join(pytest.datadir, "bedmaster")
-    pytest.mat_file = os.path.join(pytest.bedmaster_dir, "bedmaster_file_5_v4.mat")
+    pytest.mat_file = os.path.join(pytest.bedmaster_dir, "bedmaster_file-123_5_v4.mat")
     pytest.bedmaster_matching = os.path.join(pytest.datadir, "bedmaster_matching_files")
     pytest.lm4_matching = os.path.join(pytest.bedmaster_matching, "lm4-bedmaster")
 

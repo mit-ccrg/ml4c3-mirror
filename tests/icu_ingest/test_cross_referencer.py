@@ -11,23 +11,23 @@ def test_get_xref_files(cross_referencer):
     expected_dic = {
         "123": {
             "345": [
-                f"{test_dir}/data/bedmaster/file1_1_v4.mat",
-                f"{test_dir}/data/bedmaster/file1_2_v4.mat",
-                f"{test_dir}/data/bedmaster/file1_10_v4.mat",
+                f"{test_dir}/data/bedmaster/file1-123_1_v4.mat",
+                f"{test_dir}/data/bedmaster/file1-123_2_v4.mat",
+                f"{test_dir}/data/bedmaster/file1-123_10_v4.mat",
             ],
-            "890": [f"{test_dir}/data/bedmaster/file2_1_v4.mat"],
+            "890": [f"{test_dir}/data/bedmaster/file2-123_1_v4.mat"],
         },
-        "456": {"980": [f"{test_dir}/data/bedmaster/file3_1_v4.mat"]},
+        "456": {"980": [f"{test_dir}/data/bedmaster/file3-123_1_v4.mat"]},
     }
-    expected_dic2 = {"456": {"980": [f"{test_dir}/data/bedmaster/file3_1_v4.mat"]}}
+    expected_dic2 = {"456": {"980": [f"{test_dir}/data/bedmaster/file3-123_1_v4.mat"]}}
     expected_dic3 = {
         "123": {
             "345": [
-                f"{test_dir}/data/bedmaster/file1_1_v4.mat",
-                f"{test_dir}/data/bedmaster/file1_2_v4.mat",
-                f"{test_dir}/data/bedmaster/file1_10_v4.mat",
+                f"{test_dir}/data/bedmaster/file1-123_1_v4.mat",
+                f"{test_dir}/data/bedmaster/file1-123_2_v4.mat",
+                f"{test_dir}/data/bedmaster/file1-123_10_v4.mat",
             ],
-            "890": [f"{test_dir}/data/bedmaster/file2_1_v4.mat"],
+            "890": [f"{test_dir}/data/bedmaster/file2-123_1_v4.mat"],
         },
     }
     assert cross_referencer.get_xref_files() == expected_dic
