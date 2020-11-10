@@ -51,7 +51,8 @@ def predict_and_evaluate(
     :param plot_path: Path to directory to save plots to
     :param data_split: Name of data split
     :param save_coefficients: Save model coefficients
-    :param batch_size: Number of samples to use in a batch, required if data is a tuple of input and output numpy arrays
+    :param batch_size: Number of samples to use in a batch, required if data is a
+                       tuple of input and output numpy arrays
     :param save_predictions: If true, save predicted and actual output values to a csv
 
     :return: Dictionary of performance metrics
@@ -194,12 +195,16 @@ def _get_predictions_from_data(
     tensor_maps_out: Optional[List[TensorMap]],
 ) -> Tuple[Predictions, Outputs, Optional[Paths]]:
     """
-    Get model predictions, output data, and paths from data source. Data must not be infinite.
+    Get model predictions, output data, and paths from data source. Data must not
+    be infinite.
 
     :param model: Model
-    :param data: finite tensorflow Dataset or tuple of inputs, outputs, and optionally paths
-    :param batch_size: Number of samples to use in a batch, required if data is a tuple input and output numpy arrays
-    :return: Tuple of predictions as a list of numpy arrays, a dictionary of output data, and optionally paths
+    :param data: finite tensorflow Dataset or tuple of inputs, outputs, and
+                 optionally paths
+    :param batch_size: Number of samples to use in a batch, required if data is a
+                       tuple input and output numpy arrays
+    :return: Tuple of predictions as a list of numpy arrays, a dictionary of
+             output data, and optionally paths
     """
     if isinstance(data, Tuple):
         if len(data) == 2:
@@ -213,7 +218,8 @@ def _get_predictions_from_data(
             )
         if batch_size is None:
             raise ValueError(
-                f"When providing dataset as tuple of inputs and outputs, batch_size is required, got {batch_size}",
+                "When providing dataset as tuple of inputs and outputs, batch_size "
+                "is required, got {batch_size}",
             )
         y_predictions = model.predict(x=input_data, batch_size=batch_size)
 
@@ -279,7 +285,8 @@ def _get_predictions_from_data(
         )
     else:
         raise NotImplementedError(
-            f"Cannot get data for inference from data of type {type(data).__name__}: {data}",
+            "Cannot get data for inference from data of type "
+            "{type(data).__name__}: {data}",
         )
 
     if not isinstance(y_predictions, list):

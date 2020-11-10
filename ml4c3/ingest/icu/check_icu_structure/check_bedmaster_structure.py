@@ -25,12 +25,14 @@ class BedmasterChecker:
         self.bedmaster_dir = bedmaster_dir
         self.alarms_dir = alarms_dir
 
-    def check_mat_files_structure(self):
+    def check_mat_files_structure(self, sample_csv: str = None, path_xref: str = None):
         """
         Checks if bedmaster_dir is structured properly.
 
         Checks that the .mat files in bedmaster_dir are in the right format and
         it doesn't have any unexpected file.
+        :param sample_csv: <str> Path to CSV with Sample IDs to restrict MRNs.
+        :param path_xref: <str> Path to CSV with Sample IDs to restrict Bedmaster files.
         """
         bedmaster_files_paths = [
             os.path.join(self.bedmaster_dir, bedmaster_file_name)
@@ -42,6 +44,14 @@ class BedmasterChecker:
             for unexpected_file_name in os.listdir(self.bedmaster_dir)
             if not unexpected_file_name.endswith(".mat")
         ]
+
+        if sample_csv and path_xref:
+            mrns = list(pd.read_csv(sample_csv)["MRN"].unique())
+            xref_df = pd.read_csv(path_xref)
+            bedmaster_files_names = list(
+                xref_df[xref_df["MRN"].isin(mrns)]["fileID"].unique(),
+            )
+
         # Check if there are any unexpected file in bedmaster_dir
         if len(unexpected_files) > 0:
             logging.warning(
@@ -50,6 +60,13 @@ class BedmasterChecker:
             )
 
         for bedmaster_file_path in bedmaster_files_paths:
+            bedmaster_file_name = os.path.split(bedmaster_file_path)[-1].split(".")[0]
+            if (
+                sample_csv
+                and path_xref
+                and bedmaster_file_name not in bedmaster_files_names
+            ):
+                continue
             bedmaster_file = h5py.File(bedmaster_file_path, "r")
             groups = set(MATFILE_EXPECTED_GROUPS)
             missing_groups = groups.difference(set(bedmaster_file.keys()))
@@ -111,8 +128,7 @@ class BedmasterChecker:
         unknown_files = set(alarms_files_path).difference(expected_files)
         for unknown_file in unknown_files:
             logging.warning(
-                f"File name {unknown_file} is not mapped in "
-                "ALARMS_FILES['names'] (ml4icu/globals.py).",
+                f"File name {unknown_file} is not mapped in ALARMS_FILES['names'].",
             )
 
         # Check if all the mapping names have their own file
@@ -120,7 +136,6 @@ class BedmasterChecker:
         for missing_file in missing_files:
             missing_map = missing_file.split("_")[-1][:-4]
             logging.warning(
-                f"Missing file: the mapping name {missing_map} in "
-                "ALARMS_FILES['names'] (ml4icu/globals.py) doesn't have its "
-                f"corresponding file {missing_file}.",
+                f"Missing file: the mapping name {missing_map} in ALARMS_FILES['names']"
+                f" doesn't have its corresponding file {missing_file}.",
             )

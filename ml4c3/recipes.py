@@ -36,8 +36,10 @@ from ml4c3.definitions.globals import MODEL_EXT
 from ml4c3.tensormap.TensorMap import TensorMap
 from ml4c3.ecg_features_extraction import extract_ecg_features
 from ml4c3.ingest.icu.matchers.match_data import match_data
-from ml4c3.ingest.icu.summarizers.summarizer import pre_tensorize_summary
 from ml4c3.ingest.icu.check_icu_structure.check_icu_structure import check_icu_structure
+from ml4c3.ingest.icu.explorations.pre_tensorize_explorations import (
+    pre_tensorize_explore,
+)
 
 # pylint: disable=redefined-outer-name, broad-except
 
@@ -70,12 +72,12 @@ def run(args: argparse.Namespace):
             plot_ecg(args)
         elif args.mode == "build":
             build_multimodal_multitask(args)
-        elif args.mode == "assess_icu_coverage":
+        elif args.mode == "assess_coverage":
             assess_icu_coverage(args)
         elif args.mode == "check_icu_structure":
             check_icu_structure(args)
-        elif args.mode == "pre_tensorize_summary":
-            pre_tensorize_summary(args)
+        elif args.mode == "pre_tensorize_explore":
+            pre_tensorize_explore(args)
         elif args.mode == "match_patient_bedmaster":
             match_data(args)
         elif args.mode == "visualize":
