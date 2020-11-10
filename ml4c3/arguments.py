@@ -923,6 +923,39 @@ def parse_args() -> argparse.Namespace:
         "an edw and xref path.",
     )
 
+    # Visualizer parser
+    visualizer_parser = subparser.add_parser(
+        name="visualize",
+        description="Start a web server to visualize the generated "
+        "HD5 files on the given directory.",
+        parents=[io_parser, run_parser],
+    )
+    visualizer_parser.add_argument(
+        "--debug",
+        "-d",
+        action="store_true",
+        help="Launch the server in debug mode",
+    )
+    visualizer_parser.add_argument(
+        "--port",
+        "-p",
+        default="8050",
+        help="Specify the port where the server will run. Default: 8050",
+    )
+    visualizer_parser.add_argument(
+        "--address",
+        "-a",
+        default="0.0.0.0",
+        help="Specify the address where the server will run. "
+        "Default: 0.0.0.0 (localhost)",
+    )
+    visualizer_parser.add_argument(
+        "--options_file",
+        "-o",
+        default=None,
+        help="YAML file with options for the visualizer. Default: None",
+    )
+
     # Assess coverage parser
     assess_coverage_parser = subparser.add_parser(
         "assess_coverage",
@@ -1014,7 +1047,9 @@ def parse_args() -> argparse.Namespace:
         parents=[model_parser, training_parser, io_parser, run_parser, tmap_parser],
     )
     args = parser.parse_args()
+
     _process_args(args)
+
     return args
 
 

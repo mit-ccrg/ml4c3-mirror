@@ -600,6 +600,7 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
         return tmaps
 
     # Base tmaps: ECG voltage
+
     from ml4c3.tensormap.ecg import update_tmaps_ecg_voltage  # isort:skip
     tmaps = update_tmaps_ecg_voltage(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
@@ -633,4 +634,39 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
 
     raise ValueError(
         f"{tmap_name} cannot be found in tmaps despite building every TMap we can",
+    )
+
+
+def create_tmap(signal, source, field) -> Optional[TensorMap]:
+    tm_name = f"{signal}_{field}"
+    if source in ["vital", "waveform"]:
+        # Imports: first party
+        from ml4c3.tensormap.icu_bedmaster_signals import get_bedmaster_signal_tmap
+
+        return get_bedmaster_signal_tmap(tm_name, signal, source)
+
+    if source == "alarm":
+        # Imports: first party
+        from ml4c3.tensormap.icu_alarms import create_alarm_tmap
+
+        return create_alarm_tmap(tm_name, signal)
+
+    if source in ["flowsheet", "labs"]:
+        # Imports: first party
+        from ml4c3.tensormap.icu_measurements import create_measurement_tmap
+
+        return create_measurement_tmap(tm_name, signal, source)
+    if source == "med":
+        # Imports: first party
+        from ml4c3.tensormap.icu_medications import create_med_tmap
+
+        return create_med_tmap(tm_name, signal)
+    if source in ["events", "surgery", "transfusions", "procedures"]:
+        # Imports: first party
+        from ml4c3.tensormap.icu_events import create_event_tmap
+
+        return create_event_tmap(tm_name, signal, source)
+
+    raise ValueError(
+        f"Could not create tmap for field {field} of signal {signal} and source {source}",
     )

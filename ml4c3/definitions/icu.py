@@ -237,7 +237,7 @@ MED_ACTIONS = [
     "Rate Verify",
 ]
 
-ML4ICU_PATH = os.path.dirname(os.path.abspath(__file__))
+ML4ICU_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROOT_PATH = os.path.dirname(ML4ICU_PATH)
 VISUALIZER_PATH = os.path.join(ML4ICU_PATH, "visualizer")
 
