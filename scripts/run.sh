@@ -4,10 +4,9 @@
 
 ################### VARIABLES ############################################
 
+DOCKER_IMAGE="ghcr.io/aguirre-lab/ml4c3:latest-cpu"
 DOCKER_IMAGE_GPU="ghcr.io/aguirre-lab/ml4c3:latest-gpu"
-DOCKER_IMAGE_NO_GPU="ghcr.io/aguirre-lab/ml4c3:latest-cpu"
-DOCKER_IMAGE=${DOCKER_IMAGE_GPU}
-GPU_DEVICE="--gpus all"
+GPU_DEVICE=
 INTERACTIVE="-it"
 MOUNTS=""
 PORT="8888"
@@ -59,14 +58,11 @@ usage()
 
     Example: ./${SCRIPT_NAME} -n -i ml4c3:latest-cpu recipes.py --mode tensorize ...
 
-        -c                  if set use CPU docker image and machine and use the regular 'docker' launcher.
-                            By default, we assume the machine is GPU-enabled.
-
-        -d                  Select a particular GPU device on multi GPU machines
+        -d                  Select a particular GPU device; first GPU is '0'
 
         -m                  Directories to mount at the same path in the docker image
 
-        -j                  Run Jupyer Lab
+        -j                  Run Jupyter Lab
 
         -p                  Ports to map between docker container and host
 
@@ -85,7 +81,7 @@ USAGE_MESSAGE
 
 ################### OPTION PARSING #######################################
 
-while getopts ":i:d:m:p:cjnrhTv" opt ; do
+while getopts ":i:d:m:p:jnrhTv" opt ; do
     case ${opt} in
         h)
             usage
@@ -95,6 +91,7 @@ while getopts ":i:d:m:p:cjnrhTv" opt ; do
             DOCKER_IMAGE=$OPTARG
             ;;
         d)
+            DOCKER_IMAGE=${DOCKER_IMAGE_GPU}
             GPU_DEVICE="--gpus device=${OPTARG}"
             ;;
         m)
@@ -110,10 +107,6 @@ while getopts ":i:d:m:p:cjnrhTv" opt ; do
         p)
             PORT="${OPTARG}"
             PORT_FLAG="-p ${PORT}:${PORT}"
-            ;;
-        c)
-            DOCKER_IMAGE=${DOCKER_IMAGE_NO_GPU}
-            GPU_DEVICE=
             ;;
         n)
             INTERACTIVE=""
