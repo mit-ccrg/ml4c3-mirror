@@ -19,7 +19,7 @@ def test_pre_tensorize_summary(temp_dir):
     logging.disable(logging.CRITICAL)
 
     for file in os.listdir(pytest.bedmaster_dir):
-        if file.startswith("bedmaster_file_"):
+        if file.startswith("bedmaster_file-"):
             copy2(os.path.join(pytest.bedmaster_dir, file), temp_dir)
 
     sys.argv = [
@@ -117,7 +117,7 @@ def test_pre_tensorize_summary(temp_dir):
 
 def test_independent_args(temp_dir):
     for file in os.listdir(pytest.bedmaster_dir):
-        if file.startswith("bedmaster_file_"):
+        if file.startswith("bedmaster_file-"):
             copy2(os.path.join(pytest.bedmaster_dir, file), temp_dir)
 
     def _get_output_files():

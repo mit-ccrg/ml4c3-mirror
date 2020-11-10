@@ -1,4 +1,4 @@
 StartTime,EndTime,stpIn,tStart,tEnd,tDischarge,tAdmit,fileID,unixFileStartTime,unixFileEndTime,fileStartTime,MRN,PatientEncounterID,grp,ugid
-Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,file1,100,200,Wrong,123,345,Wrong,Wrong
-Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,file2_1,600,700,Wrong,123,890,Wrong,Wrong
-Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,file3_1,250,350,Wrong,456,980,Wrong,Wrong
+Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,file1-123,100,200,Wrong,123,345,Wrong,Wrong
+Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,file2-123_1,600,700,Wrong,123,890,Wrong,Wrong
+Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,file3-123_1,250,350,Wrong,456,980,Wrong,Wrong

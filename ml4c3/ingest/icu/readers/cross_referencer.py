@@ -1,5 +1,6 @@
 # Imports: standard library
 import os
+import re
 import logging
 from typing import Dict, List
 
@@ -166,7 +167,9 @@ class CrossReferencer:
                 self.crossref[mrn][csn].extend(bedmaster_path)
         for _mrn, visits in self.crossref.items():
             for _csn, bedmaster_files in visits.items():
-                bedmaster_files.sort(key=lambda x: int(x.split("_")[-2]))
+                bedmaster_files.sort(
+                    key=lambda x: (int(re.split("[_-]", x)[-3]), int(x.split("_")[-2])),
+                )
 
     def add_edw_elements(self, edw_mrns):
         # Add elements from EDW folders
