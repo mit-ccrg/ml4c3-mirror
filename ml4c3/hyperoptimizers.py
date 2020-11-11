@@ -44,30 +44,38 @@ def hyperoptimize(args: argparse.Namespace):
     desired, set max_evals >> size of search space. In this case, it is likely, but not
     guaranteed, that all combinations will be seen.
     """
-    block_size_sets = [2, 3, 4]
-    conv_layers_sets = [[32]]
-    conv_normalize_sets = [""]
+    batch_size_sets = [128, 256, 512]
+    block_size_sets = [2, 4, 6]
+    conv_layers_sets = [
+        [128],
+        [64],
+    ]
+    conv_normalize_sets = [
+        "batch_norm",
+        "layer_norm",
+        "instance_norm",
+        "poincare_norm",
+    ]
     dense_layers_sets = [
-        [10, 5],
-        [40, 20],
-        [30, 30],
-        [64, 16],
-        [100, 50],
+        [16, 64],
+        [32, 16],
     ]
     dense_blocks_sets = [
-        [32, 24, 16],
+        [128, 64, 32],
+        [64, 32, 16],
     ]
-    pool_types = ["max", "average"]
+    conv_dropout_sets = [0, 0.1, 0.3, 0.5]
     conv_regularize_sets = ["spatial_dropout"]
-    conv_dropout_sets = [0.5]
-    dropout_sets = [0, 0.1, 0.2, 0.3]
     conv_x_sets = _generate_conv1D_filter_widths(
         num_unique_filters=6,
         list_len_bounds=[1, 1],
         first_filter_width_bounds=[6, 200],
         probability_vary_filter_width=0,
     )
-    learning_rate_sets = [0.001, 0.005, 0.01]
+    dropout_sets = [0, 0.1, 0.3, 0.5]
+    learning_rate_sets = [0.0001, 0.0005, 0.001]
+    pool_types = ["max", "average"]
+    pool_x_sets = [1, 3, 5]
 
     # Initialize empty dict of tmaps
     tmaps: Dict[str, TensorMap] = {}
@@ -83,8 +91,6 @@ def hyperoptimize(args: argparse.Namespace):
 
     input_tmap_sets = [
         "ecg_2500_std_preop_newest",
-        "ecg_age_std_preop_newest",
-        "ecg_sex_preop_newest",
     ]
     for tmap_name_or_list in input_tmap_sets:
         if isinstance(tmap_name_or_list, list):
@@ -94,32 +100,37 @@ def hyperoptimize(args: argparse.Namespace):
             tmaps = update_tmaps(tmap_name=tmap_name_or_list, tmaps=tmaps)
 
     space = {
-        # "block_size": hp.choice("block_size", block_size_sets),
-        # "conv_dropout": hp.choice("conv_dropout", conv_dropout_sets),
-        # "conv_normalize": hp.choice("conv_normalize", conv_normalize_sets),
+        "batch_size": hp.choice("batch_size", batch_size_sets),
+        "block_size": hp.choice("block_size", block_size_sets),
+        "conv_dropout": hp.choice("conv_dropout", conv_dropout_sets),
+        "conv_layers": hp.choice("conv_layers", conv_layers_sets),
+        "conv_normalize": hp.choice("conv_normalize", conv_normalize_sets),
         # "conv_regularize": hp.choice("conv_regularize", conv_regularize_sets),
         # "conv_x": hp.choice("conv_x", conv_x_sets),
-        # "dense_blocks": hp.choice("dense_blocks", dense_blocks_sets),
+        "dense_blocks": hp.choice("dense_blocks", dense_blocks_sets),
         "dense_layers": hp.choice("dense_layers", dense_layers_sets),
         "dropout": hp.choice("dropout", dropout_sets),
-        "output_tensors": hp.choice("output_tensors", output_tensors_sets),
+        # "output_tensors": hp.choice("output_tensors", output_tensors_sets),
         # "input_tensors": hp.choice("input_tensors", input_tmap_sets),
         "learning_rate": hp.choice("learning_rate", learning_rate_sets),
-        # "pool_type": hp.choice("pool_type", pool_types),
+        "pool_type": hp.choice("pool_type", pool_types),
+        "pool_x": hp.choice("pool_x", pool_x_sets),
     }
     param_lists = {
-        # "block_size": block_size_sets,
-        # "conv_x": conv_x_sets,
-        # "conv_dropout": conv_dropout_sets,
-        # "conv_normalize": conv_normalize_sets,
+        "batch_size": batch_size_sets,
+        "block_size": block_size_sets,
+        "conv_dropout": conv_dropout_sets,
+        "conv_normalize": conv_normalize_sets,
         # "conv_regularize": conv_regularize_sets,
-        # "dense_blocks": dense_blocks_sets,
+        # "conv_x": conv_x_sets,
+        "dense_blocks": dense_blocks_sets,
         "dense_layers": dense_layers_sets,
         "dropout": dropout_sets,
-        "output_tensors": output_tensors_sets,
+        # "output_tensors": output_tensors_sets,
         # "input_tensors": input_tmap_sets,
         "learning_rate": learning_rate_sets,
-        # "pool_type": pool_types,
+        "pool_type": pool_types,
+        "pool_x": pool_x_sets,
     }
     hyperparameter_optimizer(args=args, space=space, param_lists=param_lists)
 
@@ -172,6 +183,7 @@ def hyperparameter_optimizer(
                 tensors=args.tensors,
                 batch_size=args.batch_size,
                 num_workers=args.num_workers,
+                keep_paths_test=False,
                 sample_csv=args.sample_csv,
                 valid_ratio=args.valid_ratio,
                 test_ratio=args.test_ratio,
@@ -180,6 +192,7 @@ def hyperparameter_optimizer(
                 test_csv=args.test_csv,
                 output_folder=args.output_folder,
                 run_id=args.id,
+                cache=args.cache,
                 mixup_alpha=args.mixup_alpha,
             )
             train_dataset, valid_dataset, test_dataset = datasets
@@ -195,6 +208,7 @@ def hyperparameter_optimizer(
                 learning_rate_reduction=args.learning_rate_reduction,
                 output_folder=trials_path,
                 run_id=trial_id,
+                image_ext=args.image_ext,
                 return_history=True,
                 plot=False,
             )
