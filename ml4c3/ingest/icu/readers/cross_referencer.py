@@ -11,7 +11,7 @@ import pandas as pd
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
 from ml4c3.definitions.icu import EDW_FILES
-from ml4c3.ingest.icu.matchers import PatientBedmasterMatcher
+from ml4c3.ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
 
 
 class CrossReferencer:
@@ -76,9 +76,9 @@ class CrossReferencer:
         self.crossref = {}
         if not os.path.exists(self.xref_file):
             bedmaster_matcher = PatientBedmasterMatcher(
-                False,
-                self.bedmaster_dir,
-                self.edw_dir,
+                flag_lm4=False,
+                path_bedmaster=self.bedmaster_dir,
+                path_adt=self.adt_file,
             )
             bedmaster_matcher.match_files(self.xref_file)
 
@@ -204,7 +204,8 @@ class CrossReferencer:
 
     def stats(self):
         """
-        :param crossref: <dict> a dictionary with the MRNs, visit ID and Bedmaster files.
+        :param crossref: <dict> a dictionary with the MRNs, visit ID and Bedmaster
+                         files.
         """
         edw_mrns_set = {
             mrn
@@ -247,6 +248,7 @@ class CrossReferencer:
             f"CSNs in {self.xref_file}: {len(xref_csns_set)}\n"
             f"Union CSNs: {len(edw_csns_set.intersection(xref_csns_set))}\n"
             f"Intersect CSNs: {len(crossref_csns_set)}\n"
-            f"Bedmaster files IDs in {self.xref_file}: {len(xref_bedmaster_files_set)}\n"
+            f"Bedmaster files IDs in {self.xref_file}: "
+            f"{len(xref_bedmaster_files_set)}\n"
             f"Intersect Bedmaster files: {len(crossref_bedmaster_files_set)}\n",
         )

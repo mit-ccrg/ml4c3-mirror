@@ -31,11 +31,11 @@ from ml4c3.evaluations import predict_and_evaluate
 from ml4c3.explorations import explore
 from ml4c3.visualizer.run import run_server
 from ml4c3.hyperoptimizers import hyperoptimize
-from ml4c3.assess_icu_coverage import assess_icu_coverage
 from ml4c3.definitions.globals import MODEL_EXT
 from ml4c3.tensormap.TensorMap import TensorMap
 from ml4c3.ecg_features_extraction import extract_ecg_features
-from ml4c3.ingest.icu.matchers.match_data import match_data
+from ml4c3.ingest.icu.assess_coverage import assess_coverage
+from ml4c3.ingest.icu.match_patient_bedmaster import match_data
 from ml4c3.ingest.icu.check_icu_structure.check_icu_structure import check_icu_structure
 from ml4c3.ingest.icu.explorations.pre_tensorize_explorations import (
     pre_tensorize_explore,
@@ -73,7 +73,7 @@ def run(args: argparse.Namespace):
         elif args.mode == "build":
             build_multimodal_multitask(args)
         elif args.mode == "assess_coverage":
-            assess_icu_coverage(args)
+            assess_coverage(args)
         elif args.mode == "check_icu_structure":
             check_icu_structure(args)
         elif args.mode == "pre_tensorize_explore":

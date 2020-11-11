@@ -12,62 +12,11 @@ import pytest
 def test_file_structure_and_atributes(get_patient_bedmaster_matcher, temp_dir):
     matcher = get_patient_bedmaster_matcher(pytest.bedmaster_matching)
     matcher2 = get_patient_bedmaster_matcher(
-        pytest.bedmaster_matching,
-        departments=["MGH BLAKE 8 CARD SICU"],
+        path_bedmaster=pytest.bedmaster_matching,
+        desired_departments=["MGH BLAKE 8 CARD SICU"],
     )
-    expect_des_departments = [
-        "MGH BIGELOW 6 PICU",
-        "MGH BIGELOW 7",
-        "MGH BIGELOW 9 MED",
-        "MGH BIGELOW 11 MED",
-        "MGH BIGELOW 12",
-        "MGH BIGELOW 13 RACU",
-        "MGH BIGELOW 14 MED",
-        "MGH BLAKE 4 ENDO DEPT",
-        "MGH BLAKE 6 TRANSPLANT",
-        "MGH BLAKE 7 MICU",
-        "MGH BLAKE 8 CARD SICU",
-        "MGH BLAKE 10 NICU",
-        "MGH BLAKE 12 ICU",
-        "MGH BLAKE 13 OB",
-        "MGH ELLISON 4 SICU",
-        "MGH ELLISON 6 ORTH\\URO",
-        "MGH ELLISON 7 SURG\\URO",
-        "MGH ELLISON 8 CARDSURG",
-        "MGH ELLISON 9 MED\\CCU",
-        "MGH ELLISON 10 STP DWN",
-        "MGH ELLISON11 CARD\\INT",
-        "MGH ELLISON 12 MED",
-        "MGH ELLISON13A OB-ANTE",
-        "MGH ELLISON 14 BRN ICU",
-        "MGH ELLISON 14 PLASTCS",
-        "MGH ELLISON 16 MED ONC",
-        "MGH ELLISON 17 PEDI",
-        "MGH ELLISON 18 PEDI",
-        "MGH ELLISON19 THOR/VAS",
-        "MGH LUNDER 6 NEURO ICU",
-        "MGH LUNDER 7 NEURO",
-        "MGH LUNDER 8 NEURO",
-        "MGH LUNDER 9 ONCOLOGY",
-        "MGH LUNDER 10 ONCOLOGY",
-        "MGH WHITE 6 ORTHO\\OMF",
-        "MGH WHITE 7 GEN SURG",
-        "MGH WHITE 8 MEDICINE",
-        "MGH WHITE 9 MEDICINE",
-        "MGH WHITE 10 MEDICINE",
-        "MGH WHITE 11 MEDICINE",
-        "MGH WHITE 12",
-        "MGH WHITE 13 PACU",
-        "MGH CARDIAC CATH LAB",
-        "MGH EMERGENCY",
-        "MGH PERIOPERATIVE DEPT",
-        "MGH EP PACER LAB",
-        "MGH PHILLIPS 20 MED",
-        "MGH CPC",
-    ]
-
-    assert expect_des_departments == matcher.des_depts
-    assert matcher2.des_depts == ["MGH BLAKE 8 CARD SICU"]
+    assert not matcher.desired_departments
+    assert matcher2.desired_departments == ["MGH BLAKE 8 CARD SICU"]
 
     cross_ref_file_matched = os.path.join(temp_dir, "xref_file_matched.csv")
     matcher.match_files(cross_ref_file_matched)
@@ -80,14 +29,14 @@ def test_xref_file_generation(get_patient_bedmaster_matcher, temp_dir):
     def test_xref_file_results(
         get_patient_bedmaster_matcher,
         temp_dir,
-        lm4,
         bedmaster_dir,
     ):
-        matcher = get_patient_bedmaster_matcher(bedmaster_dir, lm4_flag=lm4)
+        matcher = get_patient_bedmaster_matcher(
+            path_bedmaster=bedmaster_dir,
+        )
         matcher2 = get_patient_bedmaster_matcher(
-            bedmaster_dir,
-            lm4_flag=lm4,
-            departments=["MGH BLAKE 8 CARD SICU"],
+            path_bedmaster=bedmaster_dir,
+            desired_departments=["MGH BLAKE 8 CARD SICU"],
         )
 
         expected_df = pd.read_csv(
@@ -160,9 +109,5 @@ def test_xref_file_generation(get_patient_bedmaster_matcher, temp_dir):
             np.nan_to_num(obt_df["Department"].values),
         )
 
-    lm4 = False
     folder = pytest.bedmaster_matching
-    test_xref_file_results(get_patient_bedmaster_matcher, temp_dir, lm4, folder)
-    lm4 = True
-    folder = pytest.lm4_matching
-    test_xref_file_results(get_patient_bedmaster_matcher, temp_dir, lm4, folder)
+    test_xref_file_results(get_patient_bedmaster_matcher, temp_dir, folder)

@@ -62,6 +62,7 @@ class PreProcessBedmasterAlarms:
             print(f"Extracting alarms from file {k}/{len(alarms_files)}")
             new_data = self._read_files(alarm_file, beds_files)
             data = pd.concat([data, new_data], ignore_index=True)
+        data.to_csv(os.path.join(self.output_dir, "bedmaster_alarms.csv"))
 
         print("Saving data by department...")
         for department in data["Unit"].unique():

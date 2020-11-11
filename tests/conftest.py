@@ -27,7 +27,6 @@ from ml4c3.ingest.icu.readers import (
 )
 from ml4c3.ingest.icu.writers import Writer
 from ml4c3.definitions.globals import TENSOR_EXT
-from ml4c3.ingest.icu.matchers import PatientBedmasterMatcher
 from ml4c3.tensormap.TensorMap import TensorMap, Interpretation, get_local_timestamps
 from ml4c3.tensormap.icu_alarms import get_tmap as GET_ALARMS_TMAP
 from ml4c3.tensormap.icu_events import get_tmap as GET_EVENTS_TMAP
@@ -45,6 +44,7 @@ from ml4c3.tensormap.icu_list_signals import get_tmap as GET_LIST_TMAP
 from ml4c3.tensormap.icu_measurements import get_tmap as GET_MEAS_TMAP
 from ml4c3.ingest.icu.check_icu_structure import EDWChecker, BedmasterChecker
 from ml4c3.tensormap.icu_bedmaster_signals import get_tmap as GET_BEDMASTER_TMAP
+from ml4c3.ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
 
 # pylint: disable=redefined-outer-name, unused-argument, missing-class-docstring
 
@@ -113,7 +113,6 @@ def pytest_configure():
     pytest.bedmaster_dir = os.path.join(pytest.datadir, "bedmaster")
     pytest.mat_file = os.path.join(pytest.bedmaster_dir, "bedmaster_file-123_5_v4.mat")
     pytest.bedmaster_matching = os.path.join(pytest.datadir, "bedmaster_matching_files")
-    pytest.lm4_matching = os.path.join(pytest.bedmaster_matching, "lm4-bedmaster")
 
     # EDW
     pytest.edw_dir = os.path.join(pytest.datadir, "edw")
@@ -464,13 +463,11 @@ def hd5_data(temp_file, fake_signal):
 
 @pytest.fixture(scope="function")
 def get_patient_bedmaster_matcher():
-    def _get_matcher(bedmaster_folder, lm4_flag=False, departments=None):
+    def _get_matcher(path_bedmaster, desired_departments=None):
         matcher = PatientBedmasterMatcher(
-            lm4_flag,
-            bedmaster_folder,
-            pytest.edw_dir,
-            des_depts=departments,
-            adt_file="adt.csv",
+            path_bedmaster=path_bedmaster,
+            path_adt=os.path.join(pytest.edw_dir, "adt.csv"),
+            desired_departments=desired_departments,
         )
         return matcher
 

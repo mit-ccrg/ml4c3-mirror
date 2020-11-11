@@ -5,7 +5,7 @@ import os
 import pytest
 
 # Imports: first party
-from ml4c3.assess_icu_coverage import ICUCoverageAssesser
+from ml4c3.ingest.icu.assess_coverage import ICUCoverageAssesser
 
 # pylint: disable=no-member
 
@@ -17,7 +17,7 @@ def test_assesser(temp_dir):
         adt_csv=os.path.join(pytest.edw_dir, "adt.csv"),
     )
     assesser.assess_coverage(
-        path_bedmaster=pytest.lm4_matching,
+        path_bedmaster=pytest.bedmaster_matching,
         path_edw=pytest.edw_dir,
         path_hd5=temp_dir,
     )

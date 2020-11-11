@@ -20,7 +20,7 @@ from ml4c3.ingest.icu.readers import (
     BedmasterAlarmsReader,
 )
 from ml4c3.ingest.icu.writers import Writer
-from ml4c3.ingest.icu.matchers import PatientBedmasterMatcher
+from ml4c3.ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
 
 
 class Tensorizer:
@@ -33,7 +33,7 @@ class Tensorizer:
         bedmaster_dir: str,
         alarms_dir: str,
         edw_dir: str,
-        cross_ref_path: str,
+        xref_path: str,
     ):
         """
         Init a Tensorizer object.
@@ -41,13 +41,13 @@ class Tensorizer:
         :param bedmaster_dir: <str> Directory containing all the Bedmaster data.
         :param alarms_dir: <str> Directory containing all the Bedmaster alarms data.
         :param edw_dir: <str> Directory containing all the EDW data.
-        :param cross_ref_path: <str> Full path of the file containing
-                              cross reference between EDW and Bedmaster.
+        :param xref_path: <str> Full path of the file containing
+                          cross reference between EDW and Bedmaster.
         """
         self.bedmaster_dir = bedmaster_dir
         self.alarms_dir = alarms_dir
         self.edw_dir = edw_dir
-        self.cross_ref_path = cross_ref_path
+        self.xref_path = xref_path
 
     def tensorize(
         self,
@@ -105,7 +105,7 @@ class Tensorizer:
         files_per_mrn = CrossReferencer(
             self.bedmaster_dir,
             self.edw_dir,
-            self.cross_ref_path,
+            self.xref_path,
         ).get_xref_files(
             mrns,
             starting_time,
@@ -381,13 +381,10 @@ def tensorize(args):
 def tensorize_batched(args):
     # Create crossreference table if needed
     if not os.path.isfile(args.path_xref):
-        adt_table_name = os.path.split(args.path_adt)[-1]
         # Match bedmaster files from lm4 with path_adt
         matcher = PatientBedmasterMatcher(
-            flag_lm4=True,
-            bedmaster_dir=LM4_DIR,
-            edw_dir=os.path.join(MAD3_DIR, "cohorts_lists"),
-            adt_file=adt_table_name,
+            path_bedmaster=LM4_DIR,
+            path_adt=args.path_adt,
         )
         matcher.match_files(args.path_xref)
 

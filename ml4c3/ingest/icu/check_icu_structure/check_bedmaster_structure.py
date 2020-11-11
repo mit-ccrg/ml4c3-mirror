@@ -8,7 +8,8 @@ import h5py
 import pandas as pd
 
 # Imports: first party
-from ml4c3.definitions.icu import ALARMS_FILES, MATFILE_EXPECTED_GROUPS
+from ml4c3.definitions.icu import ALARMS_FILES, BEDMASTER_EXT, MATFILE_EXPECTED_GROUPS
+from ml4c3.ingest.icu.utils import get_files_in_directory
 
 
 class BedmasterChecker:
@@ -34,16 +35,10 @@ class BedmasterChecker:
         :param sample_csv: <str> Path to CSV with Sample IDs to restrict MRNs.
         :param path_xref: <str> Path to CSV with Sample IDs to restrict Bedmaster files.
         """
-        bedmaster_files_paths = [
-            os.path.join(self.bedmaster_dir, bedmaster_file_name)
-            for bedmaster_file_name in os.listdir(self.bedmaster_dir)
-            if bedmaster_file_name.endswith(".mat")
-        ]
-        unexpected_files = [
-            os.path.join(self.bedmaster_dir, unexpected_file_name)
-            for unexpected_file_name in os.listdir(self.bedmaster_dir)
-            if not unexpected_file_name.endswith(".mat")
-        ]
+        bedmaster_files_paths, unexpected_files = get_files_in_directory(
+            directory=self.bedmaster_dir,
+            extension=BEDMASTER_EXT,
+        )
 
         if sample_csv and path_xref:
             mrns = list(pd.read_csv(sample_csv)["MRN"].unique())

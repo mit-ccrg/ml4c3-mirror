@@ -6,7 +6,9 @@ MAD3_DIR = "/media/mad3"
 LM4_DIR = "/media/lm4-bedmaster"
 
 EDW_PREFIX = "edw"
+EDW_EXT = ".csv"
 BEDMASTER_PREFIX = "bedmaster"
+BEDMASTER_EXT = ".mat"
 
 MATFILE_EXPECTED_GROUPS: List[str] = [
     "vs",

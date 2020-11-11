@@ -284,3 +284,16 @@ class FileManager:
         except FileNotFoundError:
             flag_found = "NOT FOUND"
         return mrn, flag_found
+
+
+def get_files_in_directory(directory: str, extension: str):
+    fpaths = []
+    not_fpaths = []
+    for root, _, files in os.walk(directory):
+        for file in files:
+            fpath = os.path.join(root, file)
+            if file.endswith(extension):
+                fpaths.append(fpath)
+            else:
+                not_fpaths.append(fpath)
+    return fpaths, not_fpaths

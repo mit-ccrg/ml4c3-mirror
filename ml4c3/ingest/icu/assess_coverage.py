@@ -13,7 +13,7 @@ import pandas as pd
 from ml4c3.utils import get_unix_timestamps
 from ml4c3.definitions.icu import EDW_FILES, MAPPING_DEPARTMENTS
 from ml4c3.tensormap.icu_static import get_tmap as GET_STATIC_TMAP
-from ml4c3.ingest.icu.matchers.match_patient_bedmaster import PatientBedmasterMatcher
+from ml4c3.ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
 
 EXPECTED_FILES = []
 for file_type in EDW_FILES:
@@ -255,7 +255,7 @@ class ICUCoverageAssesser:
         path_bedmaster: str,
         path_edw: str,
         path_hd5: str,
-        desired_depts: List[str] = None,
+        desired_departments: List[str] = None,
         event_column: str = None,
         time_column: str = None,
         count: bool = False,
@@ -268,7 +268,7 @@ class ICUCoverageAssesser:
         :param path_bedmaster: <str> Directory with Bedmaster .mat files.
         :param path_edw: <str> Directory with EDW .csv files.
         :param path_hd5: <str> Directory with .hd5 files.
-        :param desired_depts: <List[str]> List of department names.
+        :param desired_departments: <List[str]> List of department names.
         :param event_column: <str> Name of the event column (if exists) in
                              --cohort_query/--cohort_csv.
         :param time_column: <str> Name of the event time column (if exists) in
@@ -281,8 +281,8 @@ class ICUCoverageAssesser:
             None: "all_departments",
         }
 
-        if desired_depts:
-            for department in desired_depts:
+        if desired_departments:
+            for department in desired_departments:
                 dept_name = department.upper()
                 pattern = re.compile("([a-zA-Z]+)([0-9]+)")
                 dept_name = " ".join(pattern.findall(dept_name)[0]).upper()
@@ -307,10 +307,9 @@ class ICUCoverageAssesser:
             if key:
                 matching_depts.append(key)
         bedmaster_matcher = PatientBedmasterMatcher(
-            True,
-            path_bedmaster,
-            self.output_dir,
-            matching_depts,
+            path_bedmaster=path_bedmaster,
+            path_adt=os.path.join(self.output_dir, "adt.csv"),
+            desired_departments=matching_depts,
         )
         bedmaster_matcher.match_files(os.path.join(self.output_dir, "xref.csv"))
 
@@ -377,7 +376,7 @@ class ICUCoverageAssesser:
         )
 
 
-def assess_icu_coverage(args):
+def assess_coverage(args):
     assesser = ICUCoverageAssesser(
         output_dir=args.output_folder,
         cohort_query=args.cohort_query,
@@ -388,7 +387,7 @@ def assess_icu_coverage(args):
         path_bedmaster=args.path_bedmaster,
         path_edw=args.path_edw,
         path_hd5=args.tensors,
-        desired_depts=args.desired_depts,
+        desired_departments=args.desired_departments,
         event_column=args.event_column,
         time_column=args.time_column,
         count=args.count,

@@ -54,20 +54,20 @@ def parse_args() -> argparse.Namespace:
     )
 
     # Tensor Map arguments
-    tmap_parser = argparse.ArgumentParser(add_help=False)
-    tmap_parser.add_argument("--input_tensors", default=[], nargs="+")
-    tmap_parser.add_argument("--output_tensors", default=[], nargs="+")
-    tmap_parser.add_argument(
+    tensormaps_parser = argparse.ArgumentParser(add_help=False)
+    tensormaps_parser.add_argument("--input_tensors", default=[], nargs="+")
+    tensormaps_parser.add_argument("--output_tensors", default=[], nargs="+")
+    tensormaps_parser.add_argument(
         "--tensor_maps_in",
         default=[],
         help="Do not set this directly. Use input_tensors",
     )
-    tmap_parser.add_argument(
+    tensormaps_parser.add_argument(
         "--tensor_maps_out",
         default=[],
         help="Do not set this directly. Use output_tensors",
     )
-    tmap_parser.add_argument(
+    tensormaps_parser.add_argument(
         "--mrn_column_name",
         default="medrecn",
         help="Name of MRN column in tensors_all*.csv",
@@ -178,27 +178,27 @@ def parse_args() -> argparse.Namespace:
     )
 
     # ECG Tensorize arguments
-    ecg_tens_parser = subparser.add_parser(
+    ecg_tensorization_parser = subparser.add_parser(
         name="tensorize_ecg",
         description="TODO",
         parents=[io_parser, run_parser],
     )
-    ecg_tens_parser.add_argument(
+    ecg_tensorization_parser.add_argument(
         "--bad_xml_dir",
         default=os.path.expanduser("~/bad-xml"),
         help="Path to directory to store XML files that fail tensorization.",
     )
-    ecg_tens_parser.add_argument(
+    ecg_tensorization_parser.add_argument(
         "--bad_hd5_dir",
         default=os.path.expanduser("~/bad-hd5"),
         help="Path to directory to store HD5 files that fail tensorization.",
     )
-    ecg_tens_parser.add_argument(
+    ecg_tensorization_parser.add_argument(
         "--xml_folder",
         help="Path to folder of XMLs of ECG data.",
     )
 
-    # ICU Tensorize arguments
+    # ICU modes common arguments
     icu_parser = argparse.ArgumentParser(add_help=False)
     icu_parser.add_argument(
         "--path_bedmaster",
@@ -222,49 +222,57 @@ def parse_args() -> argparse.Namespace:
         "are cross referenced. CSV file which indicates the "
         "corresponding MRN and CSN of each Bedmaster file.",
     )
+    icu_parser.add_argument(
+        "--path_adt",
+        type=str,
+        default=f"{os.path.join(MAD3_DIR, 'cohorts_lists', 'adt.csv')}",
+        help="Full path of ADT table.",
+    )
+    icu_parser.add_argument(
+        "--desired_departments",
+        nargs="+",
+        default=None,
+        help="List indicating all the desired departments in which Bedmaster"
+        "files are matched with patients.",
+    )
 
-    icu_tens_parser = subparser.add_parser(
+    # ICU Tensorize arguments
+    icu_tensorization_parser = subparser.add_parser(
         name="tensorize_icu",
         description="TODO",
         parents=[io_parser, run_parser, icu_parser],
     )
-    icu_tens_parser.add_argument(
+    icu_tensorization_parser.add_argument(
         "--overwrite_hd5",
         action="store_true",
         help="Bool indicating whether the existing hd5 files should be overwritten.",
     )
-    icu_tens_parser.add_argument(
+    icu_tensorization_parser.add_argument(
         "--num_patients_to_tensorize",
         default=None,
         type=int,
         help="Maximum number of patients whose data will be tensorized. "
         "Useful for troubleshooting.",
     )
-    icu_tens_parser.add_argument(
+    icu_tensorization_parser.add_argument(
         "--allow_one_source",
         action="store_true",
         help="If this parameter is set, patients with just one type of data "
         "will be tensorized.",
     )
-    icu_tens_parser.add_argument(
-        "--path_adt",
-        type=str,
-        default=f"{os.path.join(MAD3_DIR, 'cohorts_lists', 'adt.csv')}",
-        help="Full path of ADT table.",
-    )
-    icu_tens_parser.add_argument(
+    icu_tensorization_parser.add_argument(
         "--adt_start_index",
         type=int,
         default=0,
         help="Index of first patient in ADT table to get data from",
     )
-    icu_tens_parser.add_argument(
+    icu_tensorization_parser.add_argument(
         "--adt_end_index",
         type=int,
         default=None,
         help="Index of last patient in ADT table to get data from",
     )
-    icu_tens_parser.add_argument(
+    icu_tensorization_parser.add_argument(
         "--staging_dir",
         type=str,
         default=os.path.expanduser("~/icu-temp"),
@@ -276,7 +284,7 @@ def parse_args() -> argparse.Namespace:
             "delete the HD5 files from --staging_dir."
         ),
     )
-    icu_tens_parser.add_argument(
+    icu_tensorization_parser.add_argument(
         "--staging_batch_size",
         default=None,
         type=int,
@@ -287,7 +295,7 @@ def parse_args() -> argparse.Namespace:
     )
 
     # STS Tensorize arguments
-    sts_tens_parser = subparser.add_parser(
+    sts_tensorization_parser = subparser.add_parser(
         name="tensorize_sts",
         description="TODO",
         parents=[io_parser, run_parser],
@@ -600,22 +608,46 @@ def parse_args() -> argparse.Namespace:
     train_parser = subparser.add_parser(
         name="train",
         description="TODO",
-        parents=[model_parser, training_parser, io_parser, run_parser, tmap_parser],
+        parents=[
+            model_parser,
+            training_parser,
+            io_parser,
+            run_parser,
+            tensormaps_parser,
+        ],
     )
     train_shallow_parser = subparser.add_parser(
         name="train_shallow",
         description="TODO",
-        parents=[model_parser, training_parser, io_parser, run_parser, tmap_parser],
+        parents=[
+            model_parser,
+            training_parser,
+            io_parser,
+            run_parser,
+            tensormaps_parser,
+        ],
     )
     train_simclr_parser = subparser.add_parser(
         name="train_simclr",
         description="TODO",
-        parents=[model_parser, training_parser, io_parser, run_parser, tmap_parser],
+        parents=[
+            model_parser,
+            training_parser,
+            io_parser,
+            run_parser,
+            tensormaps_parser,
+        ],
     )
     hyperoptimize_parser = subparser.add_parser(
         name="hyperoptimize",
         description="TODO",
-        parents=[model_parser, training_parser, io_parser, run_parser, tmap_parser],
+        parents=[
+            model_parser,
+            training_parser,
+            io_parser,
+            run_parser,
+            tensormaps_parser,
+        ],
     )
 
     # Train Shallow arguments
@@ -694,7 +726,7 @@ def parse_args() -> argparse.Namespace:
     explore_parser = subparser.add_parser(
         name="explore",
         description="TODO",
-        parents=[io_parser, run_parser, tmap_parser, training_parser],
+        parents=[io_parser, run_parser, tensormaps_parser, training_parser],
     )
     explore_parser.add_argument(
         "--explore_disable_saving_output",
@@ -868,18 +900,6 @@ def parse_args() -> argparse.Namespace:
         "table between the available Bedmaster files and EDW data from an ADT table.",
         parents=[io_parser, run_parser, icu_parser],
     )
-    match_patient_parser.add_argument(
-        "--lm4",
-        action="store_true",
-        help="If argument set, the matching is performed in LM4 sever.",
-    )
-    match_patient_parser.add_argument(
-        "--desired_depts",
-        nargs="+",
-        default=None,
-        help="List indicating all the desired departments in which BedMaster"
-        "files are matched with patients.",
-    )
 
     # Pre tensorize summary parser
     pre_tensorize_explorer_parser = subparser.add_parser(
@@ -981,19 +1001,6 @@ def parse_args() -> argparse.Namespace:
         "If --cohort_query is set, this parameter will be ignored.",
     )
     assess_coverage_parser.add_argument(
-        "--path_adt",
-        type=str,
-        default=None,
-        help="Full path of the ADT table of the list of patients in --cohort_csv. "
-        "If --cohort_query is set, this parameter will be ignored.",
-    )
-    assess_coverage_parser.add_argument(
-        "--desired_depts",
-        nargs="+",
-        default=None,
-        help="List of department names.",
-    )
-    assess_coverage_parser.add_argument(
         "--count",
         action="store_true",
         help="Count the number of unique rows (events) in --cohort_query/--cohort_csv.",
@@ -1003,7 +1010,7 @@ def parse_args() -> argparse.Namespace:
     ecg_features_parser = subparser.add_parser(
         "extract_ecg_features",
         description="Extract basic ECG features from hd5 files.",
-        parents=[io_parser, run_parser, tmap_parser],
+        parents=[io_parser, run_parser, tensormaps_parser],
     )
     ecg_features_parser.add_argument(
         "--r_method",
@@ -1026,17 +1033,35 @@ def parse_args() -> argparse.Namespace:
     infer_parser = subparser.add_parser(
         name="infer",
         description="TODO",
-        parents=[model_parser, training_parser, io_parser, run_parser, tmap_parser],
+        parents=[
+            model_parser,
+            training_parser,
+            io_parser,
+            run_parser,
+            tensormaps_parser,
+        ],
     )
     plot_parser = subparser.add_parser(
         name="plot_ecg",
         description="TODO",
-        parents=[model_parser, training_parser, io_parser, run_parser, tmap_parser],
+        parents=[
+            model_parser,
+            training_parser,
+            io_parser,
+            run_parser,
+            tensormaps_parser,
+        ],
     )
     build_parser = subparser.add_parser(
         name="build",
         description="TODO",
-        parents=[model_parser, training_parser, io_parser, run_parser, tmap_parser],
+        parents=[
+            model_parser,
+            training_parser,
+            io_parser,
+            run_parser,
+            tensormaps_parser,
+        ],
     )
     args = parser.parse_args()
 

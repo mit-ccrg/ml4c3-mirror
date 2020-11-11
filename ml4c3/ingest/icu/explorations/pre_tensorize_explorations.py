@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 
 # Imports: first party
+from ml4c3.definitions.icu import BEDMASTER_EXT
+from ml4c3.ingest.icu.utils import get_files_in_directory
 from ml4c3.definitions.types import EDWType, BedmasterType
 from ml4c3.ingest.icu.readers import EDWReader, BedmasterReader
 
@@ -110,21 +112,12 @@ class PreTensorizeExplorer:
         xref_file = xref_file.dropna(subset=["MRN"])
         bedmaster_mrns = set(xref_file["MRN"].unique())
         bedmaster_csns = set(xref_file["PatientEncounterID"].unique())
-        bedmaster_ids = set(xref_file["fileID"].unique())
-        cross_ref_bedmaster_files = set()
-        for bedmaster_id in bedmaster_ids:
-            cross_ref_bedmaster_files = cross_ref_bedmaster_files.union(
-                {
-                    bedmaster_file
-                    for bedmaster_file in os.listdir(self.bedmaster_dir)
-                    if bedmaster_file.startswith(bedmaster_id)
-                },
-            )
-        bedmaster_files = [
-            bedmaster_file
-            for bedmaster_file in os.listdir(self.bedmaster_dir)
-            if bedmaster_file.endswith(".mat")
-        ]
+        cross_ref_bedmaster_files = set(xref_file["fileID"].unique())
+
+        bedmaster_files, _ = get_files_in_directory(
+            directory=self.bedmaster_dir,
+            extension=BEDMASTER_EXT,
+        )
 
         edw_mrns, edw_csns = self.get_mrns_and_csns()
 
@@ -164,15 +157,13 @@ class PreTensorizeExplorer:
         if self.signals:
             xref_file = pd.read_csv(self.xref_file)
             xref_file = xref_file.dropna(subset=["MRN"])
-            bedmaster_files = [
-                bedmaster_file
-                for bedmaster_file in os.listdir(self.bedmaster_dir)
-                if bedmaster_file.endswith(".mat")
-            ]
             k = 0
-            for bedmaster_file in bedmaster_files:
+            bedmaster_files_paths, _ = get_files_in_directory(
+                directory=self.bedmaster_dir,
+                extension=BEDMASTER_EXT,
+            )
+            for bedmaster_file_path in bedmaster_files_paths:
                 k += 1
-                bedmaster_file_path = os.path.join(self.bedmaster_dir, bedmaster_file)
                 try:
                     reader = BedmasterReader(bedmaster_file_path)
                 except OSError:
@@ -181,16 +172,17 @@ class PreTensorizeExplorer:
                     "vitals": reader.list_vs(),
                     "waveform": list(reader.list_wv()),
                 }
+                file = os.path.split(bedmaster_file_path)[-1]
                 # pylint: disable=cell-var-from-loop
                 csns = set(
-                    xref_file[
-                        list(map(lambda x: x in bedmaster_file, xref_file["fileID"]))
-                    ]["PatientEncounterID"].unique(),
+                    xref_file[list(map(lambda x: x in file, xref_file["fileID"]))][
+                        "PatientEncounterID"
+                    ].unique(),
                 )
                 self._update_list_signals(bedmaster_signals, csns)
                 logging.info(
                     "Obtained statistics from Bedmaster file number "
-                    f"{k}/{len(bedmaster_files)}",
+                    f"{k}/{len(bedmaster_files_paths)}.",
                 )
 
         mrns = [
@@ -394,21 +386,18 @@ class PreTensorizeExplorer:
         return signals_summary_df
 
     def _get_bedmaster_files(self):
-        file_ids = {
-            "_".join(bedmaster_file.split("_")[:2])
-            for bedmaster_file in os.listdir(self.bedmaster_dir)
-            if bedmaster_file.endswith(".mat")
-        }
-        bedmaster_files = {}
-        for file_id in file_ids:
-            files = [
-                file
-                for file in os.listdir(self.bedmaster_dir)
-                if file.startswith(file_id)
-            ]
-            files.sort(key=lambda x: int(x.split("_")[-2]))
-            bedmaster_files[file_id] = files
-        return bedmaster_files
+        bedmaster_files_dict = {}
+        bedmaster_files, _ = get_files_in_directory(
+            directory=self.bedmaster_dir,
+            extension=BEDMASTER_EXT,
+        )
+        for bedmaster_file in bedmaster_files:
+            file_id = "_".join(os.path.split(bedmaster_file)[-1].split("_")[:2])
+            if file_id in bedmaster_files_dict:
+                bedmaster_files_dict[file_id].append(bedmaster_file)
+            else:
+                bedmaster_files_dict[file_id] = [bedmaster_file]
+        return bedmaster_files_dict
 
     def get_detailed_bedmaster_stats(self, detailed_bedmaster_writer):
         """
@@ -422,9 +411,10 @@ class PreTensorizeExplorer:
             total_files = len(bedmaster_files[file_id])
 
             previous_max = None
-            for file_idx, file in enumerate(bedmaster_files[file_id]):
-                logging.info(f"... file {file} : {file_idx+1} of {total_files}")
-                bedmaster_file_path = os.path.join(self.bedmaster_dir, file)
+            for file_idx, bedmaster_file_path in enumerate(bedmaster_files[file_id]):
+                logging.info(
+                    f"... file {bedmaster_file_path}: {file_idx+1} of {total_files}",
+                )
 
                 with BedmasterReader(
                     bedmaster_file_path,
