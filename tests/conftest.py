@@ -556,6 +556,7 @@ class FakeSignal:
             time=np.array(list(range(starting_time, starting_time + 100))),
             units=str(np.random.choice(["mmHg", "bpm", "%"])),
             data_type=str(np.random.choice(["categorical", "numerical"])),
+            metadata={"Some_Metadata": np.array(np.random.randint(0, 1, 100))},
         )
         return measurement
 

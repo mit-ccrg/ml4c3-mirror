@@ -149,14 +149,6 @@ def parse_args() -> argparse.Namespace:
         help="Random seed to use throughout run.  Always use np.random.",
     )
     run_parser.add_argument(
-        "--eager",
-        default=False,
-        action="store_true",
-        help=(
-            "Run tensorflow functions in eager execution mode (helpful for debugging)."
-        ),
-    )
-    run_parser.add_argument(
         "--plot_mode",
         default="clinical",
         choices=["clinical", "full"],
@@ -1106,12 +1098,6 @@ def _process_args(args: argparse.Namespace):
     if "input_tensors" in args and args.mode != "explore_icu":
         logging.info(f"Total TensorMaps: {len(tmaps)} Arguments are {args}")
 
-    if args.eager:
-        # Imports: third party
-        import tensorflow as tf
-
-        tf.config.experimental_run_functions_eagerly(True)
-
     if "layer_order" in args and len(set(args.layer_order)) != 3:
         raise ValueError(
             "Activation, normalization, and regularization layers must each be listed"
@@ -1128,3 +1114,10 @@ def _process_args(args: argparse.Namespace):
             pretrained_layer: new_layer
             for pretrained_layer, new_layer in args.remap_layer
         }
+
+    # Imports: third party
+    import tensorflow as tf
+
+    gpus = tf.config.experimental.list_physical_devices("GPU")
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)

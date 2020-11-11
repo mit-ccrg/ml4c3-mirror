@@ -139,8 +139,16 @@ class Writer(h5py.File):
         # Add new signal
         if signal_name not in base_dir.keys():
             signal_dir = base_dir.create_group(signal_name)
+            metadata = {}
             for field, value in signal.__dict__.items():
-                self.write_new_data(signal_dir, field, value)
+                if isinstance(value, dict):
+                    metadata.update(value)
+                else:
+                    self.write_new_data(signal_dir, field, value)
+            if metadata:
+                meta_dir = signal_dir.create_group("metadata")
+                for field, value in metadata.items():
+                    self.write_new_data(meta_dir, field, value)
         else:  # Concatenate data into existing signal (just for Bedmaster)
             if source == self.edw_dir:
                 raise ValueError(f"EDW signal {signal} already exists")
@@ -161,7 +169,7 @@ class Writer(h5py.File):
     def write_new_data(signal_dir, field, data):
         if isinstance(data, np.ndarray):
             signal_dir.create_dataset(
-                name=field,
+                name=field.lower(),
                 data=data,
                 maxshape=(None,),
                 compression=32015,
@@ -173,7 +181,7 @@ class Writer(h5py.File):
     def concatenate_data(cls, signal_dir, field, data):
         if data is None:
             return
-
+        field = field.lower()
         new_size = signal_dir[field].shape[0] + data.shape[0]
         signal_dir[field].resize(new_size, axis=0)
         signal_dir[field][-len(data) :] = data.astype(signal_dir[field].dtype)

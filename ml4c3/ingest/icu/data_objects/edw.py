@@ -1,3 +1,6 @@
+# Imports: standard library
+from typing import Dict
+
 # Imports: third party
 import numpy as np
 
@@ -119,6 +122,7 @@ class Measurement(ICUContinuousData):
         time: np.ndarray,
         units: str,
         data_type: str,
+        metadata: Dict[str, np.ndarray] = None,
     ):
         """
         Init a Measurement object.
@@ -131,9 +135,12 @@ class Measurement(ICUContinuousData):
                     each signal value.
         :param units: <str> Unit associated to the signal value.
         :param data_type: <str> "categorical" or "numerical".
+        :param metadata: Dictionary of additional measurement metadata
         """
         super().__init__(name, source, value, time, units)
         self.data_type = data_type
+        if metadata:
+            self.metadata = metadata
 
     @property
     def _source_type(self):

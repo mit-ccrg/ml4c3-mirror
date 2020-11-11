@@ -17,13 +17,11 @@ def get_visit_id():
 def get_attributes(signal):
     signal_keys = [attr for attr in dir(signal) if not attr.startswith("_")]
     array_keys = [
-        attr for attr in signal_keys if isinstance(getattr(signal, attr), np.ndarray)
-    ]
-    attr_keys = [
         attr
         for attr in signal_keys
-        if not isinstance(getattr(signal, attr), np.ndarray)
+        if isinstance(getattr(signal, attr), (np.ndarray, dict))
     ]
+    attr_keys = list(set(signal_keys) - set(array_keys))
     return array_keys, attr_keys
 
 
@@ -141,9 +139,13 @@ def test_name_conflict(temp_file, fake_signal):
             arrays, attrs = get_attributes(m_signal)
             assert sorted(list(signal_dir.keys())) == sorted(arrays)
             for key in arrays:
-                value = signal_dir[key][()]
                 expected = getattr(m_signal, key.lower())
-                assert np.array_equal(value, expected)
+                if isinstance(expected, dict):
+                    for k in expected:
+                        assert k.lower() in signal_dir[key]
+                else:
+                    value = signal_dir[key][()]
+                    assert np.array_equal(value, expected)
             for attr in attrs:
                 value = signal_dir.attrs[attr]
                 expected = getattr(m_signal, attr.lower())
@@ -201,9 +203,13 @@ def test_write_multiple_files(temp_file, fake_signal):
 def assert_dir(signal_dir, signal, names, attrs):
     assert sorted(list(signal_dir.keys())) == sorted(names)
     for field in signal_dir:
-        value = signal_dir[field][()]
         expected = getattr(signal, field.lower())
-        assert np.array_equal(value, expected)
+        if isinstance(expected, dict):
+            for k in expected:
+                assert k.lower() in signal_dir[field]
+        else:
+            value = signal_dir[field][()]
+            assert np.array_equal(value, expected)
 
     assert sorted(list(signal_dir.attrs.keys())) == sorted(attrs)
     for field in attrs:

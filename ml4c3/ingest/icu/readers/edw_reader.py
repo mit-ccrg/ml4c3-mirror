@@ -406,7 +406,6 @@ class EDWReader(Reader):
         admission_df = pd.read_csv(self.adm_file)
         init_date = admission_df[admit_column].values[0]
         end_date = admission_df[discharge_column].values[0]
-
         vitals_df = vitals_df[vitals_df[time_column] >= init_date]
         if str(end_date) != "nan":
             vitals_df = vitals_df[vitals_df[time_column] <= end_date]
@@ -600,14 +599,19 @@ class EDWReader(Reader):
         return tobacco_hist, alcohol_hist
 
     def _get_measurements(self, file_key: str, data, measure_name: str, file_name: str):
-        signal_column, result_column, units_column, time_column = EDW_FILES[file_key][
-            "columns"
-        ]
+        (
+            signal_column,
+            result_column,
+            units_column,
+            time_column,
+            additional_columns,
+        ) = EDW_FILES[file_key]["columns"]
         source = EDW_FILES[file_key]["source"]
 
         # Drop repeated values and sort
         data = data[
             [signal_column, result_column, units_column, time_column]
+            + additional_columns
         ].drop_duplicates()
         data = data.sort_values(time_column)
 
@@ -622,7 +626,23 @@ class EDWReader(Reader):
         time = self._ensure_contiguous(time)
         data_type = "Numerical"
 
-        return Measurement(measure_name, source, value, time, units, data_type)
+        additional_data = {}
+        for col in additional_columns:
+            col_data = np.array(data[col])[idx]
+            if "DTS" in col:
+                col_data = self._get_unix_timestamps(col_data)
+            col_data = self._ensure_contiguous(col_data)
+            additional_data[col] = col_data
+
+        return Measurement(
+            measure_name,
+            source,
+            value,
+            time,
+            units,
+            data_type,
+            additional_data,
+        )
 
     def _get_procedures(
         self,

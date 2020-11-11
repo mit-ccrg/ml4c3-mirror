@@ -147,6 +147,7 @@ EDW_FILES: Dict[str, Dict[str, Any]] = {
             "MeasureTXT",  # result_column
             "UnitsCD",  # units_column
             "RecordedDTS",  # time_column
+            ["EntryTimeDTS"],  # additional_columns
         ],
     },
     "lab_file": {
@@ -157,6 +158,16 @@ EDW_FILES: Dict[str, Dict[str, Any]] = {
             "ResultTXT",  # result_column
             "ReferenceRangeUnitCD",  # units_column
             "SpecimenTakenTimeDTS",  # time_column
+            [
+                "OrderDTS",
+                "StartDTS",
+                "EndDTS",
+                "ResultDTS",
+                "ComponentObservedDTS",
+                "SpecimenReceivedTimeDTS",
+                "OrderDisplayNM",
+                "ProcedureDSC",
+            ],  # additional_columns
         ],
     },
     "surgery_file": {

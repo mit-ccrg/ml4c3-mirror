@@ -182,6 +182,7 @@ Attempting to run Docker with
     ${INTERACTIVE} \
     ${GPU_DEVICE} \
     --env GROUP_IDS_NAMES \
+    --env TF_FORCE_GPU_ALLOW_GROWTH=true \
     --uts=host \
     --ipc=host \
     -v ${HOME}/:${HOME}/ \
@@ -199,6 +200,7 @@ docker run --rm \
 ${INTERACTIVE} \
 ${GPU_DEVICE} \
 --env GROUP_IDS_NAMES \
+--env TF_FORCE_GPU_ALLOW_GROWTH=true \
 --uts=host \
 --ipc=host \
 -v ${HOME}/:${HOME}/ \

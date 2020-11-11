@@ -158,6 +158,9 @@ def test_get_vitals(edw_reader):
     assert vitals1.units == "bpm"
     assert vitals2.units == "mmHg"
 
+    assert hasattr(vitals1, "metadata") and vitals1.metadata is not None
+    assert hasattr(vitals2, "metadata") and vitals1.metadata is not None
+
     expected_time1 = np.array(
         [1423742340.0, 1423742360.0, 1423742380.0, 1423742400.0],
         dtype=float,
@@ -190,6 +193,9 @@ def test_get_labs(edw_reader):
 
     assert math.isnan(labs1.units)
     assert labs2.units == "mg/dL"
+
+    assert hasattr(labs1, "metadata") and labs1.metadata is not None
+    assert hasattr(labs2, "metadata") and labs2.metadata is not None
 
     expected_time1 = np.array(
         [1620928800.0, 1620933240.0, 1620940320.0, 1620955080.0, 1620966000.0],

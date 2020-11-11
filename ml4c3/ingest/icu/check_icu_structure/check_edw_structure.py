@@ -1,6 +1,7 @@
 # Imports: standard library
 import os
 import logging
+from typing import Set
 
 # Imports: third party
 import pandas as pd
@@ -70,9 +71,10 @@ class EDWChecker:
 
         expected_columns = {}
         for element in EDW_FILES:
-            expected_columns[EDW_FILES[element]["name"]] = set(
-                EDW_FILES[element]["columns"],
-            )
+            columns: Set[str] = set()
+            for col in EDW_FILES[element]["columns"]:
+                columns &= set(col if isinstance(col, list) else [col])
+            expected_columns[EDW_FILES[element]["name"]] = columns
         expected_files = set(expected_columns.keys())
         expected_files.remove(EDW_FILES["adt_file"]["name"])
 
