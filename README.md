@@ -46,9 +46,9 @@ If you are interested in working with ml4c3 group take a look at our workflow in
 Modes are run from the command line. Here is an example of how to call `tensorize_icu` mode:
 ```
 ./scripts/run.sh -c $PWD/ml4c3/recipes.py tensorize_icu \
---tensors /media/mad3/hd5_cabg \
---path_adt /media/mad3/cohorts_lists/adt_cabg>
---path_xref /media/mad3/cohorts_lists/xref_ca>
+--tensors /media/ml4c3/hd5_cabg \
+--path_adt /media/ml4c3/cohorts_lists/adt_cabg>
+--path_xref /media/ml4c3/cohorts_lists/xref_ca>
 --adt_start_index 0 \
 --adt_end_index 1000 \
 --staging_dir ~/data/icu \

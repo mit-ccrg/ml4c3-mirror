@@ -114,7 +114,7 @@ def parse_arguments():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="/media/mad3/bedmaster_alarms",
+        default="/media/ml4c3/bedmaster_alarms",
         help="Directory where the results will be saved.",
     )
     return parser.parse_args()

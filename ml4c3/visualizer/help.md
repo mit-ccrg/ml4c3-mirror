@@ -6,7 +6,7 @@ from hd5 files.
 **Instructions**
 - Type the path of the folder containing
 the HD5 files on the input box _'input file path'_.
-You can find a large number of hd5 files on the path `/media/mad3/hd5`.
+You can find a large number of hd5 files on the path `/media/ml4c3/hd5`.
 
 - Select an hd5 file from that folder on the
 dropdown located at its side.
@@ -28,7 +28,7 @@ a line.
 be cropped to only the points that were taken during the event
 
 **Useful resources**
-- You can find a large number of hd5 files on the path `/media/mad3/hd5`.
+- You can find a large number of hd5 files on the path `/media/ml4c3/hd5`.
 
 -------------------------------------------
 This viewer is designed to visualize hd5 files tensorized with

@@ -36,6 +36,7 @@ clean:
 > @rm -rf .pytest_cache
 > @rm -rf ml4c3.egg-info
 > @find . -iname "__pycache__" -print0 | xargs -0 rm -rf
+> @find . -iname ".ipynb_checkpoints" -print0 | xargs -0 rm -rf
 
 lint_staged:
 > @echo Running hook with staged files...

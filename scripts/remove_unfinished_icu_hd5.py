@@ -50,7 +50,7 @@ def parse_arguments():
     parser.add_argument(
         "--tensors",
         type=str,
-        default="/media/mad3/hd5_arrests",
+        default="/media/ml4c3/hd5_arrests",
         help="Directory where the completness check of hd5 files is performed.",
     )
     parser.add_argument(

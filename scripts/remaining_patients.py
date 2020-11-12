@@ -13,13 +13,13 @@ def parse_arguments():
     parser.add_argument(
         "--cohort_csv",
         type=str,
-        default="/media/mad3/adt.csv",
+        default="/media/ml4c3/adt.csv",
         help="File with a list of MRNs and CSNs to check their existance.",
     )
     parser.add_argument(
         "--input_dir",
         type=str,
-        default="/media/mad3/edw/",
+        default="/media/ml4c3/edw/",
         help="Directory where the analysis is performed.",
     )
     parser.add_argument(

@@ -14,7 +14,7 @@ import numpy as np
 # Imports: first party
 from ml4c3.logger import load_config
 from ml4c3.models import BottleneckType
-from ml4c3.definitions.icu import MAD3_DIR
+from ml4c3.definitions.icu import ML4C3_DIR
 from ml4c3.definitions.sts import STS_DATA_CSV
 from ml4c3.tensormap.TensorMap import TensorMap, update_tmaps
 
@@ -201,17 +201,17 @@ def parse_args() -> argparse.Namespace:
     )
     icu_parser.add_argument(
         "--path_alarms",
-        default="/media/mad3/bedmaster_alarms/",
+        default="/media/ml4c3/bedmaster_alarms/",
         help="Directory with Bedmaster alarms .csv files.",
     )
     icu_parser.add_argument(
         "--path_edw",
-        default="/media/mad3/edw/",
+        default="/media/ml4c3/edw/",
         help="Directory with EDW .csv files.",
     )
     icu_parser.add_argument(
         "--path_xref",
-        default="/media/mad3/xref.csv",
+        default="/media/ml4c3/xref.csv",
         help="Full path of the file where EDW and Bedmaster "
         "are cross referenced. CSV file which indicates the "
         "corresponding MRN and CSN of each Bedmaster file.",
@@ -219,7 +219,7 @@ def parse_args() -> argparse.Namespace:
     icu_parser.add_argument(
         "--path_adt",
         type=str,
-        default=f"{os.path.join(MAD3_DIR, 'cohorts_lists', 'adt.csv')}",
+        default=f"{os.path.join(ML4C3_DIR, 'cohorts_lists', 'adt.csv')}",
         help="Full path of ADT table.",
     )
     icu_parser.add_argument(

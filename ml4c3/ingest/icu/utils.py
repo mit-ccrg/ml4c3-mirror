@@ -15,7 +15,7 @@ from ml4c3.definitions.icu import MAPPING_DEPARTMENTS
 class FileManager:
     """
     Class to find the desired EDW and Bedmaster Files in LM4 related with a list of
-    patients (MRNs) and copy back the resulting tensorized files to MAD3.
+    patients (MRNs) and copy back the resulting tensorized files to ml4c3.
     """
 
     def __init__(
@@ -43,7 +43,7 @@ class FileManager:
         init_patient: int = 0,
         last_patient: int = None,
         overwrite_hd5: bool = True,
-        hd5_dir: str = "/media/mad3/hd5",
+        hd5_dir: str = "/media/ml4c3/hd5",
     ):
         """
         Get list of patients from xref_file.
@@ -71,13 +71,13 @@ class FileManager:
 
     def find_save_bedmaster_alarms(
         self,
-        mad3_dir: str = "/media/mad3/bedmaster_alarms",
+        ml4c3_dir: str = "/media/ml4c3/bedmaster_alarms",
         patient_list: str = "/data/icu/patient_list.csv",
     ):
         """
         Find Bedmaster alarms and copy them to local folder.
 
-        :param mad3_dir: <str> Path to MAD3 directory.
+        :param ml4c3_dir: <str> Path to ml4c3 directory.
         :param patient_list: <str> List of desired patients to take their respective
                             Bedmaster alarms (.csv).
         """
@@ -97,7 +97,7 @@ class FileManager:
             for short_name in short_names:
                 dept_names.append(short_name)
                 source_path = os.path.join(
-                    mad3_dir,
+                    ml4c3_dir,
                     f"bedmaster_alarms_{short_name}.csv",
                 )
                 destination_path = os.path.join(
@@ -120,7 +120,7 @@ class FileManager:
 
     def find_save_edw_files(
         self,
-        mad3_dir: str = "/media/mad3/edw",
+        ml4c3_dir: str = "/media/ml4c3/edw",
         patient_list: str = "/data/icu/patient_list.csv",
         parallelize: bool = False,
         n_workers: int = None,
@@ -128,7 +128,7 @@ class FileManager:
         """
         Find edw files and copy them to local folder.
 
-        :param mad3_dir: <str> Path to MAD3 directory.
+        :param ml4c3_dir: <str> Path to ml4c3 directory.
         :param patient_list: <str> List of desired patients to take their respective
                             EDW files (.csv).
         :param parallelize: <bool> bool indicating whether the Bedmaster files copy
@@ -163,7 +163,7 @@ class FileManager:
         with multiprocessing.Pool(processes=n_workers) as pool:
             results_list = pool.starmap(
                 self._copy_files_edw,
-                [(mad3_dir, int(mrn)) for mrn in mrns],
+                [(ml4c3_dir, int(mrn)) for mrn in mrns],
             )
 
         # Finally copy adt and filtered xref table
@@ -275,8 +275,8 @@ class FileManager:
                     flag_found.append("NOT FOUND")
         return list_bedmaster_files, folder, flag_found
 
-    def _copy_files_edw(self, mad3_dir, mrn):
-        source_path = os.path.join(mad3_dir, str(mrn))
+    def _copy_files_edw(self, ml4c3_dir, mrn):
+        source_path = os.path.join(ml4c3_dir, str(mrn))
         destination_path = os.path.join(self.output_dir, "edw_temp", str(mrn))
         try:
             shutil.copytree(source_path, destination_path)

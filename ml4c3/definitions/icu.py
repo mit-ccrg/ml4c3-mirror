@@ -2,7 +2,7 @@
 import os
 from typing import Any, Dict, List
 
-MAD3_DIR = "/media/mad3"
+ML4C3_DIR = "/media/ml4c3"
 LM4_DIR = "/media/lm4-bedmaster"
 
 EDW_PREFIX = "edw"

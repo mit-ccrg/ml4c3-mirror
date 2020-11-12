@@ -24,7 +24,7 @@ class NameEncrypter:
     and groups.
     """
 
-    def __init__(self, path_key: str = "/media/mad3/tensorization.key"):
+    def __init__(self, path_key: str = "/media/ml4c3/tensorization.key"):
         """
         Init Name Encrypter.
 
@@ -115,7 +115,7 @@ class NameEncrypter:
 
     def encrypt_folders(
         self,
-        edw_dir: str = "/media/mad3/edw",
+        edw_dir: str = "/media/ml4c3/edw",
         decrypt: bool = False,
     ):
         """
@@ -143,7 +143,7 @@ class NameEncrypter:
 
     def encrypt_csv_file(
         self,
-        csv_file: str = "/media/mad3/cohorts_lists/xref_file.csv",
+        csv_file: str = "/media/ml4c3/cohorts_lists/xref_file.csv",
         decrypt: bool = False,
     ):
         """
@@ -167,7 +167,7 @@ class NameEncrypter:
             df_csv.at[idx, "PatientEncounterID"] = csn_changed
         df_csv.to_csv(csv_file, index=False)
 
-    def encrypt_hd5(self, hd5_dir: str = "/media/mad3/hd5", decrypt: bool = False):
+    def encrypt_hd5(self, hd5_dir: str = "/media/ml4c3/hd5", decrypt: bool = False):
         """
         Decrypt hd5 name and csn groups.
 
@@ -201,19 +201,19 @@ def parse_arguments():
     parser.add_argument(
         "--path_edw",
         type=str,
-        default="/media/mad3/edw/",
+        default="/media/ml4c3/edw/",
         help="Directory with EDW .csv files.",
     )
     parser.add_argument(
         "--path_hd5",
         type=str,
-        default="/media/mad3/hd5/",
+        default="/media/ml4c3/hd5/",
         help="Directory with tensorized .hd5 files.",
     )
     parser.add_argument(
         "--path_xref",
         type=str,
-        default="/media/mad3/xref.csv",
+        default="/media/ml4c3/xref.csv",
         help="Full path of the file where EDW and Bedmaster "
         "are cross referenced. CSV file which indicates the "
         "corresponding MRN and CSN of each Bedmaster file.",
