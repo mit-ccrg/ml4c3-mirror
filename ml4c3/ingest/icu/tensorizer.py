@@ -11,7 +11,7 @@ from typing import Dict, List
 import pandas as pd
 
 # Imports: first party
-from ml4c3.definitions.icu import LM4_DIR, MAD3_DIR, ICU_SCALE_UNITS
+from ml4c3.definitions.icu import LM4_DIR, ML4C3_DIR, ICU_SCALE_UNITS
 from ml4c3.ingest.icu.utils import FileManager
 from ml4c3.ingest.icu.readers import (
     EDWReader,
@@ -303,7 +303,7 @@ def copy_source_data(file_manager: FileManager, staging_dir: str, workers: int):
     # Copy Bedmaster alarms from those patients
     init = time.time()
     file_manager.find_save_bedmaster_alarms(
-        os.path.join(MAD3_DIR, "bedmaster_alarms"),
+        os.path.join(ML4C3_DIR, "bedmaster_alarms"),
         os.path.join(staging_dir, "patient_list.csv"),
     )
     elapsed_time = time.time() - init
@@ -312,7 +312,7 @@ def copy_source_data(file_manager: FileManager, staging_dir: str, workers: int):
     # Copy EDW files from those patients
     init = time.time()
     file_manager.find_save_edw_files(
-        os.path.join(MAD3_DIR, "edw"),
+        os.path.join(ML4C3_DIR, "edw"),
         os.path.join(staging_dir, "patient_list.csv"),
         parallelize=True,
         n_workers=workers,

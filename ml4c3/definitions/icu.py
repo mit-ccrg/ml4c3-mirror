@@ -250,9 +250,7 @@ MED_ACTIONS = [
     "Rate Verify",
 ]
 
-ML4ICU_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ROOT_PATH = os.path.dirname(ML4ICU_PATH)
-VISUALIZER_PATH = os.path.join(ML4ICU_PATH, "visualizer")
+VISUALIZER_PATH = os.path.join(os.path.abspath(__file__ + "/../.."), "visualizer")
 
 STATIC_UNITS = {
     "height": "m",
