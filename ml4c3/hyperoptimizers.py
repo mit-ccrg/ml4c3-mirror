@@ -1,6 +1,9 @@
+# pylint: disable=wrong-import-position, disable=wrong-import-order
+# pylint: disable=dangerous-default-value
 # Imports: standard library
 import gc
 import os
+import json
 import logging
 import argparse
 from typing import Dict, List
@@ -34,104 +37,21 @@ MAX_LOSS = 9e9
 
 def hyperoptimize(args: argparse.Namespace):
     """
-    hyperopt is a Python library that performs Bayesian optimization over hyperparameters
-    to minimize an objective function. Here, the objective function is
-    loss_from_multimodal_multitask.
-    Hyperparameter combinations are randomly chosen and non-unique choices are skipped
-    before model compilation. The computation to skip repeated combinations is fast and
-    inexpensive. However, each non-unique combination counts towards the maximum number
-    of models to evaluate. If a grid search over a relatively small search space is
-    desired, set max_evals >> size of search space. In this case, it is likely, but not
-    guaranteed, that all combinations will be seen.
+    hyperopt is a Python library that performs Bayesian optimization over
+    hyperparameters to minimize an objective function. Here, the objective function
+    is loss_from_multimodal_multitask. Hyperparameter combinations are randomly
+    chosen and non-unique choices are skipped before model compilation. The
+    computation to skip repeated combinations is fast and inexpensive. However, each
+    non-unique combination counts towards the maximum number of models to evaluate.
+    If a grid search over a relatively small search space is desired, set max_evals
+    >> size of search space. In this case, it is likely, but not guaranteed, that
+    all combinations will be seen.
     """
-    batch_size_sets = [128, 256, 512]
-    block_size_sets = [2, 4, 6]
-    conv_layers_sets = [
-        [128],
-        [64],
-    ]
-    conv_normalize_sets = [
-        "batch_norm",
-        "layer_norm",
-        "instance_norm",
-        "poincare_norm",
-    ]
-    dense_layers_sets = [
-        [16, 64],
-        [32, 16],
-    ]
-    dense_blocks_sets = [
-        [128, 64, 32],
-        [64, 32, 16],
-    ]
-    conv_dropout_sets = [0, 0.1, 0.3, 0.5]
-    conv_regularize_sets = ["spatial_dropout"]
-    conv_x_sets = _generate_conv1D_filter_widths(
-        num_unique_filters=6,
-        list_len_bounds=[1, 1],
-        first_filter_width_bounds=[6, 200],
-        probability_vary_filter_width=0,
-    )
-    dropout_sets = [0, 0.1, 0.3, 0.5]
-    learning_rate_sets = [0.0001, 0.0005, 0.001]
-    pool_types = ["max", "average"]
-    pool_x_sets = [1, 3, 5]
-
-    # Initialize empty dict of tmaps
-    tmaps: Dict[str, TensorMap] = {}
-
-    # Generate weighted loss tmaps for STS death
-    weighted_losses = [val for val in range(1, 10, 2)]
-    output_tensors_sets = _generate_weighted_loss_tmaps(
-        base_tmap_name="sts_death",
-        weighted_losses=weighted_losses,
-    )
-    for tmap_name in output_tensors_sets:
-        tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
-
-    input_tmap_sets = [
-        "ecg_2500_std_preop_newest",
-    ]
-    for tmap_name_or_list in input_tmap_sets:
-        if isinstance(tmap_name_or_list, list):
-            for tmap_name in tmap_name_or_list:
-                tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
-        elif isinstance(tmap_name_or_list, str):
-            tmaps = update_tmaps(tmap_name=tmap_name_or_list, tmaps=tmaps)
-
-    space = {
-        "batch_size": hp.choice("batch_size", batch_size_sets),
-        "block_size": hp.choice("block_size", block_size_sets),
-        "conv_dropout": hp.choice("conv_dropout", conv_dropout_sets),
-        "conv_layers": hp.choice("conv_layers", conv_layers_sets),
-        "conv_normalize": hp.choice("conv_normalize", conv_normalize_sets),
-        # "conv_regularize": hp.choice("conv_regularize", conv_regularize_sets),
-        # "conv_x": hp.choice("conv_x", conv_x_sets),
-        "dense_blocks": hp.choice("dense_blocks", dense_blocks_sets),
-        "dense_layers": hp.choice("dense_layers", dense_layers_sets),
-        "dropout": hp.choice("dropout", dropout_sets),
-        # "output_tensors": hp.choice("output_tensors", output_tensors_sets),
-        # "input_tensors": hp.choice("input_tensors", input_tmap_sets),
-        "learning_rate": hp.choice("learning_rate", learning_rate_sets),
-        "pool_type": hp.choice("pool_type", pool_types),
-        "pool_x": hp.choice("pool_x", pool_x_sets),
-    }
-    param_lists = {
-        "batch_size": batch_size_sets,
-        "block_size": block_size_sets,
-        "conv_dropout": conv_dropout_sets,
-        "conv_normalize": conv_normalize_sets,
-        # "conv_regularize": conv_regularize_sets,
-        # "conv_x": conv_x_sets,
-        "dense_blocks": dense_blocks_sets,
-        "dense_layers": dense_layers_sets,
-        "dropout": dropout_sets,
-        # "output_tensors": output_tensors_sets,
-        # "input_tensors": input_tmap_sets,
-        "learning_rate": learning_rate_sets,
-        "pool_type": pool_types,
-        "pool_x": pool_x_sets,
-    }
+    with open(args.hyperoptimize_config_file, "r") as file:
+        param_lists = json.load(file)
+    space = {}
+    for key in param_lists:
+        space.update({key: hp.choice(key, param_lists[key])})
     hyperparameter_optimizer(args=args, space=space, param_lists=param_lists)
 
 
@@ -163,7 +83,8 @@ def hyperparameter_optimizer(
             params = str(x)
             if params in seen_combinations:
                 raise ValueError(
-                    f"Trial {trial_id}: hyperparameter combination is non-unique: {params}",
+                    f"Trial {trial_id}: hyperparameter combination is non-unique: "
+                    f"{params}",
                 )
             seen_combinations.add(params)
 
@@ -177,7 +98,7 @@ def hyperparameter_optimizer(
                 )
                 return MAX_LOSS
 
-            datasets, stats, cleanups = train_valid_test_datasets(
+            datasets, _, cleanups = train_valid_test_datasets(
                 tensor_maps_in=args.tensor_maps_in,
                 tensor_maps_out=args.tensor_maps_out,
                 tensors=args.tensors,
@@ -192,7 +113,7 @@ def hyperparameter_optimizer(
                 test_csv=args.test_csv,
                 output_folder=args.output_folder,
                 run_id=args.id,
-                cache=args.cache,
+                cache_off=args.cache_off,
                 mixup_alpha=args.mixup_alpha,
             )
             train_dataset, valid_dataset, test_dataset = datasets
@@ -325,116 +246,11 @@ def set_args_from_x(args: argparse.Namespace, x: Arguments):
                 args.__dict__[k] = x[k]
             logging.info(f"value in args is now: {args.__dict__[k]}\n")
     logging.info(f"Set arguments to: {args}")
-    tmaps = {}
+    tmaps: Dict[str, TensorMap] = {}
     for tm in args.input_tensors + args.output_tensors:
         tmaps = update_tmaps(tm, tmaps)
     args.tensor_maps_in = [tmaps[it] for it in args.input_tensors]
     args.tensor_maps_out = [tmaps[ot] for ot in args.output_tensors]
-
-
-def _ensure_even_number(num: int) -> int:
-    if num % 2 == 1:
-        num += 1
-    return num
-
-
-def _generate_conv1D_filter_widths(
-    num_unique_filters: int = 25,
-    list_len_bounds: List[int] = [5, 5],
-    first_filter_width_bounds: List[int] = [50, 150],
-    probability_vary_filter_width: float = 0.5,
-    vary_filter_scale_bounds: List[float] = [1.25, 1.75],
-) -> List[List[int]]:
-    """Generate a list of 1D convolutional filter widths that are lists of even ints.
-
-    :param num_unique_filters: number of unique lists of filters to generate,
-        e.g. 10 will result in a list of 10 lists of filter widths.
-
-    :param list_len_bounds: bounds of the number of elements in each list of filters;
-        the number of elements is a randomly selected integer in these bounds.
-        e.g. [1, 4] will choose a random int from among 1, 2, 3, or 4.
-
-    :param first_filter_width_bounds: bounds of the first filter width; randomly
-        selected integer in these bounds similar to 'list_len_bounds'.
-
-    :param probability_vary_filter_width: probability of choosing to vary filter size;
-        a randomly generated float between 0-1 is compared to this value. If <=, then
-        the filter size is varied.
-
-    :param vary_filter_scale_bounds: bounds of the scale factor for decreasing filter
-        width in subsequent layers; the scale is a randomly selected float in these
-        bounds. The filter width of the next layer equals the filter width of the prior
-        layer divided by the filter_scale. This scale factor is applied to all layers:
-           ```
-           list_len = 4
-           first_filter_width = 100
-           filter_scale = 1.5
-           ```
-        These settings would result in the following filter widths: [100, 66, 44, 30]
-    """
-    list_of_filters = []
-
-    while len(list_of_filters) < num_unique_filters:
-
-        # Generate length of filter sizes
-        list_len = np.random.randint(
-            low=list_len_bounds[0],
-            high=list_len_bounds[1] + 1,
-            size=1,
-            dtype=int,
-        )[0]
-
-        # Generate first filter size
-        first_filter_width = np.random.randint(
-            low=first_filter_width_bounds[0],
-            high=first_filter_width_bounds[1] + 1,
-            size=1,
-            dtype=int,
-        )[0]
-        first_filter_width = _ensure_even_number(first_filter_width)
-
-        # Randomly determine if filter size varies or not
-        if probability_vary_filter_width >= np.random.rand():
-
-            # Randomly generate filter scale value by which to divide subsequent filter sizes
-            vary_filter_scale = np.random.uniform(
-                low=vary_filter_scale_bounds[0],
-                high=vary_filter_scale_bounds[1],
-            )
-
-            # Iterate through list of filter sizes
-            this_filter = []
-
-            for i in range(list_len):
-                this_filter.append(first_filter_width)
-
-                # Check if we want to vary filter size
-                current_filter_width = first_filter_width
-                first_filter_width = int(first_filter_width / vary_filter_scale)
-                first_filter_width = _ensure_even_number(first_filter_width)
-
-                # If reducing filter size makes it 0, reset to prior filter size
-                if first_filter_width == 0:
-                    first_filter_width = current_filter_width
-
-            if this_filter not in list_of_filters:
-                list_of_filters.append(this_filter)
-
-        # Else the filter size is constant
-        else:
-            list_of_filters.append([first_filter_width])
-
-    return list_of_filters
-
-
-def _generate_weighted_loss_tmaps(
-    base_tmap_name: str,
-    weighted_losses: List[int],
-) -> List[str]:
-    new_tmap_names = [
-        base_tmap_name + "_weighted_loss_" + str(weight) for weight in weighted_losses
-    ]
-    return new_tmap_names
 
 
 def _string_from_architecture_dict(x: Arguments):
@@ -501,7 +317,7 @@ def _trial_metrics_and_params_to_df(
     param_lists: Dict,
     trial_aucs: List[Dict[str, Dict]],
 ) -> pd.DataFrame:
-    data = defaultdict(list)
+    data: defaultdict = defaultdict(list)
     trial_aucs_test = []
     trial_aucs_train = []
     for trial_auc in trial_aucs:
@@ -608,7 +424,7 @@ def plot_trials(
     plt.xlabel("Iterations")
     plt.ylabel("Losses")
     plt.ylim(min(lplot) * 0.95, max(lplot) * 1.05)
-    plt.title(f"Hyperparameter Optimization\n")
+    plt.title("Hyperparameter Optimization\n")
     plt.axhline(
         cutoff,
         label=f"Loss display cutoff at {cutoff:.3f}",
@@ -620,7 +436,7 @@ def plot_trials(
     plt.savefig(loss_path)
     logging.info(f"Saved loss plot to {loss_path}")
 
-    fig, [ax1, ax3, ax2] = plt.subplots(
+    _, [ax1, ax3, ax2] = plt.subplots(
         nrows=1,
         ncols=3,
         figsize=(60, 20),
@@ -668,39 +484,3 @@ def plot_trials(
     plt.tight_layout()
     plt.savefig(learning_path)
     logging.info(f"Saved learning curve plot to {learning_path}")
-
-
-def sample_random_hyperparameter(
-    lower_bound: float = 0.0,
-    upper_bound: float = 1.0,
-    scaling: str = "linear",
-    primitive_type: np.dtype = float,
-):
-    if scaling not in ["linear", "logarithmic"]:
-        raise ValueError(f"Invalid scaling parameter: {scaling}")
-
-    if lower_bound >= upper_bound:
-        logging.warning(
-            f"Lower ({lower_bound}) and upper ({upper_bound}) bounds overlap",
-        )
-
-    if scaling == "logarithmic":
-        lower_bound = np.log(lower_bound)
-        upper_bound = np.log(upper_bound)
-
-    if primitive_type == float:
-        sampled_value = np.random.uniform(low=lower_bound, high=upper_bound, size=1)
-    elif primitive_type == int:
-        sampled_value = np.random.randint(
-            low=lower_bound,
-            high=upper_bound + 1,
-            size=1,
-        )
-    else:
-        raise ValueError(f"Invalid primitive type: {primitive_type}")
-
-    if scaling == "logarithmic":
-        sampled_value = np.exp(sampled_value)
-
-    # Return the value inside numpy array
-    return sampled_value.item()

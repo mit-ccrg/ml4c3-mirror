@@ -91,7 +91,10 @@ def parse_args() -> argparse.Namespace:
     io_parser.add_argument(
         "--id",
         default="no_id",
-        help="Identifier for this run, user-defined string to keep experiments organized.",
+        help=(
+            "Identifier for this run, user-defined string to keep experiments"
+            " organized."
+        ),
     )
     io_parser.add_argument(
         "--model_file",
@@ -135,7 +138,7 @@ def parse_args() -> argparse.Namespace:
     run_parser.add_argument(
         "--cache_off",
         action="store_true",
-        help="Disable caching of tf.data.Dataset",
+        help="Disable caching of tf.data.Dataset.",
     )
     run_parser.add_argument(
         "--random_seed",
@@ -420,7 +423,8 @@ def parse_args() -> argparse.Namespace:
         default=["normalization", "activation", "regularization"],
         choices=["normalization", "activation", "regularization"],
         help=(
-            "Order of normalization, activation, and regularization after convolutional layers."
+            "Order of normalization, activation and regularization after "
+            "dense or convolutional layers."
         ),
     )
     model_parser.add_argument(
@@ -713,6 +717,12 @@ def parse_args() -> argparse.Namespace:
             "Maximum number of models for the hyperparameter optimizer to evaluate"
             " before returning."
         ),
+    )
+    hyperoptimize_parser.add_argument(
+        "--hyperoptimize_config_file",
+        type=str,
+        help="Full path to to .json file with the parameters to hyperoptimize. You can "
+        "use the script generate_hyperoptimize_json.py to create it.",
     )
 
     # Explore arguments

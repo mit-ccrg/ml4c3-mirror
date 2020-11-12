@@ -38,6 +38,8 @@ BATCH_INPUT_INDEX, BATCH_OUTPUT_INDEX, BATCH_PATHS_INDEX = (
     2,
 )
 
+# pylint: disable=line-too-long
+
 
 def _get_sample(
     tmaps: List[TensorMap],
@@ -152,7 +154,7 @@ def make_data_generator_factory(
     augment: bool = False,
     keep_paths: bool = False,
 ) -> Tuple[Callable[[], SampleGenerator], StatsWrapper, Cleanup]:
-    tensor_queue = Queue(MAX_QUEUE_SIZE)
+    tensor_queue: Queue = Queue(MAX_QUEUE_SIZE)
 
     processes = []
     worker_paths = np.array_split(paths, num_workers)
@@ -193,9 +195,9 @@ def make_data_generator_factory(
         for process in processes:
             process.start_signal.set()
 
-        stats = Counter()
+        stats: Counter = Counter()
         num_paths = len(paths)
-        linked_tensor_buffer = defaultdict(list)
+        linked_tensor_buffer: defaultdict = defaultdict(list)
         while stats["paths_completed"] < num_paths or len(linked_tensor_buffer) > 0:
             sample, path, num_linked = tensor_queue.get()
             if sample == PATH_SUCCEEDED:
@@ -326,8 +328,8 @@ def train_valid_test_datasets(
     keep_paths: bool = False,
     keep_paths_test: bool = True,
     sample_csv: str = None,
-    valid_ratio: float = None,
-    test_ratio: float = None,
+    valid_ratio: float = 0.2,
+    test_ratio: float = 0.1,
     train_csv: str = None,
     valid_csv: str = None,
     test_csv: str = None,
@@ -350,21 +352,29 @@ def train_valid_test_datasets(
     :param batch_size: number of samples in each batch
     :param num_workers: number of worker processes used to feed each dataset
     :param keep_paths: bool to return the path to each sample's source file
-    :param keep_paths_test:  bool to return the path to each sample's source file for the test set
-    :param sample_csv: CSV file of sample ids, sample ids are considered for train/valid/test only if it is in sample_csv
-    :param valid_ratio: rate of tensors to use for validation, mutually exclusive with valid_csv
-    :param test_ratio: rate of tensors to use for testing, mutually exclusive with test_csv
+    :param keep_paths_test: bool to return the path to each sample's source file
+                            for the test set
+    :param sample_csv: CSV file of sample ids, sample ids are considered for
+                       train/valid/test only if it is in sample_csv
+    :param valid_ratio: rate of tensors to use for validation, mutually exclusive
+                        with valid_csv
+    :param test_ratio: rate of tensors to use for testing, mutually exclusive with
+                       test_csv
     :param train_csv: CSV file of sample ids to use for training
-    :param valid_csv: CSV file of sample ids to use for validation, mutually exclusive with valid_ratio
-    :param test_csv: CSV file of sample ids to use for testing, mutually exclusive with test_ratio
-    :param no_empty_paths_allowed: if true, all data splits must contain paths, otherwise only one split needs to be non-empty
+    :param valid_csv: CSV file of sample ids to use for validation, mutually exclusive
+                      with valid_ratio
+    :param test_csv: CSV file of sample ids to use for testing, mutually exclusive
+                     with test_ratio
+    :param no_empty_paths_allowed: if true, all data splits must contain paths,
+                                   otherwise only one split needs to be non-empty
     :param output_folder: output folder of output files
     :param run_id: id of experiment
     :param mixup_alpha: If non-zero, mixup batches with this alpha parameter for mixup
-    :return: tuple of three tensorflow Datasets, three StatsWrapper objects, and three callbacks to cleanup worker processes
+    :return: tuple of three tensorflow Datasets, three StatsWrapper objects, and
+             three callbacks to cleanup worker processes
     """
     if len(tensor_maps_in) == 0 or len(tensor_maps_out) == 0:
-        raise ValueError(f"input and output tensors must both be given")
+        raise ValueError("input and output tensors must both be given")
 
     train_paths, valid_paths, test_paths = get_train_valid_test_paths(
         tensors=tensors,
@@ -634,23 +644,23 @@ def _get_stats_as_dataframes_from_multiple_datasets(
 
 
 def _get_train_valid_test_discard_ratios(
-    valid_ratio: float,
-    test_ratio: float,
-    train_csv: Optional[str],
-    valid_csv: Optional[str],
-    test_csv: Optional[str],
-) -> Tuple[int, int, int, int]:
+    valid_ratio: float = 0.2,
+    test_ratio: float = 0.1,
+    train_csv: Optional[str] = None,
+    valid_csv: Optional[str] = None,
+    test_csv: Optional[str] = None,
+) -> Tuple[float, float, float, float]:
 
     if valid_csv is not None:
-        valid_ratio = 0
+        valid_ratio = 0.0
     if test_csv is not None:
-        test_ratio = 0
+        test_ratio = 0.0
     if train_csv is not None:
-        train_ratio = 0
+        train_ratio = 0.0
         discard_ratio = 1.0 - valid_ratio - test_ratio
     else:
         train_ratio = 1.0 - valid_ratio - test_ratio
-        discard_ratio = 0
+        discard_ratio = 0.0
 
     if not math.isclose(train_ratio + valid_ratio + test_ratio + discard_ratio, 1.0):
         raise ValueError(
@@ -680,7 +690,8 @@ def sample_csv_to_set(
     try:
         int(df.iloc[0].values[0])
 
-    # If fails, must be header; overwrite column name with first row and remove first row
+    # If fails, must be header; overwrite column name with first row and remove
+    # first row
     except ValueError:
         df.columns = df.iloc[0]
         df = df[1:]
@@ -701,8 +712,9 @@ def sample_csv_to_set(
 
         if len(matches) > 1:
             logging.warning(
-                f"{sample_csv} has more than one potential column for MRNs. Inferring most"
-                " likely column name, but recommend explicitly setting MRN column name.",
+                f"{sample_csv} has more than one potential column for MRNs. "
+                "Inferring most likely column name, but recommend explicitly "
+                "setting MRN column name.",
             )
 
     # Isolate MRN column from dataframe, cast to float -> int -> string
@@ -713,57 +725,53 @@ def sample_csv_to_set(
 
 def get_train_valid_test_paths(
     tensors: str,
-    sample_csv: Optional[str],
-    valid_ratio: float,
-    test_ratio: float,
-    train_csv: Optional[str],
-    valid_csv: Optional[str],
-    test_csv: Optional[str],
+    sample_csv: Optional[str] = None,
+    valid_ratio: float = 0.2,
+    test_ratio: float = 0.1,
+    train_csv: Optional[str] = None,
+    valid_csv: Optional[str] = None,
+    test_csv: Optional[str] = None,
     no_empty_paths_allowed: bool = True,
 ) -> Tuple[List[str], List[str], List[str]]:
     """
     Return 3 disjoint lists of tensor paths.
 
     The paths are split in training, validation, and testing lists.
-    If no arguments are given, paths are split into train/valid/test in the ratio 0.7/0.2/0.1.
+    If no arguments are given, paths are split into train/valid/test in the ratio
+    0.7/0.2/0.1.
     Otherwise, at least 2 arguments are required to specify train/valid/test sets.
 
     :param tensors: path to directory containing tensors
-    :param sample_csv: path to csv containing sample ids, only consider sample ids for splitting
-                       into train/valid/test sets if they appear in sample_csv
-    :param valid_ratio: rate of tensors in validation list, mutually exclusive with valid_csv
-    :param test_ratio: rate of tensors in testing list, mutually exclusive with test_csv
+    :param sample_csv: path to csv containing sample ids, only consider sample ids
+                       for splitting into train/valid/test sets if they appear in
+                       sample_csv
+    :param valid_ratio: rate of tensors in validation list, mutually exclusive with
+                        valid_csv
+    :param test_ratio: rate of tensors in testing list, mutually exclusive with
+                       test_csv
     :param train_csv: path to csv containing sample ids to reserve for training list
-    :param valid_csv: path to csv containing sample ids to reserve for validation list, mutually exclusive with valid_ratio
-    :param test_csv: path to csv containing sample ids to reserve for testing list, mutually exclusive with test_ratio
-    :param no_empty_paths_allowed: If true, all data splits must contain paths, otherwise only one split needs to be non-empty
+    :param valid_csv: path to csv containing sample ids to reserve for validation
+                      list, mutually exclusive with valid_ratio
+    :param test_csv: path to csv containing sample ids to reserve for testing list,
+                     mutually exclusive with test_ratio
+    :param no_empty_paths_allowed: If true, all data splits must contain paths,
+                                   otherwise only one split needs to be non-empty
 
     :return: tuple of 3 lists of hd5 tensor file paths
     """
-    train_paths = []
-    valid_paths = []
-    test_paths = []
-    discard_paths = []
+    train_paths: List[str] = []
+    valid_paths: List[str] = []
+    test_paths: List[str] = []
+    discard_paths: List[str] = []
+    unassigned_paths: List[str] = []
 
-    (
-        train_ratio,
-        valid_ratio,
-        test_ratio,
-        discard_ratio,
-    ) = _get_train_valid_test_discard_ratios(
+    (train_ratio, valid_ratio, test_ratio, _) = _get_train_valid_test_discard_ratios(
         valid_ratio=valid_ratio,
         test_ratio=test_ratio,
         train_csv=train_csv,
         valid_csv=valid_csv,
         test_csv=test_csv,
     )
-
-    choices = {
-        "train": (train_paths, train_ratio),
-        "valid": (valid_paths, valid_ratio),
-        "test": (test_paths, test_ratio),
-        "discard": (discard_paths, discard_ratio),
-    }
 
     sample_set = sample_csv_to_set(sample_csv)
     train_set = sample_csv_to_set(train_csv)
@@ -790,7 +798,7 @@ def get_train_valid_test_paths(
         raise ValueError("validation and test samples overlap")
 
     # Find tensors and split them among train/valid/test
-    for root, dirs, files in os.walk(tensors):
+    for root, _, files in os.walk(tensors):
         for fname in files:
             if not fname.endswith(TENSOR_EXT):
                 continue
@@ -801,18 +809,27 @@ def get_train_valid_test_paths(
 
             if sample_set is not None and sample_id not in sample_set:
                 continue
-            elif train_set is not None and sample_id in train_set:
+            if train_set is not None and sample_id in train_set:
                 train_paths.append(path)
             elif valid_set is not None and sample_id in valid_set:
                 valid_paths.append(path)
             elif test_set is not None and sample_id in test_set:
                 test_paths.append(path)
             else:
-                choice = np.random.choice(
-                    [k for k in choices],
-                    p=[choices[k][1] for k in choices],
-                )
-                choices[choice][0].append(path)
+                unassigned_paths.append(path)
+
+    np.random.shuffle(unassigned_paths)
+    n = len(unassigned_paths)
+    n_train, n_valid, n_test = (
+        round(train_ratio * n),
+        round(valid_ratio * n),
+        round(test_ratio * n),
+    )
+    indices = [n_train, n_train + n_valid, n_train + n_valid + n_test]
+    _train, _valid, _test, _discard = np.split(unassigned_paths, indices)
+    train_paths.extend(_train)
+    valid_paths.extend(_valid)
+    test_paths.extend(_test)
 
     logging.info(
         f"Found {len(train_paths)} train, {len(valid_paths)} validation, and"
@@ -873,7 +890,7 @@ def get_array_from_dict_of_arrays(
     data: Dict[str, np.ndarray],
     drop_redundant_columns: bool = False,
 ) -> np.ndarray:
-    array = []
+    array = np.array([])
 
     # Determine if we are parsing input or output tensor maps
     tmap_type = "input" if np.all(["input" in key for key in data]) else "output"
@@ -892,10 +909,7 @@ def get_array_from_dict_of_arrays(
             if tm.is_categorical:
                 _, neg_idx = find_negative_label_and_channel(tm.channel_map)
                 tensor = np.delete(tensor, neg_idx, axis=1)
-        array.append(tensor)
-
-    # Convert list of arrays into n-dimensional array
-    array = np.concatenate(array, axis=1)
+        array = np.append(array, tensor, axis=1) if len(array) > 0 else tensor
 
     # If the array is 1D, reshape to contiguous flattened array
     # e.g. change shape from (n, 1) to (n,)
