@@ -89,6 +89,11 @@ def parse_args() -> argparse.Namespace:
         help="Path to output folder for recipes.py runs.",
     )
     io_parser.add_argument(
+        "--id",
+        default="no_id",
+        help="Identifier for this run, user-defined string to keep experiments organized.",
+    )
+    io_parser.add_argument(
         "--model_file",
         help="Path to a saved model architecture and weights (hd5).",
     )
@@ -128,19 +133,9 @@ def parse_args() -> argparse.Namespace:
     # Run specific and debugging arguments
     run_parser = argparse.ArgumentParser(add_help=False)
     run_parser.add_argument(
-        "--id",
-        default="no_id",
-        help=(
-            "Identifier for this run, user-defined string to keep experiments"
-            " organized."
-        ),
-    )
-    run_parser.add_argument(
-        "--cache",
+        "--cache_off",
         action="store_true",
-        help="Cache tf.data.Dataset for faster loading. Best used with small-sized of"
-        " data, e.g. STS features. Not ideal for large data (waveforms) or large "
-        "batch sizes",
+        help="Disable caching of tf.data.Dataset",
     )
     run_parser.add_argument(
         "--random_seed",
@@ -167,8 +162,7 @@ def parse_args() -> argparse.Namespace:
         "--image_ext",
         default=".pdf",
         choices=[".pdf", ".eps", ".svg", ".png"],
-        help="File format extension to save images as."
-        "Note this includes a leading period.",
+        help="File format extension to save images as. Includes leading period.",
     )
     run_parser.add_argument(
         "--num_workers",
@@ -378,20 +372,15 @@ def parse_args() -> argparse.Namespace:
         help="Dropout rate of convolutional kernels must be in [0.0, 1.0].",
     )
     model_parser.add_argument(
+        "--conv_regularize",
+        choices=["dropout", "spatial_dropout"],
+        help="Type of regularization layer for convolutions.",
+    )
+    model_parser.add_argument(
         "--conv_type",
         default="conv",
         choices=["conv", "separable", "depth"],
         help="Type of convolutional layer",
-    )
-    model_parser.add_argument(
-        "--conv_normalize",
-        choices=["", "batch_norm", "layer_norm", "instance_norm", "poincare_norm"],
-        help="Type of normalization layer for convolutions",
-    )
-    model_parser.add_argument(
-        "--conv_regularize",
-        choices=["dropout", "spatial_dropout"],
-        help="Type of regularization layer for convolutions.",
     )
     model_parser.add_argument(
         "--dense_blocks",
@@ -421,13 +410,17 @@ def parse_args() -> argparse.Namespace:
         help="Dropout rate of dense layers must be in [0.0, 1.0].",
     )
     model_parser.add_argument(
+        "--layer_normalization",
+        choices=["", "batch_norm", "layer_norm", "instance_norm", "poincare_norm"],
+        help="Type of normalization layer after dense or convolutional layer.",
+    )
+    model_parser.add_argument(
         "--layer_order",
         nargs=3,
-        default=["activation", "regularization", "normalization"],
-        choices=["activation", "normalization", "regularization"],
+        default=["normalization", "activation", "regularization"],
+        choices=["normalization", "activation", "regularization"],
         help=(
-            "Order of activation, regularization, and normalization layers following"
-            " convolutional layers."
+            "Order of normalization, activation, and regularization after convolutional layers."
         ),
     )
     model_parser.add_argument(
@@ -1064,9 +1057,7 @@ def parse_args() -> argparse.Namespace:
         ],
     )
     args = parser.parse_args()
-
     _process_args(args)
-
     return args
 
 

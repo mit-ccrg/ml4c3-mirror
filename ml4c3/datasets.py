@@ -246,7 +246,7 @@ def make_dataset(
     num_workers: int,
     augment: bool = False,
     keep_paths: bool = False,
-    cache: bool = False,
+    cache_off: bool = False,
     mixup_alpha: float = 0,
 ) -> Tuple[tf.data.Dataset, StatsWrapper, Cleanup]:
     output_types = (
@@ -278,7 +278,8 @@ def make_dataset(
         .batch(batch_size)
         .prefetch(16)
     )
-    if cache:
+
+    if not cache_off:
         dataset = dataset.cache()
 
     if mixup_alpha != 0:
@@ -333,7 +334,7 @@ def train_valid_test_datasets(
     no_empty_paths_allowed: bool = True,
     output_folder: str = None,
     run_id: str = None,
-    cache: bool = False,
+    cache_off: bool = False,
     mixup_alpha: float = 0.0,
 ) -> Tuple[
     Tuple[tf.data.Dataset, tf.data.Dataset, tf.data.Dataset],
@@ -401,7 +402,7 @@ def train_valid_test_datasets(
         num_workers=num_workers,
         augment=True,
         keep_paths=keep_paths,
-        cache=cache,
+        cache_off=cache_off,
         mixup_alpha=mixup_alpha,
     )
     valid_dataset, valid_stats, valid_cleanup = make_dataset(
@@ -413,7 +414,7 @@ def train_valid_test_datasets(
         num_workers=num_workers,
         augment=False,
         keep_paths=keep_paths,
-        cache=cache,
+        cache_off=cache_off,
     )
     test_dataset, test_stats, test_cleanup = make_dataset(
         data_split="test",
@@ -424,7 +425,7 @@ def train_valid_test_datasets(
         num_workers=num_workers,
         augment=False,
         keep_paths=keep_paths or keep_paths_test,
-        cache=cache,
+        cache_off=cache_off,
     )
 
     return (

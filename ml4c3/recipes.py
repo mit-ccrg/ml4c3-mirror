@@ -128,7 +128,7 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         test_csv=args.test_csv,
         output_folder=args.output_folder,
         run_id=args.id,
-        cache=args.cache,
+        cache_off=args.cache_off,
         mixup_alpha=args.mixup_alpha,
     )
     train_dataset, valid_dataset, test_dataset = datasets
@@ -208,7 +208,7 @@ def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         no_empty_paths_allowed=False,
         output_folder=args.output_folder,
         run_id=args.id,
-        cache=args.cache,
+        cache_off=args.cache_off,
     )
     _, _, test_dataset = datasets
 
@@ -254,7 +254,7 @@ def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
         test_csv=args.test_csv,
         output_folder=args.output_folder,
         run_id=args.id,
-        cache=args.cache,
+        cache_off=args.cache_off,
         mixup_alpha=args.mixup_alpha,
     )
     train_dataset, valid_dataset, test_dataset = datasets
@@ -395,7 +395,7 @@ def train_simclr_model(args: argparse.Namespace):
         test_csv=args.test_csv,
         output_folder=args.output_folder,
         run_id=args.id,
-        cache=args.cache,
+        cache_off=args.cache_off,
         mixup_alpha=args.mixup_alpha,
     )
     train_dataset, valid_dataset, _ = datasets

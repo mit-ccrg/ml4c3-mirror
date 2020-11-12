@@ -1021,7 +1021,7 @@ def make_multimodal_multitask_model(
     dense_blocks: List[int] = None,
     block_size: int = None,
     conv_type: str = None,
-    conv_normalize: str = None,
+    layer_normalization: str = None,
     conv_regularize: str = None,
     layer_order: List[str] = None,
     conv_x: List[int] = None,
@@ -1063,7 +1063,7 @@ def make_multimodal_multitask_model(
     :param dense_blocks: List of number of filters in densenet modules for densenet convolutional models
     :param block_size: Number of layers within each Densenet module for densenet convolutional models
     :param conv_type: Type of convolution to use, e.g. separable
-    :param conv_normalize: Type of normalization layer for convolutions, e.g. batch norm
+    :param layer_normalization: Type of normalization layer for fully connected and convolutional layers, e.g. batch norm
     :param conv_regularize: Type of regularization for convolutions, e.g. dropout
     :param layer_order: Order of activation, normalization, and regularization layers
     :param conv_x: Size of X dimension for 2D and 3D convolutional kernels
@@ -1101,7 +1101,7 @@ def make_multimodal_multitask_model(
         logging.info(f"Loaded model file from: {model_file}")
         return m
 
-    dense_normalize = conv_normalize
+    dense_normalize = layer_normalization
     dense_regularize = "dropout" if dropout else None
     dense_regularize_rate = dropout
     conv_regularize_rate = conv_dropout
@@ -1143,7 +1143,7 @@ def make_multimodal_multitask_model(
                 conv_z=conv_z,
                 block_size=block_size,
                 activation=activation,
-                normalization=conv_normalize,
+                normalization=layer_normalization,
                 regularization=conv_regularize,
                 layer_order=layer_order,
                 regularization_rate=conv_regularize_rate,
@@ -1224,7 +1224,7 @@ def make_multimodal_multitask_model(
                 conv_z=conv_z,
                 block_size=1,
                 activation=activation,
-                normalization=conv_normalize,
+                normalization=layer_normalization,
                 regularization=conv_regularize,
                 regularization_rate=conv_regularize_rate,
                 layer_order=layer_order,
