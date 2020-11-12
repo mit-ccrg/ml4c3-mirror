@@ -479,3 +479,4 @@ def tensorize_batched(args):
             f"{len(missed_patients)} HD5 files are not tensorized. MRN of "
             f"those patients: {sorted(missed_patients)}",
         )
+    os.rmdir(args.staging_dir)
