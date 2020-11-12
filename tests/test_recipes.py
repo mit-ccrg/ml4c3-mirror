@@ -1,5 +1,6 @@
 # Imports: standard library
 import os
+import argparse
 
 # Imports: third party
 import numpy as np
@@ -18,7 +19,7 @@ from ml4c3.tensormap.TensorMap import TensorMap, Interpretation
 
 
 class TestRecipes:
-    def test_infer(self, default_arguments_infer):
+    def test_infer(self, default_arguments_infer: argparse.Namespace):
         infer_multimodal_multitask(default_arguments_infer)
         path = os.path.join(
             default_arguments_infer.output_folder,
@@ -35,7 +36,12 @@ class TestRecipes:
         )
         assert len(set(predictions["sample_id"])) == len(test_samples)
 
-    def test_explore(self, default_arguments_explore, tmpdir_factory, utils):
+    def test_explore(
+        self,
+        default_arguments_explore: argparse.Namespace,
+        tmpdir_factory,
+        utils,
+    ):
         temp_dir = tmpdir_factory.mktemp("explore_tensors")
         default_arguments_explore.tensors = str(temp_dir)
         tmaps = pytest.TMAPS_UP_TO_4D[:]
@@ -80,5 +86,5 @@ class TestRecipes:
                         )
                         assert channel_val == row_expected[idx]
 
-    def test_train(self, default_arguments):
+    def test_train(self, default_arguments: argparse.Namespace):
         train_multimodal_multitask(default_arguments)

@@ -12,7 +12,7 @@ import pandas as pd
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
 from ml4c3.definitions.icu import EDW_FILES, MAPPING_DEPARTMENTS
-from ml4c3.tensormap.icu_static import get_tmap as GET_STATIC_TMAP
+from ml4c3.tensormap.icu_signals import get_tmap as GET_SIGNAL_TMAP
 from ml4c3.ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
 
 EXPECTED_FILES = []
@@ -215,8 +215,8 @@ class ICUCoverageAssesser:
         for _, row in csv.iterrows():
             if f"{int(row['MRN'])}.hd5" in hd5_files:
                 hd5_file = h5py.File(os.path.join(path_hd5, f"{row['MRN']}.hd5"), "r")
-                csns = GET_STATIC_TMAP("visits").tensor_from_file(
-                    GET_STATIC_TMAP("visits"),
+                csns = GET_SIGNAL_TMAP("visits").tensor_from_file(
+                    GET_SIGNAL_TMAP("visits"),
                     hd5_file,
                 )
                 if str(int(row["PatientEncounterID"])) in csns:

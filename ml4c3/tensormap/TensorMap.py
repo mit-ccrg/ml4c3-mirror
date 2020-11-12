@@ -497,9 +497,9 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
 
     # fmt: off
 
-    # ICU Alarms tmaps
-    from ml4c3.tensormap.icu_alarms import get_tmap as tmaps_icu_alarms # isort: skip
-    tm = tmaps_icu_alarms(tmap_name)
+    # ICU Signal tmaps
+    from ml4c3.tensormap.icu_signals import get_tmap as tmaps_icu_signals # isort: skip
+    tm = tmaps_icu_signals(tmap_name)
     if tm:
         tmaps[tmap_name] = tm
         return tmaps
@@ -511,23 +511,9 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
         tmaps[tmap_name] = tm
         return tmaps
 
-    # ICU Bedmaster tmaps
-    from ml4c3.tensormap.icu_bedmaster_signals import get_tmap as tmaps_icu_bedmaster_signals # isort: skip
-    tm = tmaps_icu_bedmaster_signals(tmap_name)
-    if tm:
-        tmaps[tmap_name] = tm
-        return tmaps
-
     # ICU ECG features tmaps
     from ml4c3.tensormap.icu_ecg_features import get_tmap as tmaps_icu_ecg_features # isort: skip
     tm = tmaps_icu_ecg_features(tmap_name)
-    if tm:
-        tmaps[tmap_name] = tm
-        return tmaps
-
-    # ICU Events tmaps
-    from ml4c3.tensormap.icu_events import get_tmap as tmaps_icu_events # isort: skip
-    tm = tmaps_icu_events(tmap_name)
     if tm:
         tmaps[tmap_name] = tm
         return tmaps
@@ -546,20 +532,6 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
         tmaps[tmap_name] = tm
         return tmaps
 
-    # ICU Measurements tmaps
-    from ml4c3.tensormap.icu_measurements import get_tmap as tmaps_icu_measurements # isort: skip
-    tm = tmaps_icu_measurements(tmap_name)
-    if tm:
-        tmaps[tmap_name] = tm
-        return tmaps
-
-    # ICU Medications tmaps
-    from ml4c3.tensormap.icu_medications import get_tmap as tmaps_icu_medications # isort: skip
-    tm = tmaps_icu_medications(tmap_name)
-    if tm:
-        tmaps[tmap_name] = tm
-        return tmaps
-
     # ICU Standardized tmaps
     from ml4c3.tensormap.icu_normalized import get_tmap as tmaps_icu_normalized # isort: skip
     tm = tmaps_icu_normalized(tmap_name)
@@ -570,13 +542,6 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
     # ICU Standardized tmaps
     from ml4c3.tensormap.icu_static_around_event import get_tmap as tmaps_icu_static_around_event # isort: skip
     tm = tmaps_icu_static_around_event(tmap_name)
-    if tm:
-        tmaps[tmap_name] = tm
-        return tmaps
-
-   # ICU Standardized tmaps
-    from ml4c3.tensormap.icu_static import get_tmap as tmaps_icu_static # isort: skip
-    tm = tmaps_icu_static(tmap_name)
     if tm:
         tmaps[tmap_name] = tm
         return tmaps
@@ -641,29 +606,29 @@ def create_tmap(signal, source, field) -> Optional[TensorMap]:
     tm_name = f"{signal}_{field}"
     if source in ["vital", "waveform"]:
         # Imports: first party
-        from ml4c3.tensormap.icu_bedmaster_signals import get_bedmaster_signal_tmap
+        from ml4c3.tensormap.icu_signals import get_bedmaster_signal_tmap
 
         return get_bedmaster_signal_tmap(tm_name, signal, source)
 
     if source == "alarm":
         # Imports: first party
-        from ml4c3.tensormap.icu_alarms import create_alarm_tmap
+        from ml4c3.tensormap.icu_signals import create_alarm_tmap
 
         return create_alarm_tmap(tm_name, signal)
 
     if source in ["flowsheet", "labs"]:
         # Imports: first party
-        from ml4c3.tensormap.icu_measurements import create_measurement_tmap
+        from ml4c3.tensormap.icu_signals import create_measurement_tmap
 
         return create_measurement_tmap(tm_name, signal, source)
     if source == "med":
         # Imports: first party
-        from ml4c3.tensormap.icu_medications import create_med_tmap
+        from ml4c3.tensormap.icu_signals import create_med_tmap
 
         return create_med_tmap(tm_name, signal)
     if source in ["events", "surgery", "transfusions", "procedures"]:
         # Imports: first party
-        from ml4c3.tensormap.icu_events import create_event_tmap
+        from ml4c3.tensormap.icu_signals import create_event_tmap
 
         return create_event_tmap(tm_name, signal, source)
 

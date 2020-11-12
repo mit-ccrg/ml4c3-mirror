@@ -8,22 +8,34 @@ import pytest
 
 # Imports: first party
 from ml4c3.definitions.icu import EDW_FILES
+from ml4c3.ingest.icu.readers import EDWReader
 
 # pylint: disable=no-member
 
 
-def test_infer_full_path(edw_reader):
+@pytest.fixture(scope="function")
+def edw_reader() -> EDWReader:
+    reader = EDWReader(pytest.edw_dir, "123", "345")
+    return reader
+
+
+def test_infer_full_path(edw_reader: EDWReader):
     expected_path = os.path.join(pytest.edw_patient_dir, "flowsheet.csv")
     assert expected_path == edw_reader.vitals_file
 
 
-def test_infer_full_path2(get_edw_reader):
-    reader = get_edw_reader("flowsheet_v2")
+def test_infer_full_path2():
+    reader = EDWReader(
+        pytest.edw_dir,
+        pytest.example_mrn,
+        pytest.example_visit_id,
+        vitals_file="flowsheet_v2",
+    )
     expected_path = os.path.join(pytest.edw_patient_dir, "flowsheet_v2.csv")
     assert expected_path == reader.vitals_file
 
 
-def test_list_vitals(edw_reader):
+def test_list_vitals(edw_reader: EDWReader):
     expected_vitals = [
         "BLOOD PRESSURE",
         "PULSE",
@@ -34,7 +46,7 @@ def test_list_vitals(edw_reader):
     assert sorted(edw_reader.list_vitals()) == sorted(expected_vitals)
 
 
-def test_list_labs(edw_reader):
+def test_list_labs(edw_reader: EDWReader):
     expected_labs = [
         "PH, ARTERIAL",
         "LACTATE, BLOOD",
@@ -44,7 +56,7 @@ def test_list_labs(edw_reader):
     assert sorted(edw_reader.list_labs()) == sorted(expected_labs)
 
 
-def test_list_medications(edw_reader):
+def test_list_medications(edw_reader: EDWReader):
     expected_medications = [
         "NOREPINEPHRINE INFUSION SYRINGE IN SWFI 80 MCG/ML CMPD CENTRAL_MGH",
         "SODIUM CHLORIDE 0.9 % INTRAVENOUS SOLUTION",
@@ -55,7 +67,7 @@ def test_list_medications(edw_reader):
     assert sorted(edw_reader.list_medications()) == sorted(expected_medications)
 
 
-def test_list_surgery(edw_reader):
+def test_list_surgery(edw_reader: EDWReader):
     expected_surgery = [
         "COLONOSCOPY",
         "CORONARY ARTERY BYPASS GRAFT",
@@ -63,12 +75,12 @@ def test_list_surgery(edw_reader):
     assert sorted(edw_reader.list_surgery()) == sorted(expected_surgery)
 
 
-def test_list_other_procedures(edw_reader):
+def test_list_other_procedures(edw_reader: EDWReader):
     expected_procedures = ["HEMODIALYSIS", "HEMODIALYSIS / ULTRAFILTRATION"]
     assert edw_reader.list_other_procedures() == sorted(expected_procedures)
 
 
-def test_list_transfusions(edw_reader):
+def test_list_transfusions(edw_reader: EDWReader):
     expected_transfusions = [
         "TRANSFUSE RED BLOOD CELLS",
         "TRANSFUSE PLATELETS",
@@ -77,12 +89,12 @@ def test_list_transfusions(edw_reader):
     assert sorted(edw_reader.list_transfusions()) == sorted(expected_transfusions)
 
 
-def test_list_events(edw_reader):
+def test_list_events(edw_reader: EDWReader):
     expected_events = ["CODE START", "RAPID RESPONSE START"]
     assert sorted(edw_reader.list_events()) == sorted(expected_events)
 
 
-def test_get_static_data(edw_reader):
+def test_get_static_data(edw_reader: EDWReader):
     static_info = edw_reader.get_static_data()
     expected_height = float("5") * 0.3048 + float("2.156") * 0.0254
     assert static_info.height == expected_height
@@ -142,7 +154,7 @@ def test_get_static_data(edw_reader):
     assert static_info.admin_diag == expected_admin_diagnosis
 
 
-def test_get_vitals(edw_reader):
+def test_get_vitals(edw_reader: EDWReader):
     vitals1 = edw_reader.get_vitals("PULSE")
     vitals2 = edw_reader.get_vitals("R PHS OB BP SYSTOLIC OUTGOING")
 
@@ -178,7 +190,7 @@ def test_get_vitals(edw_reader):
     assert np.array_equal(vitals2.value, expected_vals2)
 
 
-def test_get_labs(edw_reader):
+def test_get_labs(edw_reader: EDWReader):
     labs1 = edw_reader.get_labs("PH, ARTERIAL")
     labs2 = edw_reader.get_labs("CREATININE")
 
@@ -214,7 +226,7 @@ def test_get_labs(edw_reader):
     assert np.array_equal(labs2.value, expected_vals2)
 
 
-def test_get_med_doses(edw_reader):
+def test_get_med_doses(edw_reader: EDWReader):
     med1 = edw_reader.get_med_doses("ASPIRIN 325 MG TABLET")
     med2 = edw_reader.get_med_doses("LACTATED RINGERS IV BOLUS")
     med3 = edw_reader.get_med_doses(
@@ -254,7 +266,7 @@ def test_get_med_doses(edw_reader):
     )
 
 
-def test_get_surgery(edw_reader):
+def test_get_surgery(edw_reader: EDWReader):
     surgery1 = edw_reader.get_surgery("COLONOSCOPY")
     surgery2 = edw_reader.get_surgery("CORONARY ARTERY BYPASS GRAFT")
     assert surgery1.name == "COLONOSCOPY"
@@ -273,7 +285,7 @@ def test_get_surgery(edw_reader):
     assert np.array_equal(surgery2.end_date, np.array([323860500.0], dtype=float))
 
 
-def test_get_other_procedures(edw_reader):
+def test_get_other_procedures(edw_reader: EDWReader):
     procedure1 = edw_reader.get_other_procedures("HEMODIALYSIS")
     procedure2 = edw_reader.get_other_procedures("HEMODIALYSIS / ULTRAFILTRATION")
     assert procedure1.name == "HEMODIALYSIS"
@@ -298,7 +310,7 @@ def test_get_other_procedures(edw_reader):
     )
 
 
-def test_get_transfusions(edw_reader):
+def test_get_transfusions(edw_reader: EDWReader):
     transfuse1 = edw_reader.get_transfusions("TRANSFUSE RED BLOOD CELLS")
     transfuse2 = edw_reader.get_transfusions("TRANSFUSE PLATELETS")
     assert transfuse1.name == "TRANSFUSE RED BLOOD CELLS"
@@ -317,7 +329,7 @@ def test_get_transfusions(edw_reader):
     assert np.array_equal(transfuse2.end_date, np.array([323561700.0], dtype=float))
 
 
-def test_get_events(edw_reader):
+def test_get_events(edw_reader: EDWReader):
     event1_name = "CODE START"
     event2_name = "RAPID RESPONSE START"
     event1 = edw_reader.get_events(event1_name)
@@ -354,7 +366,7 @@ def test_get_events(edw_reader):
     )
 
 
-def test_contiguous_nparrays(edw_reader):
+def test_contiguous_nparrays(edw_reader: EDWReader):
     med1 = edw_reader.get_med_doses("ASPIRIN 325 MG TABLET")
     med2 = edw_reader.get_med_doses("LACTATED RINGERS IV BOLUS")
     med3 = edw_reader.get_med_doses(

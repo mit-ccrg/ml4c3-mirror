@@ -3,8 +3,22 @@ import os
 import logging
 import unittest.mock
 
+# Imports: third party
+import pytest
 
-def test_check_edw_structure(get_edw_checker):
+# Imports: first party
+from ml4c3.ingest.icu.check_icu_structure import EDWChecker
+
+
+def get_edw_checker(directory: str) -> EDWChecker:
+    if directory == "edw":
+        checker = EDWChecker(pytest.edw_dir)
+    else:
+        checker = EDWChecker(pytest.bedmaster_dir)
+    return checker
+
+
+def test_check_edw_structure():
     test_dir = os.path.join(os.path.dirname(__file__), "data")
     expected_warning_message = [
         "ERROR:root:Wrong folder format: "

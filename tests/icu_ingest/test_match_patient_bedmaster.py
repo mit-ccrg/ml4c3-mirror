@@ -1,15 +1,30 @@
 # Imports: standard library
 import os
+from typing import List, Optional
 
 # Imports: third party
 import numpy as np
 import pandas as pd
 import pytest
 
+# Imports: first party
 # pylint: disable=no-member
+from ml4c3.ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
 
 
-def test_file_structure_and_atributes(get_patient_bedmaster_matcher, temp_dir):
+def get_patient_bedmaster_matcher(
+    path_bedmaster: str,
+    desired_departments: Optional[List[str]] = None,
+) -> PatientBedmasterMatcher:
+    matcher = PatientBedmasterMatcher(
+        path_bedmaster=path_bedmaster,
+        path_adt=os.path.join(pytest.edw_dir, "adt.csv"),
+        desired_departments=desired_departments,
+    )
+    return matcher
+
+
+def test_file_structure_and_atributes(temp_dir):
     matcher = get_patient_bedmaster_matcher(pytest.bedmaster_matching)
     matcher2 = get_patient_bedmaster_matcher(
         path_bedmaster=pytest.bedmaster_matching,
@@ -25,9 +40,8 @@ def test_file_structure_and_atributes(get_patient_bedmaster_matcher, temp_dir):
     assert np.array_equal(expected_df.keys(), obt_df.keys())
 
 
-def test_xref_file_generation(get_patient_bedmaster_matcher, temp_dir):
+def test_xref_file_generation(temp_dir):
     def test_xref_file_results(
-        get_patient_bedmaster_matcher,
         temp_dir,
         bedmaster_dir,
     ):
@@ -110,4 +124,4 @@ def test_xref_file_generation(get_patient_bedmaster_matcher, temp_dir):
         )
 
     folder = pytest.bedmaster_matching
-    test_xref_file_results(get_patient_bedmaster_matcher, temp_dir, folder)
+    test_xref_file_results(temp_dir, folder)

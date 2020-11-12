@@ -1,13 +1,13 @@
 # Imports: standard library
 import os
 import sys
+import argparse
 import datetime
 import tempfile
 import multiprocessing as mp
 from time import time
-from typing import Dict, List, Tuple
+from typing import Dict, List, Type, Tuple, Union, Callable
 from itertools import product
-from collections import defaultdict
 
 # Imports: third party
 import h5py
@@ -19,32 +19,21 @@ import neurokit2 as nk
 import ml4c3
 from ml4c3.arguments import parse_args
 from ml4c3.definitions.icu import EDW_FILES
-from ml4c3.ingest.icu.readers import (
-    EDWReader,
-    BedmasterReader,
-    CrossReferencer,
-    BedmasterAlarmsReader,
-)
 from ml4c3.ingest.icu.writers import Writer
 from ml4c3.definitions.globals import TENSOR_EXT
 from ml4c3.tensormap.TensorMap import TensorMap, Interpretation, get_local_timestamps
-from ml4c3.tensormap.icu_alarms import get_tmap as GET_ALARMS_TMAP
-from ml4c3.tensormap.icu_events import get_tmap as GET_EVENTS_TMAP
+from ml4c3.tensormap.icu_signals import get_tmap as GET_SIGNAL_TMAP
 from ml4c3.ingest.icu.data_objects import (
     Event,
     Procedure,
     Medication,
     StaticData,
     Measurement,
+    ICUDataObject,
     BedmasterAlarm,
     BedmasterSignal,
 )
-from ml4c3.tensormap.icu_medications import get_tmap as GET_MEDS_TMAP
 from ml4c3.tensormap.icu_list_signals import get_tmap as GET_LIST_TMAP
-from ml4c3.tensormap.icu_measurements import get_tmap as GET_MEAS_TMAP
-from ml4c3.ingest.icu.check_icu_structure import EDWChecker, BedmasterChecker
-from ml4c3.tensormap.icu_bedmaster_signals import get_tmap as GET_BEDMASTER_TMAP
-from ml4c3.ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
 
 # pylint: disable=redefined-outer-name, unused-argument, missing-class-docstring
 
@@ -161,7 +150,7 @@ class Utils:
 
 
 @pytest.fixture(scope="session")
-def utils():
+def utils() -> Type[Utils]:
     return Utils
 
 
@@ -179,7 +168,7 @@ def utils():
 # https://stackoverflow.com/a/45466846
 @pytest.fixture(autouse=True)
 def use_testing_tmaps(monkeypatch):
-    def mock_update_tmaps(tmap_name, tmaps):
+    def mock_update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]):
         return pytest.MOCK_TMAPS
 
     monkeypatch.setattr(ml4c3.tensormap.TensorMap, "update_tmaps", mock_update_tmaps)
@@ -188,7 +177,7 @@ def use_testing_tmaps(monkeypatch):
 
 
 @pytest.fixture(scope="function")
-def default_arguments(tmpdir_factory, utils):
+def default_arguments(tmpdir_factory, utils: Utils) -> argparse.Namespace:
     temp_dir = tmpdir_factory.mktemp("data")
     utils.build_hdf5s(temp_dir, pytest.MOCK_TMAPS.values(), n=pytest.N_TENSORS)
     hdf5_dir = str(temp_dir)
@@ -223,7 +212,7 @@ def default_arguments(tmpdir_factory, utils):
 
 
 @pytest.fixture(scope="function")
-def default_arguments_infer(tmpdir_factory, utils):
+def default_arguments_infer(tmpdir_factory, utils: Utils) -> argparse.Namespace:
     temp_dir = tmpdir_factory.mktemp("data")
     utils.build_hdf5s(temp_dir, pytest.MOCK_TMAPS.values(), n=pytest.N_TENSORS)
     hdf5_dir = str(temp_dir)
@@ -258,7 +247,7 @@ def default_arguments_infer(tmpdir_factory, utils):
 
 
 @pytest.fixture(scope="function")
-def default_arguments_explore(tmpdir_factory, utils):
+def default_arguments_explore(tmpdir_factory, utils: Utils) -> argparse.Namespace:
     temp_dir = tmpdir_factory.mktemp("data")
     utils.build_hdf5s(temp_dir, pytest.MOCK_TMAPS.values(), n=pytest.N_TENSORS)
     hdf5_dir = str(temp_dir)
@@ -288,30 +277,13 @@ def pytest_exception_interact(node, call, report):
 
 
 @pytest.yield_fixture(scope="function")
-def cross_referencer():
-    reader = CrossReferencer(
-        pytest.bedmaster_dir,
-        pytest.edw_dir,
-        pytest.cross_ref_file,
-    )
-    yield reader
-
-
-@pytest.yield_fixture(scope="function")
-def bedmaster_reader(test_scale_units):
-    with h5py.File(pytest.mat_file, "r") as mat_file:
-        reader = BedmasterReader(mat_file.filename, test_scale_units)
-        yield reader
-
-
-@pytest.yield_fixture(scope="function")
-def matfile():
+def matfile() -> h5py.File:
     with h5py.File(pytest.mat_file, "r") as mat_file:
         yield mat_file
 
 
 @pytest.yield_fixture(scope="function")
-def empty_matfile():
+def empty_matfile() -> h5py.File:
     with tempfile.NamedTemporaryFile(delete=False) as _file:
         with h5py.File(_file.name, "w") as mat_file:
             mat_file.create_group("vs")
@@ -323,60 +295,10 @@ def empty_matfile():
         pass
 
 
-@pytest.fixture(scope="function")
-def edw_reader():
-    reader = EDWReader(pytest.edw_dir, "123", "345")
-    return reader
-
-
-@pytest.fixture(scope="function")
-def get_edw_reader():
-    def _get_reader(vitals_file):
-        reader = EDWReader(
-            pytest.edw_dir,
-            pytest.example_mrn,
-            pytest.example_visit_id,
-            vitals_file=vitals_file,
-        )
-        return reader
-
-    return _get_reader
-
-
-@pytest.fixture(scope="function")
-def alarms_reader():
-    reader = BedmasterAlarmsReader(
-        pytest.alarms_dir,
-        pytest.edw_dir,
-        pytest.example_mrn,
-        pytest.example_visit_id,
-    )
-    return reader
-
-
-@pytest.fixture(scope="function")
-def get_alarms_reader():
-    def _get_reader():
-        reader = BedmasterAlarmsReader(
-            pytest.alarms_dir,
-            pytest.edw_dir,
-            pytest.example_mrn,
-            pytest.example_visit_id,
-        )
-        return reader
-
-    return _get_reader
-
-
 @pytest.yield_fixture(scope="module")
 def temp_file():
     with tempfile.NamedTemporaryFile(delete=False) as _file:
         yield _file
-
-
-@pytest.fixture(scope="module")
-def fake_signal():
-    return FakeSignal()
 
 
 @pytest.yield_fixture(scope="function")
@@ -386,7 +308,7 @@ def temp_dir():
 
 
 @pytest.fixture(scope="session")
-def test_scale_units():
+def test_scale_units() -> Dict[str, Dict[str, Union[int, float, str]]]:
     # fmt: off
     return {
         "CUFF": {"scaling_factor": 1, "units": "mmHg"},
@@ -403,11 +325,319 @@ def test_scale_units():
     # fmt: on
 
 
+class FakeSignal:
+    """
+    Mock signal objects for use in testing.
+    """
+
+    def __init__(self):
+        self.today = datetime.date.today()
+
+    @staticmethod
+    def get_bedmaster_signal() -> BedmasterSignal:
+        starting_time = int(time())
+        sample_freq = 60
+        duration_sec = 10
+        n_points = duration_sec * sample_freq
+        m_signal = BedmasterSignal(
+            name="Some_signal",
+            source="waveform",
+            channel="ch10",
+            value=np.array(np.random.randint(40, 100, n_points)),
+            time=np.arange(starting_time, starting_time + duration_sec, 0.25),
+            units="mmHg",
+            sample_freq=np.array(
+                [(sample_freq, 0), (120, n_points / 10)],
+                dtype="float,int",
+            ),
+            scale_factor=np.random.randint(0, 5),
+            time_corr_arr=np.packbits(np.random.randint(0, 2, 100).astype(np.bool)),
+            samples_per_ts=np.array([15] * int(duration_sec / 0.25)),
+        )
+        return m_signal
+
+    @staticmethod
+    def get_static_data() -> StaticData:
+        static_data = StaticData(
+            department_id=np.array([1234, 12341]),
+            department_nm=np.array(["BLAKE1", "BLAKE2"]).astype("S"),
+            room_bed=np.array(["123 - 222", "456 - 333"]).astype("S"),
+            move_time=np.array(["2021-05-15 06:47:00", "2021-05-25 06:47:00"]).astype(
+                "S",
+            ),
+            weight=np.random.randint(50, 100),
+            height=np.random.randint(150, 210) / 100,
+            admin_type="testing",
+            admin_date="1995-08-06 00:00:00.0000000",
+            birth_date="1920-05-06 00:00:00.0000000",
+            race=str(np.random.choice(["Asian", "Native American", "Black"])),
+            sex=str(np.random.choice(["male", "female"])),
+            end_date="2020-07-10 12:00:00.0000000",
+            end_stay_type=str(np.random.choice(["discharge", "death"])),
+            local_time=["UTC-4:00"],
+            medical_hist=np.array(
+                ["ID: 245324; NAME: Diabetes; COMMENTS: typeI; DATE: UNKNOWN"],
+            ).astype("S"),
+            surgical_hist=np.array(
+                ["ID: 241324; NAME: VASECTOMY; COMMENTS: Sucessfully; DATE: UNKNOWN"],
+            ).astype("S"),
+            tobacco_hist="STATUS: Yes - Quit; COMMENT: 10 years ago",
+            alcohol_hist="STATUS: Yes; COMMENT: a little",
+            admin_diag="aortic valve repair.",
+        )
+        return static_data
+
+    @staticmethod
+    def get_measurement() -> Measurement:
+        starting_time = int(time())
+        measurement = Measurement(
+            name="Some_Measurment",
+            source=str(
+                np.random.choice(
+                    [
+                        EDW_FILES["lab_file"]["source"],
+                        EDW_FILES["vitals_file"]["source"],
+                    ],
+                ),
+            ),
+            value=np.array(np.random.randint(40, 100, 100)),
+            time=np.array(list(range(starting_time, starting_time + 100))),
+            units=str(np.random.choice(["mmHg", "bpm", "%"])),
+            data_type=str(np.random.choice(["categorical", "numerical"])),
+            metadata={"Some_Metadata": np.array(np.random.randint(0, 1, 100))},
+        )
+        return measurement
+
+    @staticmethod
+    def get_medication() -> Medication:
+        starting_time = int(time())
+        medication = Medication(
+            name="Some_medication_in_g/ml",
+            dose=np.array(np.random.randint(0, 2, 10)),
+            units=str(np.random.choice(["g/ml", "mg", "pills"])),
+            start_date=np.array(list(range(starting_time, starting_time + 100, 10))),
+            action=np.random.choice(["Given", "New bag", "Rate Change"], 10).astype(
+                "S",
+            ),
+            route=str(np.random.choice(["Oral", "Nasal", "Otic"])),
+            wt_based_dose=bool(np.random.randint(0, 2)),
+        )
+        return medication
+
+    @staticmethod
+    def get_procedure() -> Procedure:
+        starting_time = int(time())
+        procedure = Procedure(
+            name="Some_procedure",
+            source=EDW_FILES["other_procedures_file"]["source"],
+            start_date=np.array(list(range(starting_time, starting_time + 100, 5))),
+            end_date=np.array(
+                list(range(starting_time + 10000, starting_time + 10100, 5)),
+            ),
+        )
+        return procedure
+
+    @staticmethod
+    def get_demo() -> StaticData:
+        return FakeSignal.get_static_data()
+
+    @staticmethod
+    def get_measurements() -> Dict[str, Measurement]:
+        starting_time = int(time())
+        measurements_dic = {
+            "creatinine": EDW_FILES["lab_file"]["source"],
+            "ph_arterial": EDW_FILES["lab_file"]["source"],
+            "pulse": EDW_FILES["vitals_file"]["source"],
+            "r_phs_ob_bp_systolic_outgoing": EDW_FILES["vitals_file"]["source"],
+        }
+        measurements = {
+            measurement_name: Measurement(
+                name=measurement_name,
+                source=f"{measurements_dic[measurement_name]}",
+                value=np.array(np.random.randint(40, 100, 100)),
+                time=np.array(list(range(starting_time, starting_time + 100))),
+                units=str(np.random.choice(["mmHg", "bpm", "%"])),
+                data_type=str(np.random.choice(["categorical", "numerical"])),
+            )
+            for measurement_name in measurements_dic
+        }
+        sys = np.random.randint(40, 100, 250)
+        dias = np.random.randint(80, 160, 250)
+        measurements["blood_pressure"] = Measurement(
+            name="blood_pressure",
+            source=EDW_FILES["vitals_file"]["source"],
+            value=np.array(
+                [f"{sys[i]}/{dias[i]}" for i in range(0, len(sys))],
+                dtype="S",
+            ),
+            time=np.array(list(range(starting_time - 50000, starting_time, 200))),
+            units="",
+            data_type="categorical",
+        )
+        return measurements
+
+    @staticmethod
+    def get_procedures() -> Dict[str, Procedure]:
+        starting_time = int(time())
+        start_times = np.array(list(range(starting_time, starting_time + 1000, 100)))
+        end_times = np.array(
+            list(range(starting_time + 100, starting_time + 1100, 100)),
+        )
+        procedures_dic = {
+            "colonoscopy": EDW_FILES["surgery_file"]["source"],
+            "hemodialysis": EDW_FILES["other_procedures_file"]["source"],
+            "transfuse_red_blood_cells": EDW_FILES["transfusions_file"]["source"],
+        }
+        procedures = {
+            procedure_name: Procedure(
+                name=procedure_name,
+                source=f"{procedures_dic[procedure_name]}",
+                start_date=start_times,
+                end_date=end_times,
+            )
+            for procedure_name in procedures_dic
+        }
+        return procedures
+
+    @staticmethod
+    def get_medications() -> Dict[str, Medication]:
+        starting_time = int(time())
+        meds_list = [
+            "aspirin_325_mg_tablet",
+            "cefazolin_2_gram|50_ml_in_dextrose_(iso-osmotic)_intravenous_piggyback",
+            "lactated_ringers_iv_bolus",
+            "norepinephrine_infusion_syringe_in_swfi_80_mcg|ml_cmpd_central_mgh",
+            "sodium_chloride_0.9_%_intravenous_solution",
+            "aspirin_500_mg_tablet",
+        ]
+        medications = {
+            med: Medication(
+                name=med,
+                dose=np.array(np.random.randint(0, 2, 10)),
+                units=str(np.random.choice(["g/ml", "mg", "pills"])),
+                start_date=np.array(
+                    list(range(starting_time, starting_time + 100, 10)),
+                ),
+                action=np.random.choice(["Given", "New bag", "Rate Change"], 10).astype(
+                    "S",
+                ),
+                route=str(np.random.choice(["Oral", "Nasal", "Otic"])),
+                wt_based_dose=bool(np.random.randint(0, 2)),
+            )
+            for med in meds_list
+        }
+        return medications
+
+    @staticmethod
+    def get_events() -> Dict[str, Event]:
+        starting_time = int(time())
+        start_times = np.array(list(range(starting_time, starting_time + 1000, 100)))
+        events_names = ["code_start", "rapid_response_start"]
+        events = {
+            event_name: Event(name=event_name, start_date=start_times)
+            for event_name in events_names
+        }
+        return events
+
+    @staticmethod
+    def get_alarms() -> Dict[str, BedmasterAlarm]:
+        starting_time = int(time())
+        start_times = np.array(list(range(starting_time, starting_time + 1000, 100)))
+        alarms_names = ["cpp_low", "v_tach", "apnea"]
+        alarms = {
+            alarm_name: BedmasterAlarm(
+                name=alarm_name,
+                start_date=start_times,
+                duration=np.random.randint(0, 21, size=len(start_times)),
+                level=np.random.randint(1, 6),
+            )
+            for alarm_name in alarms_names
+        }
+        return alarms
+
+    @staticmethod
+    def get_bedmaster_waveforms() -> Dict[str, BedmasterSignal]:
+        starting_time = int(time())
+        duration = 8
+        sample_freq_1 = 240
+        sample_freq_2 = 120
+        times = np.arange(starting_time, starting_time + duration, 0.25)
+        values1 = nk.ecg_simulate(
+            duration=int(duration / 2),
+            sampling_rate=sample_freq_1,
+        )
+        values2 = nk.ecg_simulate(
+            duration=int(duration / 2),
+            sampling_rate=sample_freq_2,
+        )
+        values = np.concatenate([values1, values2])
+        n_samples = np.array(
+            [sample_freq_1 * 0.25] * int(duration * 4 / 2)
+            + [sample_freq_2 * 0.25] * int(duration * 4 / 2),
+        )
+
+        # Remove some samples
+        values = np.delete(values, [10, 11, 250])
+        n_samples[0] = 58
+        n_samples[5] = 59
+
+        leads = {
+            lead: BedmasterSignal(
+                name=lead,
+                source="waveform",
+                channel=f"ch{idx}",
+                value=values,
+                time=times,
+                units="mV",
+                sample_freq=np.array(
+                    [(sample_freq_1, 0), (sample_freq_2, 16)],
+                    dtype="float,int",
+                ),
+                scale_factor=np.random.uniform() * 5,
+                time_corr_arr=np.packbits(np.random.randint(0, 2, 100).astype(np.bool)),
+                samples_per_ts=n_samples,
+            )
+            for idx, lead in enumerate(["i", "ii", "iii", "v", "spo2"])
+        }
+        return leads
+
+    @staticmethod
+    def get_bedmaster_vitals() -> Dict[str, BedmasterSignal]:
+        starting_time = int(time())
+        times = np.array(list(range(starting_time, starting_time + 100)))
+        signals = {
+            signal: BedmasterSignal(
+                name=signal,
+                source="vitals",
+                channel=signal,
+                value=np.array(np.random.randint(40, 100, 100)),
+                time=times,
+                units="%" if "%" in signal else "",
+                sample_freq=np.array([(0.5, 0)], dtype="float,int"),
+                scale_factor=np.random.uniform() * 5,
+                time_corr_arr=np.packbits(np.random.randint(0, 2, 100).astype(np.bool)),
+                samples_per_ts=np.array([0.5] * len(times)),
+            )
+            for idx, signal in enumerate(["spo2%", "spo2r"])
+        }
+        return signals
+
+
 @pytest.fixture(scope="module")
-def hd5_data(temp_file, fake_signal):
+def fake_signal() -> FakeSignal:
+    return FakeSignal()
+
+
+@pytest.fixture(scope="module")
+def hd5_data(
+    temp_file,
+    fake_signal: FakeSignal,
+) -> Tuple[
+    h5py.File,
+    Dict[str, List[Union[str, ICUDataObject, Dict[str, ICUDataObject]]]],
+]:
     visits = ["0123456789", "1111111111"]
-    data = defaultdict(list)
-    data = {
+    data: Dict[str, List[Union[str, ICUDataObject, Dict[str, ICUDataObject]]]] = {
         "measurements": [],
         "procedures": [],
         "meds": [],
@@ -458,351 +688,16 @@ def hd5_data(temp_file, fake_signal):
             _write(visit)
 
     with h5py.File(temp_file, "r") as _hd5:
-        yield (_hd5, data)
+        yield _hd5, data
 
 
 @pytest.fixture(scope="function")
-def get_patient_bedmaster_matcher():
-    def _get_matcher(path_bedmaster, desired_departments=None):
-        matcher = PatientBedmasterMatcher(
-            path_bedmaster=path_bedmaster,
-            path_adt=os.path.join(pytest.edw_dir, "adt.csv"),
-            desired_departments=desired_departments,
-        )
-        return matcher
-
-    return _get_matcher
-
-
-class FakeSignal:
-    """
-    Mock signal objects for use in testing.
-    """
-
-    def __init__(self):
-        self.today = datetime.date.today()
-
-    @staticmethod
-    def get_bedmaster_signal():
-        starting_time = int(time())
-        sample_freq = 60
-        duration_sec = 10
-        n_points = duration_sec * sample_freq
-        m_signal = BedmasterSignal(
-            name="Some_signal",
-            source="waveform",
-            channel="ch10",
-            value=np.array(np.random.randint(40, 100, n_points)),
-            time=np.arange(starting_time, starting_time + duration_sec, 0.25),
-            units="mmHg",
-            sample_freq=np.array(
-                [(sample_freq, 0), (120, n_points / 10)],
-                dtype="float,int",
-            ),
-            scale_factor=np.random.randint(0, 5),
-            time_corr_arr=np.packbits(np.random.randint(0, 2, 100).astype(np.bool)),
-            samples_per_ts=np.array([15] * int(duration_sec / 0.25)),
-        )
-        return m_signal
-
-    @staticmethod
-    def get_static_data():
-        static_data = StaticData(
-            department_id=np.array([1234, 12341]),
-            department_nm=np.array(["BLAKE1", "BLAKE2"]).astype("S"),
-            room_bed=np.array(["123 - 222", "456 - 333"]).astype("S"),
-            move_time=np.array(["2021-05-15 06:47:00", "2021-05-25 06:47:00"]).astype(
-                "S",
-            ),
-            weight=np.random.randint(50, 100),
-            height=np.random.randint(150, 210) / 100,
-            admin_type="testing",
-            admin_date="1995-08-06 00:00:00.0000000",
-            birth_date="1920-05-06 00:00:00.0000000",
-            race=str(np.random.choice(["Asian", "Native American", "Black"])),
-            sex=str(np.random.choice(["male", "female"])),
-            end_date="2020-07-10 12:00:00.0000000",
-            end_stay_type=str(np.random.choice(["discharge", "death"])),
-            local_time=["UTC-4:00"],
-            medical_hist=np.array(
-                ["ID: 245324; NAME: Diabetes; COMMENTS: typeI; DATE: UNKNOWN"],
-            ).astype("S"),
-            surgical_hist=np.array(
-                ["ID: 241324; NAME: VASECTOMY; COMMENTS: Sucessfully; DATE: UNKNOWN"],
-            ).astype("S"),
-            tobacco_hist="STATUS: Yes - Quit; COMMENT: 10 years ago",
-            alcohol_hist="STATUS: Yes; COMMENT: a little",
-            admin_diag="aortic valve repair.",
-        )
-        return static_data
-
-    @staticmethod
-    def get_measurement():
-        starting_time = int(time())
-        measurement = Measurement(
-            name="Some_Measurment",
-            source=str(
-                np.random.choice(
-                    [
-                        EDW_FILES["lab_file"]["source"],
-                        EDW_FILES["vitals_file"]["source"],
-                    ],
-                ),
-            ),
-            value=np.array(np.random.randint(40, 100, 100)),
-            time=np.array(list(range(starting_time, starting_time + 100))),
-            units=str(np.random.choice(["mmHg", "bpm", "%"])),
-            data_type=str(np.random.choice(["categorical", "numerical"])),
-            metadata={"Some_Metadata": np.array(np.random.randint(0, 1, 100))},
-        )
-        return measurement
-
-    @staticmethod
-    def get_medication():
-        starting_time = int(time())
-        medication = Medication(
-            name="Some_medication_in_g/ml",
-            dose=np.array(np.random.randint(0, 2, 10)),
-            units=str(np.random.choice(["g/ml", "mg", "pills"])),
-            start_date=np.array(list(range(starting_time, starting_time + 100, 10))),
-            action=np.random.choice(["Given", "New bag", "Rate Change"], 10).astype(
-                "S",
-            ),
-            route=str(np.random.choice(["Oral", "Nasal", "Otic"])),
-            wt_based_dose=bool(np.random.randint(0, 2)),
-        )
-        return medication
-
-    @staticmethod
-    def get_procedure():
-        starting_time = int(time())
-        procedure = Procedure(
-            name="Some_procedure",
-            source=EDW_FILES["other_procedures_file"]["source"],
-            start_date=np.array(list(range(starting_time, starting_time + 100, 5))),
-            end_date=np.array(
-                list(range(starting_time + 10000, starting_time + 10100, 5)),
-            ),
-        )
-        return procedure
-
-    @staticmethod
-    def get_demo():
-        return FakeSignal.get_static_data()
-
-    @staticmethod
-    def get_measurements():
-        starting_time = int(time())
-        measurements_dic = {
-            "creatinine": EDW_FILES["lab_file"]["source"],
-            "ph_arterial": EDW_FILES["lab_file"]["source"],
-            "pulse": EDW_FILES["vitals_file"]["source"],
-            "r_phs_ob_bp_systolic_outgoing": EDW_FILES["vitals_file"]["source"],
-        }
-        measurements = {
-            measurement_name: Measurement(
-                name=measurement_name,
-                source=f"{measurements_dic[measurement_name]}",
-                value=np.array(np.random.randint(40, 100, 100)),
-                time=np.array(list(range(starting_time, starting_time + 100))),
-                units=str(np.random.choice(["mmHg", "bpm", "%"])),
-                data_type=str(np.random.choice(["categorical", "numerical"])),
-            )
-            for measurement_name in measurements_dic
-        }
-        sys = np.random.randint(40, 100, 250)
-        dias = np.random.randint(80, 160, 250)
-        measurements["blood_pressure"] = Measurement(
-            name="blood_pressure",
-            source=EDW_FILES["vitals_file"]["source"],
-            value=np.array(
-                [f"{sys[i]}/{dias[i]}" for i in range(0, len(sys))],
-                dtype="S",
-            ),
-            time=np.array(list(range(starting_time - 50000, starting_time, 200))),
-            units="",
-            data_type="categorical",
-        )
-        return measurements
-
-    @staticmethod
-    def get_procedures():
-        starting_time = int(time())
-        start_times = np.array(list(range(starting_time, starting_time + 1000, 100)))
-        end_times = np.array(
-            list(range(starting_time + 100, starting_time + 1100, 100)),
-        )
-        procedures_dic = {
-            "colonoscopy": EDW_FILES["surgery_file"]["source"],
-            "hemodialysis": EDW_FILES["other_procedures_file"]["source"],
-            "transfuse_red_blood_cells": EDW_FILES["transfusions_file"]["source"],
-        }
-        procedures = {
-            procedure_name: Procedure(
-                name=procedure_name,
-                source=f"{procedures_dic[procedure_name]}",
-                start_date=start_times,
-                end_date=end_times,
-            )
-            for procedure_name in procedures_dic
-        }
-        return procedures
-
-    @staticmethod
-    def get_medications():
-        starting_time = int(time())
-        meds_list = [
-            "aspirin_325_mg_tablet",
-            "cefazolin_2_gram|50_ml_in_dextrose_(iso-osmotic)_intravenous_piggyback",
-            "lactated_ringers_iv_bolus",
-            "norepinephrine_infusion_syringe_in_swfi_80_mcg|ml_cmpd_central_mgh",
-            "sodium_chloride_0.9_%_intravenous_solution",
-            "aspirin_500_mg_tablet",
-        ]
-        medications = {
-            med: Medication(
-                name=med,
-                dose=np.array(np.random.randint(0, 2, 10)),
-                units=str(np.random.choice(["g/ml", "mg", "pills"])),
-                start_date=np.array(
-                    list(range(starting_time, starting_time + 100, 10)),
-                ),
-                action=np.random.choice(["Given", "New bag", "Rate Change"], 10).astype(
-                    "S",
-                ),
-                route=str(np.random.choice(["Oral", "Nasal", "Otic"])),
-                wt_based_dose=bool(np.random.randint(0, 2)),
-            )
-            for med in meds_list
-        }
-        return medications
-
-    @staticmethod
-    def get_events():
-        starting_time = int(time())
-        start_times = np.array(list(range(starting_time, starting_time + 1000, 100)))
-        events_names = ["code_start", "rapid_response_start"]
-        events = {
-            event_name: Event(name=event_name, start_date=start_times)
-            for event_name in events_names
-        }
-        return events
-
-    @staticmethod
-    def get_alarms():
-        starting_time = int(time())
-        start_times = np.array(list(range(starting_time, starting_time + 1000, 100)))
-        alarms_names = ["cpp_low", "v_tach", "apnea"]
-        alarms = {
-            alarm_name: BedmasterAlarm(
-                name=alarm_name,
-                start_date=start_times,
-                duration=np.random.randint(0, 21, size=len(start_times)),
-                level=np.random.randint(1, 6),
-            )
-            for alarm_name in alarms_names
-        }
-        return alarms
-
-    @staticmethod
-    def get_bedmaster_waveforms():
-        starting_time = int(time())
-        duration = 8
-        sample_freq_1 = 240
-        sample_freq_2 = 120
-        times = np.arange(starting_time, starting_time + duration, 0.25)
-        values1 = nk.ecg_simulate(
-            duration=int(duration / 2),
-            sampling_rate=sample_freq_1,
-        )
-        values2 = nk.ecg_simulate(
-            duration=int(duration / 2),
-            sampling_rate=sample_freq_2,
-        )
-        values = np.concatenate([values1, values2])
-        n_samples = np.array(
-            [sample_freq_1 * 0.25] * int(duration * 4 / 2)
-            + [sample_freq_2 * 0.25] * int(duration * 4 / 2),
-        )
-
-        # Remove some samples
-        values = np.delete(values, [10, 11, 250])
-        n_samples[0] = 58
-        n_samples[5] = 59
-
-        leads = {
-            lead: BedmasterSignal(
-                name=lead,
-                source="waveform",
-                channel=f"ch{idx}",
-                value=values,
-                time=times,
-                units="mV",
-                sample_freq=np.array(
-                    [(sample_freq_1, 0), (sample_freq_2, 16)],
-                    dtype="float,int",
-                ),
-                scale_factor=np.random.uniform() * 5,
-                time_corr_arr=np.packbits(np.random.randint(0, 2, 100).astype(np.bool)),
-                samples_per_ts=n_samples,
-            )
-            for idx, lead in enumerate(["i", "ii", "iii", "v", "spo2"])
-        }
-        return leads
-
-    @staticmethod
-    def get_bedmaster_vitals():
-        starting_time = int(time())
-        times = np.array(list(range(starting_time, starting_time + 100)))
-        signals = {
-            signal: BedmasterSignal(
-                name=signal,
-                source="vitals",
-                channel=signal,
-                value=np.array(np.random.randint(40, 100, 100)),
-                time=times,
-                units="%" if "%" in signal else "",
-                sample_freq=np.array([(0.5, 0)], dtype="float,int"),
-                scale_factor=np.random.uniform() * 5,
-                time_corr_arr=np.packbits(np.random.randint(0, 2, 100).astype(np.bool)),
-                samples_per_ts=np.array([0.5] * len(times)),
-            )
-            for idx, signal in enumerate(["spo2%", "spo2r"])
-        }
-        return signals
-
-
-@pytest.fixture(scope="function")
-def get_edw_checker():
-    def _get_checker(directory):
-        if directory == "edw":
-            checker = EDWChecker(pytest.edw_dir)
-        else:
-            checker = EDWChecker(pytest.bedmaster_dir)
-        return checker
-
-    return _get_checker
-
-
-@pytest.fixture(scope="function")
-def get_bedmaster_checker():
-    def _get_checker(directory):
-        if directory == "bedmaster":
-            checker = BedmasterChecker(pytest.bedmaster_dir, pytest.alarms_dir)
-        else:
-            checker = BedmasterChecker(pytest.edw_dir, pytest.alarms_dir)
-        return checker
-
-    return _get_checker
-
-
-@pytest.fixture(scope="function")
-def testing_tmaps():
+def testing_tmaps() -> Dict[str, Dict[str, TensorMap]]:
     test_tmaps = {}
 
     bedmaster_tmap_test_names = ["i", "ii", "iii", "v", "spo2", "spo2%", "spo2r"]
     test_tmaps["bedmaster_signals"] = {
-        name: GET_BEDMASTER_TMAP(name)
+        name: GET_SIGNAL_TMAP(name)
         for signal in bedmaster_tmap_test_names
         for name in (
             f"{signal}_timeseries",
@@ -819,7 +714,7 @@ def testing_tmaps():
     }
     alarms_tmap_test_names = ["cpp_low", "v_tach", "apnea"]
     test_tmaps["alarms"] = {
-        name: GET_ALARMS_TMAP(name)
+        name: GET_SIGNAL_TMAP(name)
         for name in [i + "_init_date" for i in alarms_tmap_test_names]
         + [i + "_duration" for i in alarms_tmap_test_names]
         + [i + "_level" for i in alarms_tmap_test_names]
@@ -832,7 +727,7 @@ def testing_tmaps():
         "blood_pressure_systolic",
     ]
     test_tmaps["measurements"] = {
-        name: GET_MEAS_TMAP(name)
+        name: GET_SIGNAL_TMAP(name)
         for signal in meas_tmap_test_names
         for name in (
             f"{signal}_timeseries",
@@ -849,7 +744,7 @@ def testing_tmaps():
         "sodium_chloride_0.9_%_intravenous_solution",
     ]
     test_tmaps["meds"] = {
-        name: GET_MEDS_TMAP(name)
+        name: GET_SIGNAL_TMAP(name)
         for signal in meds_tmap_test_names
         for name in (
             f"{signal}_timeseries",
@@ -864,13 +759,13 @@ def testing_tmaps():
         "rapid_response_start",
     ]
     test_tmaps["events"] = {
-        name: GET_EVENTS_TMAP(name)
+        name: GET_SIGNAL_TMAP(name)
         for signal in events_tmap_test_names
         for name in (f"{signal}_start_date", f"{signal}_double", f"{signal}_single")
     }
     proce_tmap_test_names = ["colonoscopy", "hemodialysis", "transfuse_red_blood_cells"]
     test_tmaps["procedures"] = {
-        name: GET_EVENTS_TMAP(name)
+        name: GET_SIGNAL_TMAP(name)
         for signal in proce_tmap_test_names
         for name in (
             f"{signal}_start_date",
@@ -893,7 +788,7 @@ def testing_tmaps():
 
 
 @pytest.fixture(scope="function")
-def test_get_local_time():
+def test_get_local_time() -> Callable[[np.ndarray], np.ndarray]:
     def _get_local_time(time_array):
         get_function = get_local_timestamps(time_array)
         return get_function

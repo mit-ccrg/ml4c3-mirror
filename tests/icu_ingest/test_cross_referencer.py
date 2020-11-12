@@ -3,8 +3,24 @@ import os
 import logging
 import unittest.mock
 
+# Imports: third party
+import pytest
 
-def test_get_xref_files(cross_referencer):
+# Imports: first party
+from ml4c3.ingest.icu.readers import CrossReferencer
+
+
+@pytest.yield_fixture(scope="function")
+def cross_referencer() -> CrossReferencer:
+    reader = CrossReferencer(
+        pytest.bedmaster_dir,
+        pytest.edw_dir,
+        pytest.cross_ref_file,
+    )
+    yield reader
+
+
+def test_get_xref_files(cross_referencer: CrossReferencer):
     logging.disable(logging.CRITICAL)
 
     test_dir = os.path.dirname(__file__)
@@ -57,7 +73,7 @@ def test_get_xref_files(cross_referencer):
     )
 
 
-def test_stats(cross_referencer):
+def test_stats(cross_referencer: CrossReferencer):
     test_dir = os.path.dirname(__file__)
     expected_message = [
         f"INFO:root:MRNs in {test_dir}/data/edw: 2\n"

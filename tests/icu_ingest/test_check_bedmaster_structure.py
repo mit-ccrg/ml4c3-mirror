@@ -3,10 +3,23 @@ import os
 import logging
 import unittest.mock
 
+# Imports: third party
 # pylint: disable=no-member
+import pytest
+
+# Imports: first party
+from ml4c3.ingest.icu.check_icu_structure import BedmasterChecker
 
 
-def test_check_bedmaster_structure(get_bedmaster_checker):
+def get_bedmaster_checker(directory: str) -> BedmasterChecker:
+    if directory == "bedmaster":
+        checker = BedmasterChecker(pytest.bedmaster_dir, pytest.alarms_dir)
+    else:
+        checker = BedmasterChecker(pytest.edw_dir, pytest.alarms_dir)
+    return checker
+
+
+def test_check_bedmaster_structure():
     test_dir = os.path.join(os.path.dirname(__file__))
     depts = [
         "BIG06",

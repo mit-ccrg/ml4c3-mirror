@@ -1,2 +1,0 @@
-from .check_edw_structure import EDWChecker
-from .check_bedmaster_structure import BedmasterChecker

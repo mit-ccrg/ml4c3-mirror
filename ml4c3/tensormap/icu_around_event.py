@@ -8,13 +8,9 @@ import numpy as np
 
 # Imports: first party
 from ml4c3.tensormap.TensorMap import Axis, TensorMap
-from ml4c3.tensormap.icu_alarms import get_tmap as get_alarm_tmap
-from ml4c3.tensormap.icu_events import get_tmap as get_event_tmap
-from ml4c3.tensormap.icu_medications import get_tmap as get_med_tmap
+from ml4c3.tensormap.icu_signals import get_tmap as get_signal_tmap
 from ml4c3.tensormap.icu_ecg_features import get_tmap as get_ecg_tmap
-from ml4c3.tensormap.icu_measurements import get_tmap as get_measure_tmap
 from ml4c3.tensormap.icu_signal_metrics import compute_feature
-from ml4c3.tensormap.icu_bedmaster_signals import get_tmap as get_bedmaster_tmap
 from ml4c3.tensormap.icu_first_visit_with_signal import get_tmap as get_visit_tmap
 
 # pylint: disable=unused-argument
@@ -218,11 +214,8 @@ def get_tmap(tmap_name: str) -> Optional[TensorMap]:
     def _get_tmap(_tmap_name):
         _tm = None
         for _get in [
-            get_bedmaster_tmap,
-            get_med_tmap,
             get_ecg_tmap,
-            get_alarm_tmap,
-            get_measure_tmap,
+            get_signal_tmap,
         ]:
             _tm = _get(_tmap_name)
             if _tm is not None:
@@ -247,7 +240,7 @@ def get_tmap(tmap_name: str) -> Optional[TensorMap]:
     time = int(time)
     time_2 = int(time_2)
     signal_tm = _get_tmap(signal_tm)
-    event_proc_tm = get_event_tmap(event_proc_tm)
+    event_proc_tm = get_signal_tmap(event_proc_tm)
     if window is not None:
         window = int(window)
 

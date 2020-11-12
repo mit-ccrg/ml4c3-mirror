@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 # Imports: first party
-from ml4c3.datasets import _sample_csv_to_set
+from ml4c3.datasets import sample_csv_to_set
 from ml4c3.definitions.ecg import ECG_PREFIX
 from ml4c3.definitions.globals import CSV_EXT, TENSOR_EXT, MRN_COLUMNS
 
@@ -102,7 +102,7 @@ def _get_csv_mrns(args):
         # Iterate over paths to CSV files
         for fpath in fpaths:
             try:
-                _mrns = _sample_csv_to_set(sample_csv=fpath)
+                _mrns = sample_csv_to_set(sample_csv=fpath)
             except ValueError:
                 print(f"Could not get MRNs from {fpath}, skipping de-identification")
                 global path_of_csv_to_skip

@@ -1,10 +1,24 @@
+# Imports: standard library
+from typing import Dict, List, Tuple, Union
+
+# Imports: third party
+import h5py
+
 # Imports: first party
 from ml4c3.ecg_features_extraction import ECGFeatureFileExtractor
+from ml4c3.ingest.icu.data_objects import ICUDataObject
 
 # pylint: disable=unused-argument
+# hd5_data fixture is needed to write the data file this test inspects
 
 
-def test_ecg_features_file_extraction(hd5_data, temp_file):
+def test_ecg_features_file_extraction(
+    hd5_data: Tuple[
+        h5py.File,
+        Dict[str, List[Union[str, ICUDataObject, Dict[str, ICUDataObject]]]],
+    ],
+    temp_file,
+):
     ecg_signal = ECGFeatureFileExtractor(temp_file.name)
     assert ecg_signal.list_available_leads() == ["i", "ii", "iii", "v"]
     ecg_signal.extract_features(min_peaks=0)

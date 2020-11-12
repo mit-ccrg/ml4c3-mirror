@@ -1,16 +1,29 @@
 # Imports: standard library
 import copy
+from typing import Dict, Union
 
 # Imports: third party
+import h5py
 import numpy as np
+import pytest
 
 # Imports: first party
 from ml4c3.ingest.icu.readers import BedmasterReader
+from ml4c3.ingest.icu.data_objects import BedmasterSignal
 
 # pylint: disable=invalid-name
 
 
-def test_list_vs(bedmaster_reader, empty_matfile):
+@pytest.yield_fixture(scope="function")
+def bedmaster_reader(
+    test_scale_units: Dict[str, Dict[str, Union[int, float, str]]],
+) -> BedmasterReader:
+    with h5py.File(pytest.mat_file, "r") as mat_file:
+        reader = BedmasterReader(mat_file.filename, test_scale_units)
+        yield reader
+
+
+def test_list_vs(bedmaster_reader: BedmasterReader, empty_matfile: h5py.File):
     expected_vs = ["CO", "CUFF", "HR", "SPO2%", "SPO2R"]
     assert bedmaster_reader.list_vs() == expected_vs
 
@@ -19,7 +32,7 @@ def test_list_vs(bedmaster_reader, empty_matfile):
     assert empty_reader.list_vs() == []
 
 
-def test_list_wv(bedmaster_reader, empty_matfile):
+def test_list_wv(bedmaster_reader: BedmasterReader, empty_matfile: h5py.File):
     expected_dict = {
         "I": "ch7",
         "II": "ch8",
@@ -35,7 +48,7 @@ def test_list_wv(bedmaster_reader, empty_matfile):
     assert empty_reader.list_vs() == []
 
 
-def test_get_vs(bedmaster_reader, matfile):
+def test_get_vs(bedmaster_reader: BedmasterReader, matfile: h5py.File):
     def _linearize(arr):
         return np.transpose(arr)[0]
 
@@ -74,7 +87,7 @@ def test_get_vs(bedmaster_reader, matfile):
     assert spo2r.sample_freq == np.array([(0.5, 0)], dtype="float,int")
 
 
-def test_get_wv(bedmaster_reader, matfile):
+def test_get_wv(bedmaster_reader: BedmasterReader, matfile: h5py.File):
     def linearize(arr):
         return np.transpose(arr)[0]
 
@@ -131,7 +144,7 @@ def test_get_wv(bedmaster_reader, matfile):
     assert np.array_equal(ecg3.sample_freq, np.array([(240, 0)], dtype="float,int"))
 
 
-def test_format_data(bedmaster_reader):
+def test_format_data(bedmaster_reader: BedmasterReader):
     expected_data = np.arange(10)
 
     #  Case column vector [[0], [1]] -> [0,1]
@@ -153,7 +166,7 @@ def test_format_data(bedmaster_reader):
     assert np.array_equal(bedmaster_reader.format_data(input_2d_data), formatted_data)
 
 
-def test_decode_data(bedmaster_reader):
+def test_decode_data(bedmaster_reader: BedmasterReader):
     # float signal
     codified_data = np.repeat([[48, 46, 50], [49, 46, 50]], 5, axis=0)
     decoded_data = np.repeat([0.2, 1.2], 5)
@@ -184,7 +197,7 @@ def test_decode_data(bedmaster_reader):
     assert np.isnan(obtained[3])
 
 
-def test_contiguous_nparrays(bedmaster_reader):
+def test_contiguous_nparrays(bedmaster_reader: BedmasterReader):
     heart_rate = bedmaster_reader.get_vs("HR")
     ecgv = bedmaster_reader.get_wv("ch10", "V")
     signals = [heart_rate, ecgv]
@@ -193,7 +206,7 @@ def test_contiguous_nparrays(bedmaster_reader):
         assert not signal.time.dtype == object
 
 
-def test_max_segment(bedmaster_reader):
+def test_max_segment(bedmaster_reader: BedmasterReader):
     def _create_max_seg_dict(seg_no, max_time, signal_name):
         return {
             "segmentNo": seg_no,
@@ -231,7 +244,7 @@ def test_max_segment(bedmaster_reader):
     assert bedmaster_reader.max_segment["wv"] == expected_wv_max
 
 
-def test_get_interbundle_correction(bedmaster_reader):
+def test_get_interbundle_correction(bedmaster_reader: BedmasterReader):
     art1d = bedmaster_reader.get_vs("CO")
     ch10 = bedmaster_reader.get_wv("ch10", "v")
 
@@ -282,14 +295,14 @@ def test_get_interbundle_correction(bedmaster_reader):
 
 
 def test_apply_interbundle_correction(bedmaster_reader: BedmasterReader):
-    def _create_ib_corr_dict(signal, cut_idx, time_corr):
+    def _create_ib_corr_dict(signal: BedmasterSignal, cut_idx: int, time_corr: int):
         source_corr = {
             "maxTime": signal.time[cut_idx],
             "timeCorr": time_corr,
         }
         return source_corr
 
-    def _apply_and_assert_ib(signal, sig_type):
+    def _apply_and_assert_ib(signal: BedmasterSignal, sig_type: str):
         signal.time_corr_arr = np.unpackbits(signal.time_corr_arr)
         signal_original = copy.deepcopy(signal)
         bedmaster_reader.interbundle_corr[sig_type] = _create_ib_corr_dict(
@@ -332,7 +345,12 @@ def test_apply_interbundle_correction(bedmaster_reader: BedmasterReader):
     _apply_and_assert_ib(ecgii, "wv")
 
 
-def _assert_ib_correction(original, corrected, cut_idx, time_corr):
+def _assert_ib_correction(
+    original: BedmasterSignal,
+    corrected: BedmasterSignal,
+    cut_idx: int,
+    time_corr: int,
+):
     # Assert array length
     length_cut = cut_idx + 1
     for array in ["time", "samples_per_ts"]:

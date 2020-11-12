@@ -1,3 +1,6 @@
+# Imports: standard library
+from typing import List, Tuple
+
 # Imports: third party
 import h5py
 import numpy as np
@@ -6,15 +9,16 @@ import pytest
 # Imports: first party
 from ml4c3.definitions.types import EDWType, BedmasterType
 from ml4c3.ingest.icu.writers import Writer
+from ml4c3.ingest.icu.data_objects import ICUDataObject
 
 # pylint: disable=protected-access
 
 
-def get_visit_id():
+def get_visit_id() -> str:
     return str(np.random.randint(1000000000, 9999999999))
 
 
-def get_attributes(signal):
+def get_attributes(signal: ICUDataObject) -> Tuple[List[str], List[str]]:
     signal_keys = [attr for attr in dir(signal) if not attr.startswith("_")]
     array_keys = [
         attr
@@ -200,7 +204,12 @@ def test_write_multiple_files(temp_file, fake_signal):
         assert np.array_equal(wv_signal_dir["sample_freq"][()], expected_sf)
 
 
-def assert_dir(signal_dir, signal, names, attrs):
+def assert_dir(
+    signal_dir: h5py.Group,
+    signal: ICUDataObject,
+    names: List[str],
+    attrs: List[str],
+):
     assert sorted(list(signal_dir.keys())) == sorted(names)
     for field in signal_dir:
         expected = getattr(signal, field.lower())

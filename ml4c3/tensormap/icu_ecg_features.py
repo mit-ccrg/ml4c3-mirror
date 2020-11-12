@@ -12,8 +12,8 @@ from ml4c3.tensormap.TensorMap import (
     get_visits,
     get_local_timestamps,
 )
+from ml4c3.tensormap.icu_signals import get_tmap as get_signal_tmap
 from ml4c3.definitions.icu_tmap_list import DEFINED_TMAPS
-from ml4c3.tensormap.icu_bedmaster_signals import get_tmap as get_bedmaster_tmap
 
 
 def make_ecg_peak_tensor_from_file(lead):
@@ -33,7 +33,7 @@ def make_ecg_peak_tensor_from_file(lead):
             indices = hd5[path][()]
             is_nan_indices = np.isnan(indices)
             no_nan_indices = indices[~is_nan_indices].astype(int)
-            ecg_tm = get_bedmaster_tmap(f"{lead}_time")
+            ecg_tm = get_signal_tmap(f"{lead}_time")
             data = ecg_tm.tensor_from_file(ecg_tm, hd5, visit=visit)[0][no_nan_indices]
             nan_indices = np.where(is_nan_indices)[0]
             nan_indices -= np.array(range(nan_indices.shape[0]))

@@ -100,10 +100,6 @@ def assert_model_trains(
             assert name in history.history
 
 
-def _rotate(a: List, n: int):
-    return a[-n:] + a[:-n]
-
-
 class TestMakeMultimodalMultitaskModel:
     @pytest.mark.parametrize(
         "input_output_tmaps",
@@ -113,7 +109,10 @@ class TestMakeMultimodalMultitaskModel:
             (pytest.CONTINUOUS_TMAPS[:2], pytest.CONTINUOUS_TMAPS[:2]),
         ],
     )
-    def test_multimodal_multitask_quickly(self, input_output_tmaps):
+    def test_multimodal_multitask_quickly(
+        self,
+        input_output_tmaps: Tuple[List[TensorMap], List[TensorMap]],
+    ):
         """
         Tests 1d->2d, 2d->1d, (1d,2d)->(1d,2d)
         """
@@ -156,7 +155,7 @@ class TestMakeMultimodalMultitaskModel:
         "output_tmap",
         pytest.TMAPS_UP_TO_4D,
     )
-    def test_load_unimodal(self, tmpdir, input_tmap, output_tmap):
+    def test_load_unimodal(self, tmpdir, input_tmap: TensorMap, output_tmap: TensorMap):
         m = make_multimodal_multitask_model(
             [input_tmap],
             [output_tmap],
@@ -176,7 +175,7 @@ class TestMakeMultimodalMultitaskModel:
         "activation",
         ACTIVATION_FUNCTIONS.keys(),
     )
-    def test_load_custom_activations(self, tmpdir, activation):
+    def test_load_custom_activations(self, tmpdir, activation: str):
         inp, out = pytest.CONTINUOUS_TMAPS[:2], pytest.CATEGORICAL_TMAPS[:2]
         params = DEFAULT_PARAMS.copy()
         params["activation"] = activation
@@ -227,7 +226,11 @@ class TestMakeMultimodalMultitaskModel:
             ([pytest.SEGMENT_IN], [pytest.SEGMENT_IN]),
         ],
     )
-    def test_multimodal_multitask_variational(self, input_output_tmaps, tmpdir):
+    def test_multimodal_multitask_variational(
+        self,
+        input_output_tmaps: Tuple[List[TensorMap], List[TensorMap]],
+        tmpdir,
+    ):
         """
         Tests 1d->2d, 2d->1d, (1d,2d)->(1d,2d)
         """

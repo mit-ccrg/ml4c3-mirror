@@ -635,9 +635,9 @@ def _get_stats_as_dataframes_from_multiple_datasets(
 def _get_train_valid_test_discard_ratios(
     valid_ratio: float,
     test_ratio: float,
-    train_csv: str,
-    valid_csv: str,
-    test_csv: str,
+    train_csv: Optional[str],
+    valid_csv: Optional[str],
+    test_csv: Optional[str],
 ) -> Tuple[int, int, int, int]:
 
     if valid_csv is not None:
@@ -664,7 +664,7 @@ def _get_train_valid_test_discard_ratios(
     return train_ratio, valid_ratio, test_ratio, discard_ratio
 
 
-def _sample_csv_to_set(
+def sample_csv_to_set(
     sample_csv: Optional[str] = None,
     mrn_col_name: Optional[str] = None,
 ) -> Union[None, Set[str]]:
@@ -712,12 +712,12 @@ def _sample_csv_to_set(
 
 def get_train_valid_test_paths(
     tensors: str,
-    sample_csv: str,
+    sample_csv: Optional[str],
     valid_ratio: float,
     test_ratio: float,
-    train_csv: str,
-    valid_csv: str,
-    test_csv: str,
+    train_csv: Optional[str],
+    valid_csv: Optional[str],
+    test_csv: Optional[str],
     no_empty_paths_allowed: bool = True,
 ) -> Tuple[List[str], List[str], List[str]]:
     """
@@ -764,10 +764,10 @@ def get_train_valid_test_paths(
         "discard": (discard_paths, discard_ratio),
     }
 
-    sample_set = _sample_csv_to_set(sample_csv)
-    train_set = _sample_csv_to_set(train_csv)
-    valid_set = _sample_csv_to_set(valid_csv)
-    test_set = _sample_csv_to_set(test_csv)
+    sample_set = sample_csv_to_set(sample_csv)
+    train_set = sample_csv_to_set(train_csv)
+    valid_set = sample_csv_to_set(valid_csv)
+    test_set = sample_csv_to_set(test_csv)
 
     if (
         train_set is not None

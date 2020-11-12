@@ -12,8 +12,7 @@ from ml4c3.definitions.icu import BEDMASTER_EXT
 from ml4c3.ingest.icu.utils import get_files_in_directory
 from ml4c3.definitions.types import EDWType, BedmasterType
 from ml4c3.ingest.icu.readers import EDWReader, BedmasterReader
-
-from .bedmaster_stats import BedmasterStats
+from ml4c3.ingest.icu.bedmaster_stats import BedmasterStats
 
 
 class PreTensorizeExplorer:

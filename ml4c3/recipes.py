@@ -35,11 +35,9 @@ from ml4c3.definitions.globals import MODEL_EXT
 from ml4c3.tensormap.TensorMap import TensorMap
 from ml4c3.ecg_features_extraction import extract_ecg_features
 from ml4c3.ingest.icu.assess_coverage import assess_coverage
+from ml4c3.ingest.icu.check_icu_structure import check_icu_structure
 from ml4c3.ingest.icu.match_patient_bedmaster import match_data
-from ml4c3.ingest.icu.check_icu_structure.check_icu_structure import check_icu_structure
-from ml4c3.ingest.icu.explorations.pre_tensorize_explorations import (
-    pre_tensorize_explore,
-)
+from ml4c3.ingest.icu.pre_tensorize_explorations import pre_tensorize_explore
 
 # pylint: disable=redefined-outer-name, broad-except
 

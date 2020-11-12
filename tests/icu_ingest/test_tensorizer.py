@@ -1,6 +1,7 @@
 # Imports: standard library
 import os
 import sys
+from typing import Dict, Union
 
 # Imports: third party
 import h5py
@@ -14,14 +15,18 @@ from ml4c3.arguments import parse_args
 # pylint: disable=no-member
 
 
-def test_tensorizer(temp_dir, monkeypatch, test_scale_units):
+def test_tensorizer(
+    temp_dir,
+    monkeypatch,
+    test_scale_units: Dict[str, Dict[str, Union[int, float, str]]],
+):
     monkeypatch.setattr("ml4c3.definitions.icu.ICU_SCALE_UNITS", test_scale_units)
     monkeypatch.setattr(
         "ml4c3.ingest.icu.tensorizer.ICU_SCALE_UNITS",
         test_scale_units,
     )
     monkeypatch.setattr(
-        "ml4c3.ingest.icu.readers.bedmaster_reader.ICU_SCALE_UNITS",
+        "ml4c3.ingest.icu.readers.ICU_SCALE_UNITS",
         test_scale_units,
     )
 

@@ -1,6 +1,8 @@
 # Imports: standard library
 import os
 import csv
+import argparse
+from typing import Set, List, Tuple, Iterable, Optional
 from collections import defaultdict
 
 # Imports: third party
@@ -11,13 +13,23 @@ import pytest
 from ml4c3.datasets import (
     BATCH_PATHS_INDEX,
     make_dataset,
-    _sample_csv_to_set,
+    sample_csv_to_set,
     get_train_valid_test_paths,
 )
 from ml4c3.definitions.globals import TENSOR_EXT
 
+DATA_SPLIT = Tuple[str, Set[str]]
+DATA_SPLITS = Tuple[DATA_SPLIT, DATA_SPLIT, DATA_SPLIT]
+PATH_SPLIT = List[str]
+PATH_SPLITS = Tuple[PATH_SPLIT, PATH_SPLIT, PATH_SPLIT]
 
-def _write_samples(csv_path, sample_ids, use_header=False, write_dupes=False):
+
+def _write_samples(
+    csv_path: str,
+    sample_ids: Iterable[str],
+    use_header: bool = False,
+    write_dupes: bool = False,
+):
     with open(csv_path, "w", newline="") as csv_file:
         csv_writer = csv.writer(csv_file)
         if use_header:
@@ -29,7 +41,7 @@ def _write_samples(csv_path, sample_ids, use_header=False, write_dupes=False):
 
 
 @pytest.fixture(scope="function")
-def sample_csv(tmpdir_factory, request):
+def sample_csv(tmpdir_factory, request) -> DATA_SPLIT:
     use_header = getattr(request, "param", None) == "header"
     write_dupes = getattr(request, "param", None) == "duplicates"
     csv_path = tmpdir_factory.mktemp("csvs").join("sample.csv")
@@ -46,7 +58,7 @@ def sample_csv(tmpdir_factory, request):
 
 
 @pytest.fixture(scope="function")
-def train_valid_test_csv(tmpdir_factory, request):
+def train_valid_test_csv(tmpdir_factory, request) -> DATA_SPLITS:
     overlap = getattr(request, "param", "")
     csv_dir = tmpdir_factory.mktemp("csvs")
     train_path = csv_dir.join("train.csv")
@@ -76,7 +88,10 @@ def train_valid_test_csv(tmpdir_factory, request):
 
 
 @pytest.fixture(scope="function")
-def train_valid_test_paths(default_arguments, train_valid_test_csv):
+def train_valid_test_paths(
+    default_arguments: argparse.Namespace,
+    train_valid_test_csv: DATA_SPLITS,
+) -> PATH_SPLITS:
     args = default_arguments
     (
         (train_csv, train_ids),
@@ -95,17 +110,17 @@ def train_valid_test_paths(default_arguments, train_valid_test_csv):
 
 
 @pytest.fixture(scope="function")
-def train_paths(train_valid_test_paths):
+def train_paths(train_valid_test_paths: PATH_SPLITS) -> PATH_SPLIT:
     return train_valid_test_paths[0]
 
 
 @pytest.fixture(scope="function")
-def valid_paths(train_valid_test_paths):
+def valid_paths(train_valid_test_paths: PATH_SPLITS) -> PATH_SPLIT:
     return train_valid_test_paths[1]
 
 
 @pytest.fixture(scope="function")
-def test_paths(train_valid_test_paths):
+def test_paths(train_valid_test_paths: PATH_SPLITS) -> PATH_SPLIT:
     return train_valid_test_paths[2]
 
 
@@ -113,56 +128,60 @@ def test_paths(train_valid_test_paths):
 # used as parameters in pytest.mark.parametrize
 # https://github.com/pytest-dev/pytest/issues/349
 @pytest.fixture(scope="function")
-def sample_set(request, sample_csv):
+def sample_set(request, sample_csv: DATA_SPLIT) -> Optional[DATA_SPLIT]:
     if request.param is None:
         return None
     return sample_csv
 
 
 @pytest.fixture(scope="function")
-def train_set(request, train_valid_test_csv):
+def train_set(request, train_valid_test_csv: DATA_SPLITS) -> Optional[DATA_SPLIT]:
     if request.param is None:
         return None
     return train_valid_test_csv[0]
 
 
 @pytest.fixture(scope="function")
-def valid_set(request, train_valid_test_csv):
+def valid_set(request, train_valid_test_csv: DATA_SPLITS) -> Optional[DATA_SPLIT]:
     if request.param is None:
         return None
     return train_valid_test_csv[1]
 
 
 @pytest.fixture(scope="function")
-def test_set(request, train_valid_test_csv):
+def test_set(request, train_valid_test_csv: DATA_SPLITS) -> Optional[DATA_SPLIT]:
     if request.param is None:
         return None
     return train_valid_test_csv[2]
 
 
 @pytest.fixture(scope="function")
-def valid_test_ratio():
+def valid_test_ratio() -> Tuple[float, float]:
     valid_ratio = np.random.randint(1, 5) / 10
     test_ratio = np.random.randint(1, 5) / 10
     return valid_ratio, test_ratio
 
 
 @pytest.fixture(scope="function")
-def valid_ratio(request, valid_test_ratio):
+def valid_ratio(request, valid_test_ratio: Tuple[float, float]) -> Optional[float]:
     if request.param is None:
         return None
     return valid_test_ratio[0]
 
 
 @pytest.fixture(scope="function")
-def test_ratio(request, valid_test_ratio):
+def test_ratio(request, valid_test_ratio: Tuple[float, float]) -> Optional[float]:
     if request.param is None:
         return None
     return valid_test_ratio[1]
 
 
 class TestDataset:
-    def test_get_true_epoch(self, default_arguments, train_paths):
+    def test_get_true_epoch(
+        self,
+        default_arguments: argparse.Namespace,
+        train_paths: PATH_SPLIT,
+    ):
         num_workers = 2
         num_tensors = len(train_paths)  # 8 paths by default
         batch_size = 2
@@ -202,26 +221,26 @@ class TestDataset:
 
 
 class TestSampleCsvToSet:
-    def test_sample_csv(self, sample_csv):
+    def test_sample_csv(self, sample_csv: DATA_SPLIT):
         csv_path, sample_ids = sample_csv
-        sample_set = _sample_csv_to_set(csv_path)
+        sample_set = sample_csv_to_set(csv_path)
 
         assert open(csv_path).readline() != "sample_id\n"
         assert all([sample_id in sample_set for sample_id in sample_ids])
         assert len(sample_ids) == len(sample_set)
 
     @pytest.mark.parametrize("sample_csv", ["header"], indirect=["sample_csv"])
-    def test_sample_csv_header(self, sample_csv):
+    def test_sample_csv_header(self, sample_csv: DATA_SPLIT):
         csv_path, sample_ids = sample_csv
-        sample_set = _sample_csv_to_set(csv_path)
+        sample_set = sample_csv_to_set(csv_path)
         assert open(csv_path).readline() == "sample_id\n"
         assert all([sample_id in sample_set for sample_id in sample_ids])
         assert len(sample_ids) == len(sample_set)
 
     @pytest.mark.parametrize("sample_csv", ["duplicates"], indirect=["sample_csv"])
-    def test_sample_csv_duplicates(self, sample_csv):
+    def test_sample_csv_duplicates(self, sample_csv: DATA_SPLIT):
         csv_path, sample_ids = sample_csv
-        sample_set = _sample_csv_to_set(csv_path)
+        sample_set = sample_csv_to_set(csv_path)
         assert open(csv_path).readline() != "sample_id\n"
         assert all([sample_id in sample_set for sample_id in sample_ids])
         assert len(sample_ids) == len(sample_set)
@@ -243,18 +262,18 @@ class TestGetTrainValidTestPaths:
     @pytest.mark.parametrize("test_set", [None, "test_csv"], indirect=True)
     def test_get_paths(
         self,
-        default_arguments,
-        sample_set,
-        train_set,
-        valid_set,
-        test_set,
+        default_arguments: argparse.Namespace,
+        sample_set: Optional[DATA_SPLIT],
+        train_set: Optional[DATA_SPLIT],
+        valid_set: Optional[DATA_SPLIT],
+        test_set: Optional[DATA_SPLIT],
     ):
         args = default_arguments
 
-        def _path_2_sample(path):
+        def _path_2_sample(path: str) -> str:
             return os.path.splitext(os.path.basename(path))[0]
 
-        def _paths_equal_samples(paths, samples):
+        def _paths_equal_samples(paths: List[str], samples: Set[str]):
             assert len(paths) == len(samples)
             assert all(_path_2_sample(path) in samples for path in paths)
             return True
@@ -315,7 +334,11 @@ class TestGetTrainValidTestPaths:
         ["train-valid", "train-test", "valid-test"],
         indirect=True,
     )
-    def test_get_paths_overlap(self, default_arguments, train_valid_test_csv):
+    def test_get_paths_overlap(
+        self,
+        default_arguments: argparse.Namespace,
+        train_valid_test_csv: DATA_SPLITS,
+    ):
         args = default_arguments
         (
             (train_csv, train_ids),

@@ -1,16 +1,28 @@
 # Imports: third party
 import numpy as np
+import pytest
 
 # Imports: first party
 from ml4c3.definitions.icu import ALARMS_FILES
+from ml4c3.ingest.icu.readers import BedmasterAlarmsReader
 
 
-def test_get_alarms_dfs(get_alarms_reader):
-    reader = get_alarms_reader()
-    assert len(reader.alarms_dfs) == 3
+@pytest.fixture(scope="function")
+def alarms_reader() -> BedmasterAlarmsReader:
+    reader = BedmasterAlarmsReader(
+        pytest.alarms_dir,
+        pytest.edw_dir,
+        pytest.example_mrn,
+        pytest.example_visit_id,
+    )
+    return reader
 
 
-def test_list_alarms(alarms_reader):
+def test_get_alarms_dfs(alarms_reader: BedmasterAlarmsReader):
+    assert len(alarms_reader.alarms_dfs) == 3
+
+
+def test_list_alarms(alarms_reader: BedmasterAlarmsReader):
     expected_alarms = [
         "TACHY",
         "HR HI 156",
@@ -25,7 +37,7 @@ def test_list_alarms(alarms_reader):
     assert sorted(alarms_reader.list_alarms()) == sorted(expected_alarms)
 
 
-def test_get_alarm(alarms_reader):
+def test_get_alarm(alarms_reader: BedmasterAlarmsReader):
     alarm1 = alarms_reader.get_alarm("SPO2 PROBE")
     alarm2 = alarms_reader.get_alarm("TVEXP LOW")
 

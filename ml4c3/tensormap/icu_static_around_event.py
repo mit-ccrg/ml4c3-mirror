@@ -7,8 +7,8 @@ import numpy as np
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
 from ml4c3.tensormap.TensorMap import TensorMap, Interpretation
-from ml4c3.tensormap.icu_events import get_tmap as GET_EVENT_TMAP
-from ml4c3.tensormap.icu_static import admin_age_tensor_from_file
+from ml4c3.tensormap.icu_signals import get_tmap as GET_SIGNAL_TMAP
+from ml4c3.tensormap.icu_signals import admin_age_tensor_from_file
 from ml4c3.tensormap.icu_first_visit_with_signal import get_tmap as GET_FIRST_VISIT_TMAP
 
 
@@ -126,7 +126,7 @@ def get_tmap(tm_name: str):
         match = pattern.findall(tm_name)
         if match:
             time, period, event_procedure = match[0]
-            event_procedure_tm = GET_EVENT_TMAP(event_procedure)
+            event_procedure_tm = GET_SIGNAL_TMAP(event_procedure)
             visit_tm = GET_FIRST_VISIT_TMAP(
                 event_procedure.replace("end_date", "first_visit").replace(
                     "start_date",
@@ -151,7 +151,7 @@ def get_tmap(tm_name: str):
         match = pattern.findall(tm_name)
         if match:
             time_1, time_2, period, event_procedure = match[0]
-            event_procedure_tm = GET_EVENT_TMAP(event_procedure)
+            event_procedure_tm = GET_SIGNAL_TMAP(event_procedure)
             visit_tm = GET_FIRST_VISIT_TMAP(
                 event_procedure.replace("end_date", "first_visit").replace(
                     "start_date",

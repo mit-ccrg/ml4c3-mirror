@@ -103,7 +103,7 @@ class Writer(h5py.File):
             if not field.startswith("_"):
                 static_group.attrs[field] = getattr(static_data, field)
 
-    def write_signal(self, signal: Type[ICUDataObject]):
+    def write_signal(self, signal: ICUDataObject):
         """
         Writer for generic fields that all the data share.
         """
