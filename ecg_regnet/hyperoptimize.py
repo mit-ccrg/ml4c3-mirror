@@ -2,11 +2,15 @@ import os
 import argparse
 import numpy as np
 from ray import tune
+from ray.tune.suggest.bohb import TuneBOHB
+from ray.tune.schedulers import HyperBandForBOHB
 from .regnet import ML4C3Regnet
 from .data import get_pretraining_datasets, get_ecg_tmap, get_pretraining_tasks, augmentation_dict
 from ml4c3.metrics import get_metric_dict
 from tensorflow_addons.optimizers import SGDW
 from tensorflow.keras.experimental import CosineDecay
+from tensorflow import config as tf_config
+from multiprocessing import cpu_count
 
 
 def build_pretraining_model(
@@ -96,12 +100,10 @@ class PretrainingTrainable(tune.Trainable):
 def run(
         train_csv: str, valid_csv: str, test_csv: str,
         epochs: int, hd5_folder: str,
-        cpus_available: int, gpus_available: int,
-        parallel_trials: int,
+        cpus_per_model: int, gpus_per_model: float,
         output_folder: str,
+        num_trials: int,
 ):
-    # TODO: consider population based optimization
-    # TODO: consider bayesian optimization
     augmentation_strengths = {
         f'{aug_name}_strength': tune.uniform(0, 1)
         for aug_name in augmentation_dict()
@@ -112,7 +114,7 @@ def run(
         'group_size': tune.qrandint(1, 32, 8),
         'depth': tune.randint(12, 28),
         'initial_width': tune.randint(16, 256),
-        'width_growth_rate': tune.uniform(0, 256),
+        'width_growth_rate': tune.uniform(0, 4),
         'width_quantization': tune.uniform(1.5, 3),
     }
     training_config = {
@@ -122,30 +124,93 @@ def run(
         'epochs': epochs,
         'hd5_folder': hd5_folder,
     }
-    tune.run(
-        PretrainingTrainable,
-        stop={'training_iteration': epochs},
-        verbose=1,
-        num_samples=4,  # how many models to train
-        resources_per_trial={
-            'cpu': cpus_available / parallel_trials,
-            'gpu': gpus_available / gpus_available,
-        },
+    hyperparams = {**augmentation_strengths, **model_params}
+
+    max_concurrent = min(
+            cpu_count() // cpus_per_model,
+            len(tf_config.list_physical_devices('GPU') // gpus_per_model)
+        )
+    bohb_search = TuneBOHB(
+        hyperparams,
+        metric='val_loss',
+        max_concurrent=max_concurrent
+    )
+    bohb_scheduler = HyperBandForBOHB(
+        time_attr='training_iteration',
         metric='val_loss',
         mode='min',
-        local_dir=output_folder,
-        config={
-            **augmentation_strengths, **model_params,
-            **training_config,
-        }
+        max_t=epochs,
     )
+
+    print(f'Running BOHB tune for {num_trials} trials with {max_concurrent} maximum concurrent trials')
+    print(f'Results will appear in {output_folder}')
+    analysis = tune.run(
+        PretrainingTrainable,
+        verbose=1,
+        num_samples=num_trials,  # how many hyperparameter trials
+        search_alg=bohb_search,
+        scheduler=bohb_scheduler,
+        resources_per_trial={
+            'cpu': cpus_per_model,
+            'gpu': gpus_per_model,
+        },
+        local_dir=output_folder,
+        config={**hyperparams, **training_config}
+    )
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--train_csv",
+        help="Path to CSV with Sample IDs to reserve for training.",
+    )
+    parser.add_argument(
+        "--valid_csv",
+        help=(
+            "Path to CSV with Sample IDs to reserve for validation. Takes precedence"
+            " over valid_ratio."
+        ),
+    )
+    parser.add_argument(
+        "--test_csv",
+        help=(
+            "Path to CSV with Sample IDs to reserve for testing. Takes precedence over"
+            " test_ratio."
+        ),
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        help="Number of training epochs.",
+    )
+    parser.add_argument(
+        "--num_trials",
+        type=int,
+        help="Number of training epochs.",
+    )
+    parser.add_argument(
+        "--cpus_per_model",
+        type=int,
+        help="Number of cpus per model in hyperparameter optimization.",
+    )
+    parser.add_argument(
+        "--gpus_per_model",
+        type=float,
+        help="Number of gpus per model in hyperparameter optimization.",
+    )
+    parser.add_argument(
+        "--hd5_folder",
+        help="Path to folder containing tensors, or where tensors will be written.",
+    )
+    parser.add_argument(
+        "--output_folder",
+        default="./recipes-output",
+        help="Path to output folder for recipes.py runs.",
+    )
+    return parser.parse_args()
 
 
 if __name__ == '__main__':
-    run(  # TODO: argparse for these parameters
-        train_csv, valid_csv, test_csv,
-        epochs, hd5_folder,
-        cpus_available, gpus_available,
-        parallel_trials,
-        output_folder,
-    )
+    args = parse_args()
+    run(**args.__dict__)
