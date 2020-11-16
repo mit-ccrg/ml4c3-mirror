@@ -121,6 +121,7 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         sample_csv=args.sample_csv,
+        mrn_column_name=args.mrn_column_name,
         valid_ratio=args.valid_ratio,
         test_ratio=args.test_ratio,
         train_csv=args.train_csv,

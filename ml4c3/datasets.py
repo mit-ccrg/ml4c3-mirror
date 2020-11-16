@@ -328,6 +328,7 @@ def train_valid_test_datasets(
     keep_paths: bool = False,
     keep_paths_test: bool = True,
     sample_csv: str = None,
+    mrn_column_name: Optional[str] = None,
     valid_ratio: float = 0.2,
     test_ratio: float = 0.1,
     train_csv: str = None,
@@ -385,6 +386,7 @@ def train_valid_test_datasets(
         valid_csv=valid_csv,
         test_csv=test_csv,
         no_empty_paths_allowed=no_empty_paths_allowed,
+        mrn_column_name=mrn_column_name,
     )
 
     if output_folder is not None and run_id is not None:
@@ -677,7 +679,7 @@ def _get_train_valid_test_discard_ratios(
 
 def sample_csv_to_set(
     sample_csv: Optional[str] = None,
-    mrn_col_name: Optional[str] = None,
+    mrn_column_name: Optional[str] = None,
 ) -> Union[None, Set[str]]:
 
     if sample_csv is None:
@@ -695,7 +697,7 @@ def sample_csv_to_set(
     except ValueError:
         df.columns = df.iloc[0]
         df = df[1:]
-    if mrn_col_name is None:
+    if mrn_column_name is None:
         df.columns = [
             col.lower() if isinstance(col, str) else col for col in df.columns
         ]
@@ -705,10 +707,10 @@ def sample_csv_to_set(
 
         # If no matches, assume the first column is MRN
         if not matches:
-            mrn_col_name = df.columns[0]
+            mrn_column_name = df.columns[0]
         else:
             # Get first string from set of matches to use as column name
-            mrn_col_name = next(iter(matches))
+            mrn_column_name = next(iter(matches))
 
         if len(matches) > 1:
             logging.warning(
@@ -718,7 +720,7 @@ def sample_csv_to_set(
             )
 
     # Isolate MRN column from dataframe, cast to float -> int -> string
-    sample_ids = df[mrn_col_name].astype(float).astype(int).apply(str)
+    sample_ids = df[mrn_column_name].astype(float).astype(int).apply(str)
 
     return set(sample_ids)
 
@@ -726,6 +728,7 @@ def sample_csv_to_set(
 def get_train_valid_test_paths(
     tensors: str,
     sample_csv: Optional[str] = None,
+    mrn_column_name: Optional[str] = None,
     valid_ratio: float = 0.2,
     test_ratio: float = 0.1,
     train_csv: Optional[str] = None,
@@ -773,10 +776,13 @@ def get_train_valid_test_paths(
         test_csv=test_csv,
     )
 
-    sample_set = sample_csv_to_set(sample_csv)
-    train_set = sample_csv_to_set(train_csv)
-    valid_set = sample_csv_to_set(valid_csv)
-    test_set = sample_csv_to_set(test_csv)
+    sample_set = sample_csv_to_set(
+        sample_csv=sample_csv,
+        mrn_column_name=mrn_column_name,
+    )
+    train_set = sample_csv_to_set(sample_csv=train_csv, mrn_column_name=mrn_column_name)
+    valid_set = sample_csv_to_set(sample_csv=valid_csv, mrn_column_name=mrn_column_name)
+    test_set = sample_csv_to_set(sample_csv=test_csv, mrn_column_name=mrn_column_name)
 
     if (
         train_set is not None

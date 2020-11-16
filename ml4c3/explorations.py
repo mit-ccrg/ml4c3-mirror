@@ -6,7 +6,7 @@ import logging
 import argparse
 import datetime
 import multiprocessing as mp
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from functools import reduce
 from collections import OrderedDict, defaultdict
 
@@ -88,6 +88,7 @@ def explore(
         tensors=args.tensors,
         num_workers=args.num_workers,
         sample_csv=args.sample_csv,
+        mrn_column_name=args.mrn_column_name,
         valid_ratio=args.valid_ratio,
         test_ratio=args.test_ratio,
         train_csv=args.train_csv,
@@ -1025,6 +1026,7 @@ def _tensors_to_df(
     tensors: str,
     num_workers: int,
     sample_csv: str = None,
+    mrn_column_name: Optional[str] = None,
     valid_ratio: float = None,
     test_ratio: float = None,
     train_csv: str = None,
@@ -1045,6 +1047,7 @@ def _tensors_to_df(
     train_paths, valid_paths, test_paths = get_train_valid_test_paths(
         tensors=tensors,
         sample_csv=sample_csv,
+        mrn_column_name=mrn_column_name,
         valid_ratio=valid_ratio,
         test_ratio=test_ratio,
         train_csv=train_csv,

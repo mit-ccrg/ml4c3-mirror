@@ -67,17 +67,17 @@ def parse_args() -> argparse.Namespace:
         default=[],
         help="Do not set this directly. Use output_tensors",
     )
-    tensormaps_parser.add_argument(
-        "--mrn_column_name",
-        default="medrecn",
-        help="Name of MRN column in tensors_all*.csv",
-    )
 
     # Input and Output files and directories
     io_parser = argparse.ArgumentParser(add_help=False)
     io_parser.add_argument(
         "--sample_csv",
         help="Path to CSV with Sample IDs to restrict tensor paths",
+    )
+    io_parser.add_argument(
+        "--mrn_column_name",
+        default="medrecn",
+        help="Name of MRN column in sample_csv.csv to look for",
     )
     io_parser.add_argument(
         "--tensors",
@@ -734,8 +734,7 @@ def parse_args() -> argparse.Namespace:
     explore_parser.add_argument(
         "--explore_disable_saving_output",
         action="store_true",
-        help="Disable saving outputs from explore: histograms, summary statistics, "
-        "and tensors.",
+        help="Disable saving outputs from explore: histograms, summary stats, and tensors.",
     )
     explore_parser.add_argument(
         "--explore_export_error",
