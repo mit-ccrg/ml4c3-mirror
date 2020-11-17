@@ -56,7 +56,6 @@ repos:
     entry: pylint
     language: system
     types: [python]
-    exlude: ^ecg_regnet/
 
 - repo: git://github.com/luismayta/pre-commit-mypy
   rev: master

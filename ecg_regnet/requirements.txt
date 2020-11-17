@@ -1,5 +1,5 @@
 hpbandster
 ConfigSpace
-"ray[tune]"
+ray[tune]
 tensorflow_addons
 tensorboardX

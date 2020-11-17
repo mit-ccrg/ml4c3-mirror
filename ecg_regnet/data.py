@@ -1,20 +1,23 @@
+# Imports: standard library
+from typing import Dict, List, Callable
+from functools import partial
+
+# Imports: third party
 import h5py
 import numpy as np
-from functools import partial
-from typing import List, Dict, Callable
 
-
-from ml4c3.tensormap.TensorMap import TensorMap
-from ml4c3.tensormap.ecg import (
-    get_ecg_age_from_hd5, ECG_PREFIX, ECG_REST_LEADS_ALL,
-    tmaps, make_voltage_tff,
-)
-from ml4c3.validators import (
-    RangeValidator,
-    validator_voltage_no_zero_padding,
-)
-from ml4c3.normalizer import Standardize, ZeroMeanStd1
+# Imports: first party
 from ml4c3.datasets import train_valid_test_datasets
+from ml4c3.normalizer import Standardize, ZeroMeanStd1
+from ml4c3.validators import RangeValidator, validator_voltage_no_zero_padding
+from ml4c3.tensormap.ecg import (
+    ECG_PREFIX,
+    ECG_REST_LEADS_ALL,
+    tmaps,
+    make_voltage_tff,
+    get_ecg_age_from_hd5,
+)
+from ml4c3.tensormap.TensorMap import TensorMap
 
 
 def most_recent_ecg_date(hd5: h5py.File) -> List[str]:
@@ -27,7 +30,7 @@ def warp(ecg, strength):
     strength *= 1  # reasonable range between -> [0, 1]
 
     i = np.linspace(0, 1, len(ecg))
-    envelope = strength * (.5 - np.abs(.5 - i))
+    envelope = strength * (0.5 - np.abs(0.5 - i))
     warped = i + envelope * (
         np.sin(np.random.rand() * 5 + np.random.randn() * 5)
         + np.cos(np.random.rand() * 5 + np.random.randn() * 5)
@@ -44,7 +47,7 @@ def crop(ecg, strength):
     cropped_ecg = ecg.copy()
     crop_len = int(np.random.randint(len(ecg)) * strength)
     crop_start = max(0, np.random.randint(-crop_len, len(ecg)))
-    cropped_ecg[crop_start: crop_start + crop_len] = 0
+    cropped_ecg[crop_start : crop_start + crop_len] = 0
     return cropped_ecg
 
 
@@ -63,7 +66,9 @@ def roll(ecg, strength):
 def baseline_drift(ecg, strength):
     strength *= 1  # reasonable range between -> [0, 1]
 
-    frequency = (np.random.rand() * 20 + 10) * 10 / 60  # typical breaths per second for an adult
+    frequency = (
+        (np.random.rand() * 20 + 10) * 10 / 60
+    )  # typical breaths per second for an adult
     phase = np.random.rand() * 2 * np.pi
     drift = strength * np.sin(np.linspace(0, 1, len(ecg)) * frequency + phase)
     return ecg + drift
@@ -87,7 +92,7 @@ def apply_augmentation_strengths(augmentation_strengths: Dict[str, float]):
 # ECG tmaps
 def get_ecg_tmap(length: int, augmentations: List) -> TensorMap:
     return TensorMap(
-        name='ecg',
+        name="ecg",
         shape=(length, len(ECG_REST_LEADS_ALL)),
         path_prefix=ECG_PREFIX,
         tensor_from_file=make_voltage_tff(exact_length=False),
@@ -102,22 +107,22 @@ def get_ecg_tmap(length: int, augmentations: List) -> TensorMap:
 
 # Pretraining tmaps
 def get_axis_tmaps() -> List[TensorMap]:
-    keys = 'ecg_paxis_md', 'ecg_raxis_md', 'ecg_taxis_md'
+    keys = "ecg_paxis_md", "ecg_raxis_md", "ecg_taxis_md"
     out = []
     for key in keys:
         tmap = tmaps[key]
-        tmap.loss = 'mse'
+        tmap.loss = "mse"
         tmap.time_series_filter = most_recent_ecg_date
         out.append(tmap)
     return out
 
 
 def get_interval_tmaps() -> List[TensorMap]:
-    keys = 'ecg_rate_md', 'ecg_pr_md', 'ecg_qrt_md', 'ecg_qt_md'
+    keys = "ecg_rate_md", "ecg_pr_md", "ecg_qrs_md", "ecg_qt_md"
     out = []
     for key in keys:
         tmap = tmaps[key]
-        tmap.loss = 'mse'
+        tmap.loss = "mse"
         tmap.time_series_filter = most_recent_ecg_date
         out.append(tmap)
     return out
@@ -130,7 +135,7 @@ def get_pretraining_tasks() -> List[TensorMap]:
 # Downstream tmaps
 def get_age_tmap() -> TensorMap:
     return TensorMap(
-        name='age',
+        name="age",
         path_prefix=ECG_PREFIX,
         loss="mse",
         tensor_from_file=get_ecg_age_from_hd5,
@@ -144,14 +149,14 @@ def get_age_tmap() -> TensorMap:
 
 # Data generators
 def get_pretraining_datasets(
-        ecg_length: int,
-        augmentation_strengths: Dict[str, float],
-        hd5_folder: str,
-        num_workers: int,
-        batch_size: int,
-        train_csv: str,
-        valid_csv: str,
-        test_csv: str,
+    ecg_length: int,
+    augmentation_strengths: Dict[str, float],
+    hd5_folder: str,
+    num_workers: int,
+    batch_size: int,
+    train_csv: str,
+    valid_csv: str,
+    test_csv: str,
 ):
     augmentations = apply_augmentation_strengths(augmentation_strengths)
     ecg_tmap = get_ecg_tmap(ecg_length, augmentations)
