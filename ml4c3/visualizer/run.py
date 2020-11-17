@@ -1,5 +1,8 @@
+# Imports: third party
+from flask_caching import Cache
+
 # Imports: first party
-from ml4c3.visualizer import app, cache
+from ml4c3.visualizer import app
 from ml4c3.visualizer.properties import load_config
 from ml4c3.visualizer.static_callbacks import set_static_callbacks
 
@@ -7,6 +10,15 @@ from ml4c3.visualizer.static_callbacks import set_static_callbacks
 # pylint: disable=import-outside-toplevel
 def run(debug, port, address, files_dir, options):
     app.title = "HD5 visualizer"
+
+    cache = Cache(
+        app.server,
+        config={
+            "CACHE_TYPE": "filesystem",
+            "CACHE_DIR": "cache-directory",
+            "CACHE_THRESHOLD": 200,
+        },
+    )
 
     load_config(user_files=options)
     # Imports: first party
