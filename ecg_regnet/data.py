@@ -11,6 +11,7 @@ from matplotlib import pyplot as plt
 
 # Imports: first party
 from ml4c3.datasets import train_valid_test_datasets
+from ml4c3.explorations import _tensors_to_df
 from ml4c3.normalizer import Standardize, ZeroMeanStd1
 from ml4c3.validators import RangeValidator, validator_voltage_no_zero_padding
 from ml4c3.tensormap.ecg import (
@@ -247,9 +248,28 @@ def demo_augmentations(
         cleanup()
 
 
+def explore_pretraining(
+    hd5_folder: str,
+    output_folder: str,
+    **kwargs,
+):
+    tmaps = [get_ecg_tmap(2500, [])] + get_pretraining_tasks()
+    df = _tensors_to_df(
+        tensor_maps_in=tmaps,
+        tensors=hd5_folder,
+        num_workers=10,
+        output_folder=output_folder,
+        run_id='pretraining_explore',
+        export_error=False,
+        export_fpath=False,
+        export_generator=False,
+    )
+    df.to_csv(os.path.join(output_folder, 'pretraining_explore.tsv'), index=False, sep='\t')
+
+
 MODES = {
     "augmentation_demo": demo_augmentations,
-    # TODO: add explore
+    "explore_pretraining": explore_pretraining,
 }
 
 
