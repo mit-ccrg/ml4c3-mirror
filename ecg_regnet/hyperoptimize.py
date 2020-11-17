@@ -1,7 +1,6 @@
 # Imports: standard library
 import os
 import argparse
-from multiprocessing import cpu_count
 
 # Imports: third party
 import numpy as np
@@ -20,9 +19,6 @@ from tensorflow.keras.layers import Input
 from tensorflow_addons.optimizers import SGDW
 from tensorflow.keras.experimental import CosineDecay
 from tensorflow.python.keras.utils.layer_utils import count_params
-
-# Imports: first party
-from ml4c3.metrics import get_metric_dict
 
 
 def build_pretraining_model(
@@ -49,7 +45,6 @@ def build_pretraining_model(
         input_name,
         output_name_to_shape,
     )
-    metrics = get_metric_dict(tmaps_out)
     lr_schedule = CosineDecay(
         initial_learning_rate=0.005,
         decay_steps=epochs,
@@ -104,6 +99,7 @@ class PretrainingTrainable(tune.Trainable):
         datasets, stats, cleanups = get_pretraining_datasets(
             ecg_length=config["ecg_length"],
             augmentation_strengths=augmentation_strengths,
+            num_augmentations=config["num_augmentations"],
             hd5_folder=config["hd5_folder"],
             num_workers=config["num_workers"],
             batch_size=128,  # following RegNet
@@ -154,9 +150,11 @@ def run(
     num_trials: int,
 ):
     cpus = 16  # TODO: should be an argument
-    augmentation_strengths = {
-        f"{aug_name}_strength": tune.uniform(0, 1) for aug_name in augmentation_dict()
+    augmentation_params = {
+        f"{aug_name}_strength": tune.uniform(0, 1) for aug_name in augmentation_dict(),
     }
+    augmentation_params["num_augmentations"] = tune.randint(0, len(augmentation_dict()))
+
     model_params = {
         "ecg_length": tune.qrandint(1250, 5000, 250),
         "kernel_size": tune.randint(3, 10),
@@ -174,7 +172,7 @@ def run(
         "hd5_folder": hd5_folder,
         "num_workers": cpus_per_model,
     }
-    hyperparams = {**augmentation_strengths, **model_params}
+    hyperparams = {**augmentation_params, **model_params}
 
     max_concurrent = min(
         cpus // cpus_per_model,
@@ -224,16 +222,14 @@ def parse_args():
     parser.add_argument(
         "--valid_csv",
         help=(
-            "Path to CSV with Sample IDs to reserve for validation. Takes precedence"
-            " over valid_ratio."
+            "Path to CSV with Sample IDs to reserve for validation"
         ),
         required=True,
     )
     parser.add_argument(
         "--test_csv",
         help=(
-            "Path to CSV with Sample IDs to reserve for testing. Takes precedence over"
-            " test_ratio."
+            "Path to CSV with Sample IDs to reserve for testing."
         ),
         required=True,
     )
@@ -263,7 +259,7 @@ def parse_args():
     )
     parser.add_argument(
         "--hd5_folder",
-        help="Path to folder containing tensors, or where tensors will be written.",
+        help="Path to folder containing hd5s.",
         required=True,
     )
     parser.add_argument(

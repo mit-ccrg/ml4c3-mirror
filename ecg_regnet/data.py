@@ -1,9 +1,12 @@
 # Imports: standard library
+import argparse
 from typing import Dict, List, Callable
 from functools import partial
+import os
 
 # Imports: third party
 import h5py
+import matplotlib.pyplot as plt
 import numpy as np
 
 # Imports: first party
@@ -81,11 +84,21 @@ def augmentation_dict():
     }
 
 
-def apply_augmentation_strengths(augmentation_strengths: Dict[str, float]):
+def chain_apply(input_value, functions: List[Callable]):
+    out = input_value
+    for func in functions:
+        out = func(input_value)
+    return out
+
+
+def apply_augmentation_strengths(augmentation_strengths: Dict[str, float], num_augmentations: int):
     aug_dict = augmentation_dict()
-    return [
+    augmentations = [
         partial(aug_dict[func_name], strength=strength)
         for func_name, strength in augmentation_strengths.items()
+    ]
+    return [
+        lambda ecg: chain_apply(ecg, np.random.choice(augmentations, num_augmentations))
     ]
 
 
@@ -151,6 +164,7 @@ def get_age_tmap() -> TensorMap:
 def get_pretraining_datasets(
     ecg_length: int,
     augmentation_strengths: Dict[str, float],
+    num_augmentations: int,
     hd5_folder: str,
     num_workers: int,
     batch_size: int,
@@ -158,7 +172,7 @@ def get_pretraining_datasets(
     valid_csv: str,
     test_csv: str,
 ):
-    augmentations = apply_augmentation_strengths(augmentation_strengths)
+    augmentations = apply_augmentation_strengths(augmentation_strengths, num_augmentations)
     ecg_tmap = get_ecg_tmap(ecg_length, augmentations)
     return train_valid_test_datasets(
         [ecg_tmap],
@@ -170,3 +184,96 @@ def get_pretraining_datasets(
         valid_csv=valid_csv,
         test_csv=test_csv,
     )
+
+
+# plot augmentations
+def demo_augmentation(
+    ecg: np.ndarray,
+    augmentation: Callable[[np.ndarray, float], np.ndarray],
+    axes: List[plt.Axes],
+):
+    for axis, strength in zip(axes, np.linspace(0, 1, len(axes))):
+        axis.axis('off')  # hide x and y ticks
+        axis.plot(augmentation(ecg, strength))
+
+
+def demo_augmentations(
+    hd5_folder: str,
+    train_csv: str,
+    valid_csv: str,
+    test_csv: str,
+    output_folder: str,
+):
+    os.makedirs(output_folder, exist_ok=True)
+    augmentations = augmentation_dict()
+    ecgs_per_augmentation = 3
+
+    (train_dataset, _, _), _, _ = get_pretraining_datasets(
+        ecg_length=2500,
+        augmentation_strengths={name: 0. for name in augmentations},
+        num_augmentations=0,
+        hd5_folder=hd5_folder,
+        num_workers=0,
+        batch_size=ecgs_per_augmentation,
+        train_csv=train_csv,
+        valid_csv=valid_csv,
+        test_csv=test_csv,
+    )
+    ecgs = train_dataset.take(1)
+    for name, augmentation in augmentations.items():
+        fig, axes = plt.subplots(10, ecgs_per_augmentation, figsize=(10 * ecgs_per_augmentation, 10))
+        for i, ecg in enumerate(ecgs):
+            demo_augmentation(ecg, augmentation, axes[:, i])
+        plt.savefig(os.path.join(output_folder, f'{name}.png'))
+
+
+MODES = {
+    'augmentation_demo': demo_augmentations,
+    # TODO: add explore
+}
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "mode",
+        help=f"Which data functionality to use. Choose between {list(MODES)}.",
+        required=True,
+        choices=list(MODES),
+    )
+    parser.add_argument(
+        "--train_csv",
+        help="Path to CSV with Sample IDs to reserve for training.",
+        required=True,
+    )
+    parser.add_argument(
+        "--valid_csv",
+        help=(
+            "Path to CSV with Sample IDs to reserve for validation"
+        ),
+        required=True,
+    )
+    parser.add_argument(
+        "--test_csv",
+        help=(
+            "Path to CSV with Sample IDs to reserve for testing."
+        ),
+        required=True,
+    )
+    parser.add_argument(
+        "--hd5_folder",
+        help="Path to folder containing hd5s.",
+        required=True,
+    )
+    parser.add_argument(
+        "--output_folder",
+        default="./recipes-output",
+        help="Path to output folder for recipes.py runs.",
+        required=True,
+    )
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    demo_augmentations(**args.__dict__)
