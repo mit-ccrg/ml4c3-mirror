@@ -3,7 +3,7 @@ bokeh
 dash
 datashader
 flask-caching
-h5py>=2.10.0
+h5py==2.10.0
 hyperopt>=0.1.2
 ipympl
 ipywidgets>=7.5.1
@@ -19,9 +19,6 @@ seaborn>=0.10.1
 tabulate
 tensorflow-probability==0.11.1
 tensorflow-addons==0.11.2
-# list tensorflow for awareness however the correct version comes with the base images
-# tensorflow-gpu==2.3.1
-# tensorflow==2.3.1
 unidecode
 xgboost
 xlrd
