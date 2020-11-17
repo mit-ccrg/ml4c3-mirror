@@ -76,7 +76,6 @@ def parse_args() -> argparse.Namespace:
     )
     io_parser.add_argument(
         "--mrn_column_name",
-        default="medrecn",
         help="Name of MRN column in sample_csv.csv to look for",
     )
     io_parser.add_argument(
