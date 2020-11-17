@@ -7,13 +7,15 @@ from functools import partial
 # Imports: third party
 import h5py
 import numpy as np
+import pandas as pd
 from matplotlib import pyplot as plt
+from sklearn.model_selection import train_test_split
 
 # Imports: first party
 from ml4c3.datasets import train_valid_test_datasets
-from ml4c3.explorations import _tensors_to_df
 from ml4c3.normalizer import Standardize, ZeroMeanStd1
 from ml4c3.validators import RangeValidator, validator_voltage_no_zero_padding
+from ml4c3.explorations import _tensors_to_df
 from ml4c3.tensormap.ecg import (
     ECG_PREFIX,
     ECG_REST_LEADS_ALL,
@@ -25,7 +27,7 @@ from ml4c3.tensormap.TensorMap import TensorMap
 
 
 def most_recent_ecg_date(hd5: h5py.File) -> List[str]:
-    return sorted(list(hd5[ECG_PREFIX]), reverse=True)
+    return [max(hd5[ECG_PREFIX])]
 
 
 # ECG augmentations
@@ -217,7 +219,6 @@ def demo_augmentations(
     output_folder: str,
     **kwargs,
 ):
-    os.makedirs(output_folder, exist_ok=True)
     augmentations = augmentation_dict()
     ecgs_per_augmentation = 3
 
@@ -251,23 +252,65 @@ def demo_augmentations(
 def explore_pretraining(
     hd5_folder: str,
     output_folder: str,
+    sample_csv: str,
     **kwargs,
 ):
-    tmaps = [get_ecg_tmap(2500, [])] + get_pretraining_tasks()
+    run_id = "pretraining_explore"
+    os.makedirs(os.path.join(args.output_folder, run_id), exist_ok=True)
+    sample_freq_tmap = tmaps["ecg_sampling_frequency_pc_continuous"]
+    sample_freq_tmap.time_series_filter = most_recent_ecg_date
+
+    explore_tmaps = [get_ecg_tmap(2500, []), sample_freq_tmap] + get_pretraining_tasks()
     df = _tensors_to_df(
-        tensor_maps_in=tmaps,
+        tensor_maps_in=explore_tmaps,
         tensors=hd5_folder,
         num_workers=10,
         output_folder=output_folder,
-        run_id='pretraining_explore',
+        run_id=run_id,
+        valid_ratio=0,
+        test_ratio=0,
         export_error=False,
-        export_fpath=False,
+        export_fpath=True,
         export_generator=False,
+        sample_csv=sample_csv,
     )
-    df.to_csv(os.path.join(output_folder, 'pretraining_explore.tsv'), index=False, sep='\t')
+    sample_ids = [
+        int(os.path.splitext(os.path.basename(path))[0]) for path in df["fpath"]
+    ]
+    df["sample_id"] = sample_ids
+    df.to_csv(
+        os.path.join(output_folder, "pretraining_explore.tsv"),
+        index=False,
+        sep="\t",
+    )
+
+    working_sample_ids = df.dropna()["sample_id"]
+    training_ids, test_ids = train_test_split(
+        working_sample_ids,
+        test_size=len(working_sample_ids) // 10,
+        random_state=42,
+    )
+    training_ids, valid_ids = train_test_split(
+        training_ids,
+        test_size=len(working_sample_ids) // 10,
+        random_state=17,
+    )
+
+    pd.DataFrame({"sample_id": training_ids}).to_csv(
+        os.path.join(output_folder, "train_ids.csv"),
+        index=False,
+    )
+    pd.DataFrame({"sample_id": valid_ids}).to_csv(
+        os.path.join(output_folder, "valid_ids.csv"),
+        index=False,
+    )
+    pd.DataFrame({"sample_id": test_ids}).to_csv(
+        os.path.join(output_folder, "test_ids.csv"),
+        index=False,
+    )
 
 
-MODES = {
+MODES: Dict[str, Callable] = {
     "augmentation_demo": demo_augmentations,
     "explore_pretraining": explore_pretraining,
 }
@@ -281,19 +324,20 @@ def parse_args():
         choices=list(MODES),
     )
     parser.add_argument(
+        "--sample_csv",
+        help=("Path to CSV with all Sample IDs to use."),
+    )
+    parser.add_argument(
         "--train_csv",
         help="Path to CSV with Sample IDs to reserve for training.",
-        required=True,
     )
     parser.add_argument(
         "--valid_csv",
         help=("Path to CSV with Sample IDs to reserve for validation"),
-        required=True,
     )
     parser.add_argument(
         "--test_csv",
         help=("Path to CSV with Sample IDs to reserve for testing."),
-        required=True,
     )
     parser.add_argument(
         "--hd5_folder",
@@ -311,4 +355,5 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    demo_augmentations(**args.__dict__)
+    os.makedirs(args.output_folder, exist_ok=True)
+    MODES[args.mode](**args.__dict__)

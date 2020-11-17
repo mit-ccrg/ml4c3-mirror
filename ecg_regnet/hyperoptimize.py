@@ -151,7 +151,7 @@ def run(
 ):
     cpus = 16  # TODO: should be an argument
     augmentation_params = {
-        f"{aug_name}_strength": tune.uniform(0, 1) for aug_name in augmentation_dict(),
+        f"{aug_name}_strength": tune.uniform(0, 1) for aug_name in augmentation_dict()
     }
     augmentation_params["num_augmentations"] = tune.randint(0, len(augmentation_dict()))
 
@@ -221,16 +221,12 @@ def parse_args():
     )
     parser.add_argument(
         "--valid_csv",
-        help=(
-            "Path to CSV with Sample IDs to reserve for validation"
-        ),
+        help=("Path to CSV with Sample IDs to reserve for validation"),
         required=True,
     )
     parser.add_argument(
         "--test_csv",
-        help=(
-            "Path to CSV with Sample IDs to reserve for testing."
-        ),
+        help=("Path to CSV with Sample IDs to reserve for testing."),
         required=True,
     )
     parser.add_argument(
