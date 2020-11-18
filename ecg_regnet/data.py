@@ -131,7 +131,7 @@ def get_ecg_tmap(length: int, augmentations: List) -> TensorMap:
 
 # Pretraining tmaps
 def get_axis_tmaps() -> List[TensorMap]:
-    keys = "ecg_paxis_md", "ecg_raxis_md", "ecg_taxis_md"
+    keys = "ecg_paxis_std_md", "ecg_raxis_std_md", "ecg_taxis_std_md"
     out = []
     for key in keys:
         tmap = tmaps[key]
@@ -142,7 +142,7 @@ def get_axis_tmaps() -> List[TensorMap]:
 
 
 def get_interval_tmaps() -> List[TensorMap]:
-    keys = "ecg_rate_md", "ecg_pr_md", "ecg_qrs_md", "ecg_qt_md"
+    keys = "ecg_rate_std_md", "ecg_pr_std_md", "ecg_qrs_std_md", "ecg_qt_std_md"
     out = []
     for key in keys:
         tmap = tmaps[key]

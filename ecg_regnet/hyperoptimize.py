@@ -16,6 +16,7 @@ from tensorflow import config as tf_config
 from ray.tune.schedulers import HyperBandForBOHB
 from ray.tune.suggest.bohb import TuneBOHB
 from tensorflow.keras.layers import Input
+from tensorflow.keras.callbacks import TerminateOnNaN
 from tensorflow_addons.optimizers import SGDW
 from tensorflow.keras.experimental import CosineDecay
 from tensorflow.python.keras.utils.layer_utils import count_params
@@ -131,7 +132,9 @@ class PretrainingTrainable(tune.Trainable):
         history = self.model.fit(
             x=self.train_dataset,
             epochs=1,
+            initial_epoch=self.iteration,
             validation_data=self.valid_dataset,
+            callbacks=[TerminateOnNaN()],
         )
         history_dict = {name: np.mean(val) for name, val in history.history}
         history_dict["epoch"] = self.iteration
