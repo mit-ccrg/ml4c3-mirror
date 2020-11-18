@@ -205,10 +205,10 @@ def parse_arguments():
         help="Directory with EDW .csv files.",
     )
     parser.add_argument(
-        "--path_hd5",
+        "--tensors",
         type=str,
         default="/media/ml4c3/hd5/",
-        help="Directory with tensorized .hd5 files.",
+        help="Directory with tensorized .hd5 tensors.",
     )
     parser.add_argument(
         "--path_xref",
@@ -221,13 +221,13 @@ def parse_arguments():
     parser.add_argument(
         "--path_key",
         type=str,
-        default="/data/icu/tensorization.key",
+        default="~/icu/tensorization.key",
         help="Full path to encryption key.",
     )
     parser.add_argument(
         "--encryption_type",
         type=str,
-        default="Folder",
+        default="folder",
         help="Types can be: 'folder', 'csv_file' and 'hd5_file'.",
     )
     parser.add_argument(
