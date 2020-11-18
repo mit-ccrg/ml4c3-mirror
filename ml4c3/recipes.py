@@ -280,9 +280,9 @@ def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
         hyperparameters = {}
         if args.sklearn_model_type == "logreg":
             if args.l1 == 0 and args.l2 == 0:
-                c = 1e7
+                args.c = 1e7
             else:
-                c = 1 / (args.l1 + args.l2)
+                args.c = 1 / (args.l1 + args.l2)
             hyperparameters["c"] = args.c
             hyperparameters["l1_ratio"] = args.c * args.l1
         elif args.sklearn_model_type == "svm":
