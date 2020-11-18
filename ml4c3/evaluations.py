@@ -14,8 +14,8 @@ from tensorflow.keras.models import Model
 from ml4c3.plots import subplot_rocs, subplot_scatters, evaluate_predictions
 from ml4c3.models import SKLEARN_MODELS
 from ml4c3.datasets import (
+    BATCH_IDS_INDEX,
     BATCH_INPUT_INDEX,
-    BATCH_PATHS_INDEX,
     BATCH_OUTPUT_INDEX,
     get_array_from_dict_of_arrays,
     get_dicts_of_arrays_from_dataset,
@@ -226,7 +226,7 @@ def _get_predictions_from_data(
     elif isinstance(data, tf.data.Dataset):
         y_prediction_batches = defaultdict(list)
         output_data_batches = defaultdict(list)
-        path_batches = []
+        id_batches = []
 
         if isinstance(model, Model):
             for batch in data:
@@ -244,7 +244,7 @@ def _get_predictions_from_data(
                     y_prediction_batches[prediction_idx].append(batch_y_prediction)
 
                 if len(batch) == 3:
-                    path_batches.append(batch[BATCH_PATHS_INDEX].numpy().astype(str))
+                    id_batches.append(batch[BATCH_IDS_INDEX].numpy().astype(str))
 
             y_predictions = [
                 np.concatenate(y_prediction_batches[prediction_idx])
@@ -268,7 +268,7 @@ def _get_predictions_from_data(
                 output_data_batches[output_name].append(output_tensor)
 
             if len(data) == 3:
-                path_batches.append(data[BATCH_PATHS_INDEX])
+                id_batches.append(data[BATCH_IDS_INDEX])
 
         else:
             raise NotImplementedError(
@@ -280,9 +280,7 @@ def _get_predictions_from_data(
             output_name: np.concatenate(output_data_batches[output_name])
             for output_name in output_data_batches
         }
-        paths = (
-            None if len(path_batches) == 0 else np.concatenate(path_batches).tolist()
-        )
+        paths = None if len(id_batches) == 0 else np.concatenate(id_batches).tolist()
     else:
         raise NotImplementedError(
             "Cannot get data for inference from data of type "

@@ -206,7 +206,7 @@ def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         train_csv=args.train_csv,
         valid_csv=args.valid_csv,
         test_csv=args.test_csv,
-        no_empty_paths_allowed=False,
+        allow_empty_split=True,
         output_folder=args.output_folder,
         run_id=args.id,
         cache_off=args.cache_off,

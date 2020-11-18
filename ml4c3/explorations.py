@@ -18,7 +18,7 @@ import seaborn as sns
 
 # Imports: first party
 from ml4c3.plots import SUBPLOT_SIZE
-from ml4c3.datasets import get_train_valid_test_paths
+from ml4c3.datasets import get_train_valid_test_ids
 from ml4c3.tensormap.TensorMap import (
     TensorMap,
     Interpretation,
@@ -932,7 +932,7 @@ class TensorsToDataFrameParallelWrapper:
                                 tensor = tm.postprocess_tensor(
                                     tensor,
                                     augment=False,
-                                    hd5=hd5,
+                                    data=hd5,
                                 )
                                 if tm.channel_map:
                                     for cm in tm.channel_map:
@@ -1044,7 +1044,7 @@ def _tensors_to_df(
     single dataframe, and return dataframe.
     """
     logging.info("Building generators for specified tensors")
-    train_paths, valid_paths, test_paths = get_train_valid_test_paths(
+    train_ids, valid_ids, test_ids = get_train_valid_test_ids(
         tensors=tensors,
         sample_csv=sample_csv,
         mrn_column_name=mrn_column_name,
@@ -1053,8 +1053,11 @@ def _tensors_to_df(
         train_csv=train_csv,
         valid_csv=valid_csv,
         test_csv=test_csv,
-        no_empty_paths_allowed=False,
+        allow_empty_split=True,
     )
+    train_paths = [os.path.join(tensors, f"{sample_id}.hd5") for sample_id in train_ids]
+    valid_paths = [os.path.join(tensors, f"{sample_id}.hd5") for sample_id in valid_ids]
+    test_paths = [os.path.join(tensors, f"{sample_id}.hd5") for sample_id in test_ids]
     paths = []
     paths.extend(zip(train_paths, ["train"] * len(train_paths)))
     paths.extend(zip(valid_paths, ["valid"] * len(valid_paths)))

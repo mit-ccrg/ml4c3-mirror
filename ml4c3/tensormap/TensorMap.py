@@ -35,6 +35,28 @@ DEFAULT_TIME_TO_EVENT_CHANNELS = {"event": 0, "follow_up_days": 1}
 # pylint: disable=line-too-long, import-outside-toplevel, too-many-return-statements
 
 
+class PatientData:
+    def __init__(self):
+        self.data = dict()
+
+    def __setitem__(self, key, value):
+        if not isinstance(key, str):
+            raise KeyError(f"Patient dictionary keys must be strings: {key}")
+        elif len(key.split("/")) != 1:
+            raise KeyError(f"Patient dictionary keys must not be nested: {key}")
+        self.data[key] = value
+
+    def __getitem__(self, key):
+        if not isinstance(key, str):
+            raise KeyError(f"Patient dictionary keys must be strings: {key}")
+        key = key.strip("/")
+        splits = key.split("/", 1)
+        if len(splits) == 1:
+            return self.data[key]
+        else:
+            return self.data[splits[0]][splits[1]]
+
+
 class Interpretation(Enum):
     """
     Interpretations give TensorMaps semantics encoded by the numpy array the
@@ -322,18 +344,18 @@ class TensorMap:
     def postprocess_tensor(
         self,
         tensor: np.ndarray,
-        hd5: h5py.File,
+        data: PatientData,
         augment: bool,
     ) -> np.ndarray:
-        self.validate(tensor, hd5)
+        self.validate(tensor, data)
         tensor = self.augment(tensor) if augment else tensor
         tensor = self.normalize(tensor)
         return tensor
 
-    def validate(self, tensor: np.ndarray, hd5: h5py.File):
+    def validate(self, tensor: np.ndarray, data: PatientData):
         if self.validators is not None:
             for validator in self.validators:  # type: ignore
-                validator(self, tensor, hd5)
+                validator(self, tensor, data)
 
     def augment(self, tensor: np.ndarray) -> np.ndarray:
         if self.augmenters is not None:

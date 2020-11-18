@@ -11,17 +11,17 @@ import pytest
 
 # Imports: first party
 from ml4c3.datasets import (
-    BATCH_PATHS_INDEX,
+    BATCH_IDS_INDEX,
     make_dataset,
     sample_csv_to_set,
-    get_train_valid_test_paths,
+    get_train_valid_test_ids,
 )
 from ml4c3.definitions.globals import TENSOR_EXT
 
 DATA_SPLIT = Tuple[str, Set[str]]
 DATA_SPLITS = Tuple[DATA_SPLIT, DATA_SPLIT, DATA_SPLIT]
-PATH_SPLIT = List[str]
-PATH_SPLITS = Tuple[PATH_SPLIT, PATH_SPLIT, PATH_SPLIT]
+ID_SPLIT = Set[str]
+ID_SPLITS = Tuple[ID_SPLIT, ID_SPLIT, ID_SPLIT]
 
 
 def _write_samples(
@@ -88,17 +88,17 @@ def train_valid_test_csv(tmpdir_factory, request) -> DATA_SPLITS:
 
 
 @pytest.fixture(scope="function")
-def train_valid_test_paths(
+def train_valid_test_ids(
     default_arguments: argparse.Namespace,
     train_valid_test_csv: DATA_SPLITS,
-) -> PATH_SPLITS:
+) -> ID_SPLITS:
     args = default_arguments
     (
         (train_csv, train_ids),
         (valid_csv, valid_ids),
         (test_csv, test_ids),
     ) = train_valid_test_csv
-    return get_train_valid_test_paths(
+    return get_train_valid_test_ids(
         tensors=args.tensors,
         valid_ratio=args.valid_ratio,
         test_ratio=args.test_ratio,
@@ -110,18 +110,18 @@ def train_valid_test_paths(
 
 
 @pytest.fixture(scope="function")
-def train_paths(train_valid_test_paths: PATH_SPLITS) -> PATH_SPLIT:
-    return train_valid_test_paths[0]
+def train_ids(train_valid_test_ids: ID_SPLITS) -> ID_SPLIT:
+    return train_valid_test_ids[0]
 
 
 @pytest.fixture(scope="function")
-def valid_paths(train_valid_test_paths: PATH_SPLITS) -> PATH_SPLIT:
-    return train_valid_test_paths[1]
+def valid_ids(train_valid_test_ids: ID_SPLITS) -> ID_SPLIT:
+    return train_valid_test_ids[1]
 
 
 @pytest.fixture(scope="function")
-def test_paths(train_valid_test_paths: PATH_SPLITS) -> PATH_SPLIT:
-    return train_valid_test_paths[2]
+def test_ids(train_valid_test_ids: ID_SPLITS) -> ID_SPLIT:
+    return train_valid_test_ids[2]
 
 
 # Ugly meta fixtures because fixtures cannot be
@@ -180,10 +180,10 @@ class TestDataset:
     def test_get_true_epoch(
         self,
         default_arguments: argparse.Namespace,
-        train_paths: PATH_SPLIT,
+        train_ids: ID_SPLIT,
     ):
         num_workers = 2
-        num_tensors = len(train_paths)  # 8 paths by default
+        num_tensors = len(train_ids)  # 8 paths by default
         batch_size = 2
         repeat_test = 3
 
@@ -191,23 +191,24 @@ class TestDataset:
         for _ in range(repeat_test):
             dataset, stats, cleanup = make_dataset(
                 data_split="train",
+                tensors=default_arguments.tensors,
+                sample_ids=train_ids,
                 input_maps=default_arguments.tensor_maps_in,
                 output_maps=default_arguments.tensor_maps_out,
-                paths=train_paths,
                 batch_size=batch_size,
                 num_workers=num_workers,
-                keep_paths=True,
+                keep_ids=True,
             )
 
             rets = []
             for batch in dataset:
                 rets.append(batch)
 
-            paths = []
+            sample_ids = []
             for ret in rets:
-                paths.extend(ret[BATCH_PATHS_INDEX])
-            paths = [path.numpy().decode() for path in paths]
-            unique_paths, counts = np.unique(paths, return_counts=True)
+                sample_ids.extend(ret[BATCH_IDS_INDEX])
+            sample_ids = [sample_id.numpy().decode() for sample_id in sample_ids]
+            unique_ids, counts = np.unique(sample_ids, return_counts=True)
             unique_counts = np.unique(counts)
 
             try:
@@ -215,7 +216,7 @@ class TestDataset:
                 # make sure all the tensors are visited
                 # make sure the tensors are visited the expected number of times
                 assert len(unique_counts) == 1
-                assert set(unique_paths) == set(train_paths)
+                assert set(unique_ids) == set(train_ids)
             finally:
                 cleanup()
 
@@ -260,7 +261,7 @@ class TestGetTrainValidTestPaths:
     @pytest.mark.parametrize("train_set", [None, "train_csv"], indirect=True)
     @pytest.mark.parametrize("valid_set", [None, "valid_csv"], indirect=True)
     @pytest.mark.parametrize("test_set", [None, "test_csv"], indirect=True)
-    def test_get_paths(
+    def test_get_ids(
         self,
         default_arguments: argparse.Namespace,
         sample_set: Optional[DATA_SPLIT],
@@ -270,20 +271,16 @@ class TestGetTrainValidTestPaths:
     ):
         args = default_arguments
 
-        def _path_2_sample(path: str) -> str:
-            return os.path.splitext(os.path.basename(path))[0]
-
-        def _paths_equal_samples(paths: List[str], samples: Set[str]):
-            assert len(paths) == len(samples)
-            assert all(_path_2_sample(path) in samples for path in paths)
+        def _ids_equal_samples(all_ids: Set[str], samples: Set[str]):
+            assert len(all_ids) == len(samples)
+            assert len(all_ids - samples) == 0
             return True
 
         sample_csv, sample_ids = sample_set or (None, None)
         train_csv, train_ids = train_set or (None, None)
         valid_csv, valid_ids = valid_set or (None, None)
         test_csv, test_ids = test_set or (None, None)
-
-        train_paths, valid_paths, test_paths = get_train_valid_test_paths(
+        train, valid, test = get_train_valid_test_ids(
             tensors=args.tensors,
             sample_csv=sample_csv,
             valid_ratio=args.valid_ratio,
@@ -294,40 +291,39 @@ class TestGetTrainValidTestPaths:
         )
 
         # make sure paths are disjoint and unique
-        all_paths = train_paths + valid_paths + test_paths
+        all_ids = train | valid | test
         counts = defaultdict(int)
-        for path in all_paths:
-            counts[path] += 1
+        for sample_id in all_ids:
+            counts[sample_id] += 1
         assert all(count == 1 for count in counts.values())
 
         # if sample csv was not given, find the files, just like how tensor_generator does
         if sample_ids is None:
-            sample_paths = []
+            sample_ids = set()
             for root, dirs, files in os.walk(default_arguments.tensors):
                 for name in files:
                     if os.path.splitext(name)[-1].lower() != TENSOR_EXT:
                         continue
-                    sample_paths.append(os.path.join(root, name))
-            sample_ids = {_path_2_sample(path) for path in sample_paths}
+                    sample_ids.add(os.path.splitext(name)[0])
 
         if train_ids is not None:
             # this block handles the cases where samples are discarded, which happens if train_csv is supplied
-            assert len(all_paths) <= len(sample_ids)
-            assert all(_path_2_sample(path) in sample_ids for path in all_paths)
+            assert len(all_ids) <= len(sample_ids)
+            assert all(sample_id in sample_ids for sample_id in all_ids)
         else:
-            assert _paths_equal_samples(all_paths, sample_ids)
+            assert _ids_equal_samples(all_ids, sample_ids)
 
         if train_ids is not None:
             train_ids &= sample_ids
-            assert _paths_equal_samples(train_paths, train_ids)
+            assert _ids_equal_samples(train, train_ids)
 
         if valid_ids is not None:
             valid_ids &= sample_ids
-            assert _paths_equal_samples(valid_paths, valid_ids)
+            assert _ids_equal_samples(valid, valid_ids)
 
         if test_ids is not None:
             test_ids &= sample_ids
-            assert _paths_equal_samples(test_paths, test_ids)
+            assert _ids_equal_samples(test, test_ids)
 
     @pytest.mark.parametrize(
         "train_valid_test_csv",
@@ -351,7 +347,7 @@ class TestGetTrainValidTestPaths:
                 r"(train|validation|test) and (train|validation|test) samples overlap"
             ),
         ):
-            train_paths, valid_paths, test_paths = get_train_valid_test_paths(
+            train, valid, test = get_train_valid_test_ids(
                 tensors=args.tensors,
                 valid_ratio=args.valid_ratio,
                 test_ratio=args.test_ratio,

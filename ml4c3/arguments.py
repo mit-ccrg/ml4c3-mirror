@@ -80,7 +80,15 @@ def parse_args() -> argparse.Namespace:
     )
     io_parser.add_argument(
         "--tensors",
-        help="Path to folder containing tensors, or where tensors will be written.",
+        action="append",
+        nargs="+",
+        help="Path to folder containing hd5 files or path to csv file."
+        "Specify multiple data sources by repeating this argument."
+        "In the data object passed to tensor_from_file functions,"
+        "csv files are keyed by the filename by default. To key"
+        "csv files by another name, provide the name as a second"
+        "argument after the path to the csv file, e.g."
+        "--tensors /path/to/data.csv data-name",
     )
     io_parser.add_argument(
         "--output_folder",
@@ -1088,6 +1096,19 @@ def _process_args(args: argparse.Namespace):
         os.path.join(args.output_folder, args.id),
         "log_" + now_string,
     )
+
+    tensors = []
+    if "tensors" in args and args.tensors is not None:
+        for tensor in args.tensors:
+            if len(tensor) == 2:
+                tensors.append(tuple(tensor))
+            elif len(tensor) == 1:
+                tensors.append(tensor[0])
+            else:
+                raise ValueError(
+                    f"Tensors must be a path or a path and a name, instead got: {tensor}",
+                )
+        args.tensors = tensors if len(tensors) > 1 else tensors[0]
 
     # Create list of names of all needed TMaps
     if "input_tensors" in args and args.mode != "explore_icu":

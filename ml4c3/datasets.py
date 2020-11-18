@@ -17,7 +17,7 @@ from tensorflow_probability import distributions as tfd
 from ml4c3.definitions.globals import CSV_EXT, TENSOR_EXT, MRN_COLUMNS
 from ml4c3.tensormap.TensorMap import (
     TensorMap,
-    id_from_filename,
+    PatientData,
     find_negative_label_and_channel,
 )
 
@@ -28,11 +28,11 @@ SampleGenerator = Generator[
 ]
 Cleanup = Callable[[], None]
 MAX_QUEUE_SIZE = 2048
-PATH_SUCCEEDED = 0
-PATH_FAILED = 1
+ID_SUCCEEDED = 0
+ID_FAILED = 1
 SAMPLE_FAILED = 2
 
-BATCH_INPUT_INDEX, BATCH_OUTPUT_INDEX, BATCH_PATHS_INDEX = (
+BATCH_INPUT_INDEX, BATCH_OUTPUT_INDEX, BATCH_IDS_INDEX = (
     0,
     1,
     2,
@@ -41,19 +41,39 @@ BATCH_INPUT_INDEX, BATCH_OUTPUT_INDEX, BATCH_PATHS_INDEX = (
 # pylint: disable=line-too-long
 
 
+def infer_mrn_column(df: pd.DataFrame, sample_csv: str) -> str:
+    # Find intersection between CSV columns and possible MRN column names
+    matches = set(df.columns.astype(str).str.lower()).intersection(MRN_COLUMNS)
+
+    # If no matches, assume the first column is MRN
+    if not matches:
+        mrn_column_name = df.columns[0]
+    else:
+        # Get first string from set of matches to use as column name
+        mrn_column_name = next(iter(matches))
+
+    if len(matches) > 1:
+        logging.warning(
+            f"{sample_csv} has more than one potential column for MRNs. "
+            "Inferring most likely column name, but recommend verifying "
+            "data columns or not using column inference.",
+        )
+    return mrn_column_name
+
+
 def _get_sample(
     tmaps: List[TensorMap],
     sample_tensors: Dict[str, np.ndarray],
     is_input: bool,
     augment: bool,
-    hd5: h5py.File,
+    data: PatientData,
 ) -> Dict[str, np.ndarray]:
     sample = dict()
     for tm in tmaps:
         name = tm.input_name if is_input else tm.output_name
         sample[name] = tm.postprocess_tensor(
             tensor=sample_tensors[tm.name],
-            hd5=hd5,
+            data=data,
             augment=augment,
         )
     return sample
@@ -61,7 +81,8 @@ def _get_sample(
 
 def _tensor_worker(
     worker_name: str,
-    paths: List[str],
+    tensors: Union[str, List[Union[str, Tuple[str, str]]]],
+    sample_ids: List[str],
     start_signal: Event,
     tensor_queue: Queue,
     input_maps: List[TensorMap],
@@ -69,15 +90,40 @@ def _tensor_worker(
     augment: bool = False,
 ):
     tmaps = input_maps + output_maps
+    if not isinstance(tensors, list):
+        tensors = [tensors]
+
+    csv_sources = []
+    hd5_sources = []
+    for source in tensors:
+        if isinstance(source, tuple):
+            csv_sources.append(source)
+        elif source.endswith(CSV_EXT):
+            csv_name = os.path.splitext(os.path.basename(source))[0]
+            csv_sources.append((source, csv_name))
+        else:
+            hd5_sources.append(source)
+
+    # preload all CSVs into dataframes
+    csv_data = []
+    sample_ids_set = set(sample_ids)
+    for csv_source, csv_name in csv_sources:
+        df = pd.read_csv(csv_source, low_memory=False)
+        mrn_col = infer_mrn_column(df, csv_source)
+        df[mrn_col] = df[mrn_col].astype(str)
+        df = df[df[mrn_col].isin(sample_ids_set)]
+        csv_data.append((csv_name, df, mrn_col))
+
     while True:
         start_signal.wait()
         start_signal.clear()
-        np.random.shuffle(paths)
-        for path in paths:
+        np.random.shuffle(sample_ids)
+        for sample_id in sample_ids:
             num_linked = 1
+            open_hd5s = []
             try:
-                # A path may contain many samples. TMaps fetch all the samples from a
-                # path but generator should yield individual samples.
+                # An ID may contain many samples. TMaps fetch all the samples from an
+                # ID but generator should yield individual samples.
                 #
                 # tensors = [
                 #     [sample_1_voltage, sample_2_voltage, ...],
@@ -86,58 +132,79 @@ def _tensor_worker(
                 #     ...
                 # ]
                 tensors = []
-                with h5py.File(path, "r") as hd5:
-                    # load all samples found at path
-                    for tm in tmaps:
-                        _tensor = tm.tensor_from_file(tm, hd5)
-                        # if tensor is not dynamically shaped,
-                        # wrap in extra dimension to simulate time series with 1 sample
-                        if tm.time_series_limit is None:
-                            _tensor = np.array([_tensor])
-                        if tm.linked_tensors:
-                            num_linked = len(_tensor)
-                        tensors.append(_tensor)
+                data = PatientData()
 
-                    # individually yield samples
-                    for i in range(len(tensors[0])):
-                        sample_tensors = {
-                            tm.name: tensor[i] for tm, tensor in zip(tmaps, tensors)
-                        }
-                        try:
-                            in_tensors = _get_sample(
-                                tmaps=input_maps,
-                                sample_tensors=sample_tensors,
-                                is_input=True,
-                                augment=augment,
-                                hd5=hd5,
-                            )
-                            out_tensors = _get_sample(
-                                tmaps=output_maps,
-                                sample_tensors=sample_tensors,
-                                is_input=False,
-                                augment=augment,
-                                hd5=hd5,
-                            )
-                            tensor_queue.put(
-                                ((in_tensors, out_tensors), path, num_linked),
-                            )
-                        except (
-                            IndexError,
-                            KeyError,
-                            ValueError,
-                            OSError,
-                            RuntimeError,
-                        ) as e:
-                            # sample failed postprocessing
-                            # if sample was linked, fail all samples from this path
-                            if num_linked != 1:
-                                raise ValueError("Linked sample failed")
-                            tensor_queue.put((SAMPLE_FAILED, path, num_linked))
-                            continue
-                tensor_queue.put((PATH_SUCCEEDED, path, num_linked))
+                # add top level groups in hd5s to patient dictionary
+                for hd5_source in hd5_sources:
+                    hd5_path = os.path.join(hd5_source, f"{sample_id}.hd5")
+                    if not os.path.isfile(hd5_path):
+                        continue
+                    hd5 = h5py.File(hd5_path, "r")
+                    for key in hd5:
+                        data[key] = hd5[key]
+                    open_hd5s.append(hd5)
+
+                # add rows in csv with patient data accessible in patient dictionary
+                for csv_name, df, mrn_col in csv_data:
+                    mask = df[mrn_col == sample_id]
+                    if not mask.any():
+                        continue
+                    data[csv_name] = df[df[mrn_col == sample_id]]
+
+                # load all samples found at ID
+                for tm in tmaps:
+                    _tensor = tm.tensor_from_file(tm, data)
+                    # if tensor is not dynamically shaped,
+                    # wrap in extra dimension to simulate time series with 1 sample
+                    if tm.time_series_limit is None:
+                        _tensor = np.array([_tensor])
+                    if tm.linked_tensors:
+                        num_linked = len(_tensor)
+                    tensors.append(_tensor)
+
+                # individually yield samples
+                for i in range(len(tensors[0])):
+                    sample_tensors = {
+                        tm.name: tensor[i] for tm, tensor in zip(tmaps, tensors)
+                    }
+                    try:
+                        in_tensors = _get_sample(
+                            tmaps=input_maps,
+                            sample_tensors=sample_tensors,
+                            is_input=True,
+                            augment=augment,
+                            data=data,
+                        )
+                        out_tensors = _get_sample(
+                            tmaps=output_maps,
+                            sample_tensors=sample_tensors,
+                            is_input=False,
+                            augment=augment,
+                            data=data,
+                        )
+                        tensor_queue.put(
+                            ((in_tensors, out_tensors), sample_id, num_linked),
+                        )
+                    except (
+                        IndexError,
+                        KeyError,
+                        ValueError,
+                        OSError,
+                        RuntimeError,
+                    ) as e:
+                        # sample failed postprocessing
+                        # if sample was linked, fail all samples from this ID
+                        if num_linked != 1:
+                            raise ValueError("Linked sample failed")
+                        tensor_queue.put((SAMPLE_FAILED, sample_id, num_linked))
+                        continue
+                tensor_queue.put((ID_SUCCEEDED, sample_id, num_linked))
             except (IndexError, KeyError, ValueError, OSError, RuntimeError) as e:
-                # could not load samples from path
-                tensor_queue.put((PATH_FAILED, path, num_linked))
+                # could not load samples from ID
+                tensor_queue.put((ID_FAILED, sample_id, num_linked))
+            finally:
+                for hd5 in open_hd5s:
+                    hd5.close()
 
 
 class StatsWrapper:
@@ -148,17 +215,20 @@ class StatsWrapper:
 def make_data_generator_factory(
     data_split: str,
     num_workers: int,
+    tensors: Union[str, List[Union[str, Tuple[str, str]]]],
+    sample_ids: Set[str],
     input_maps: List[TensorMap],
     output_maps: List[TensorMap],
-    paths: List[str],
     augment: bool = False,
-    keep_paths: bool = False,
+    keep_ids: bool = False,
 ) -> Tuple[Callable[[], SampleGenerator], StatsWrapper, Cleanup]:
     tensor_queue: Queue = Queue(MAX_QUEUE_SIZE)
+    if not isinstance(tensors, list):
+        tensors = [tensors]
 
     processes = []
-    worker_paths = np.array_split(paths, num_workers)
-    for i, _paths in enumerate(worker_paths):
+    worker_ids = np.array_split(list(sample_ids), num_workers)
+    for i, _ids in enumerate(worker_ids):
         name = f"{data_split}_worker_{i}"
         start_signal = Event()
         process = Process(
@@ -166,7 +236,8 @@ def make_data_generator_factory(
             name=name,
             args=(
                 name,
-                _paths,
+                tensors,
+                _ids,
                 start_signal,
                 tensor_queue,
                 input_maps,
@@ -196,37 +267,37 @@ def make_data_generator_factory(
             process.start_signal.set()
 
         stats: Counter = Counter()
-        num_paths = len(paths)
+        num_ids = len(sample_ids)
         linked_tensor_buffer: defaultdict = defaultdict(list)
-        while stats["paths_completed"] < num_paths or len(linked_tensor_buffer) > 0:
-            sample, path, num_linked = tensor_queue.get()
-            if sample == PATH_SUCCEEDED:
-                stats["paths_succeeded"] += 1
-                stats["paths_completed"] += 1
-            elif sample == PATH_FAILED:
-                stats["paths_failed"] += 1
-                stats["paths_completed"] += 1
-                if path in linked_tensor_buffer:
-                    del linked_tensor_buffer[path]
+        while stats["ids_completed"] < num_ids or len(linked_tensor_buffer) > 0:
+            sample, sample_id, num_linked = tensor_queue.get()
+            if sample == ID_SUCCEEDED:
+                stats["ids_succeeded"] += 1
+                stats["ids_completed"] += 1
+            elif sample == ID_FAILED:
+                stats["ids_failed"] += 1
+                stats["ids_completed"] += 1
+                if sample_id in linked_tensor_buffer:
+                    del linked_tensor_buffer[sample_id]
             elif sample == SAMPLE_FAILED:
                 stats["samples_failed"] += 1
                 stats["samples_completed"] += 1
             elif num_linked != 1:
-                linked_tensor_buffer[path].append(sample)
-                if len(linked_tensor_buffer[path]) == num_linked:
-                    for sample in linked_tensor_buffer[path]:
+                linked_tensor_buffer[sample_id].append(sample)
+                if len(linked_tensor_buffer[sample_id]) == num_linked:
+                    for sample in linked_tensor_buffer[sample_id]:
                         stats["samples_succeeded"] += 1
                         stats["samples_completed"] += 1
                         _collect_sample_stats(stats, sample, input_maps, output_maps)
-                        yield sample if not keep_paths else sample + (path,)
-                    del linked_tensor_buffer[path]
+                        yield sample if not keep_ids else sample + (sample_id,)
+                    del linked_tensor_buffer[sample_id]
                 else:
                     continue
             else:
                 stats["samples_succeeded"] += 1
                 stats["samples_completed"] += 1
                 _collect_sample_stats(stats, sample, input_maps, output_maps)
-                yield sample if not keep_paths else sample + (path,)
+                yield sample if not keep_ids else sample + (sample_id,)
 
         logging.info(
             f"{get_stats_string(name, stats, epoch_counter)}"
@@ -241,16 +312,19 @@ def make_data_generator_factory(
 
 def make_dataset(
     data_split: str,
+    tensors: Union[str, List[Union[str, Tuple[str, str]]]],
+    sample_ids: Set[str],
     input_maps: List[TensorMap],
     output_maps: List[TensorMap],
-    paths: List[str],
     batch_size: int,
     num_workers: int,
     augment: bool = False,
-    keep_paths: bool = False,
+    keep_ids: bool = False,
     cache_off: bool = False,
     mixup_alpha: float = 0,
 ) -> Tuple[tf.data.Dataset, StatsWrapper, Cleanup]:
+    if not isinstance(tensors, list):
+        tensors = [tensors]
     output_types = (
         {tm.input_name: tf.float32 for tm in input_maps},
         {tm.output_name: tf.float32 for tm in output_maps},
@@ -259,17 +333,18 @@ def make_dataset(
         {tm.input_name: tm.shape for tm in input_maps},
         {tm.output_name: tm.shape for tm in output_maps},
     )
-    if keep_paths:
+    if keep_ids:
         output_types += (tf.string,)
         output_shapes += (tuple(),)
     data_generator_factory, stats_wrapper, cleanup = make_data_generator_factory(
         data_split=data_split,
         num_workers=num_workers,
+        tensors=tensors,
+        sample_ids=sample_ids,
         input_maps=input_maps,
         output_maps=output_maps,
-        paths=paths,
         augment=augment,
-        keep_paths=keep_paths,
+        keep_ids=keep_ids,
     )
     dataset = (
         tf.data.Dataset.from_generator(
@@ -322,21 +397,21 @@ def make_dataset(
 def train_valid_test_datasets(
     tensor_maps_in: List[TensorMap],
     tensor_maps_out: List[TensorMap],
-    tensors: str,
+    tensors: Union[str, List[Union[str, Tuple[str, str]]]],
     batch_size: int,
     num_workers: int,
-    keep_paths: bool = False,
-    keep_paths_test: bool = True,
-    sample_csv: str = None,
-    mrn_column_name: Optional[str] = None,
+    keep_ids: bool = False,
+    keep_ids_test: bool = True,
     valid_ratio: float = 0.2,
     test_ratio: float = 0.1,
-    train_csv: str = None,
-    valid_csv: str = None,
-    test_csv: str = None,
-    no_empty_paths_allowed: bool = True,
-    output_folder: str = None,
-    run_id: str = None,
+    mrn_column_name: Optional[str] = None,
+    sample_csv: Optional[str] = None,
+    train_csv: Optional[str] = None,
+    valid_csv: Optional[str] = None,
+    test_csv: Optional[str] = None,
+    allow_empty_split: bool = False,
+    output_folder: Optional[str] = None,
+    run_id: Optional[str] = None,
     cache_off: bool = False,
     mixup_alpha: float = 0.0,
 ) -> Tuple[
@@ -349,12 +424,12 @@ def train_valid_test_datasets(
 
     :param tensor_maps_in: list of TensorMaps that are input names to a model
     :param tensor_maps_out: list of TensorMaps that are output from a model
-    :param tensors: directory containing tensors
+    :param tensors: list of paths or tuples to directories or CSVs containing tensors
     :param batch_size: number of samples in each batch
     :param num_workers: number of worker processes used to feed each dataset
-    :param keep_paths: bool to return the path to each sample's source file
-    :param keep_paths_test: bool to return the path to each sample's source file
-                            for the test set
+    :param keep_ids: if true, return the patient ID for each sample
+    :param keep_ids_test: if true, return the patient ID for each sample in the test set
+    :param mrn_column_name: name of column in csv files with MRNs
     :param sample_csv: CSV file of sample ids, sample ids are considered for
                        train/valid/test only if it is in sample_csv
     :param valid_ratio: rate of tensors to use for validation, mutually exclusive
@@ -366,77 +441,81 @@ def train_valid_test_datasets(
                       with valid_ratio
     :param test_csv: CSV file of sample ids to use for testing, mutually exclusive
                      with test_ratio
-    :param no_empty_paths_allowed: if true, all data splits must contain paths,
-                                   otherwise only one split needs to be non-empty
+    :param allow_empty_split: If true, allow one or more data splits to be empty
     :param output_folder: output folder of output files
     :param run_id: id of experiment
-    :param mixup_alpha: If non-zero, mixup batches with this alpha parameter for mixup
+    :param cache_off: if true, do not cache dataset in memory
+    :param mixup_alpha: if non-zero, mixup batches with this alpha parameter for mixup
     :return: tuple of three tensorflow Datasets, three StatsWrapper objects, and
              three callbacks to cleanup worker processes
     """
     if len(tensor_maps_in) == 0 or len(tensor_maps_out) == 0:
         raise ValueError("input and output tensors must both be given")
+    if not isinstance(tensors, list):
+        tensors = [tensors]
 
-    train_paths, valid_paths, test_paths = get_train_valid_test_paths(
+    train_ids, valid_ids, test_ids = get_train_valid_test_ids(
         tensors=tensors,
+        mrn_column_name=mrn_column_name,
         sample_csv=sample_csv,
         valid_ratio=valid_ratio,
         test_ratio=test_ratio,
         train_csv=train_csv,
         valid_csv=valid_csv,
         test_csv=test_csv,
-        no_empty_paths_allowed=no_empty_paths_allowed,
-        mrn_column_name=mrn_column_name,
+        allow_empty_split=allow_empty_split,
     )
 
     if output_folder is not None and run_id is not None:
 
-        def save_paths(paths: List[str], split: str):
+        def save_ids(ids: Set[str], split: str):
             fpath = os.path.join(output_folder, run_id, f"{split}{CSV_EXT}")
-            ids = [id_from_filename(path) for path in paths]
-            df = pd.DataFrame({"sample_id": ids})
+            df = pd.DataFrame({"sample_id": list(ids)})
             df.to_csv(fpath, index=False)
             logging.info(f"--{split}_csv was not provided; saved sample IDs to {fpath}")
 
         if train_csv is None:
-            save_paths(paths=train_paths, split="train")
+            save_ids(ids=train_ids, split="train")
         if valid_csv is None:
-            save_paths(paths=valid_paths, split="valid")
+            save_ids(ids=valid_ids, split="valid")
         if test_csv is None:
-            save_paths(paths=test_paths, split="test")
+            save_ids(ids=test_ids, split="test")
 
     train_dataset, train_stats, train_cleanup = make_dataset(
         data_split="train",
+        tensors=tensors,
+        sample_ids=train_ids,
         input_maps=tensor_maps_in,
         output_maps=tensor_maps_out,
-        paths=train_paths,
         batch_size=batch_size,
         num_workers=num_workers,
         augment=True,
-        keep_paths=keep_paths,
+        keep_ids=keep_ids,
         cache_off=cache_off,
         mixup_alpha=mixup_alpha,
     )
     valid_dataset, valid_stats, valid_cleanup = make_dataset(
         data_split="valid",
+        tensors=tensors,
+        sample_ids=valid_ids,
         input_maps=tensor_maps_in,
         output_maps=tensor_maps_out,
-        paths=valid_paths,
         batch_size=batch_size,
         num_workers=num_workers,
         augment=False,
-        keep_paths=keep_paths,
+        keep_ids=keep_ids,
         cache_off=cache_off,
     )
     test_dataset, test_stats, test_cleanup = make_dataset(
         data_split="test",
+        tensors=tensors,
+        sample_ids=test_ids,
         input_maps=tensor_maps_in,
         output_maps=tensor_maps_out,
-        paths=test_paths,
         batch_size=batch_size,
         num_workers=num_workers,
         augment=False,
-        keep_paths=keep_paths or keep_paths_test,
+        keep_ids=keep_ids or keep_ids_test,
         cache_off=cache_off,
     )
 
@@ -482,8 +561,8 @@ def get_stats_string(name: str, stats: Counter, epoch_count: int) -> str:
     return (
         f"\n"
         f"------------------- {name} completed true epoch {epoch_count} -------------------\n"
-        f"\tGenerator shuffled {stats['paths_completed']} paths. {stats['paths_succeeded']} paths succeeded and {stats['paths_failed']} paths failed.\n"
-        f"\tFrom {stats['paths_succeeded']} paths, {stats['samples_completed']} samples were extracted.\n"
+        f"\tGenerator shuffled {stats['ids_completed']} IDs. {stats['ids_succeeded']} IDs succeeded and {stats['ids_failed']} IDs failed.\n"
+        f"\tFrom {stats['ids_succeeded']} IDs, {stats['samples_completed']} samples were extracted.\n"
         f"\tFrom {stats['samples_completed']} samples, {stats['samples_succeeded']} yielded tensors and {stats['samples_failed']} samples failed.\n"
     )
     # fmt: on
@@ -697,27 +776,12 @@ def sample_csv_to_set(
     except ValueError:
         df.columns = df.iloc[0]
         df = df[1:]
+
     if mrn_column_name is None:
         df.columns = [
             col.lower() if isinstance(col, str) else col for col in df.columns
         ]
-
-        # Find intersection between CSV columns and possible MRN column names
-        matches = set(df.columns).intersection(MRN_COLUMNS)
-
-        # If no matches, assume the first column is MRN
-        if not matches:
-            mrn_column_name = df.columns[0]
-        else:
-            # Get first string from set of matches to use as column name
-            mrn_column_name = next(iter(matches))
-
-        if len(matches) > 1:
-            logging.warning(
-                f"{sample_csv} has more than one potential column for MRNs. "
-                "Inferring most likely column name, but recommend explicitly "
-                "setting MRN column name.",
-            )
+        mrn_column_name = infer_mrn_column(df, sample_csv)
 
     # Isolate MRN column from dataframe, cast to float -> int -> string
     sample_ids = df[mrn_column_name].astype(float).astype(int).apply(str)
@@ -725,26 +789,27 @@ def sample_csv_to_set(
     return set(sample_ids)
 
 
-def get_train_valid_test_paths(
-    tensors: str,
-    sample_csv: Optional[str] = None,
+def get_train_valid_test_ids(
+    tensors: Union[str, List[Union[str, Tuple[str, str]]]],
     mrn_column_name: Optional[str] = None,
+    sample_csv: Optional[str] = None,
     valid_ratio: float = 0.2,
     test_ratio: float = 0.1,
     train_csv: Optional[str] = None,
     valid_csv: Optional[str] = None,
     test_csv: Optional[str] = None,
-    no_empty_paths_allowed: bool = True,
-) -> Tuple[List[str], List[str], List[str]]:
+    allow_empty_split: bool = False,
+) -> Tuple[Set[str], Set[str], Set[str]]:
     """
-    Return 3 disjoint lists of tensor paths.
+    Return 3 disjoint sets of IDs.
 
-    The paths are split in training, validation, and testing lists.
-    If no arguments are given, paths are split into train/valid/test in the ratio
-    0.7/0.2/0.1.
-    Otherwise, at least 2 arguments are required to specify train/valid/test sets.
+    The IDs are gathered from sources in tensors and are split into training,
+    validation, and testing splits. By default, IDs are split into train/valid/test
+    in the ratio 0.7/0.2/0.1. Otherwise, at least 2 arguments are required to specify
+    train/valid/test sets.
 
-    :param tensors: path to directory containing tensors
+    :param tensors: list of paths or tuples to directories or CSVs containing tensors
+    :param mrn_column_name: name of column in csv files with MRNs
     :param sample_csv: path to csv containing sample ids, only consider sample ids
                        for splitting into train/valid/test sets if they appear in
                        sample_csv
@@ -757,18 +822,21 @@ def get_train_valid_test_paths(
                       list, mutually exclusive with valid_ratio
     :param test_csv: path to csv containing sample ids to reserve for testing list,
                      mutually exclusive with test_ratio
-    :param no_empty_paths_allowed: If true, all data splits must contain paths,
-                                   otherwise only one split needs to be non-empty
+    :param allow_empty_split: If true, allow one or more data splits to be empty
 
-    :return: tuple of 3 lists of hd5 tensor file paths
+    :return: tuple of 3 sets of sample IDs
     """
-    train_paths: List[str] = []
-    valid_paths: List[str] = []
-    test_paths: List[str] = []
-    discard_paths: List[str] = []
-    unassigned_paths: List[str] = []
+    all_ids: Set[str] = set()
+    train_ids: Set[str] = set()
+    valid_ids: Set[str] = set()
+    test_ids: Set[str] = set()
+    discard_ids: Set[str] = set()
+    unassigned_ids: List[str] = []
 
-    (train_ratio, valid_ratio, test_ratio, _) = _get_train_valid_test_discard_ratios(
+    if not isinstance(tensors, list):
+        tensors = [tensors]
+
+    train_ratio, valid_ratio, test_ratio, _ = _get_train_valid_test_discard_ratios(
         valid_ratio=valid_ratio,
         test_ratio=test_ratio,
         train_csv=train_csv,
@@ -803,57 +871,73 @@ def get_train_valid_test_paths(
     ):
         raise ValueError("validation and test samples overlap")
 
-    # Find tensors and split them among train/valid/test
-    for root, _, files in os.walk(tensors):
-        for fname in files:
-            if not fname.endswith(TENSOR_EXT):
-                continue
+    # Get list of all IDs from all sources
+    for source in tensors:
+        if isinstance(source, tuple):
+            source = source[0]
 
-            path = os.path.join(root, fname)
-            split = os.path.splitext(fname)
-            sample_id = split[0]
+        if os.path.isdir(source):
+            for root, _, files in os.walk(source):
+                for fname in files:
+                    if not fname.endswith(TENSOR_EXT):
+                        continue
+                    sample_id = os.path.splitext(fname)[0]
+                    all_ids.add(sample_id)
+        elif source.endswith(CSV_EXT):
+            source_ids = sample_csv_to_set(
+                sample_csv=source,
+                mrn_column_name=mrn_column_name,
+            )
+            all_ids |= source_ids
+        else:
+            raise ValueError(f"Cannot get IDs from source: {source}")
 
-            if sample_set is not None and sample_id not in sample_set:
-                continue
-            if train_set is not None and sample_id in train_set:
-                train_paths.append(path)
-            elif valid_set is not None and sample_id in valid_set:
-                valid_paths.append(path)
-            elif test_set is not None and sample_id in test_set:
-                test_paths.append(path)
-            else:
-                unassigned_paths.append(path)
+    # Split IDs among train/valid/test
+    for sample_id in all_ids:
+        if sample_set is not None and sample_id not in sample_set:
+            continue
 
-    np.random.shuffle(unassigned_paths)
-    n = len(unassigned_paths)
+        if train_set is not None and sample_id in train_set:
+            train_ids.add(sample_id)
+        elif valid_set is not None and sample_id in valid_set:
+            valid_ids.add(sample_id)
+        elif test_set is not None and sample_id in test_set:
+            test_ids.add(sample_id)
+        else:
+            unassigned_ids.append(sample_id)
+
+    np.random.shuffle(unassigned_ids)
+    n = len(unassigned_ids)
     n_train, n_valid, n_test = (
         round(train_ratio * n),
         round(valid_ratio * n),
         round(test_ratio * n),
     )
     indices = [n_train, n_train + n_valid, n_train + n_valid + n_test]
-    _train, _valid, _test, _discard = np.split(unassigned_paths, indices)
-    train_paths.extend(_train)
-    valid_paths.extend(_valid)
-    test_paths.extend(_test)
+    _train, _valid, _test, _discard = np.split(list(unassigned_ids), indices)
+    train_ids |= set(_train)
+    valid_ids |= set(_valid)
+    test_ids |= set(_test)
 
     logging.info(
-        f"Found {len(train_paths)} train, {len(valid_paths)} validation, and"
-        f" {len(test_paths)} testing tensors at: {tensors}",
+        f"Split IDs from sources at tensors into {len(train_ids)} training, "
+        f"{len(valid_ids)} validation, and {len(test_ids)} testing IDs.",
     )
-    logging.debug(f"Discarded {len(discard_paths)} tensors due to given ratios")
+    logging.debug(f"Discarded {len(discard_ids)} tensors due to given ratios")
     if (
-        no_empty_paths_allowed
-        and (len(train_paths) == 0 or len(valid_paths) == 0 or len(test_paths) == 0)
-    ) or (len(train_paths) == 0 and len(valid_paths) == 0 and len(test_paths) == 0):
+        not allow_empty_split
+        and len(train_ids) == 0
+        and len(valid_ids) == 0
+        and len(test_ids) == 0
+    ):
         raise ValueError(
-            f"Not enough tensors at {tensors}\n"
-            f"Found {len(train_paths)} training,"
-            f" {len(valid_paths)} validation, and"
-            f" {len(test_paths)} testing tensors\n"
-            f"Discarded {len(discard_paths)} tensors",
+            f"Cannot have empty split\n"
+            f"Found {len(train_ids)} training,"
+            f" {len(valid_ids)} validation, and"
+            f" {len(test_ids)} testing IDs\n"
+            f"Discarded {len(discard_ids)} IDs",
         )
-    return train_paths, valid_paths, test_paths
+    return train_ids, valid_ids, test_ids
 
 
 def get_dicts_of_arrays_from_dataset(
@@ -864,7 +948,7 @@ def get_dicts_of_arrays_from_dataset(
 ]:
     input_data_batches = defaultdict(list)
     output_data_batches = defaultdict(list)
-    path_batches = []
+    id_batches = []
 
     for batch in dataset:
         input_data_batch = batch[BATCH_INPUT_INDEX]
@@ -876,7 +960,7 @@ def get_dicts_of_arrays_from_dataset(
             output_data_batches[output_name].append(output_tensor.numpy())
 
         if len(batch) == 3:
-            path_batches.append(batch[BATCH_PATHS_INDEX].numpy().astype(str))
+            id_batches.append(batch[BATCH_IDS_INDEX].numpy().astype(str))
 
     input_data = {
         input_name: np.concatenate(input_data_batches[input_name])
@@ -886,9 +970,13 @@ def get_dicts_of_arrays_from_dataset(
         output_name: np.concatenate(output_data_batches[output_name])
         for output_name in output_data_batches
     }
-    paths = None if len(path_batches) == 0 else np.concatenate(path_batches).tolist()
+    sample_ids = None if len(id_batches) == 0 else np.concatenate(id_batches).tolist()
 
-    return (input_data, output_data) if not paths else (input_data, output_data, paths)
+    return (
+        (input_data, output_data)
+        if not sample_ids
+        else (input_data, output_data, sample_ids)
+    )
 
 
 def get_array_from_dict_of_arrays(

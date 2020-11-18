@@ -40,7 +40,7 @@ from ml4c3.tensormap.icu_list_signals import get_tmap as GET_LIST_TMAP
 
 def pytest_configure():
     def tff(tm, hd5):
-        return hd5[f"/{tm.name}/"][:]
+        return hd5[f"/{tm.name}"][:]
 
     pytest.TFF = tff
     pytest.N_TENSORS = 50
@@ -144,7 +144,7 @@ class Utils:
                             "Cannot automatically build hdf5 from interpretation"
                             f' "{tm.interpretation}"',
                         )
-                    hd5.create_dataset(f"/{tm.name}/", data=value)
+                    hd5.create_dataset(f"/{tm.name}", data=value)
                     out[(hd5_path, tm)] = value
         return out
 

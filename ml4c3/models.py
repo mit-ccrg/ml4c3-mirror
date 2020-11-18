@@ -72,7 +72,6 @@ from ml4c3.plots import plot_metric_history, plot_architecture_diagram
 from ml4c3.metrics import get_metric_dict
 from ml4c3.datasets import (
     BATCH_INPUT_INDEX,
-    BATCH_PATHS_INDEX,
     BATCH_OUTPUT_INDEX,
     get_array_from_dict_of_arrays,
     get_dicts_of_arrays_from_dataset,
