@@ -67,7 +67,7 @@ def compute_feature(
     elif feature == "mean":
         if tm.name.endswith("_timeseries"):
             raise KeyError(
-                "To compute the mean use signal_value, not signal_timeseries.",
+                f"To compute {feature} use signal_value, not signal_timeseries.",
             )
         tensor = np.nanmean(
             tm.tensor_from_file(tm, hd5, visits=visit, **kwargs)[0][indices],
@@ -75,7 +75,7 @@ def compute_feature(
     elif feature == "std":
         if tm.name.endswith("_timeseries"):
             raise KeyError(
-                "To compute the std use signal_value, not signal_timeseries.",
+                f"To compute {feature} use signal_value, not signal_timeseries.",
             )
         tensor = np.nanstd(
             tm.tensor_from_file(tm, hd5, visits=visit, **kwargs)[0][indices],
@@ -83,17 +83,41 @@ def compute_feature(
     elif feature == "count":
         if tm.name.endswith("_timeseries"):
             raise KeyError(
-                "To compute the number of counts use signal_value, "
-                "not signal_timeseries.",
+                f"To compute {feature} use signal_value, not signal_timeseries.",
             )
         values = tm.tensor_from_file(tm, hd5, visits=visit, **kwargs)[0][indices]
         tensor = values[~np.isnan(values)].size
+    elif feature == "mean_crossing_rate":
+        if tm.name.endswith("_timeseries"):
+            raise KeyError(
+                f"To compute {feature} use signal_value, not signal_timeseries.",
+            )
+        tensor = tm.tensor_from_file(tm, hd5, visits=visit, **kwargs)[0][indices]
+        mean = np.nanmean(tensor)
+        tensor = np.sign(tensor - mean)
+        tensor = np.where(tensor[1:] - tensor[:-1])[0].size
+
+    elif feature == "mean_slope":
+        if not tm.name.endswith("_timeseries"):
+            raise KeyError(
+                f"To compute {feature} use signal_timeseries, not signal_value.",
+            )
+        tensor = tm.tensor_from_file(tm, hd5, visits=visit, **kwargs)[0][:, indices]
+        tensor = np.nanmean(
+            (tensor[0, 1:] - tensor[0, :-1]) / (tensor[1, 1:] - tensor[1, :-1]),
+        )
     else:
         raise KeyError("Unable to compute feature {feature}.")
 
     tensor = missing_imputation(tm.name, tensor, imputation_type)
 
-    if tm.name.endswith("_timeseries") and feature != "raw":
+    if tm.name.endswith("_timeseries") and feature in [
+        "min",
+        "max",
+        "median",
+        "first",
+        "last",
+    ]:
         # Obtain time indice where the feature is found
         if feature in ("last", "first"):
             sample_time = -1 if feature == "last" else 0

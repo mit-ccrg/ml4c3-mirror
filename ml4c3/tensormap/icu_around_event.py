@@ -172,7 +172,8 @@ def get_tmap(tmap_name: str) -> Optional[TensorMap]:
         tmap_match_name = tmap_match_name.replace(f"_{imputation_type}", "")
         match = None
 
-    pattern = re.compile(r"^(.*)_(min|max|mean|median|std|first|last|count)$")
+    features = "min|max|mean|median|std|first|last|count|mean_slope|mean_crossing_rate"
+    pattern = re.compile(fr"^(.*)_({features})$")
     match = pattern.findall(tmap_match_name)
     if match:
         _, feature = match[0]
