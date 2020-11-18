@@ -50,7 +50,16 @@ def hyperoptimize(args: argparse.Namespace):
     with open(args.hyperoptimize_config_file, "r") as file:
         param_lists = json.load(file)
     space = {}
-    for key in param_lists:
+    keys = list(param_lists.keys())
+    for key in keys:
+        if not isinstance(param_lists[key], list):
+            value = param_lists.pop(key)
+            vars(args)[key] = value
+            continue
+        if len(param_lists[key]) == 1:
+            value = param_lists.pop(key)
+            vars(args)[key] = value[0]
+            continue
         space.update({key: hp.choice(key, param_lists[key])})
     hyperparameter_optimizer(args=args, space=space, param_lists=param_lists)
 

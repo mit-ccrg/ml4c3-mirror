@@ -56,7 +56,7 @@ def parse_arguments():
     parser.add_argument(
         "--no_bedmaster",
         action="store_true",
-        help="If parameter is set, files with no Bedmaster data will be deleted too..",
+        help="If parameter is set, files with no Bedmaster data will be deleted too.",
     )
     return parser.parse_args()
 
