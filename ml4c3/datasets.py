@@ -132,7 +132,7 @@ def _tensor_worker(
                 #     ...
                 # ]
                 tensors = []
-                data = PatientData()
+                data = PatientData(sample_id=sample_id)
 
                 # add top level groups in hd5s to patient dictionary
                 for hd5_source in hd5_sources:
@@ -146,10 +146,10 @@ def _tensor_worker(
 
                 # add rows in csv with patient data accessible in patient dictionary
                 for csv_name, df, mrn_col in csv_data:
-                    mask = df[mrn_col == sample_id]
+                    mask = df[mrn_col] == sample_id
                     if not mask.any():
                         continue
-                    data[csv_name] = df[df[mrn_col == sample_id]]
+                    data[csv_name] = df[mask]
 
                 # load all samples found at ID
                 for tm in tmaps:

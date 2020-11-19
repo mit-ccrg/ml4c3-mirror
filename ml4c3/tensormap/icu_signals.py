@@ -3,7 +3,6 @@ import logging
 from typing import Dict, Tuple, Callable, Optional
 
 # Imports: third party
-import h5py
 import numpy as np
 
 # Imports: first party
@@ -16,6 +15,7 @@ from ml4c3.validators import (
 from ml4c3.definitions.icu import EDW_PREFIX, ICU_SCALE_UNITS
 from ml4c3.tensormap.TensorMap import (
     TensorMap,
+    PatientData,
     Interpretation,
     get_visits,
     id_from_filename,
@@ -972,8 +972,8 @@ def create_med_tmap(tm_name: str, med_name: str):
     return tm
 
 
-def visit_tensor_from_file(tm: TensorMap, hd5: h5py.File) -> np.ndarray:
-    return np.array(tm.time_series_filter(hd5))[:, None]
+def visit_tensor_from_file(tm: TensorMap, data: PatientData) -> np.ndarray:
+    return np.array(tm.time_series_filter(data))[:, None]
 
 
 def create_visits_tmap():
@@ -989,9 +989,9 @@ def create_visits_tmap():
     return tmap
 
 
-def mrn_tensor_from_file(tm: TensorMap, hd5: h5py.File) -> np.ndarray:
-    mrn = str(id_from_filename(hd5.filename))
-    return np.array([mrn] * len(tm.time_series_filter(hd5)))[:, None]
+def mrn_tensor_from_file(tm: TensorMap, data: PatientData) -> np.ndarray:
+    mrn = str(data.id)
+    return np.array([mrn] * len(tm.time_series_filter(data)))[:, None]
 
 
 def create_mrn_tmap():
@@ -1007,19 +1007,19 @@ def create_mrn_tmap():
     return tmap
 
 
-def length_of_stay_tensor_from_file(tm: TensorMap, hd5: h5py.File) -> np.ndarray:
-    visits = tm.time_series_filter(hd5)
+def length_of_stay_tensor_from_file(tm: TensorMap, data: PatientData) -> np.ndarray:
+    visits = tm.time_series_filter(data)
     shape = (len(visits),) + tm.shape
     tensor = np.zeros(shape)
 
     for i, visit in enumerate(visits):
         try:
             path = f"{tm.path_prefix}/{visit}"
-            end_date = get_unix_timestamps(hd5[path].attrs["end_date"])
-            start_date = get_unix_timestamps(hd5[path].attrs["admin_date"])
+            end_date = get_unix_timestamps(data[path].attrs["end_date"])
+            start_date = get_unix_timestamps(data[path].attrs["admin_date"])
             tensor[i] = (end_date - start_date) / 60 / 60
         except (ValueError, KeyError) as e:
-            logging.debug(f"Could not get length of stay from {hd5.filename}/{visit}")
+            logging.debug(f"Could not get length of stay from {data.id}/{visit}")
             logging.debug(e)
 
     return tensor
@@ -1038,20 +1038,20 @@ def create_length_of_stay_tmap():
     return tmap
 
 
-def admin_age_tensor_from_file(tm: TensorMap, hd5: h5py.File) -> np.ndarray:
-    visits = tm.time_series_filter(hd5)
+def admin_age_tensor_from_file(tm: TensorMap, data: PatientData) -> np.ndarray:
+    visits = tm.time_series_filter(data)
     shape = (len(visits),) + tm.shape
     tensor = np.zeros(shape)
 
     for i, visit in enumerate(visits):
         try:
             path = f"{tm.path_prefix}/{visit}"
-            admit_date = get_unix_timestamps(hd5[path].attrs["admin_date"])
-            birth_date = get_unix_timestamps(hd5[path].attrs["birth_date"])
+            admit_date = get_unix_timestamps(data[path].attrs["admin_date"])
+            birth_date = get_unix_timestamps(data[path].attrs["birth_date"])
             age = admit_date - birth_date
             tensor[i] = age / 60 / 60 / 24 / 365
         except (ValueError, KeyError) as e:
-            logging.debug(f"Could not get age from {hd5.filename}/{visit}")
+            logging.debug(f"Could not get age from {data.id}/{visit}")
             logging.debug(e)
 
     return tensor
@@ -1070,13 +1070,13 @@ def create_age_tmap():
     return tmap
 
 
-def sex_double_tensor_from_file(tm: TensorMap, hd5: h5py.File) -> np.ndarray:
-    visit = tm.time_series_filter(hd5)[0]
+def sex_double_tensor_from_file(tm: TensorMap, data: PatientData) -> np.ndarray:
+    visit = tm.time_series_filter(data)[0]
     shape = (2,) + tm.shape
     tensor = np.zeros(shape)
     path = f"{tm.path_prefix}/{visit}"
-    data = hd5[path].attrs["sex"]
-    tensor[:, tm.channel_map[data.lower()]] = np.array([1, 1])
+    value = data[path].attrs["sex"]
+    tensor[:, tm.channel_map[value.lower()]] = np.array([1, 1])
 
     return tensor
 
@@ -1095,12 +1095,12 @@ def create_sex_double_tmap():
 
 
 def make_static_tensor_from_file(key: str) -> Callable:
-    def _tensor_from_file(tm: TensorMap, hd5: h5py.File) -> np.ndarray:
-        visits = tm.time_series_filter(hd5)
+    def _tensor_from_file(tm: TensorMap, data: PatientData) -> np.ndarray:
+        visits = tm.time_series_filter(data)
         temp = None
         finalize = False
         if tm.is_timeseries:
-            temp = [hd5[f"{tm.path_prefix}/{v}"].attrs[key] for v in visits]
+            temp = [data[f"{tm.path_prefix}/{v}"].attrs[key] for v in visits]
             max_len = max(map(len, temp))
             shape = (len(visits), max_len)
         else:
@@ -1123,13 +1123,13 @@ def make_static_tensor_from_file(key: str) -> Callable:
         for i, visit in enumerate(visits):
             try:
                 path = f"{tm.path_prefix}/{visit}"
-                data = hd5[path].attrs[key] if temp is None else temp[i]
+                value = data[path].attrs[key] if temp is None else temp[i]
                 if tm.channel_map:
-                    tensor[i, tm.channel_map[data.lower()]] = 1
+                    tensor[i, tm.channel_map[value.lower()]] = 1
                 else:
-                    tensor[i] = data
+                    tensor[i] = value
             except (ValueError, KeyError) as e:
-                logging.debug(f"Error getting {key} from {hd5.filename}/{visit}")
+                logging.debug(f"Error getting {key} from {data.id}/{visit}")
                 logging.debug(e)
 
         if finalize:

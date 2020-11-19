@@ -16,7 +16,7 @@ known_first_party = "ml4c3"
 known_third_party = ["gitlint", "h5py", "matplotlib", "numpy", "pandas", "pytest"]
 
 [tool.pylint.'MESSAGES CONTROL']
-disable="too-many-branches, invalid-name, too-many-boolean-expressions, bad-continuation, missing-module-docstring, missing-function-docstring, too-few-public-methods, too-many-arguments, too-many-locals, too-many-instance-attributes, too-many-ancestors, fixme, logging-fstring-interpolation, protected-access, ungrouped-imports, too-many-statements"
+disable="too-many-branches, invalid-name, too-many-boolean-expressions, bad-continuation, missing-module-docstring, missing-function-docstring, too-few-public-methods, too-many-arguments, too-many-locals, too-many-instance-attributes, too-many-ancestors, fixme, logging-fstring-interpolation, protected-access, ungrouped-imports, too-many-statements, no-else-return, no-else-raise"
 
 [tool.pylint.'SIMILARITIES']
 min-similarity-lines="10"

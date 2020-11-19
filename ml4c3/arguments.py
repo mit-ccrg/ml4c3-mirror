@@ -15,7 +15,6 @@ import numpy as np
 from ml4c3.logger import load_config
 from ml4c3.models import BottleneckType
 from ml4c3.definitions.icu import ML4C3_DIR
-from ml4c3.definitions.sts import STS_DATA_CSV
 from ml4c3.tensormap.TensorMap import TensorMap, update_tmaps
 
 BOTTLENECK_STR_TO_ENUM = {
@@ -133,11 +132,6 @@ def parse_args() -> argparse.Namespace:
         "--freeze_donor_layers",
         action="store_true",
         help="Whether to freeze the layers from donor_layers.",
-    )
-    io_parser.add_argument(
-        "--sts_csv",
-        default=STS_DATA_CSV,
-        help="Path to STS data csv file.",
     )
 
     # Run specific and debugging arguments
@@ -741,7 +735,8 @@ def parse_args() -> argparse.Namespace:
     explore_parser.add_argument(
         "--explore_disable_saving_output",
         action="store_true",
-        help="Disable saving outputs from explore: histograms, summary stats, and tensors.",
+        help="Disable saving outputs from explore: "
+        "histograms, summary stats, and tensors.",
     )
     explore_parser.add_argument(
         "--explore_export_error",
@@ -1106,7 +1101,8 @@ def _process_args(args: argparse.Namespace):
                 tensors.append(tensor[0])
             else:
                 raise ValueError(
-                    f"Tensors must be a path or a path and a name, instead got: {tensor}",
+                    f"Tensors must be a path or a path and a name, "
+                    f"instead got: {tensor}",
                 )
         args.tensors = tensors if len(tensors) > 1 else tensors[0]
 

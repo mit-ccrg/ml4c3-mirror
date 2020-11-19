@@ -2,22 +2,23 @@
 import copy
 import logging
 import datetime
-from typing import Dict, Callable
+from typing import Dict, List, Union, Callable
 
 # Imports: third party
-import h5py
 import numpy as np
+import pandas as pd
 
 # Imports: first party
 from ml4c3.normalizer import MinMax, RobustScaler
 from ml4c3.validators import validator_no_nans, validator_not_all_zero
 from ml4c3.definitions.ecg import ECG_PREFIX, ECG_DATETIME_FORMAT
-from ml4c3.definitions.sts import STS_PREFIX, STS_DATE_FORMAT
+from ml4c3.definitions.sts import STS_PREFIX, STS_DATE_FORMAT, STS_SURGERY_DATE_COLUMN
 from ml4c3.definitions.types import ChannelMap
 from ml4c3.tensormap.TensorMap import (
+    Dates,
     TensorMap,
+    PatientData,
     Interpretation,
-    make_hd5_path,
     is_dynamic_shape,
     outcome_channels,
 )
@@ -85,7 +86,7 @@ sts_features_categorical = {
 # Define the name, median, and IQR of continuous features to enable standardization
 # These values are calculated from the entire STS MGH cohort using a Jupyter Notebook
 # fmt: off
-sts_features_continuous = {
+sts_features_continuous: Dict[str, Dict[str, Union[int, float]]] = {
     "age":       {"median": 67,    "iqr": 18,    "min": 21,   "max": 110},
     "creatlst":  {"median": 1,     "iqr": 0.36,  "min": 0.17, "max": 17.89},
     "hct":       {"median": 39,    "iqr": 8,     "min": 2.3,  "max": 76.766},
@@ -118,8 +119,9 @@ sts_outcomes = {
     "sts_reoperation":           "reop",
     "sts_long_stay":             "llos",
 }
+
 # Get keys of outcomes in STS features CSV
-sts_outcomes_raw_keys = [key for outcome, key in sts_outcomes.items()]
+sts_outcome_keys = [key for outcome, key in sts_outcomes.items()]
 
 sts_operative_types = {
     "opcab":                     "opcab",
@@ -129,19 +131,43 @@ sts_operative_types = {
 # fmt: on
 
 
+def binarize(
+    key: str,
+    value: int,
+    negative_value: int = 0,
+    positive_value: int = 1,
+) -> List[int]:
+    if value == negative_value:
+        return [1, 0]
+    elif value == positive_value:
+        return [0, 1]
+    else:
+        logging.debug(
+            f"STS {key} has value that is not {negative_value} or {positive_value}",
+        )
+        return [0, 0]
+
+
+def one_hot(channel_map: Dict[str, int], value: int) -> List[int]:
+    t = [0] * len(channel_map)
+    prefix = next(iter(channel_map)).split("_")[0]
+    value_str = f"{prefix}_{value}"
+    if value_str in channel_map:
+        t[channel_map[value_str]] = 1
+    return t
+
+
+def get_sts_surgery_dates(data: PatientData) -> Dates:
+    # STS data is stored in data as a pandas DataFrame
+    return data[STS_PREFIX][STS_SURGERY_DATE_COLUMN]
+
+
 def _make_sts_tff_continuous(key: str) -> Callable:
-    def tensor_from_file(tm: TensorMap, hd5: h5py.File) -> np.ndarray:
-        surgery_dates = tm.time_series_filter(hd5)
-        dynamic, shape = is_dynamic_shape(tm, len(surgery_dates))
-        tensor = np.zeros(shape, dtype=np.float32)
-        for i, surgery_date in enumerate(surgery_dates):
-            try:
-                path = make_hd5_path(tm, surgery_date, key)
-                feature_value = hd5[path][()]
-                slices = (i,) if dynamic else (...,)
-                tensor[slices] = feature_value
-            except (KeyError, ValueError):
-                logging.debug(f"Could not get STS {key} for hd5 {hd5.filename}")
+    def tensor_from_file(tm: TensorMap, data: PatientData) -> np.ndarray:
+        surgery_dates = tm.time_series_filter(data)
+        tensor = data[STS_PREFIX].loc[surgery_dates.index, key].to_numpy()
+        if is_dynamic_shape(tm):
+            tensor = tensor[:, None]
         return tensor
 
     return tensor_from_file
@@ -149,62 +175,35 @@ def _make_sts_tff_continuous(key: str) -> Callable:
 
 def _make_sts_tff_binary(
     key: str,
-    negative_value: int = 2,
-    positive_value: int = 1,
+    negative_value: int,
+    positive_value: int,
 ) -> Callable:
-    def tensor_from_file(tm: TensorMap, hd5: h5py.File) -> np.ndarray:
-        """
-        Parses MRN from the HD5 file name, look up the feature in a dict, and return
-        the feature. Note the default encoding of +/- features in STS is 2/1,
-        e.g. yes == 1, no == 2, but outcomes are encoded using the usual format of 0/1.
-        """
-        surgery_dates = tm.time_series_filter(hd5)
-        dynamic, shape = is_dynamic_shape(tm, len(surgery_dates))
-        tensor = np.zeros(shape, dtype=np.float32)
-        for i, surgery_date in enumerate(surgery_dates):
-            try:
-                path = make_hd5_path(tm, surgery_date, key)
-                feature_value = hd5[path][()]
-                if feature_value == positive_value:
-                    idx = 1
-                elif feature_value == negative_value:
-                    idx = 0
-                else:
-                    raise ValueError(
-                        f"TMap {tm.name} has value {feature_value} that is not a "
-                        f"positive value ({positive_value}), or negative value "
-                        f"({negative_value})",
-                    )
-                slices = (i, idx) if dynamic else (idx,)
-                tensor[slices] = 1
-            except (KeyError, ValueError):
-                logging.debug(f"Could not get STS {key} for hd5 {hd5.filename}")
+    def tensor_from_file(tm: TensorMap, data: PatientData) -> np.ndarray:
+        surgery_dates = tm.time_series_filter(data)
+        tensor = data[STS_PREFIX].loc[surgery_dates.index, key].to_numpy()
+        tensor = tensor[:, None]
+        tensor = np.apply_along_axis(
+            func1d=lambda x: binarize(key, x, negative_value, positive_value),
+            axis=1,
+            arr=tensor,
+        )
+        if not is_dynamic_shape(tm):
+            tensor = tensor[0]
         return tensor
 
     return tensor_from_file
 
 
 def _make_sts_tff_categorical(key: str) -> Callable:
-    def tensor_from_file(tm: TensorMap, hd5: h5py.File) -> np.ndarray:
-        surgery_dates = tm.time_series_filter(hd5)
-        dynamic, shape = is_dynamic_shape(tm, len(surgery_dates))
-        tensor = np.zeros(shape, dtype=np.float32)
-        for i, surgery_date in enumerate(surgery_dates):
-            try:
-                path = make_hd5_path(tm, surgery_date, key)
-                feature_value = hd5[path][()]
-                for cm in tm.channel_map:
-                    original_value = cm.split("_")[1]
-                    if str(feature_value) == str(original_value):
-                        slices = (
-                            (i, tm.channel_map[cm])
-                            if dynamic
-                            else (tm.channel_map[cm],)
-                        )
-                        tensor[slices] = 1
-                        break
-            except (KeyError, ValueError):
-                logging.debug(f"Could not get STS {key} for hd5 {hd5.filename}")
+    def tensor_from_file(tm: TensorMap, data: PatientData) -> np.ndarray:
+        surgery_dates = tm.time_series_filter(data)
+        tensor = data[STS_PREFIX].loc[surgery_dates.index, key].to_numpy()
+        tensor = tensor[:, None]
+        if tm.channel_map is None:
+            raise ValueError(f"{tm.name} channel map is None")
+        tensor = np.apply_along_axis(lambda x: one_hot(tm.channel_map, x), 1, tensor)
+        if not is_dynamic_shape(tm):
+            tensor = tensor[0]
         return tensor
 
     return tensor_from_file
@@ -221,17 +220,6 @@ def _make_sts_categorical_channel_map(feature: str) -> ChannelMap:
     return channel_map
 
 
-def str2datetime(
-    input_date: str,
-    date_format: str = STS_DATE_FORMAT,
-) -> datetime.datetime:
-    return datetime.datetime.strptime(input_date, date_format)
-
-
-# Get keys of outcomes in STS features CSV
-outcome_keys = [key for outcome, key in sts_outcomes.items()]
-
-
 # Categorical (non-binary)
 for tmap_name in sts_features_categorical:
     tff = _make_sts_tff_categorical(key=tmap_name)
@@ -245,6 +233,7 @@ for tmap_name in sts_features_categorical:
         channel_map=channel_map,
         validators=validator_not_all_zero,
         time_series_limit=0,
+        time_series_filter=get_sts_surgery_dates,
     )
 
 # Binary
@@ -264,6 +253,7 @@ for tmap_name in sts_features_binary:
         channel_map=channel_map,
         validators=validator_not_all_zero,
         time_series_limit=0,
+        time_series_filter=get_sts_surgery_dates,
     )
 
 # Continuous
@@ -292,6 +282,7 @@ for tmap_name in sts_features_continuous:
             validators=validator_no_nans,
             normalizers=normalizer,
             time_series_limit=0,
+            time_series_filter=get_sts_surgery_dates,
         )
 
 # Outcomes + Operative Types
@@ -310,28 +301,19 @@ for tmap_name, key in {**sts_outcomes, **sts_operative_types}.items():
         channel_map=outcome_channels(tmap_name),
         validators=validator_not_all_zero,
         time_series_limit=0,
+        time_series_filter=get_sts_surgery_dates,
     )
 
 
 # Composite tensor map for any outcome
-def tff_any(tm: TensorMap, hd5: h5py.File) -> np.ndarray:
-    surgery_dates = tm.time_series_filter(hd5)
-    dynamic, shape = is_dynamic_shape(tm, len(surgery_dates))
-    tensor = np.zeros(shape, dtype=np.float32)
-    for i, surgery_date in enumerate(surgery_dates):
-        try:
-            idx = 0
-            for key in sts_outcomes_raw_keys:
-                path = make_hd5_path(tm, surgery_date, key)
-                feature_value = hd5[path][()]
-                if feature_value == 1:
-                    idx = 1
-                    break
-            slices = (i, idx) if dynamic else (idx,)
-            tensor[slices] = 1
-            break
-        except (KeyError, ValueError):
-            logging.debug(f"Could not get STS any outcome for hd5 {hd5.filename}")
+def tff_any(tm: TensorMap, data: PatientData) -> np.ndarray:
+    surgery_dates = tm.time_series_filter(data)
+    tensor = data[STS_PREFIX].loc[surgery_dates.index, sts_outcome_keys].to_numpy()
+    tensor = tensor.any(axis=1).astype(int)
+    tensor = tensor[:, None]
+    tensor = np.apply_along_axis(lambda x: binarize("any", x), 1, tensor)
+    if not is_dynamic_shape(tm):
+        tensor = tensor[0]
     return tensor
 
 
@@ -344,6 +326,7 @@ tmaps[tmap_name] = TensorMap(
     channel_map=outcome_channels(tmap_name),
     validators=validator_not_all_zero,
     time_series_limit=0,
+    time_series_filter=get_sts_surgery_dates,
 )
 
 
@@ -359,7 +342,8 @@ def update_tmaps_sts_window(
             base_name, _ = tmap_name.split(f"_{window}")
             if base_name not in tmaps:
                 raise ValueError(
-                    f"Base tmap {base_name} not in existing tmaps. Cannot modify STS {window} window.",
+                    f"Base tmap {base_name} not in existing tmaps. "
+                    f"Cannot modify STS {window} window.",
                 )
             base_tmap = tmaps[base_name]
             new_tmap = copy.deepcopy(base_tmap)
@@ -375,36 +359,59 @@ def update_tmaps_sts_window(
                     + datetime.timedelta(days=offset)
                 ).strftime(date_format)
 
-            def time_series_filter(hd5):
-                _dates = base_tmap.time_series_filter(hd5)
-
-                if "ecg" in window:
-                    xref_dates = list(hd5[ECG_PREFIX])
-                    date_format = ECG_DATETIME_FORMAT
-                else:
-                    xref_dates = list(hd5[STS_PREFIX])
-                    date_format = STS_DATE_FORMAT
-                dates = []
-                for xref_date in xref_dates:
-                    if window == "preop" or window == "with_postop_ecg":
-                        start_date = offset_date(
-                            xref_date,
-                            -30,
-                            date_format=date_format,
-                        )
-                        end_date = xref_date
-                    elif window == "postop" or window == "with_preop_ecg":
-                        start_date = xref_date
-                        end_date = offset_date(xref_date, 30, date_format=date_format)
+            def make_time_series_filter(
+                _tm: TensorMap,
+                _window: str,
+            ) -> Callable[[PatientData], Dates]:
+                def get_cross_referenced_dates(data: PatientData) -> Dates:
+                    _dates = _tm.time_series_filter(data)
+                    if "ecg" in _window:
+                        xref_dates = list(data[ECG_PREFIX])
+                        date_format = ECG_DATETIME_FORMAT
                     else:
-                        raise ValueError(f"Unknown STS window: {window}")
-                    for d in _dates:
-                        if start_date < d < end_date:
-                            dates.append(d)
-                return dates
+                        xref_dates = data[STS_PREFIX][STS_SURGERY_DATE_COLUMN]
+                        date_format = STS_DATE_FORMAT
+
+                    dates = (
+                        pd.Series(dtype=str) if isinstance(_dates, pd.Series) else []
+                    )
+                    for xref_date in xref_dates:
+                        if _window == "preop" or _window == "with_postop_ecg":
+                            start_date = offset_date(
+                                xref_date,
+                                -30,
+                                date_format=date_format,
+                            )
+                            end_date = xref_date
+                        elif _window == "postop" or _window == "with_preop_ecg":
+                            start_date = xref_date
+                            end_date = offset_date(
+                                xref_date,
+                                30,
+                                date_format=date_format,
+                            )
+                        else:
+                            raise ValueError(f"Unknown STS window: {_window}")
+                        if isinstance(_dates, pd.Series):
+                            dates = dates.append(
+                                _dates[
+                                    _dates.between(
+                                        start_date,
+                                        end_date,
+                                        inclusive=False,
+                                    )
+                                ],
+                            )
+                        else:
+                            for d in _dates:
+                                if start_date < d < end_date:
+                                    dates.append(d)
+                    return dates
+
+                return get_cross_referenced_dates
 
             new_tmap.name = new_tmap_name
-            new_tmap.time_series_filter = time_series_filter
+            new_tmap.time_series_filter = make_time_series_filter(base_tmap, window)
             tmaps[new_tmap_name] = new_tmap
             break
     return tmaps

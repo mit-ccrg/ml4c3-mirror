@@ -6,10 +6,8 @@ from typing import Any, Dict, List, Tuple, Union, Callable, Optional
 from datetime import datetime
 
 # Imports: third party
-import h5py
 import numpy as np
 import pandas as pd
-from tensorflow.keras import Model
 
 # Imports: first party
 from ml4c3.metrics import (
@@ -29,6 +27,7 @@ from ml4c3.normalizer import Normalizer
 from ml4c3.definitions.globals import TIMEZONE
 
 Axis = Union[int, None]
+Dates = Union[List[str], pd.Series]
 
 DEFAULT_TIME_TO_EVENT_CHANNELS = {"event": 0, "follow_up_days": 1}
 
@@ -36,8 +35,13 @@ DEFAULT_TIME_TO_EVENT_CHANNELS = {"event": 0, "follow_up_days": 1}
 
 
 class PatientData:
-    def __init__(self):
+    """
+    Wrapper around a patient's data from multiple sources.
+    """
+
+    def __init__(self, sample_id):
         self.data = dict()
+        self.id = sample_id
 
     def __setitem__(self, key, value):
         if not isinstance(key, str):
@@ -55,6 +59,16 @@ class PatientData:
             return self.data[key]
         else:
             return self.data[splits[0]][splits[1]]
+
+    def __contains__(self, key):
+        if not isinstance(key, str):
+            raise KeyError(f"Patient dictionary keys must be strings: {key}")
+        key = key.strip("/")
+        splits = key.split("/", 1)
+        if len(splits) == 1:
+            return splits[0] in self.data
+        else:
+            return splits[0] in self.data and splits[1] in self.data
 
 
 class Interpretation(Enum):
@@ -88,16 +102,6 @@ class Interpretation(Enum):
         return str.lower(super().__str__().split(".")[1])
 
 
-class TimeSeriesOrder(Enum):
-    """
-    TimeSeriesOrder defines which data in a time series are selected.
-    """
-
-    NEWEST = "NEWEST"
-    OLDEST = "OLDEST"
-    RANDOM = "RANDOM"
-
-
 class TensorMap:
     """
     Tensor maps encode the semantics, shapes and types of tensors available
@@ -117,17 +121,15 @@ class TensorMap:
         name: str,
         loss: Optional[Union[str, Callable]] = None,
         shape: Optional[Tuple[int, ...]] = None,
-        model: Optional[Model] = None,
         metrics: Optional[List[Union[str, Callable]]] = None,
         activation: Optional[Union[str, Callable]] = None,
-        days_window: int = 1825,
         path_prefix: Optional[str] = None,
-        loss_weight: Optional[float] = 1.0,
+        loss_weight: float = 1.0,
         channel_map: Optional[Dict[str, int]] = None,
         augmenters: Optional[Union[Callable, List[Callable]]] = None,
         validators: Optional[Union[Callable, List[Callable]]] = None,
         normalizers: Optional[Union[Normalizer, List[Normalizer]]] = None,
-        interpretation: Optional[Interpretation] = Interpretation.CONTINUOUS,
+        interpretation: Interpretation = Interpretation.CONTINUOUS,
         annotation_units: Optional[int] = None,
         tensor_from_file: Optional[Callable] = None,
         time_series_limit: Optional[int] = None,
@@ -142,8 +144,6 @@ class TensorMap:
                                is it a label, a continuous value an embedding...
         :param loss: Loss function or str specifying pre-defined loss function
         :param shape: Tuple of integers specifying tensor shape
-        :param model: The model that computes the embedding layer, only used by
-                      embedding tensor maps
         :param metrics: List of metric functions of strings
         :param activation: String specifying activation function
         :param path_prefix: Path prefix of HD5 file groups where the data we are
@@ -167,101 +167,99 @@ class TensorMap:
                                this tensor map should be linked.
         """
         self.name = name
-        self.loss = loss
-        self.model = model
-        self.shape = shape
-        self.metrics = metrics
-        self.activation = activation
-        self.days_window = days_window
         self.loss_weight = loss_weight
         self.path_prefix = path_prefix
+        self.interpretation = interpretation
+        self.linked_tensors = linked_tensors
+        self.time_series_limit = time_series_limit
+
+        if tensor_from_file is None:
+            raise ValueError(f"{self.name}: tensor_from_file cannot be None")
+        self.tensor_from_file = tensor_from_file
+
+        # Infer channel map from interpretation
+        if channel_map is None and self.is_time_to_event:
+            channel_map = DEFAULT_TIME_TO_EVENT_CHANNELS
         self.channel_map = channel_map
+
+        # Infer shape from channel map or interpretation
+        if shape is None:
+            if self.channel_map is not None:
+                if self.is_time_to_event:
+                    shape = (2,)
+                else:
+                    shape = (len(self.channel_map),)
+            else:
+                raise ValueError(f"{self.name}: cannot infer shape")
+        self.shape = shape
+
+        # Infer loss from interpretation and shape
+        if loss is None:
+            if self.is_categorical or self.is_language:
+                loss = "categorical_crossentropy"
+            elif self.is_continuous or self.is_timeseries or self.is_event:
+                loss = "mse"
+            elif self.is_survival_curve:
+                loss = survival_likelihood_loss(self.shape[0] // 2)
+            elif self.is_time_to_event:
+                loss = cox_hazard_loss
+            else:
+                raise ValueError(f"{self.name}: cannot infer loss")
+        self.loss = loss
+
+        # Infer activation from interpretation
+        if activation is None:
+            if self.is_categorical or self.is_language:
+                activation = "softmax"
+            elif self.is_continuous or self.is_timeseries or self.is_event:
+                activation = "linear"
+            elif self.is_survival_curve or self.is_time_to_event:
+                activation = "sigmoid"
+            else:
+                raise ValueError(f"{self.name}: cannot infer activation")
+        self.activation = activation
+
+        # Infer metrics from interpretation
+        if metrics is None:
+            if self.is_categorical:
+                metrics = ["categorical_accuracy"]
+                if self.axes == 1:
+                    metrics += per_class_precision(self.channel_map)
+                    metrics += per_class_recall(self.channel_map)
+                elif self.axes == 2:
+                    metrics += per_class_precision_3d(self.channel_map)
+                    metrics += per_class_recall_3d(self.channel_map)
+                elif self.axes == 3:
+                    metrics += per_class_precision_4d(self.channel_map)
+                    metrics += per_class_recall_4d(self.channel_map)
+                elif self.axes == 4:
+                    metrics += per_class_precision_5d(self.channel_map)
+                    metrics += per_class_recall_5d(self.channel_map)
+            elif self.is_continuous and self.shape[-1] == 1:
+                metrics = [pearson]
+            else:
+                metrics = []
+        self.metrics = metrics
+
+        # Infer embedded dimensionality from shape
+        if annotation_units is None:
+            annotation_units = self.size
+        self.annotation_units = annotation_units
+
+        # Wrap augmenter, validator, and normalizer in lists
+        if augmenters is not None and not isinstance(augmenters, list):
+            augmenters = [augmenters]
+        if validators is not None and not isinstance(validators, list):
+            validators = [validators]
+        if normalizers is not None and not isinstance(normalizers, list):
+            normalizers = [normalizers]
         self.augmenters = augmenters
         self.validators = validators
         self.normalizers = normalizers
-        self.interpretation = interpretation
-        self.annotation_units = annotation_units
-        self.tensor_from_file = tensor_from_file
-        self.time_series_limit = time_series_limit
+
+        if time_series_filter is None:
+            time_series_filter = make_default_time_series_filter(path_prefix)
         self.time_series_filter = time_series_filter
-        self.linked_tensors = linked_tensors
-
-        if self.tensor_from_file is None:
-            raise ValueError(f"{self.name}: tensor_from_file cannot be None")
-
-        # Infer channel map from interpretation
-        if self.channel_map is None and self.is_time_to_event:
-            self.channel_map = DEFAULT_TIME_TO_EVENT_CHANNELS
-
-        # Infer shape from channel map or interpretation
-        if self.shape is None:
-            if self.channel_map is not None:
-                if self.is_time_to_event:
-                    self.shape = (2,)
-                else:
-                    self.shape = (len(self.channel_map),)
-            else:
-                raise ValueError(f"{self.name}: cannot infer shape")
-
-        # Infer loss from interpretation and shape
-        if self.loss is None:
-            if self.is_categorical or self.is_language:
-                self.loss = "categorical_crossentropy"
-            elif self.is_continuous or self.is_timeseries or self.is_event:
-                self.loss = "mse"
-            elif self.is_survival_curve:
-                self.loss = survival_likelihood_loss(self.shape[0] // 2)
-            elif self.is_time_to_event:
-                self.loss = cox_hazard_loss
-            else:
-                raise ValueError(f"{self.name}: cannot infer loss")
-
-        # Infer activation from interpretation
-        if self.activation is None:
-            if self.is_categorical or self.is_language:
-                self.activation = "softmax"
-            elif self.is_continuous or self.is_timeseries or self.is_event:
-                self.activation = "linear"
-            elif self.is_survival_curve or self.is_time_to_event:
-                self.activation = "sigmoid"
-            else:
-                raise ValueError(f"{self.name}: cannot infer activation")
-
-        # Infer metrics from interpretation
-        if self.metrics is None:
-            if self.is_categorical:
-                self.metrics = ["categorical_accuracy"]
-                if self.axes == 1:
-                    self.metrics += per_class_precision(self.channel_map)
-                    self.metrics += per_class_recall(self.channel_map)
-                elif self.axes == 2:
-                    self.metrics += per_class_precision_3d(self.channel_map)
-                    self.metrics += per_class_recall_3d(self.channel_map)
-                elif self.axes == 3:
-                    self.metrics += per_class_precision_4d(self.channel_map)
-                    self.metrics += per_class_recall_4d(self.channel_map)
-                elif self.axes == 4:
-                    self.metrics += per_class_precision_5d(self.channel_map)
-                    self.metrics += per_class_recall_5d(self.channel_map)
-            elif self.is_continuous and self.shape[-1] == 1:
-                self.metrics = [pearson]
-            else:
-                self.metrics = []
-
-        # Infer embedded dimensionality from shape
-        if self.annotation_units is None:
-            self.annotation_units = self.size
-
-        # Wrap augmenter, validator, and normalizer in lists
-        if self.augmenters is not None and not isinstance(self.augmenters, list):
-            self.augmenters = [self.augmenters]
-        if self.validators is not None and not isinstance(self.validators, list):
-            self.validators = [self.validators]
-        if self.normalizers is not None and not isinstance(self.normalizers, list):
-            self.normalizers = [self.normalizers]
-
-        if self.time_series_filter is None:
-            self.time_series_filter = lambda hd5: sorted(list(hd5[self.path_prefix]))
 
     def __hash__(self):
         return hash((self.name, self.shape, self.interpretation))
@@ -376,7 +374,7 @@ class TensorMap:
         return tensor
 
 
-def get_visits(tm: TensorMap, hd5: h5py.File, **kwargs) -> List[str]:
+def get_visits(tm: TensorMap, data: PatientData, **kwargs) -> List[str]:
     visits = None
     if "visits" in kwargs:
         visits = kwargs["visits"]
@@ -386,7 +384,7 @@ def get_visits(tm: TensorMap, hd5: h5py.File, **kwargs) -> List[str]:
             raise TypeError(f"{kwargs['visits']} is not a List[str] or [str].")
     if visits is None:
         if tm.path_prefix:
-            visits = list(hd5[tm.path_prefix.split("*")[0]])
+            visits = list(data[tm.path_prefix.split("*")[0]])
         else:
             raise TypeError("Unable to get_visits with the inputs given.")
     return visits
@@ -457,6 +455,18 @@ def _get_name_if_function(field: Any) -> Any:
     return field
 
 
+def make_default_time_series_filter(
+    path_prefix: Optional[str] = None,
+) -> Callable[[PatientData], Dates]:
+    if path_prefix is None:
+        path_prefix = ""
+
+    def default_time_series_filter(data: PatientData) -> Dates:
+        return sorted(list(data[path_prefix]))
+
+    return default_time_series_filter
+
+
 def outcome_channels(outcome: str):
     return {f"no_{outcome}": 0, f"{outcome}": 1}
 
@@ -494,10 +504,17 @@ def binary_channel_map(tm: TensorMap) -> bool:
     )
 
 
-def is_dynamic_shape(tm: TensorMap, num_samples: int) -> Tuple[bool, Tuple[int, ...]]:
-    if tm.time_series_limit is not None:
-        return True, (num_samples,) + tm.shape
-    return False, tm.shape
+def is_dynamic_shape(
+    tm: TensorMap,
+    num_samples: Optional[int] = None,
+) -> Union[bool, Tuple[bool, Tuple[int, ...]]]:
+    is_dynamic = tm.time_series_limit is not None
+    if num_samples is not None:
+        shape = tm.shape or tuple()
+        if is_dynamic:
+            return is_dynamic, (num_samples,) + shape
+        return is_dynamic, shape
+    return is_dynamic
 
 
 def make_hd5_path(tm: TensorMap, date_key: str, value_key: str) -> str:
@@ -622,12 +639,6 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
     # Modify: time series
     from ml4c3.tensormap.updaters import update_tmaps_time_series  # isort:skip
     tmaps = update_tmaps_time_series(tmap_name=tmap_name, tmaps=tmaps)
-    if tmap_name in tmaps:
-        return tmaps
-
-    # Modify: load predictions
-    from ml4c3.tensormap.updaters import update_tmaps_model_predictions  # isort:skip
-    tmaps = update_tmaps_model_predictions(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps
 

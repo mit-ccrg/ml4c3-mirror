@@ -26,7 +26,6 @@ from ml4c3.arguments import parse_args
 from ml4c3.ingest.ecg import tensorize as tensorize_ecg
 from ml4c3.ingest.icu import tensorize as tensorize_icu
 from ml4c3.ingest.icu import tensorize_batched as tensorize_icu_batched
-from ml4c3.ingest.sts import tensorize as tensorize_sts
 from ml4c3.evaluations import predict_and_evaluate
 from ml4c3.explorations import explore
 from ml4c3.visualizer.run import run_server
@@ -62,8 +61,6 @@ def run(args: argparse.Namespace):
                 tensorize_icu_batched(args)
             else:
                 tensorize_icu(args)
-        elif args.mode == "tensorize_sts":
-            tensorize_sts(args)
         elif args.mode == "explore":
             explore(args=args, disable_saving_output=args.explore_disable_saving_output)
         elif args.mode == "plot_ecg":
