@@ -68,7 +68,7 @@ class PatientData:
         if len(splits) == 1:
             return splits[0] in self.data
         else:
-            return splits[0] in self.data and splits[1] in self.data
+            return splits[0] in self.data and splits[1] in self.data[splits[0]]
 
 
 class Interpretation(Enum):
