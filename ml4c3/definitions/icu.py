@@ -25,7 +25,7 @@ MATFILE_EXPECTED_GROUPS: List[str] = [
 # TODO list more departments names https://github.com/aguirre-lab/ml4c3/issues/575
 MAPPING_DEPARTMENTS: Dict[str, List[Any]] = {
     # EDW dept name: [possible file name]
-    "MGH BIGELOW 6 PICU": ["BIG06"],
+    "MGH BIGELOW 6 PICU": ["BIG06", "PICU"],
     "MGH BIGELOW 7": ["BIG7"],
     "MGH BIGELOW 9 MED": ["BIG09", "BIG9", "BIG09PU"],
     "MGH BIGELOW 11 MED": ["BIG11"],
@@ -61,8 +61,8 @@ MAPPING_DEPARTMENTS: Dict[str, List[Any]] = {
     "MGH LUNDER 10 ONCOLOGY": ["LUN10"],
     "MGH WHITE 6 ORTHO\\OMF": ["WHT06"],
     "MGH WHITE 7 GEN SURG": ["WHT07"],
-    "MGH WHITE 8 MEDICINE": ["WHT08"],
-    "MGH WHITE 9 MEDICINE": ["WHT09"],
+    "MGH WHITE 8 MEDICINE": ["WHT08", "WHITE08"],
+    "MGH WHITE 9 MEDICINE": ["WHT09", "WHITE09"],
     "MGH WHITE 10 MEDICINE": ["WHITE10"],
     "MGH WHITE 11 MEDICINE": ["WHITE11"],
     "MGH WHITE 12": ["WHT12"],
@@ -73,6 +73,8 @@ MAPPING_DEPARTMENTS: Dict[str, List[Any]] = {
     "MGH EP PACER LAB": [None],
     "MGH PHILLIPS 20 MED": [None],
     "MGH CPC": [None],
+    "MGH PHILLIPS 22 GYN/SG": ["PH22"],
+    "MGH WANG 3 ICU": ["WANG3"],
 }
 
 ALARMS_FILES: Dict[str, Any] = {

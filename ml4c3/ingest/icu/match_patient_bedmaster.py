@@ -149,6 +149,13 @@ class PatientBedmasterMatcher:
         unmatched_files = []
         for _, bedmaster_file in enumerate(bedmaster_files):
             dept, room_bed, start_time = self._take_bedmaster_file_info(bedmaster_file)
+            if dept not in self.folder_to_dept:
+                self.folder_to_dept[dept] = dept
+                logging.warning(
+                    f"Bedmaster department {dept} doesn't have it's corresponding "
+                    "mapping.",
+                )
+
             if (
                 self.desired_departments
                 and self.folder_to_dept[dept] not in self.desired_departments
