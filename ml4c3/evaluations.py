@@ -11,7 +11,12 @@ import tensorflow as tf
 from tensorflow.keras.models import Model
 
 # Imports: first party
-from ml4c3.plots import subplot_rocs, subplot_scatters, evaluate_predictions
+from ml4c3.plots import (
+    subplot_rocs,
+    subplot_scatters,
+    evaluate_predictions,
+    plot_feature_coefficients,
+)
 from ml4c3.models import SKLEARN_MODELS
 from ml4c3.datasets import (
     BATCH_IDS_INDEX,
@@ -40,6 +45,7 @@ def predict_and_evaluate(
     save_coefficients: bool = False,
     batch_size: Optional[int] = None,
     save_predictions: bool = False,
+    top_features_to_plot: Optional[int] = None,
 ) -> Dict:
     """
     Evaluate trained model on dataset, save plots, and return performance metrics
@@ -54,12 +60,14 @@ def predict_and_evaluate(
     :param batch_size: Number of samples to use in a batch, required if data is a
                        tuple of input and output numpy arrays
     :param save_predictions: If true, save predicted and actual output values to a csv
+    :param top_features_to_plot: Number of features to plot in features coefficients
+                                 plot.
 
     :return: Dictionary of performance metrics
     """
     performance_metrics = {}
-    scatters = []
-    rocs = []
+    scatters: List[Tuple[np.ndarray, np.ndarray, str, List[str]]] = []
+    rocs: List[Tuple[np.ndarray, np.ndarray, Dict[str, int]]] = []
     if isinstance(model, Model):
         layer_names = [layer.name for layer in model.layers]
         for tm in tensor_maps_out:
@@ -67,7 +75,13 @@ def predict_and_evaluate(
                 raise ValueError(
                     "Output tensor map name not found in layers of loaded model",
                 )
-    if save_coefficients:
+    if (
+        save_coefficients
+        and isinstance(model, Model)
+        and not len(model.layers) == len(tensor_maps_in) + len(tensor_maps_out) + 1 # concat layer
+    ):
+        pass
+    elif save_coefficients:
         if isinstance(model, Model):
             coefficients = [c[0].round(3) for c in model.layers[-1].get_weights()[0]]
         else:
@@ -89,6 +103,16 @@ def predict_and_evaluate(
         # Create dataframe of features
         df = pd.DataFrame({"feature": feature_names, "coefficient": coefficients})
         df = df.iloc[(-df["coefficient"]).argsort()].reset_index(drop=True)
+
+        # Create coefficients plots
+        if top_features_to_plot:
+            plot_feature_coefficients(
+                plot_path=plot_path,
+                model_name=model.name,
+                feature_values=df,
+                top_features_to_plot=top_features_to_plot,
+                image_ext=image_ext,
+            )
 
         # Save dataframe
         fname = os.path.join(plot_path, "coefficients" + ".csv")
@@ -175,12 +199,11 @@ def predict_and_evaluate(
 def _get_sklearn_model_coefficients(model: SKLEARN_MODELS) -> np.array:
     if model.name == "logreg":
         return model.coef_.flatten()
-    elif model.name == "svm":
+    if model.name == "svm":
         return model.LSVC.coef_.flatten()
-    elif model.name == "randomforest" or model.name == "xgboost":
+    if model.name == "randomforest" or model.name == "xgboost":
         return model.feature_importances_.flatten()
-    else:
-        raise ValueError(f"{model.name} lacks feature coefficients or importances")
+    raise ValueError(f"{model.name} lacks feature coefficients or importances")
 
 
 def _get_predictions_from_data(
@@ -206,7 +229,7 @@ def _get_predictions_from_data(
     :return: Tuple of predictions as a list of numpy arrays, a dictionary of
              output data, and optionally paths
     """
-    if isinstance(data, Tuple):
+    if isinstance(data, tuple):
         if len(data) == 2:
             input_data, output_data = data
             paths = None

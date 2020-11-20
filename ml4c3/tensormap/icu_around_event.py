@@ -7,6 +7,7 @@ from typing import Tuple, Optional
 import numpy as np
 
 # Imports: first party
+from ml4c3.validators import validator_no_nans
 from ml4c3.tensormap.TensorMap import Axis, TensorMap
 from ml4c3.tensormap.icu_signals import get_tmap as get_signal_tmap
 from ml4c3.tensormap.icu_ecg_features import get_tmap as get_ecg_tmap
@@ -264,4 +265,5 @@ def get_tmap(tmap_name: str) -> Optional[TensorMap]:
         channel_map=signal_tm.channel_map,
         path_prefix=signal_tm.path_prefix,
         interpretation=signal_tm.interpretation,
+        validators=validator_no_nans,
     )

@@ -324,6 +324,12 @@ def parse_args() -> argparse.Namespace:
         help="Save model coefficients to CSV file",
     )
     model_parser.add_argument(
+        "--top_features_to_plot",
+        default=None,
+        type=int,
+        help="Number of features to plot in features coefficients plot.",
+    )
+    model_parser.add_argument(
         "--conv_layers",
         nargs="*",
         default=[32],

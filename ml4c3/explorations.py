@@ -1,3 +1,4 @@
+# pylint: disable=wrong-import-order, wrong-import-position, too-many-nested-blocks
 # Imports: standard library
 import os
 import csv
@@ -6,7 +7,7 @@ import logging
 import argparse
 import datetime
 import multiprocessing as mp
-from typing import List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional
 from functools import reduce
 from collections import OrderedDict, defaultdict
 
@@ -39,7 +40,7 @@ def explore(
     args: argparse.Namespace,
     disable_saving_output: bool = False,
 ) -> pd.DataFrame:
-    cohort_counts = OrderedDict()
+    cohort_counts: Dict[str, Any] = OrderedDict()
 
     src_path = args.tensors
     src_name = args.source_name
@@ -77,7 +78,7 @@ def explore(
     for tmap_name in tmap_names_to_get:
         tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
     tmaps = args.tensor_maps_in + [tmaps[tmap_name] for tmap_name in tmap_names_to_get]
-    required_tmaps = []
+    required_tmaps: List[TensorMap] = []
     for tmap in tmaps:
         if _tmap_requires_modification_for_explore(tmap=tmap):
             tmap = _modify_tmap_to_return_mean(tmap=tmap)
@@ -156,10 +157,10 @@ def explore(
 
         # If path to reference tensors is dir, parse HD5 files
         if os.path.isdir(args.reference_tensors):
-            ref_tmaps = {}
+            ref_tmaps_dict: Dict[str, TensorMap] = {}
             for tm_name in ref_cols:
-                ref_tmaps = update_tmaps(tm_name, ref_tmaps)
-            ref_tmaps = [ref_tmaps[tm_name] for tm_name in ref_cols]
+                ref_tmaps_dict = update_tmaps(tm_name, ref_tmaps_dict)
+            ref_tmaps = [ref_tmaps_dict[tm_name] for tm_name in ref_cols]
             df_ref = _tensors_to_df(
                 tensor_maps_in=ref_tmaps,
                 tensors=args.reference_tensors,
@@ -368,7 +369,8 @@ def explore(
                 src_cols=src_cols,
             )
             logging.info(
-                f"Cross-referenced so unique event occurs exactly {number_per_window} times in any window",
+                "Cross-referenced so unique event occurs exactly "
+                f"{number_per_window} times in any window",
             )
             title = f"{number_per_window} in any window"
 
@@ -518,11 +520,12 @@ def explore(
                     )
                     df_stats.round(3).to_csv(fpath)
                     logging.info(
-                        f"{window} / {union_or_intersect} / {interpretation} tmaps: saved summary stats to {fpath}",
+                        f"{window} / {union_or_intersect} / {interpretation} tmaps: "
+                        f"saved summary stats to {fpath}",
                     )
 
     # Save tensors, including column with window name
-    fpath = os.path.join(args.output_folder, args.id, f"tensors_union.csv")
+    fpath = os.path.join(args.output_folder, args.id, "tensors_union.csv")
 
     # Time-windowed
     if use_time:
@@ -599,7 +602,6 @@ def _plot_histogram_continuous_tensor(
     fig = plt.figure(figsize=(plot_width, plot_height))
     ax = plt.gca()
     plt.title(f"{tmap_name}: n={len(df)}")
-    legend_labels = []
 
     # Iterate through unique values of stratify label
     if stratify_label is not None:
@@ -608,22 +610,24 @@ def _plot_histogram_continuous_tensor(
             legend_str = f"{stratify_label}={stratify_label_value} (n={n})"
             data = df[df[stratify_label] == stratify_label_value][tmap_name]
             kde = not np.isclose(data.var(), 0)
-            sns.distplot(
-                a=data,
-                label=legend_str,
-                kde=kde,
-            )
+            if kde:
+                sns.kdeplot(data, label=legend_str)
+                sns.histplot(data, label=legend_str, stat="density")
+            else:
+                sns.displot(data, label=legend_str)
             plt.xlabel("Value")
-            plt.ylabel("Probability")
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
         ax.legend(frameon=False, loc="center left", bbox_to_anchor=(1, 0.5))
     else:
         data = df[tmap_name].to_numpy()
         kde = not np.isclose(data.var(), 0)
-        sns.distplot(data, kde=kde)
+        if kde:
+            sns.kdeplot(data)
+            sns.histplot(data, stat="density")
+        else:
+            sns.displot(data, kde=kde)
         plt.xlabel("Value")
-        plt.ylabel("Probability")
     fpath = os.path.join(
         output_folder,
         output_id,
@@ -651,8 +655,8 @@ def _calculate_summary_stats(df: pd.DataFrame, key: str, interpretation) -> dict
         stats["missing_fraction"] = stats["missing"] / stats["total"]
     elif interpretation is Interpretation.CATEGORICAL:
         num_key = np.count_nonzero(df[key] == 1)
-        stats[f"count"] = num_key
-        stats[f"fraction"] = num_key / len(df[key])
+        stats["count"] = num_key
+        stats["fraction"] = num_key / len(df[key])
         stats["total"] = len(df[key])
     elif interpretation is Interpretation.LANGUAGE:
         stats["count"] = df[key].count()
@@ -777,7 +781,10 @@ def _aggregate_time_windows(
     windows: list,
     src_cols: list,
 ) -> pd.DataFrame:
-    """Aggregate list of dataframes (one per time window) back into one dataframe with column indicating the time window index"""
+    """
+    Aggregate list of dataframes (one per time window) back into one dataframe with
+    column indicating the time window index
+    """
     # Add time window column and value to each df in list
     for df, window in zip(dfs, windows):
         if "time_window" not in df:
@@ -974,7 +981,8 @@ class TensorsToDataFrameParallelWrapper:
                         OSError,
                         RuntimeError,
                     ) as e:
-                        # Most likely error came from tensor_from_file and dict_of_tensor_dicts is empty
+                        # Most likely error came from tensor_from_file and
+                        # dict_of_tensor_dicts is empty
                         if tm.channel_map:
                             for cm in tm.channel_map:
                                 dict_of_tensor_dicts[0][f"{tm.name}_{cm}"] = np.nan
@@ -1055,10 +1063,11 @@ def _tensors_to_df(
         test_csv=test_csv,
         allow_empty_split=True,
     )
+
     train_paths = [os.path.join(tensors, f"{sample_id}.hd5") for sample_id in train_ids]
     valid_paths = [os.path.join(tensors, f"{sample_id}.hd5") for sample_id in valid_ids]
     test_paths = [os.path.join(tensors, f"{sample_id}.hd5") for sample_id in test_ids]
-    paths = []
+    paths: List[Tuple[str, str]] = []
     paths.extend(zip(train_paths, ["train"] * len(train_paths)))
     paths.extend(zip(valid_paths, ["valid"] * len(valid_paths)))
     paths.extend(zip(test_paths, ["test"] * len(test_paths)))
@@ -1076,20 +1085,20 @@ def _tensors_to_df(
     ).run()
 
     # Get columns that should have dtype 'string' instead of dtype 'O'
-    str_cols = []
+    str_cols_list: List[str] = []
     if export_fpath:
-        str_cols.extend("fpath")
+        str_cols_list.extend("fpath")
     if export_generator:
-        str_cols.extend("generator")
+        str_cols_list.extend("generator")
     for tm in tmaps:
         if tm.interpretation == Interpretation.LANGUAGE:
-            str_cols.extend(
+            str_cols_list.extend(
                 [f"{tm.name}_{cm}" for cm in tm.channel_map]
                 if tm.channel_map
                 else [tm.name],
             )
-        str_cols.append(f"error_type_{tm.name}")
-    str_cols = {key: "string" for key in str_cols}
+        str_cols_list.append(f"error_type_{tm.name}")
+    str_cols = {key: "string" for key in str_cols_list}
 
     # Consolidate temporary CSV files into one dataframe
     base = os.path.join(output_folder, run_id)

@@ -170,6 +170,7 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         data_split="test",
         image_ext=args.image_ext,
         save_coefficients=args.save_coefficients,
+        top_features_to_plot=args.top_features_to_plot,
     )
 
     for cleanup in cleanups:
@@ -334,6 +335,7 @@ def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
         data_split="test",
         image_ext=args.image_ext,
         save_coefficients=True,
+        top_features_to_plot=args.top_features_to_plot,
     )
     for cleanup in cleanups:
         cleanup()

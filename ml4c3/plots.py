@@ -1,3 +1,4 @@
+# pylint: disable=wrong-import-order, wrong-import-position
 # Imports: standard library
 import os
 import re
@@ -126,14 +127,15 @@ def evaluate_predictions(
     title: str,
     image_ext: str,
     folder: str,
-    test_paths: List[str] = None,
+    test_paths: Optional[List[str]] = None,
     max_melt: int = 30000,
     rocs: List[Tuple[np.ndarray, np.ndarray, Dict[str, int]]] = [],
     scatters: List[Tuple[np.ndarray, np.ndarray, str, List[str]]] = [],
     data_split: str = "test",
 ) -> Dict[str, float]:
-    """Evaluate predictions for a given TensorMap with truth data and plot the appropriate metrics.
-    Accumulates data in the rocs and scatters lists to facilitate subplotting.
+    """Evaluate predictions for a given TensorMap with truth data and plot the
+    appropriate metrics. Accumulates data in the rocs and scatters lists to
+    facilitate subplotting.
 
     :param tm: The TensorMap predictions to evaluate
     :param y_predictions: The predictions
@@ -142,11 +144,15 @@ def evaluate_predictions(
     :param image_ext: File type to save images as
     :param folder: The folder to save the plots at
     :param test_paths: The tensor paths that were predicted
-    :param max_melt: For multi-dimensional prediction the maximum number of prediction to allow in the flattened array
-    :param rocs: (output) List of Tuples which are inputs for ROC curve plotting to allow subplotting downstream
-    :param scatters: (output) List of Tuples which are inputs for scatter plots to allow subplotting downstream
+    :param max_melt: For multi-dimensional prediction the maximum number of
+                     prediction to allow in the flattened array
+    :param rocs: (output) List of Tuples which are inputs for ROC curve plotting to
+                 allow subplotting downstream
+    :param scatters: (output) List of Tuples which are inputs for scatter plots to
+                     allow subplotting downstream
     :param data_split: The data split being evaluated (train, valid, or test)
-    :return: Dictionary of performance metrics with string keys for labels and float values
+    :return: Dictionary of performance metrics with string keys for labels and float
+             values
     """
     performance_metrics = {}
     if tm.is_categorical and tm.axes == 1:
@@ -392,7 +398,7 @@ def plot_metric_history(
     )  # divide by 2 because we plot validation and train histories together
     cols = max(2, int(math.ceil(math.sqrt(total_plots))))
     rows = max(2, int(math.ceil(total_plots / cols)))
-    f, axes = plt.subplots(
+    _, axes = plt.subplots(
         rows,
         cols,
         figsize=(int(cols * SUBPLOT_SIZE), int(rows * SUBPLOT_SIZE)),
@@ -402,7 +408,7 @@ def plot_metric_history(
             if isinstance(history.history[k][0], LearningRateSchedule):
                 if training_steps is None:
                     raise NotImplementedError(
-                        f"cannot plot learning rate schedule without training_steps",
+                        "cannot plot learning rate schedule without training_steps",
                     )
                 history.history[k] = [
                     history.history[k][0](i * training_steps)
@@ -455,9 +461,12 @@ def plot_prediction_calibration(
 ):
     """Plot calibration performance and compute Brier Score.
 
-    :param prediction: Array of probabilistic predictions with shape (num_samples, num_classes)
-    :param truth: The true classifications of each class, one hot encoded of shape (num_samples, num_classes)
-    :param labels: Dictionary mapping strings describing each class to their corresponding index in the arrays
+    :param prediction: Array of probabilistic predictions with shape
+                       (num_samples, num_classes)
+    :param truth: The true classifications of each class, one hot encoded of shape
+                  (num_samples, num_classes)
+    :param labels: Dictionary mapping strings describing each class to their
+                   corresponding index in the arrays
     :param title: The name of this plot
     :param prefix: Optional path prefix where the plot will be saved
     :param n_bins: Number of bins to quantize predictions into
@@ -555,8 +564,7 @@ def plot_confusion_matrix(
     data_split: str,
 ):
     plt.rcParams["font.size"] = 14
-    lw = 2
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(SUBPLOT_SIZE, 2 * SUBPLOT_SIZE))
+    _, (ax1, ax2) = plt.subplots(2, 1, figsize=(SUBPLOT_SIZE, 2 * SUBPLOT_SIZE))
     idx_to_label = {idx: label for label, idx in labels.items()}
     labels = list(labels.keys())
 
@@ -569,7 +577,7 @@ def plot_confusion_matrix(
     cms = []
     for matrix_title, normalize, ax in [
         (f"{title} confusion matrix, n = {len(class_truth)}", None, ax1),
-        (f"normalized to true classes", "true", ax2),
+        ("normalized to true classes", "true", ax2),
     ]:
         cm = confusion_matrix(
             y_true=class_truth,
@@ -599,9 +607,7 @@ def plot_confusion_matrix(
     plt.tight_layout()
     plt.savefig(figure_path, bbox_inches="tight")
     plt.clf()
-    logging.info(
-        "{data_split} split: saved confusion matrix at: {}".format(figure_path),
-    )
+    logging.info(f"{data_split} split: saved confusion matrix at: {figure_path}")
     return cms
 
 
@@ -617,7 +623,7 @@ def plot_scatter(
     alpha=0.5,
 ):
     margin = float((np.max(truth) - np.min(truth)) / 100)
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(SUBPLOT_SIZE, 2 * SUBPLOT_SIZE))
+    _, (ax1, ax2) = plt.subplots(2, 1, figsize=(SUBPLOT_SIZE, 2 * SUBPLOT_SIZE))
     ax1.plot(
         [np.min(truth), np.max(truth)],
         [np.min(truth), np.max(truth)],
@@ -670,21 +676,23 @@ def plot_scatter(
     ax1.set_title(title + "\n")
     ax1.legend(loc="lower right")
 
-    sns.distplot(prediction, label="Predicted", color="r", ax=ax2)
-    sns.distplot(truth, label="Truth", color="b", ax=ax2)
+    sns.kdeplot(prediction, label="Predicted", color="r", ax=ax2)
+    sns.histplot(prediction, label="Predicted", color="r", ax=ax2, stat="density")
+    sns.kdeplot(truth, label="Truth", color="b", ax=ax2)
+    sns.histplot(truth, label="Truth", color="b", ax=ax2, stat="density")
     ax2.legend(loc="upper left")
 
     figure_path = os.path.join(prefix, f"scatter_{title}_{data_split}{image_ext}")
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
-    logging.info("Try to save scatter plot at: {}".format(figure_path))
+    logging.info(f"Try to save scatter plot at: {figure_path}")
     plt.savefig(figure_path)
     plt.clf()
     return {title + "_pearson": pearson}
 
 
 def subplot_scatters(
-    scatters: List[Tuple[np.ndarray, np.ndarray, str, Optional[List[str]]]],
+    scatters: List[Tuple[np.ndarray, np.ndarray, str, List[str]]],
     data_split: str,
     image_ext: str,
     plot_path: str = "./figures/",
@@ -696,7 +704,7 @@ def subplot_scatters(
     total_plots = len(scatters)
     cols = max(2, int(math.ceil(math.sqrt(total_plots))))
     rows = max(2, int(math.ceil(total_plots / cols)))
-    fig, axes = plt.subplots(
+    _, axes = plt.subplots(
         rows,
         cols,
         figsize=(cols * SUBPLOT_SIZE, rows * SUBPLOT_SIZE),
@@ -789,14 +797,14 @@ def _plot_ecg_text(
 
     fig.text(0.17 / w, 7.77 / h, f"{dob} ({age} yr)", weight="bold")
     fig.text(0.17 / w, 7.63 / h, f"{sex[1]}".title(), weight="bold")
-    fig.text(0.17 / w, 7.35 / h, f"Room: ", weight="bold")
+    fig.text(0.17 / w, 7.35 / h, "Room: ", weight="bold")
     fig.text(0.17 / w, 7.21 / h, f"Loc: {data['location']}", weight="bold")
 
-    fig.text(2.15 / w, 7.77 / h, f"Vent. rate", weight="bold")
-    fig.text(2.15 / w, 7.63 / h, f"PR interval", weight="bold")
-    fig.text(2.15 / w, 7.49 / h, f"QRS duration", weight="bold")
-    fig.text(2.15 / w, 7.35 / h, f"QT/QTc", weight="bold")
-    fig.text(2.15 / w, 7.21 / h, f"P-R-T axes", weight="bold")
+    fig.text(2.15 / w, 7.77 / h, "Vent. rate", weight="bold")
+    fig.text(2.15 / w, 7.63 / h, "PR interval", weight="bold")
+    fig.text(2.15 / w, 7.49 / h, "QRS duration", weight="bold")
+    fig.text(2.15 / w, 7.35 / h, "QT/QTc", weight="bold")
+    fig.text(2.15 / w, 7.21 / h, "P-R-T axes", weight="bold")
 
     fig.text(3.91 / w, 7.77 / h, f"{int(data['rate_md'])}", weight="bold", ha="right")
     fig.text(3.91 / w, 7.63 / h, f"{int(data['pr_md'])}", weight="bold", ha="right")
@@ -816,10 +824,10 @@ def _plot_ecg_text(
         ha="right",
     )
 
-    fig.text(4.30 / w, 7.77 / h, f"BPM", weight="bold", ha="right")
-    fig.text(4.30 / w, 7.63 / h, f"ms", weight="bold", ha="right")
-    fig.text(4.30 / w, 7.49 / h, f"ms", weight="bold", ha="right")
-    fig.text(4.30 / w, 7.35 / h, f"ms", weight="bold", ha="right")
+    fig.text(4.30 / w, 7.77 / h, "BPM", weight="bold", ha="right")
+    fig.text(4.30 / w, 7.63 / h, "ms", weight="bold", ha="right")
+    fig.text(4.30 / w, 7.49 / h, "ms", weight="bold", ha="right")
+    fig.text(4.30 / w, 7.35 / h, "ms", weight="bold", ha="right")
     fig.text(4.30 / w, 7.21 / h, f"{int(data['taxis_md'])}", weight="bold", ha="right")
 
     fig.text(4.75 / w, 7.21 / h, f"{data['read_md']}", wrap=True, weight="bold")
@@ -908,7 +916,7 @@ def _plot_ecg_clinical(voltage: Dict[str, np.ndarray], ax: plt.Axes) -> None:
     text_yoffset = -0.1
 
     # plot signal and add labels
-    for i in range(len(voltage)):
+    for i, _ in enumerate(voltage):
         this_offset = (len(voltage) - i - 0.5) * y_offset
         ax.plot(voltage[i] + this_offset, color="black", linewidth=0.375)
         if i == 0:
@@ -1167,9 +1175,9 @@ def plot_ecg(args):
         if os.path.splitext(tp)[-1].lower() == TENSOR_EXT
     ]
 
-    if "clinical" == args.plot_mode:
+    if args.plot_mode == "clinical":
         plot_signal_function = _plot_ecg_clinical
-    elif "full" == args.plot_mode:
+    elif args.plot_mode == "full":
         plot_signal_function = _plot_ecg_full
     else:
         raise ValueError(f"Unsupported plot mode: {args.plot_mode}")
@@ -1207,7 +1215,7 @@ def plot_ecg(args):
                         ValueError,
                         OSError,
                         RuntimeError,
-                    ) as e:
+                    ):
                         logging.warning(
                             f"Could not obtain {tm.name}. Skipping plotting for all"
                             f" ECGs at {tp}",
@@ -1324,14 +1332,17 @@ def subplot_rocs(
     image_ext: str,
     plot_path: str = "./figures/",
 ):
-    """Log and tabulate AUCs given as nested dictionaries in the format '{model: {label: auc}}'"""
+    """
+    Log and tabulate AUCs given as nested dictionaries in the format
+    '{model: {label: auc}}'
+    """
     lw = 2
     row = 0
     col = 0
     total_plots = len(rocs)
     cols = max(2, int(math.ceil(math.sqrt(total_plots))))
     rows = max(2, int(math.ceil(total_plots / cols)))
-    fig, axes = plt.subplots(
+    _, axes = plt.subplots(
         rows,
         cols,
         figsize=(cols * SUBPLOT_SIZE, rows * SUBPLOT_SIZE),
@@ -1439,7 +1450,10 @@ def plot_precision_recall_per_class(
 
 
 def _hash_string_to_color(string):
-    """Hash a string to color (using hashlib and not the built-in hash for consistency between runs)"""
+    """
+    Hash a string to color (using hashlib and not the built-in hash for consistency
+    between runs)
+    """
     return COLOR_ARRAY[
         int(hashlib.sha1(string.encode("utf-8")).hexdigest(), 16) % len(COLOR_ARRAY)
     ]
@@ -1530,4 +1544,67 @@ def plot_architecture_diagram(dot: pydot.Dot, image_path: str):
             format=os.path.splitext(image_path)[-1][1:],
         )
 
-    logging.info("Saved architecture diagram to:{}".format(image_path))
+    logging.info(f"Saved architecture diagram to: {image_path}")
+
+
+def plot_feature_coefficients(
+    plot_path: str,
+    model_name: str,
+    feature_values: pd.DataFrame,
+    top_features_to_plot: int,
+    image_ext: str,
+):
+    sns.set(style="white", palette="muted", color_codes=True)
+    sns.set_context("talk")
+
+    # Isolate subset of top features for plotting
+    if top_features_to_plot < len(feature_values):
+        feature_values = feature_values.reindex(
+            feature_values["coefficient"].abs().sort_values(ascending=False).index,
+        )
+        feature_values = feature_values.iloc[:top_features_to_plot]
+
+    feature_names = feature_values["feature"].to_list()
+    for k, feature_name in enumerate(feature_names):
+        if len(feature_name) > 51:
+            feature_names[k] = feature_name[:24] + "..." + feature_name[-24:]
+
+    # Calculate length of strings to enable dynamic resizing of figure
+    length_longest_feature_string = max([len(feature) for feature in feature_names])
+    fig_width = 8 + length_longest_feature_string / 10
+    fig_height = 2 + top_features_to_plot * 0.35
+
+    plt.figure(
+        num=None,
+        figsize=(fig_width, fig_height),
+        dpi=150,
+        facecolor="w",
+        edgecolor="k",
+    )
+
+    y_pos = np.arange(feature_values.shape[0])
+    plt.barh(y_pos, feature_values.iloc[:, 1], align="center", alpha=0.75)
+    plt.yticks(y_pos, feature_names)
+    plt.xlabel("Coefficient")
+    plt.title(f"Feature coefficient: {model_name}")
+
+    # Flip axis so highest feature_values are plotted on top of figure
+    axes = plt.gca()
+    axes.invert_yaxis()
+
+    # Remove ticks on y-axis
+    axes.tick_params(axis="both", which="both", length=0)
+
+    # Remove top, right, and left border
+    axes.spines["top"].set_visible(False)
+    axes.spines["right"].set_visible(False)
+    axes.spines["left"].set_visible(False)
+
+    # Auto-adjust layout and whitespace
+    plt.tight_layout()
+
+    fpath = os.path.join(plot_path, f"feature_coefficients_{model_name}{image_ext}")
+
+    plt.savefig(fpath, bbox_inches="tight", pad_inches=0.01)
+    plt.close()
+    logging.info(f"Saved {fpath}")
