@@ -452,12 +452,12 @@ def make_ecg_tensor(
         for i, ecg_date in enumerate(ecg_dates):
             path = make_hd5_path(tm, ecg_date, key)
             try:
-                data = data[path][()]
+                value = data[path][()]
                 if tm.interpretation == Interpretation.CATEGORICAL:
                     matched = False
-                    data = f"{channel_prefix}{data}"
+                    value = f"{channel_prefix}{value}"
                     for cm in tm.channel_map:
-                        if data.lower() == cm.lower():
+                        if value.lower() == cm.lower():
                             slices = (
                                 (i, tm.channel_map[cm])
                                 if dynamic
@@ -474,7 +474,7 @@ def make_ecg_tensor(
                         )
                         tensor[slices] = 1.0
                 else:
-                    tensor[i] = data
+                    tensor[i] = value
             except (KeyError, ValueError):
                 logging.debug(
                     f"Could not obtain tensor {tm.name} from ECG on {ecg_date} in"
