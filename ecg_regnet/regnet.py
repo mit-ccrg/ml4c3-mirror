@@ -196,10 +196,15 @@ class Stage(Layer):
 
     def build(self, input_shape):
         channels = input_shape[-1]
+        if channels < self.group_size:
+            print(
+                f"WARNING: group size {self.group_size} > channels {channels}. "
+                "Setting number of groups to 1.",
+            )
         self.blocks = [
             Block(
                 width=self.width,
-                groups=channels // self.group_size,
+                groups=max(channels // self.group_size, 1),
                 stride=2,
                 kernel_size=self.kernel_size,
                 activation=self.activation,
@@ -209,7 +214,7 @@ class Stage(Layer):
             self.blocks.append(
                 Block(
                     width=self.width,
-                    groups=channels // self.group_size,
+                    groups=max(channels // self.group_size, 1),
                     stride=1,
                     kernel_size=self.kernel_size,
                     activation=self.activation,

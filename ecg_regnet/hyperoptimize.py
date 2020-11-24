@@ -16,7 +16,6 @@ from tensorflow import config as tf_config
 from ray.tune.schedulers import HyperBandForBOHB
 from ray.tune.suggest.bohb import TuneBOHB
 from tensorflow.keras.layers import Input
-from tensorflow.keras.callbacks import TerminateOnNaN
 from tensorflow_addons.optimizers import SGDW
 from tensorflow.keras.experimental import CosineDecay
 from tensorflow.python.keras.utils.layer_utils import count_params
@@ -76,7 +75,38 @@ def _test_build_pretraining_model():
     dummy_out = {
         tm.output_name: np.zeros((10,) + tm.shape) for tm in get_pretraining_tasks()
     }
-    m.fit(dummy_in, dummy_out, batch_size=2)
+    history = m.fit(
+        dummy_in,
+        dummy_out,
+        batch_size=2,
+        validation_data=(dummy_in, dummy_out),
+    )
+    assert "val_loss" in history.history
+
+
+def _test_build_pretraining_model_bad_group_size():
+    m = build_pretraining_model(
+        epochs=10,
+        ecg_length=2250,
+        kernel_size=3,
+        group_size=32,
+        depth=13,
+        initial_width=28,
+        width_growth_rate=2.11,
+        width_quantization=2.6,
+    )
+    m.summary()
+    dummy_in = {m.input_name: np.zeros((10, 100, 12))}
+    dummy_out = {
+        tm.output_name: np.zeros((10,) + tm.shape) for tm in get_pretraining_tasks()
+    }
+    history = m.fit(
+        dummy_in,
+        dummy_out,
+        batch_size=2,
+        validation_data=(dummy_in, dummy_out),
+    )
+    assert "val_loss" in history.history
 
 
 class PretrainingTrainable(tune.Trainable):
@@ -121,9 +151,9 @@ class PretrainingTrainable(tune.Trainable):
             cleanup()
 
     def save_checkpoint(self, tmp_checkpoint_dir):
-        self.model.save_weights(
-            os.path.join(tmp_checkpoint_dir, "pretraining_model.h5"),
-        )
+        checkpoint_path = os.path.join(tmp_checkpoint_dir, "pretraining_model.h5")
+        self.model.save_weights(checkpoint_path)
+        return checkpoint_path
 
     def load_checkpoint(self, checkpoint):
         self.model.load_weights(checkpoint)
@@ -131,13 +161,16 @@ class PretrainingTrainable(tune.Trainable):
     def step(self):
         history = self.model.fit(
             x=self.train_dataset,
+            steps_per_epoch=100,
+            validation_steps=10,
             epochs=1,
-            initial_epoch=self.iteration,
             validation_data=self.valid_dataset,
-            callbacks=[TerminateOnNaN()],
         )
-        history_dict = {name: np.mean(val) for name, val in history.history}
+        history_dict = {name: np.mean(val) for name, val in history.history.items()}
+        if "val_loss" not in history_dict:
+            raise ValueError(f"No val loss in epoch {self.iteration}")
         history_dict["epoch"] = self.iteration
+        print(f"Completed epoch {self.iteration}")
         return history_dict
 
 
@@ -154,8 +187,11 @@ def run(
 ):
     cpus = 16  # TODO: should be an argument
     augmentation_params = {
-        f"{aug_name}_strength": tune.uniform(0, 1) for aug_name in augmentation_dict()
+        f"{aug_name}_strength": tune.uniform(0, 1)
+        for aug_name in augmentation_dict()
+        if "roll" not in aug_name
     }
+    augmentation_params["roll_strength"] = 1.0
     augmentation_params["num_augmentations"] = tune.randint(0, len(augmentation_dict()))
 
     model_params = {
@@ -211,8 +247,8 @@ def run(
         },
         local_dir=output_folder,
         config={**hyperparams, **training_config},
-        reuse_actors=True,  # speed up trials by reusing resources
     )
+    analysis.results_df.to_csv(os.path.join(output_folder, "results.tsv"), sep="\t")
 
 
 def parse_args():
@@ -235,13 +271,13 @@ def parse_args():
     parser.add_argument(
         "--epochs",
         type=int,
-        help="Number of training epochs.",
+        help="Number of training epochs of size 128 (batch size) * 100 (steps per epoch).",
         required=True,
     )
     parser.add_argument(
         "--num_trials",
         type=int,
-        help="Number of training epochs.",
+        help="Number of models to train.",
         required=True,
     )
     parser.add_argument(
