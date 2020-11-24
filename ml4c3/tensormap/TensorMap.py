@@ -30,6 +30,7 @@ Axis = Union[int, None]
 Dates = Union[List[str], pd.Series]
 
 DEFAULT_TIME_TO_EVENT_CHANNELS = {"event": 0, "follow_up_days": 1}
+ChannelMap = Dict[str, int]
 
 # pylint: disable=line-too-long, import-outside-toplevel, too-many-return-statements
 
@@ -600,44 +601,49 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
         return tmaps
 
     # Base tmaps: ECG
-    from ml4c3.tensormap.ecg import tmaps as tmaps_ecg  # isort:skip
+    from ml4c3.tensormap.ecg import tmaps as tmaps_ecg # isort:skip
     tmaps.update(tmaps_ecg)
     if tmap_name in tmaps:
         return tmaps
 
     # Base tmaps: STS
-    from ml4c3.tensormap.sts import tmaps as tmaps_sts  # isort:skip
+    from ml4c3.tensormap.sts import tmaps as tmaps_sts # isort:skip
     tmaps.update(tmaps_sts)
     if tmap_name in tmaps:
         return tmaps
 
+    # Base tmaps: Echo
+    from ml4c3.tensormap.echo import tmaps as tmaps_echo  # isort:skip
+    tmaps.update(tmaps_echo)
+    if tmap_name in tmaps:
+        return tmaps
+
     # Base tmaps: ECG labels
-    from ml4c3.tensormap.ecg_labels import tmaps as tmaps_ecg_labels  # isort:skip
+    from ml4c3.tensormap.ecg_labels import tmaps as tmaps_ecg_labels # isort:skip
     tmaps.update(tmaps_ecg_labels)
     if tmap_name in tmaps:
         return tmaps
 
     # Base tmaps: ECG voltage
-
-    from ml4c3.tensormap.ecg import update_tmaps_ecg_voltage  # isort:skip
+    from ml4c3.tensormap.ecg import update_tmaps_ecg_voltage # isort:skip
     tmaps = update_tmaps_ecg_voltage(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps
 
-    # Modify: weighted loss
-    from ml4c3.tensormap.updaters import update_tmaps_weighted_loss  # isort:skip
+    # Modify: Weighted loss
+    from ml4c3.tensormap.updaters import update_tmaps_weighted_loss # isort:skip
     tmaps = update_tmaps_weighted_loss(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps
 
-    # Modify: STS window (e.g. preop)
-    from ml4c3.tensormap.sts import update_tmaps_sts_window  # isort:skip
-    tmaps = update_tmaps_sts_window(tmap_name=tmap_name, tmaps=tmaps)
+    # Modify: Window (e.g. "pre_echo" or "pre_sts")
+    from ml4c3.tensormap.updaters import update_tmaps_window # isort:skip
+    tmaps = update_tmaps_window(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps
 
-    # Modify: time series
-    from ml4c3.tensormap.updaters import update_tmaps_time_series  # isort:skip
+    # Modify: Time series
+    from ml4c3.tensormap.updaters import update_tmaps_time_series # isort:skip
     tmaps = update_tmaps_time_series(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps

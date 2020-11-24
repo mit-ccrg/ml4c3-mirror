@@ -42,23 +42,19 @@ BATCH_INPUT_INDEX, BATCH_OUTPUT_INDEX, BATCH_IDS_INDEX = (
 
 
 def infer_mrn_column(df: pd.DataFrame, sample_csv: str) -> str:
-    # Find intersection between CSV columns and possible MRN column names
-    matches = set(df.columns.astype(str).str.lower()).intersection(MRN_COLUMNS)
-
-    # If no matches, assume the first column is MRN
-    if not matches:
-        mrn_column_name = df.columns[0]
-    else:
-        # Get first string from set of matches to use as column name
-        mrn_column_name = next(iter(matches))
-
-    if len(matches) > 1:
+    matches = []
+    for col in df.columns.astype(str):
+        if col.lower() in MRN_COLUMNS:
+            matches.append(col)
+    if len(matches) == 0:
+        return df.columns[0]
+    elif len(matches) > 1:
         logging.warning(
             f"{sample_csv} has more than one potential column for MRNs. "
             "Inferring most likely column name, but recommend verifying "
             "data columns or not using column inference.",
         )
-    return mrn_column_name
+    return matches[0]
 
 
 def _get_sample(
@@ -326,8 +322,14 @@ def make_dataset(
     if not isinstance(tensors, list):
         tensors = [tensors]
     output_types = (
-        {tm.input_name: tf.float32 for tm in input_maps},
-        {tm.output_name: tf.float32 for tm in output_maps},
+        {
+            tm.input_name: tf.string if tm.is_language else tf.float32
+            for tm in input_maps
+        },
+        {
+            tm.output_name: tf.string if tm.is_language else tf.float32
+            for tm in output_maps
+        },
     )
     output_shapes = (
         {tm.input_name: tm.shape for tm in input_maps},
@@ -449,8 +451,6 @@ def train_valid_test_datasets(
     :return: tuple of three tensorflow Datasets, three StatsWrapper objects, and
              three callbacks to cleanup worker processes
     """
-    if len(tensor_maps_in) == 0 or len(tensor_maps_out) == 0:
-        raise ValueError("input and output tensors must both be given")
     if not isinstance(tensors, list):
         tensors = [tensors]
 
@@ -871,7 +871,7 @@ def get_train_valid_test_ids(
     ):
         raise ValueError("validation and test samples overlap")
 
-    # Get list of all IDs from all sources
+    # Get list of intersect of all IDs from all sources
     for source in tensors:
         if isinstance(source, tuple):
             source = source[0]
@@ -888,7 +888,7 @@ def get_train_valid_test_ids(
                 sample_csv=source,
                 mrn_column_name=mrn_column_name,
             )
-            all_ids |= source_ids
+            all_ids &= source_ids
         else:
             raise ValueError(f"Cannot get IDs from source: {source}")
 

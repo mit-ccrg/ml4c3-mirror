@@ -78,7 +78,8 @@ def predict_and_evaluate(
     if (
         save_coefficients
         and isinstance(model, Model)
-        and not len(model.layers) == len(tensor_maps_in) + len(tensor_maps_out) + 1 # concat layer
+        and not len(model.layers)
+        == len(tensor_maps_in) + len(tensor_maps_out) + 1  # concat layer
     ):
         pass
     elif save_coefficients:

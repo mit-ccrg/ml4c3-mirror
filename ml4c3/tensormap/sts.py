@@ -1,7 +1,5 @@
 # Imports: standard library
-import copy
 import logging
-import datetime
 from typing import Dict, List, Union, Callable
 
 # Imports: third party
@@ -11,12 +9,11 @@ import pandas as pd
 # Imports: first party
 from ml4c3.normalizer import MinMax, RobustScaler
 from ml4c3.validators import validator_no_nans, validator_not_all_zero
-from ml4c3.definitions.ecg import ECG_PREFIX, ECG_DATETIME_FORMAT
 from ml4c3.definitions.sts import STS_PREFIX, STS_DATE_FORMAT, STS_SURGERY_DATE_COLUMN
-from ml4c3.definitions.types import ChannelMap
 from ml4c3.tensormap.TensorMap import (
     Dates,
     TensorMap,
+    ChannelMap,
     PatientData,
     Interpretation,
     is_dynamic_shape,
@@ -328,90 +325,3 @@ tmaps[tmap_name] = TensorMap(
     time_series_limit=0,
     time_series_filter=get_sts_surgery_dates,
 )
-
-
-def update_tmaps_sts_window(
-    tmap_name: str,
-    tmaps: Dict[str, TensorMap],
-) -> Dict[str, TensorMap]:
-    """Make new tmap from base name, making conditional on surgery date"""
-
-    windows = ["with_preop_ecg", "with_postop_ecg", "preop", "postop"]
-    for window in windows:
-        if window in tmap_name:
-            base_name, _ = tmap_name.split(f"_{window}")
-            if base_name not in tmaps:
-                raise ValueError(
-                    f"Base tmap {base_name} not in existing tmaps. "
-                    f"Cannot modify STS {window} window.",
-                )
-            base_tmap = tmaps[base_name]
-            new_tmap = copy.deepcopy(base_tmap)
-            new_tmap_name = f"{base_name}_{window}"
-
-            def offset_date(
-                sts_date: str,
-                offset: int,
-                date_format: str,
-            ) -> str:
-                return (
-                    datetime.datetime.strptime(sts_date, date_format)
-                    + datetime.timedelta(days=offset)
-                ).strftime(date_format)
-
-            def make_time_series_filter(
-                _tm: TensorMap,
-                _window: str,
-            ) -> Callable[[PatientData], Dates]:
-                def get_cross_referenced_dates(data: PatientData) -> Dates:
-                    _dates = _tm.time_series_filter(data)
-                    if "ecg" in _window:
-                        xref_dates = list(data[ECG_PREFIX])
-                        date_format = ECG_DATETIME_FORMAT
-                    else:
-                        xref_dates = data[STS_PREFIX][STS_SURGERY_DATE_COLUMN]
-                        date_format = STS_DATE_FORMAT
-
-                    dates = (
-                        pd.Series(dtype=str) if isinstance(_dates, pd.Series) else []
-                    )
-                    for xref_date in xref_dates:
-                        if _window == "preop" or _window == "with_postop_ecg":
-                            start_date = offset_date(
-                                xref_date,
-                                -30,
-                                date_format=date_format,
-                            )
-                            end_date = xref_date
-                        elif _window == "postop" or _window == "with_preop_ecg":
-                            start_date = xref_date
-                            end_date = offset_date(
-                                xref_date,
-                                30,
-                                date_format=date_format,
-                            )
-                        else:
-                            raise ValueError(f"Unknown STS window: {_window}")
-                        if isinstance(_dates, pd.Series):
-                            dates = dates.append(
-                                _dates[
-                                    _dates.between(
-                                        start_date,
-                                        end_date,
-                                        inclusive=False,
-                                    )
-                                ],
-                            )
-                        else:
-                            for d in _dates:
-                                if start_date < d < end_date:
-                                    dates.append(d)
-                    return dates
-
-                return get_cross_referenced_dates
-
-            new_tmap.name = new_tmap_name
-            new_tmap.time_series_filter = make_time_series_filter(base_tmap, window)
-            tmaps[new_tmap_name] = new_tmap
-            break
-    return tmaps

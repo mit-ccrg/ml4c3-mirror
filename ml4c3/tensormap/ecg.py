@@ -349,7 +349,7 @@ def make_ecg_label_from_read_tff(
     return tensor_from_file
 
 
-def ecg_datetime(tm, data):
+def get_ecg_datetime(tm, data):
     ecg_dates = tm.time_series_filter(data)
     dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
     tensor = np.full(shape, "", dtype=f"<U19")
@@ -363,7 +363,7 @@ tmaps[tmap_name] = TensorMap(
     name=tmap_name,
     interpretation=Interpretation.LANGUAGE,
     path_prefix=ECG_PREFIX,
-    tensor_from_file=ecg_datetime,
+    tensor_from_file=get_ecg_datetime,
     shape=(1,),
     time_series_limit=0,
     validators=validator_no_empty,

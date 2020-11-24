@@ -12,10 +12,10 @@ XML_EXT = ".xml"
 CSV_EXT = ".csv"
 
 MRN_COLUMNS = {
+    "mrn",
     "mgh_mrn",
     "sampleid",
     "medrecn",
-    "mrn",
     "patient_id",
     "patientid",
     "sample_id",

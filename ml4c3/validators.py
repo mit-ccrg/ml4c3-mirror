@@ -1,5 +1,6 @@
 # Imports: third party
 import numpy as np
+import pandas as pd
 
 # Imports: first party
 from ml4c3.definitions.ecg import ECG_ZERO_PADDING_THRESHOLD
@@ -25,7 +26,7 @@ def validator_no_empty(tm: TensorMap, tensor: np.ndarray, data: PatientData):
 
 
 def validator_no_nans(tm: TensorMap, tensor: np.ndarray, data: PatientData):
-    if np.isnan(tensor).any():
+    if pd.isnull(tensor).any():
         raise ValueError(
             f"TensorMap {tm.name} failed no nans check on sample {data.id}.",
         )

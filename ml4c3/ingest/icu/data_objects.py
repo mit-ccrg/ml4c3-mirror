@@ -345,7 +345,7 @@ class Medication(ICUDiscreteData):
         """
         Init a Medication object.
 
-        :param name: <str> Medicine name.
+        :param name: <str> Medication name.
         :param dose: <np.ndarray> Array of floats containing the dose
                     administered in each timestamp.
         :param units: <str> Unit associated to the dosage value.
@@ -429,3 +429,7 @@ class Procedure(ICUDiscreteData):
     @property
     def _source_type(self):
         return self.source.replace("EDW_", "")
+
+
+EDWType = (StaticData, Measurement, Procedure, Event, Medication)
+BedmasterType = (BedmasterSignal, BedmasterAlarm)

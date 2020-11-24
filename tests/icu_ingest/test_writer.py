@@ -7,9 +7,8 @@ import numpy as np
 import pytest
 
 # Imports: first party
-from ml4c3.definitions.types import EDWType, BedmasterType
 from ml4c3.ingest.icu.writers import Writer
-from ml4c3.ingest.icu.data_objects import ICUDataObject
+from ml4c3.ingest.icu.data_objects import EDWType, BedmasterType, ICUDataObject
 
 # pylint: disable=protected-access
 
