@@ -297,6 +297,7 @@ class EDWReader(Reader):
         # Find possible diagnosis at admission
         diag_info = admission_df["AdmitDiagnosisTXT"].dropna().drop_duplicates()
         if list(diag_info):
+            diag_info = diag_info.astype("str")
             admin_diag = diag_info.str.cat(sep="; ")
         else:
             admin_diag = "UNKNOWN"
@@ -1546,7 +1547,6 @@ class CrossReferencer:
         self.crossref = {}
         if not os.path.exists(self.xref_file):
             bedmaster_matcher = PatientBedmasterMatcher(
-                flag_lm4=False,
                 path_bedmaster=self.bedmaster_dir,
                 path_adt=self.adt_file,
             )

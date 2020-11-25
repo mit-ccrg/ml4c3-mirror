@@ -16,7 +16,7 @@ from ml4c3.arguments import parse_args
 
 
 def test_pre_tensorize_explorations(temp_dir):
-    logging.disable(logging.CRITICAL)
+    # logging.disable(logging.CRITICAL)
 
     for file in os.listdir(pytest.bedmaster_dir):
         if file.startswith("bedmaster_file-"):
