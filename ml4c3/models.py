@@ -151,7 +151,7 @@ def make_shallow_model(
         my_metrics[ot.output_name] = ot.metrics
         outputs.append(
             Dense(
-                units=len(ot.channel_map),
+                units=len(ot.channel_map) if ot.channel_map else 1,
                 activation=ot.activation,
                 name=ot.output_name,
                 kernel_regularizer=regularizer,

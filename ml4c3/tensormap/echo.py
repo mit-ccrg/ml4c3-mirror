@@ -9,7 +9,7 @@ import pandas as pd
 
 # Imports: first party
 from ml4c3.normalizer import MinMax, RobustScaler
-from ml4c3.validators import validator_no_nans, validator_not_all_zero
+from ml4c3.validators import RangeValidator, validator_no_nans, validator_not_all_zero
 from ml4c3.definitions.echo import ECHO_PREFIX, ECHO_MRN_COLUMN, ECHO_DATETIME_COLUMN
 from ml4c3.tensormap.TensorMap import (
     Dates,
@@ -25,10 +25,10 @@ tmaps: Dict[str, TensorMap] = {}
 
 # Define name and statistical properties of continuous properties to enable standardization. These values are calculated from the entire dataset.
 echo_measures_continuous: Dict[str, Dict[str, Union[int, float]]] = {
-    "av_area": {"median": 1, "iqr": 2, "min": 0, "max": 3},
+    "av_area": {"median": 1.39, "iqr": 1.03, "min": 0, "max": 8},
     "av_peak_gradient": {"median": 1, "iqr": 2, "min": 0, "max": 3},
-    "av_mean_gradient": {"median": 1, "iqr": 2, "min": 0, "max": 3},
-    "av_peak_velocity": {"median": 1, "iqr": 2, "min": 0, "max": 3},
+    "av_mean_gradient": {"median": 12, "iqr": 14, "min": 0, "max": 100},
+    "av_peak_velocity": {"median": 241.07, "iqr": 239, "min": 30, "max": 750},
 }
 
 
@@ -75,7 +75,10 @@ for tmap_name, tmap_key in continuous_tmap_names_and_keys.items():
             interpretation=Interpretation.CONTINUOUS,
             path_prefix=ECHO_PREFIX,
             tensor_from_file=_make_echo_tff_continuous(key=tmap_key),
-            validators=validator_no_nans,
+            validators=RangeValidator(
+                minimum=echo_measures_continuous[tmap_name]["min"],
+                maximum=echo_measures_continuous[tmap_name]["max"],
+            ),
             normalizers=normalizer,
             time_series_limit=0,
             time_series_filter=get_echo_dates,

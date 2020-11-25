@@ -472,6 +472,7 @@ def plot_prediction_calibration(
     :param n_bins: Number of bins to quantize predictions into
     :param data_split: The data split being plotted (train, valid, or test)
     """
+
     plt.rcParams["font.size"] = 14
     _, (ax1, ax3, ax2) = plt.subplots(3, figsize=(SUBPLOT_SIZE, 2 * SUBPLOT_SIZE))
 
@@ -622,6 +623,8 @@ def plot_scatter(
     top_k=3,
     alpha=0.5,
 ):
+    prediction = prediction.ravel()
+    truth = truth.ravel()
     margin = float((np.max(truth) - np.min(truth)) / 100)
     _, (ax1, ax2) = plt.subplots(2, 1, figsize=(SUBPLOT_SIZE, 2 * SUBPLOT_SIZE))
     ax1.plot(
@@ -654,7 +657,7 @@ def plot_scatter(
     )
     if paths is not None:
         diff = np.abs(prediction - truth)
-        arg_sorted = diff[:, 0].argsort()
+        arg_sorted = diff.argsort()
         # The path of the best prediction, ie the inlier
         _text_on_plot(
             ax1,
@@ -710,6 +713,8 @@ def subplot_scatters(
         figsize=(cols * SUBPLOT_SIZE, rows * SUBPLOT_SIZE),
     )
     for prediction, truth, title, paths in scatters:
+        prediction = prediction.ravel()
+        truth = truth.ravel()
         axes[row, col].plot(
             [np.min(truth), np.max(truth)],
             [np.min(truth), np.max(truth)],
@@ -724,7 +729,7 @@ def subplot_scatters(
         # If tensor paths are provided, plot file names of top_k outliers and #1 inlier
         if paths is not None:
             diff = np.abs(prediction - truth)
-            arg_sorted = diff[:, 0].argsort()
+            arg_sorted = diff.argsort()
             # The path of the best prediction, ie the inlier
             _text_on_plot(
                 axes[row, col],
