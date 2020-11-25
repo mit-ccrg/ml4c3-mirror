@@ -18,7 +18,12 @@ from skimage.filters import threshold_otsu
 
 # Imports: first party
 from ml4c3.plots import plot_metric_history
-from ml4c3.models import train_model_from_datasets, make_multimodal_multitask_model
+from ml4c3.models import (
+    make_shallow_model,
+    make_sklearn_model,
+    train_model_from_datasets,
+    make_multimodal_multitask_model,
+)
 from ml4c3.datasets import train_valid_test_datasets
 from ml4c3.evaluations import predict_and_evaluate
 from ml4c3.definitions.types import Arguments
@@ -39,7 +44,7 @@ def hyperoptimize(args: argparse.Namespace):
     """
     hyperopt is a Python library that performs Bayesian optimization over
     hyperparameters to minimize an objective function. Here, the objective function
-    is loss_from_multimodal_multitask. Hyperparameter combinations are randomly
+    is loss_from_model. Hyperparameter combinations are randomly
     chosen and non-unique choices are skipped before model compilation. The
     computation to skip repeated combinations is fast and inexpensive. However, each
     non-unique combination counts towards the maximum number of models to evaluate.
@@ -69,15 +74,13 @@ def hyperparameter_optimizer(
     space: Dict[str, hyperopt.pyll.base.Apply],
     param_lists: Arguments,
 ):
-    args.keep_paths = False
-    args.keep_paths_test = False
     histories = []
     aucs = []
     results_path = os.path.join(args.output_folder, args.id)
     i = 0
     seen_combinations = set()
 
-    def loss_from_multimodal_multitask(x: Arguments):
+    def loss_from_model(x: Arguments):
         model = None
         history = None
         auc = None
@@ -98,7 +101,37 @@ def hyperparameter_optimizer(
             seen_combinations.add(params)
 
             set_args_from_x(args, x)
-            model = make_multimodal_multitask_model(**args.__dict__)
+            if args.mode == "train":
+                model = make_multimodal_multitask_model(**args.__dict__)
+            elif args.mode == "train_keras_logreg":
+                model = make_shallow_model(**args.__dict__)
+            else:
+                hyperparameters = {}
+                if args.mode == "train_sklearn_logreg":
+                    if args.l1 == 0 and args.l2 == 0:
+                        args.c = 1e7
+                    else:
+                        args.c = 1 / (args.l1 + args.l2)
+                    hyperparameters["c"] = args.c
+                    hyperparameters["l1_ratio"] = args.c * args.l1
+                elif args.mode == "train_sklearn_svm":
+                    hyperparameters["c"] = args.c
+                elif args.mode == "train_sklearn_randomforest":
+                    hyperparameters["n_estimators"] = args.n_estimators
+                    hyperparameters["max_depth"] = args.max_depth
+                    hyperparameters["min_samples_split"] = args.min_samples_split
+                    hyperparameters["min_samples_leaf"] = args.min_samples_leaf
+                elif args.mode == "train_sklearn_xgboost":
+                    hyperparameters["n_estimators"] = args.n_estimators
+                    hyperparameters["max_depth"] = args.max_depth
+                else:
+                    raise ValueError("Uknown train mode: ", args.mode)
+                # SKLearn only works with one output tmap
+                assert len(args.tensor_maps_out) == 1
+                model = make_sklearn_model(
+                    model_type=args.sklearn_model_type,
+                    hyperparameters=hyperparameters,
+                )
 
             if model.count_params() > args.max_parameters:
                 logging.info(
@@ -113,7 +146,6 @@ def hyperparameter_optimizer(
                 tensors=args.tensors,
                 batch_size=args.batch_size,
                 num_workers=args.num_workers,
-                keep_paths_test=False,
                 sample_csv=args.sample_csv,
                 valid_ratio=args.valid_ratio,
                 test_ratio=args.test_ratio,
@@ -140,7 +172,7 @@ def hyperparameter_optimizer(
                 run_id=trial_id,
                 image_ext=args.image_ext,
                 return_history=True,
-                plot=False,
+                plot=args.make_training_plots,
             )
             history.history["parameter_count"] = [model.count_params()]
             histories.append(history.history)
@@ -217,7 +249,7 @@ def hyperparameter_optimizer(
 
     trials = hyperopt.Trials()
     fmin(
-        fn=loss_from_multimodal_multitask,
+        fn=loss_from_model,
         space=space,
         algo=tpe.suggest,
         max_evals=args.max_evals,

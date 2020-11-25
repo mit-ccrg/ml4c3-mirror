@@ -3,7 +3,7 @@ import os
 import argparse
 
 # Imports: first party
-from ml4c3.assess_icu_coverage import ICUCoverageAssesser
+from ml4c3.ingest.icu.assess_coverage import ICUCoverageAssesser
 
 # pylint: disable=redefined-outer-name
 
@@ -11,19 +11,19 @@ from ml4c3.assess_icu_coverage import ICUCoverageAssesser
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--cohort_csv",
+        "--sample_csv",
         type=str,
         default="/media/ml4c3/adt.csv",
         help="File with a list of MRNs and CSNs to check their existance.",
     )
     parser.add_argument(
-        "--input_dir",
+        "--path_edw",
         type=str,
         default="/media/ml4c3/edw/",
         help="Directory where the analysis is performed.",
     )
     parser.add_argument(
-        "--output_dir",
+        "--output_folder",
         type=str,
         default="./results",
         help="Directory where the results are saved.",
@@ -40,14 +40,14 @@ def parse_arguments():
 def run(args: argparse.Namespace):
     remaining_patients = ICUCoverageAssesser._compare(
         ICUCoverageAssesser,
-        args.cohort_csv,
-        args.input_dir,
+        args.sample_csv,
+        args.path_edw,
         args.remove,
     )
-    if not os.path.isdir(args.output_dir):
-        os.makedirs(args.output_dir)
+    if not os.path.isdir(args.output_folder):
+        os.makedirs(args.output_folder)
     remaining_patients.to_csv(
-        os.path.join(args.output_dir, "remaining_patients.csv"),
+        os.path.join(args.output_folder, "remaining_patients.csv"),
         index=False,
     )
 

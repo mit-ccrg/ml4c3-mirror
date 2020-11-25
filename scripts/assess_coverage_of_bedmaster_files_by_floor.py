@@ -1,5 +1,7 @@
 # Imports: standard library
 import os
+import time
+import argparse
 from typing import Any, Dict, List
 from datetime import datetime
 
@@ -8,9 +10,9 @@ import pandas as pd
 
 # Imports: first party
 from ml4c3.definitions.icu import MAPPING_DEPARTMENTS
-from ml4c3.ingest.icu.matchers.match_patient_bedmaster import PatientBedmasterMatcher
+from ml4c3.ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
 
-# pylint: disable=possibly-unused-variable, too-many-statements
+# pylint: disable=redefined-outer-name, possibly-unused-variable, too-many-statements
 
 
 class AssessBedmasterCoverage:
@@ -19,37 +21,36 @@ class AssessBedmasterCoverage:
     """
 
     @staticmethod
-    def department_coverage(
-        bedmaster_dir: str,
-        edw_dir: str,
-        adt_file: str,
-        des_dept: str,
-        output_dir: str = "./results",
+    def count_department_coverage(
+        path_bedmaster: str,
+        path_adt: str,
+        path_xref: str,
+        path_coverage_statistics: str,
+        desired_department: str,
     ):
         """
-        It checks how many MRN of the ADT table has at least one Bedmaster file
-        associated.
+        Counts MRNs in ADT table with 1+ associated Bedmaster file.
 
-        :param bedmaster_dir: <str> Directory with Bedmaster .mat files.
-        :param edw_dir: <str> Directory with the adt_file.
-        :param adt_file: <str> File containing the admission, transfer and
-                                 discharge from patients (.csv).
-        :param des_dept: <str> Desired department to assess coverage.
-        :param output_dir: <str> Directory where the output file will be saved.
+        :param path_bedmaster: <str> Directory with Bedmaster .mat files.
+        :param path_adt: <str> Path to ADT table.
+        :param path_xref: <str> Path to xref table.
+        :param path_coverage_statistics: <str> Path to save the resulting
+               coverage-$department.csv file.
+        :param desired_department: <str> Desired department to assess coverage.
         """
         # Match the bedmaster files in bedmaster_dir with adt_file
-        matcher = PatientBedmasterMatcher(
-            flag_lm4=False,
-            bedmaster_dir=bedmaster_dir,
-            edw_dir=edw_dir,
-            adt_file=adt_file,
-            des_depts=[des_dept],
-        )
-        matcher.match_files(
-            os.path.join(output_dir, f"match_{des_dept.replace(' ', '')}.csv"),
-            True,
-        )
-        bedmaster_df = pd.DataFrame(matcher.table_dic)
+        if os.path.exists(path_xref):
+            print("{path_xref} exists")
+        else:
+            print(f"{path_xref} does not exist; generating")
+            matcher = PatientBedmasterMatcher(
+                path_bedmaster=path_bedmaster,
+                path_adt=path_adt,
+                desired_departments=[desired_department],
+            )
+            matcher.match_files(path_xref, True)
+
+        bedmaster_df = pd.read_csv(path_xref)
 
         data: Dict[str, Dict[str, Any]] = {
             "mrn": {},
@@ -79,7 +80,7 @@ class AssessBedmasterCoverage:
         ).strftime("%Y-%m-%d %H:%M:%S")
 
         # Read adt and filter before first and after last Bedmaster files and in between
-        adt_df = pd.read_csv(os.path.join(edw_dir, adt_file))
+        adt_df = pd.read_csv(path_adt)
         # adt_df = adt_df[adt_df["DepartmentDSC"] == des_dept]
         adt_first = adt_df["TransferInDTS"].min()[:-8]
         adt_last = adt_df["TransferInDTS"].max()[:-8]
@@ -156,9 +157,13 @@ class AssessBedmasterCoverage:
         for key in ["bedmaster", "adt", "adt_filt", "adt_u"]:
             data["size"][key] = 0
             for path in data["bedmaster_file"][key]:
-                data["size"][key] += os.path.getsize(
-                    os.path.join(bedmaster_dir, f"{path}.mat"),
-                )
+                for department in MAPPING_DEPARTMENTS[desired_department]:
+                    try:
+                        data["size"][key] += os.path.getsize(
+                            os.path.join(path_bedmaster, department, f"{path}.mat"),
+                        )
+                    except FileNotFoundError:
+                        continue
             data["size"][key] = round(data["size"][key] / 1e6, 2)
             data["a_size"][key] = round(
                 data["size"][key] / len(data["bedmaster_file"][key]),
@@ -235,40 +240,88 @@ class AssessBedmasterCoverage:
             "Last",
             "Unique MRNs",
         ]
-        data_frame = pd.DataFrame.from_dict(results, orient="index", columns=columns)
-        new_index = pd.Index(rows, name=des_dept)
-        data_frame.index = new_index
+        df = pd.DataFrame.from_dict(results, orient="index", columns=columns)
+        new_index = pd.Index(rows, name=desired_department)
+        df.index = new_index
+        df.to_csv(path_coverage_statistics)
         order = [2, 12, 13, 5, 1, 14, 15, 8, 9, 3, 4, 6, 7, 10, 11]
-        data_frame.insert(1, "Order", order)
-        data_frame = data_frame.sort_values(by=["Order"])
-        data_frame = data_frame.drop(columns=["Order"])
-        output_path = os.path.join(output_dir, f"bedmaster_files_coverage_{adt_file}")
-        data_frame.to_csv(output_path)
+        df.insert(1, "Order", order)
+        df = df.sort_values(by=["Order"])
+        df = df.drop(columns=["Order"])
+        df.to_csv(path_coverage_statistics)
+        print(f"Saved {path_coverage_statistics}")
 
 
-dept = [
-    "MGH BLAKE 8 CARD SICU",
-    "MGH ELLISON 8 CARDSURG",
-    "MGH ELLISON 9 MED\\CCU",
-    "MGH ELLISON 10 STP DWN",
-    "MGH ELLISON11 CARD\\INT",
-]
-adt_dept = ["blake8", "ellison8", "ellison9", "ellison10", "ellison11"]
-
-for i, _ in enumerate(dept):
-    DEPT = MAPPING_DEPARTMENTS[dept[i]][0]
-    DES_DEPT = dept[i]
-    Bedmaster_DIR = f"/media/lm4-bedmaster/{DEPT}"
-    EDW_DIR = "./depts_adts"
-    ADT_TABLE = f"adt_{adt_dept[i]}.csv"
-
-    os.system(
-        f"python3 /home/$USER/repos/edw/icu/pipeline.py \
-        --cohort_query {adt_dept[i]} \
-        --destination {EDW_DIR} \
-        --compute_adt",
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--path_to_pipeline_script",
+        type=str,
+        default="/$HOME/edw/icu/pipeline.py",
+        help="Path to EDW pipeline script.",
     )
-    os.rename(os.path.join(EDW_DIR, "adt.csv"), os.path.join(EDW_DIR, ADT_TABLE))
+    parser.add_argument(
+        "--output_folder",
+        type=str,
+        default="./results",
+        help="Directory where the results are saved.",
+    )
+    parser.add_argument(
+        "--path_bedmaster",
+        type=str,
+        default="/media/lm4-bedmaster/",
+        help="Directory where the results are saved.",
+    )
+    return parser.parse_args()
 
-    assesser = AssessBedmasterCoverage()
-    assesser.department_coverage(Bedmaster_DIR, EDW_DIR, ADT_TABLE, DES_DEPT)
+
+def run(args: argparse.Namespace):
+    print("\n")
+
+    departments = {
+        "blake8": "MGH BLAKE 8 CARD SICU",
+        "ellison8": "MGH ELLISON 8 CARDSURG",
+        "ellison9": "MGH ELLISON 9 MED\\CCU",
+        "ellison10": "MGH ELLISON 10 STP DWN",
+        "ellison11": "MGH ELLISON11 CARD\\INT",
+    }
+
+    for department in departments:
+        path_adt = os.path.join(args.output_folder, f"adt-{department}.csv")
+        path_xref = os.path.join(args.output_folder, f"xref-{department}.csv")
+
+        # If ADT and xref .csv files exist, use them
+        if os.path.exists(path_adt):
+            print(f"{path_adt} exists")
+
+        # If these files do not exist, create them by pulling from EDW
+        else:
+            print(f"{path_adt} does not exist; pulling from EDW")
+            os.system(
+                f"python {args.path_to_pipeline_script} obtain_cohort \
+                --department {department} \
+                --output_folder {args.output_folder}",
+            )
+
+        edw_department_name = departments[department]
+        path_coverage_statistics = os.path.join(
+            args.output_folder,
+            f"coverage-{department}.csv",
+        )
+
+        start_time = time.time()
+        assessor = AssessBedmasterCoverage()
+        assessor.count_department_coverage(
+            path_bedmaster=args.path_bedmaster,
+            path_adt=path_adt,
+            path_xref=path_xref,
+            path_coverage_statistics=path_coverage_statistics,
+            desired_department=edw_department_name,
+        )
+        elapsed_time = time.time() - start_time
+        print(f"Assessing coverage of {department} took {elapsed_time:0f} sec")
+
+
+if __name__ == "__main__":
+    args = parse_arguments()
+    run(args)

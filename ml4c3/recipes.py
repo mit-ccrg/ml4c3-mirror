@@ -44,10 +44,15 @@ from ml4c3.ingest.icu.pre_tensorize_explorations import pre_tensorize_explore
 def run(args: argparse.Namespace):
     start_time = timer()  # Keep track of elapsed execution time
     try:
-        if args.mode == "train":
-            train_multimodal_multitask(args)
-        elif args.mode == "train_shallow":
-            train_shallow_model(args)
+        if args.mode in [
+            "train",
+            "train_keras_logreg",
+            "train_sklearn_logreg",
+            "train_sklearn_randomforest",
+            "train_sklearn_svm",
+            "train_sklearn_xbost",
+        ]:
+            train_model(args)
         elif args.mode == "train_simclr":
             train_simclr_model(args)
         elif args.mode == "infer":
@@ -110,7 +115,11 @@ def build_multimodal_multitask(args: argparse.Namespace) -> Model:
     return model
 
 
-def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
+def train_model(args: argparse.Namespace) -> Dict[str, float]:
+    if args.mode != "train":
+        args.mixup_alpha = 0
+
+    # Create datasets
     datasets, stats, cleanups = train_valid_test_datasets(
         tensor_maps_in=args.tensor_maps_in,
         tensor_maps_out=args.tensor_maps_out,
@@ -130,8 +139,49 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         mixup_alpha=args.mixup_alpha,
     )
     train_dataset, valid_dataset, test_dataset = datasets
-    model = make_multimodal_multitask_model(**args.__dict__)
 
+    if args.mode == "train":
+        model = make_multimodal_multitask_model(**args.__dict__)
+    elif args.mode == "train_keras_logreg":
+        model = make_shallow_model(
+            tensor_maps_in=args.tensor_maps_in,
+            tensor_maps_out=args.tensor_maps_out,
+            optimizer=args.optimizer,
+            learning_rate=args.learning_rate,
+            learning_rate_schedule=args.learning_rate_schedule,
+            model_file=args.model_file,
+            donor_layers=args.donor_layers,
+            l1=args.l1,
+            l2=args.l2,
+        )
+    else:
+        hyperparameters = {}
+        if args.mode == "train_sklearn_logreg":
+            if args.l1 == 0 and args.l2 == 0:
+                args.c = 1e7
+            else:
+                args.c = 1 / (args.l1 + args.l2)
+            hyperparameters["c"] = args.c
+            hyperparameters["l1_ratio"] = args.c * args.l1
+        elif args.mode == "train_sklearn_svm":
+            hyperparameters["c"] = args.c
+        elif args.mode == "train_sklearn_randomforest":
+            hyperparameters["n_estimators"] = args.n_estimators
+            hyperparameters["max_depth"] = args.max_depth
+            hyperparameters["min_samples_split"] = args.min_samples_split
+            hyperparameters["min_samples_leaf"] = args.min_samples_leaf
+        elif args.mode == "train_sklearn_xgboost":
+            hyperparameters["n_estimators"] = args.n_estimators
+            hyperparameters["max_depth"] = args.max_depth
+        else:
+            raise ValueError("Uknown train mode: ", args.mode)
+        assert len(args.tensor_maps_out) == 1
+        model = make_sklearn_model(
+            model_type=args.sklearn_model_type,
+            hyperparameters=hyperparameters,
+        )
+
+    # Train model using datasets
     model, history = train_model_from_datasets(
         model=model,
         tensor_maps_in=args.tensor_maps_in,
@@ -149,14 +199,15 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         plot=True,
     )
 
-    out_path = os.path.join(args.output_folder, args.id + "/")
+    # Evaluate trained model
+    plot_path = os.path.join(args.output_folder, args.id + "/")
     if args.mixup_alpha == 0:
         predict_and_evaluate(
             model=model,
             data=train_dataset,
             tensor_maps_in=args.tensor_maps_in,
             tensor_maps_out=args.tensor_maps_out,
-            plot_path=out_path,
+            plot_path=plot_path,
             data_split="train",
             image_ext=args.image_ext,
         )
@@ -166,7 +217,7 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         data=test_dataset,
         tensor_maps_in=args.tensor_maps_in,
         tensor_maps_out=args.tensor_maps_out,
-        plot_path=out_path,
+        plot_path=plot_path,
         data_split="test",
         image_ext=args.image_ext,
         save_coefficients=args.save_coefficients,
@@ -176,7 +227,8 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
     for cleanup in cleanups:
         cleanup()
 
-    logging.info(f"Model trained for {len(history.history['loss'])} epochs")
+    if args.mode == "train":
+        logging.info(f"Model trained for {len(history.history['loss'])} epochs")
     logging.info(
         get_verbose_stats_string(
             split_stats={
@@ -192,6 +244,7 @@ def train_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
 
 
 def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
+    # Create datasets
     datasets, _, cleanups = train_valid_test_datasets(
         tensor_maps_in=args.tensor_maps_in,
         tensor_maps_out=args.tensor_maps_out,
@@ -227,116 +280,6 @@ def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         image_ext=args.image_ext,
     )
 
-    for cleanup in cleanups:
-        cleanup()
-    return performance_metrics
-
-
-def train_shallow_model(args: argparse.Namespace) -> Dict[str, float]:
-    """
-    Train shallow model (e.g. linear or logistic regression) and return
-    performance metrics.
-    """
-
-    # Create datasets
-    datasets, _, cleanups = train_valid_test_datasets(
-        tensor_maps_in=args.tensor_maps_in,
-        tensor_maps_out=args.tensor_maps_out,
-        tensors=args.tensors,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        sample_csv=args.sample_csv,
-        valid_ratio=args.valid_ratio,
-        test_ratio=args.test_ratio,
-        train_csv=args.train_csv,
-        valid_csv=args.valid_csv,
-        test_csv=args.test_csv,
-        output_folder=args.output_folder,
-        run_id=args.id,
-        cache_off=args.cache_off,
-        mixup_alpha=args.mixup_alpha,
-    )
-    train_dataset, valid_dataset, test_dataset = datasets
-
-    # Initialize shallow model
-    if args.sklearn_model_type is None:
-        model = make_shallow_model(
-            tensor_maps_in=args.tensor_maps_in,
-            tensor_maps_out=args.tensor_maps_out,
-            optimizer=args.optimizer,
-            learning_rate=args.learning_rate,
-            learning_rate_schedule=args.learning_rate_schedule,
-            model_file=args.model_file,
-            donor_layers=args.donor_layers,
-            l1=args.l1,
-            l2=args.l2,
-        )
-    else:
-        # SKLearn only works with one output tmap
-        assert len(args.tensor_maps_out) == 1
-
-        hyperparameters = {}
-        if args.sklearn_model_type == "logreg":
-            if args.l1 == 0 and args.l2 == 0:
-                args.c = 1e7
-            else:
-                args.c = 1 / (args.l1 + args.l2)
-            hyperparameters["c"] = args.c
-            hyperparameters["l1_ratio"] = args.c * args.l1
-        elif args.sklearn_model_type == "svm":
-            hyperparameters["c"] = args.c
-        elif args.sklearn_model_type == "randomforest":
-            hyperparameters["n_estimators"] = args.n_estimators
-            hyperparameters["max_depth"] = args.max_depth
-            hyperparameters["min_samples_split"] = args.min_samples_split
-            hyperparameters["min_samples_leaf"] = args.min_samples_leaf
-        elif args.sklearn_model_type == "xgboost":
-            hyperparameters["n_estimators"] = args.n_estimators
-            hyperparameters["max_depth"] = args.max_depth
-        model = make_sklearn_model(
-            model_type=args.sklearn_model_type,
-            hyperparameters=hyperparameters,
-        )
-
-    # Train model using datasets
-    model = train_model_from_datasets(
-        model=model,
-        tensor_maps_in=args.tensor_maps_in,
-        tensor_maps_out=args.tensor_maps_out,
-        train_dataset=train_dataset,
-        valid_dataset=valid_dataset,
-        epochs=args.epochs,
-        patience=args.patience,
-        learning_rate_patience=args.learning_rate_patience,
-        learning_rate_reduction=args.learning_rate_reduction,
-        output_folder=args.output_folder,
-        run_id=args.id,
-        image_ext=args.image_ext,
-    )
-
-    # Evaluate trained model
-    plot_path = os.path.join(args.output_folder, args.id + "/")
-    predict_and_evaluate(
-        model=model,
-        data=train_dataset,
-        tensor_maps_in=args.tensor_maps_in,
-        tensor_maps_out=args.tensor_maps_out,
-        plot_path=plot_path,
-        data_split="train",
-        image_ext=args.image_ext,
-    )
-
-    performance_metrics = predict_and_evaluate(
-        model=model,
-        data=test_dataset,
-        tensor_maps_in=args.tensor_maps_in,
-        tensor_maps_out=args.tensor_maps_out,
-        plot_path=plot_path,
-        data_split="test",
-        image_ext=args.image_ext,
-        save_coefficients=True,
-        top_features_to_plot=args.top_features_to_plot,
-    )
     for cleanup in cleanups:
         cleanup()
     return performance_metrics

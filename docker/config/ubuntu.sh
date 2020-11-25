@@ -16,3 +16,11 @@ cmake .
 make
 make install
 cd ..
+
+# database connection prerequisites
+# https://github.com/aguirre-lab/ml4c3/wiki/EDW-pipeline#setup
+apt-get install -y unixodbc unixodbc-dev freetds-dev freetds-bin tdsodbc
+echo "[FreeTDS]
+Description=FreeTDS ODBC Driver
+Driver64=/usr/lib/x86_64-linux-gnu/odbc/libtdsodbc.so
+FileUsage=1" >> /etc/odbcinst.ini

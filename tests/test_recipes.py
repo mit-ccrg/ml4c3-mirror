@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 # Imports: first party
-from ml4c3.recipes import infer_multimodal_multitask, train_multimodal_multitask
+from ml4c3.recipes import train_model, infer_multimodal_multitask
 from ml4c3.explorations import (
     explore,
     continuous_explore_header,
@@ -19,12 +19,13 @@ from ml4c3.tensormap.TensorMap import TensorMap, Interpretation
 
 
 class TestRecipes:
-    def test_infer(self, default_arguments_infer: argparse.Namespace):
+    @staticmethod
+    def test_infer(default_arguments_infer: argparse.Namespace):
         infer_multimodal_multitask(default_arguments_infer)
         path = os.path.join(
             default_arguments_infer.output_folder,
             default_arguments_infer.id,
-            f"predictions_test.csv",
+            "predictions_test.csv",
         )
         predictions = pd.read_csv(path)
         test_samples = pd.read_csv(
@@ -36,8 +37,8 @@ class TestRecipes:
         )
         assert len(set(predictions["sample_id"])) == len(test_samples)
 
+    @staticmethod
     def test_explore(
-        self,
         default_arguments_explore: argparse.Namespace,
         tmpdir_factory,
         utils,
@@ -47,7 +48,7 @@ class TestRecipes:
         tmaps = pytest.TMAPS_UP_TO_4D[:]
         tmaps.append(
             TensorMap(
-                f"scalar",
+                "scalar",
                 shape=(1,),
                 interpretation=Interpretation.CONTINUOUS,
                 tensor_from_file=pytest.TFF,
@@ -86,5 +87,6 @@ class TestRecipes:
                         )
                         assert channel_val == row_expected[idx]
 
-    def test_train(self, default_arguments: argparse.Namespace):
-        train_multimodal_multitask(default_arguments)
+    @staticmethod
+    def test_train(default_arguments: argparse.Namespace):
+        train_model(default_arguments)

@@ -608,53 +608,8 @@ def parse_args() -> argparse.Namespace:
         help="Annealing maximum value",
     )
 
-    # Training modes parsers
-    train_parser = subparser.add_parser(
-        name="train",
-        description="TODO",
-        parents=[
-            model_parser,
-            training_parser,
-            io_parser,
-            run_parser,
-            tensormaps_parser,
-        ],
-    )
-    train_shallow_parser = subparser.add_parser(
-        name="train_shallow",
-        description="TODO",
-        parents=[
-            model_parser,
-            training_parser,
-            io_parser,
-            run_parser,
-            tensormaps_parser,
-        ],
-    )
-    train_simclr_parser = subparser.add_parser(
-        name="train_simclr",
-        description="TODO",
-        parents=[
-            model_parser,
-            training_parser,
-            io_parser,
-            run_parser,
-            tensormaps_parser,
-        ],
-    )
-    hyperoptimize_parser = subparser.add_parser(
-        name="hyperoptimize",
-        description="TODO",
-        parents=[
-            model_parser,
-            training_parser,
-            io_parser,
-            run_parser,
-            tensormaps_parser,
-        ],
-    )
-
     # Train Shallow arguments
+    train_shallow_parser = argparse.ArgumentParser(add_help=False)
     train_shallow_parser.add_argument(
         "--sklearn_model_type",
         nargs="?",
@@ -708,6 +663,101 @@ def parse_args() -> argparse.Namespace:
         help="",
     )
 
+    # Training modes parsers
+    train_parser = subparser.add_parser(
+        name="train",
+        description="TODO",
+        parents=[
+            model_parser,
+            training_parser,
+            io_parser,
+            run_parser,
+            tensormaps_parser,
+        ],
+    )
+    train_keras_logreg_parser = subparser.add_parser(
+        name="train_keras_logreg",
+        description="TODO",
+        parents=[
+            model_parser,
+            training_parser,
+            train_shallow_parser,
+            io_parser,
+            run_parser,
+            tensormaps_parser,
+        ],
+    )
+    train_sklearn_logreg_parser = subparser.add_parser(
+        name="train_sklearn_logreg",
+        description="TODO",
+        parents=[
+            model_parser,
+            training_parser,
+            train_shallow_parser,
+            io_parser,
+            run_parser,
+            tensormaps_parser,
+        ],
+    )
+    train_svm_parser = subparser.add_parser(
+        name="train_sklearn_svm",
+        description="TODO",
+        parents=[
+            model_parser,
+            training_parser,
+            train_shallow_parser,
+            io_parser,
+            run_parser,
+            tensormaps_parser,
+        ],
+    )
+    train_randomforest_parser = subparser.add_parser(
+        name="train_sklearn_randomforest",
+        description="TODO",
+        parents=[
+            model_parser,
+            training_parser,
+            train_shallow_parser,
+            io_parser,
+            run_parser,
+            tensormaps_parser,
+        ],
+    )
+    train_xgboost_parser = subparser.add_parser(
+        name="train_sklearn_xgboost",
+        description="TODO",
+        parents=[
+            model_parser,
+            training_parser,
+            train_shallow_parser,
+            io_parser,
+            run_parser,
+            tensormaps_parser,
+        ],
+    )
+    train_simclr_parser = subparser.add_parser(
+        name="train_simclr",
+        description="TODO",
+        parents=[
+            model_parser,
+            training_parser,
+            io_parser,
+            run_parser,
+            tensormaps_parser,
+        ],
+    )
+    hyperoptimize_parser = subparser.add_parser(
+        name="hyperoptimize",
+        description="TODO",
+        parents=[
+            model_parser,
+            training_parser,
+            io_parser,
+            run_parser,
+            tensormaps_parser,
+        ],
+    )
+
     # Hyperoptimize arguments
     hyperoptimize_parser.add_argument(
         "--max_parameters",
@@ -724,6 +774,12 @@ def parse_args() -> argparse.Namespace:
             "Maximum number of models for the hyperparameter optimizer to evaluate"
             " before returning."
         ),
+    )
+    hyperoptimize_parser.add_argument(
+        "--make_training_plots",
+        action="store_true",
+        help="Whether or not to plot calibration, ROC and PR curvese from the "
+        "training set.",
     )
     hyperoptimize_parser.add_argument(
         "--hyperoptimize_config_file",
