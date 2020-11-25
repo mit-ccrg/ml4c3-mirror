@@ -284,30 +284,24 @@ def explore_pretraining(
         sep="\t",
     )
 
-    working_sample_ids = df.dropna()["sample_id"]
-    training_ids, test_ids = train_test_split(
-        working_sample_ids,
-        test_size=len(working_sample_ids) // 10,
-        random_state=42,
+    working_sample_ids = df.dropna()["sample_id"].sample(frac=1, random_state=3005)
+    names = (
+        "pretrain_train",
+        "pretrain_valid",
+        "finetune_train",
+        "finetune_valid",
+        "test",
     )
-    training_ids, valid_ids = train_test_split(
-        training_ids,
-        test_size=len(working_sample_ids) // 10,
-        random_state=17,
-    )
-
-    pd.DataFrame({"sample_id": training_ids}).to_csv(
-        os.path.join(output_folder, "train_ids.csv"),
-        index=False,
-    )
-    pd.DataFrame({"sample_id": valid_ids}).to_csv(
-        os.path.join(output_folder, "valid_ids.csv"),
-        index=False,
-    )
-    pd.DataFrame({"sample_id": test_ids}).to_csv(
-        os.path.join(output_folder, "test_ids.csv"),
-        index=False,
-    )
+    sizes = [
+        int(frac * len(working_sample_ids)) for frac in np.cumsum([0.7, 0.1, 0.1, 0.05])
+    ]
+    splits = np.split(working_sample_ids, sizes)
+    for name, ids in zip(names, splits):
+        print(f"Writing {len(ids)} {name} ids.")
+        pd.DataFrame({"sample_id": ids}).to_csv(
+            os.path.join(output_folder, f"{name}_ids.csv"),
+            index=False,
+        )
 
 
 MODES: Dict[str, Callable] = {
