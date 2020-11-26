@@ -1,3 +1,4 @@
+# pylint: disable=too-many-return-statements
 # Imports: standard library
 import logging
 from typing import Dict, Tuple, Callable, Optional
@@ -7,21 +8,20 @@ import numpy as np
 
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
+from definitions.icu import EDW_PREFIX, ICU_SCALE_UNITS
 from ml4c3.validators import (
     validator_no_empty,
     validator_no_negative,
     validator_not_all_zero,
 )
-from ml4c3.definitions.icu import EDW_PREFIX, ICU_SCALE_UNITS
+from definitions.icu_tmap_list import DEFINED_TMAPS
 from ml4c3.tensormap.TensorMap import (
     TensorMap,
     PatientData,
     Interpretation,
     get_visits,
-    id_from_filename,
     get_local_timestamps,
 )
-from ml4c3.definitions.icu_tmap_list import DEFINED_TMAPS
 from ml4c3.tensormap.icu_first_visit_with_signal import get_tmap as get_visit_tmap
 
 

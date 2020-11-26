@@ -3,8 +3,8 @@ import numpy as np
 import pytest
 
 # Imports: first party
-from ml4c3.definitions.icu import ALARMS_FILES
-from ml4c3.ingest.icu.readers import BedmasterAlarmsReader
+from definitions.icu import ALARMS_FILES
+from ingest.icu.readers import BedmasterAlarmsReader
 
 
 @pytest.fixture(scope="function")

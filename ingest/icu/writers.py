@@ -7,12 +7,7 @@ import h5py
 import numpy as np
 
 # Imports: first party
-from ml4c3.ingest.icu.data_objects import (
-    EDWType,
-    StaticData,
-    BedmasterType,
-    ICUDataObject,
-)
+from ingest.icu.data_objects import EDWType, StaticData, BedmasterType, ICUDataObject
 
 # pylint: disable=too-many-branches
 

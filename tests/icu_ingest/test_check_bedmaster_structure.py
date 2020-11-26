@@ -8,7 +8,7 @@ import unittest.mock
 import pytest
 
 # Imports: first party
-from ml4c3.ingest.icu.check_icu_structure import BedmasterChecker
+from ingest.icu.check_structure import BedmasterChecker
 
 
 def get_bedmaster_checker(directory: str) -> BedmasterChecker:

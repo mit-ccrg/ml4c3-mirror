@@ -3,7 +3,7 @@ import re
 import copy
 import logging
 import datetime
-from typing import Dict, List, Union, Callable, Optional
+from typing import Dict, List, Union, Optional
 
 # Imports: third party
 import numpy as np
@@ -11,14 +11,9 @@ import pandas as pd
 
 # Imports: first party
 from ml4c3.metrics import weighted_crossentropy
-from ml4c3.definitions.ecg import ECG_PREFIX, ECG_DATETIME_FORMAT
-from ml4c3.definitions.sts import STS_PREFIX, STS_DATE_FORMAT, STS_SURGERY_DATE_COLUMN
-from ml4c3.definitions.echo import (
-    ECHO_PREFIX,
-    ECHO_MRN_COLUMN,
-    ECHO_DATETIME_COLUMN,
-    ECHO_DATETIME_FORMAT,
-)
+from definitions.ecg import ECG_PREFIX, ECG_DATETIME_FORMAT
+from definitions.sts import STS_PREFIX, STS_DATE_FORMAT, STS_SURGERY_DATE_COLUMN
+from definitions.echo import ECHO_PREFIX, ECHO_DATETIME_COLUMN, ECHO_DATETIME_FORMAT
 from ml4c3.tensormap.TensorMap import Dates, TensorMap, PatientData
 
 
@@ -91,12 +86,11 @@ def update_tmaps_time_series(
             )
             random_date_selections[data.id] = _dates
             return _dates
-        elif "_oldest" in tmap_name:
+        if "_oldest" in tmap_name:
             return _dates[:tsl]
-        elif "_newest" in tmap_name:
+        if "_newest" in tmap_name:
             return _dates[-tsl:]
-        else:
-            raise ValueError(f"Unknown time series ordering: {tmap_name}")
+        raise ValueError(f"Unknown time series ordering: {tmap_name}")
 
     new_tmap = copy.deepcopy(base_tmap)
     new_tmap_name = f"{base_name}{base_split}"
@@ -151,8 +145,7 @@ def update_tmaps_window(
     offset_days = re.findall(fr"_(\d+){time_suffix}", tmap_name)
     if len(offset_days) == 0:
         return tmaps
-    else:
-        offset_days = offset_days[0]
+    offset_days = offset_days[0]
 
     # time window: pre vs post
     if "_pre_" in tmap_name:
@@ -166,7 +159,6 @@ def update_tmaps_window(
     # dataset descriptor;
     # given "ecg_2500_30_days_pre_echo", isolate "echo"
     # given "ecg_2500_30_days_pre_echo_newest", isolate "echo_newest"
-    data_descriptor_prefix = f"_{pre_or_post}"
     text_after_descriptor_prefix = tmap_name.split(f"_{pre_or_post}_")[1]
 
     # If "echo_newest", isolate "echo"

@@ -14,9 +14,9 @@ import unidecode
 
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
-from ml4c3.definitions.icu import EDW_FILES, MED_ACTIONS, ALARMS_FILES, ICU_SCALE_UNITS
-from ml4c3.definitions.globals import TIMEZONE
-from ml4c3.ingest.icu.data_objects import (
+from definitions.icu import EDW_FILES, MED_ACTIONS, ALARMS_FILES, ICU_SCALE_UNITS
+from definitions.globals import TIMEZONE
+from ingest.icu.data_objects import (
     Event,
     Procedure,
     Medication,
@@ -25,8 +25,8 @@ from ml4c3.ingest.icu.data_objects import (
     BedmasterAlarm,
     BedmasterSignal,
 )
-from ml4c3.ingest.icu.bedmaster_stats import BedmasterStats
-from ml4c3.ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
+from ingest.icu.bedmaster_stats import BedmasterStats
+from ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
 
 # pylint: disable=too-many-branches
 

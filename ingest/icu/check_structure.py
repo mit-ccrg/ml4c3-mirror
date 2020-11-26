@@ -9,13 +9,13 @@ import pandas as pd
 
 # Imports: first party
 from ml4c3.datasets import sample_csv_to_set
-from ml4c3.definitions.icu import (
+from definitions.icu import (
     EDW_FILES,
     ALARMS_FILES,
     BEDMASTER_EXT,
     MATFILE_EXPECTED_GROUPS,
 )
-from ml4c3.ingest.icu.utils import get_files_in_directory
+from ingest.icu.utils import get_files_in_directory
 
 
 class EDWChecker:

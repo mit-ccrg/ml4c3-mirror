@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 # Imports: first party
-from ml4c3.definitions.ecg import ECG_ZERO_PADDING_THRESHOLD
+from definitions.ecg import ECG_ZERO_PADDING_THRESHOLD
 from ml4c3.tensormap.TensorMap import TensorMap, PatientData
 
 

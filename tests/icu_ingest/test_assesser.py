@@ -5,7 +5,7 @@ import os
 import pytest
 
 # Imports: first party
-from ml4c3.ingest.icu.assess_coverage import ICUCoverageAssesser
+from ingest.icu.assess_coverage import ICUCoverageAssesser
 
 # pylint: disable=no-member
 

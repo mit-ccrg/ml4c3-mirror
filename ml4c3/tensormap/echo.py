@@ -1,29 +1,25 @@
 # Imports: standard library
-import logging
-import datetime
-from typing import Dict, List, Union, Callable
+from typing import Dict, Union, Callable
 
 # Imports: third party
 import numpy as np
-import pandas as pd
 
 # Imports: first party
-from ml4c3.normalizer import MinMax, RobustScaler
-from ml4c3.validators import RangeValidator, validator_no_nans, validator_not_all_zero
-from ml4c3.definitions.echo import ECHO_PREFIX, ECHO_MRN_COLUMN, ECHO_DATETIME_COLUMN
+from definitions.echo import ECHO_PREFIX, ECHO_DATETIME_COLUMN
+from ml4c3.normalizer import RobustScaler
+from ml4c3.validators import RangeValidator, validator_no_nans
 from ml4c3.tensormap.TensorMap import (
     Dates,
     TensorMap,
-    ChannelMap,
     PatientData,
     Interpretation,
     is_dynamic_shape,
-    outcome_channels,
 )
 
 tmaps: Dict[str, TensorMap] = {}
 
-# Define name and statistical properties of continuous properties to enable standardization. These values are calculated from the entire dataset.
+# Define name and statistical properties of continuous properties to enable
+# standardization. These values are calculated from the entire dataset.
 echo_measures_continuous: Dict[str, Dict[str, Union[int, float]]] = {
     "av_area": {"median": 1.39, "iqr": 1.03, "min": 0, "max": 8},
     "av_peak_gradient": {"median": 1, "iqr": 2, "min": 0, "max": 3},

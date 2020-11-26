@@ -30,8 +30,8 @@ from tensorflow.keras.optimizers.schedules import LearningRateSchedule
 
 # Imports: first party
 from ml4c3.metrics import coefficient_of_determination
-from ml4c3.definitions.ecg import ECG_DATE_FORMAT, ECG_DATETIME_FORMAT
-from ml4c3.definitions.globals import PDF_EXT, TENSOR_EXT
+from definitions.ecg import ECG_DATE_FORMAT, ECG_DATETIME_FORMAT
+from definitions.globals import PDF_EXT, TENSOR_EXT
 from ml4c3.tensormap.TensorMap import (
     TensorMap,
     update_tmaps,

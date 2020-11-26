@@ -7,10 +7,10 @@ import numpy as np
 import pytest
 
 # Imports: first party
-from ml4c3.definitions.icu import EDW_FILES
-from ml4c3.ingest.icu.readers import EDWReader
+from definitions.icu import EDW_FILES
+from ingest.icu.readers import EDWReader
 
-# pylint: disable=no-member
+# pylint: disable=no-member, redefined-outer-name
 
 
 @pytest.fixture(scope="function")

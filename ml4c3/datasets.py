@@ -14,7 +14,7 @@ import tensorflow as tf
 from tensorflow_probability import distributions as tfd
 
 # Imports: first party
-from ml4c3.definitions.globals import CSV_EXT, TENSOR_EXT, MRN_COLUMNS
+from definitions.globals import CSV_EXT, TENSOR_EXT, MRN_COLUMNS
 from ml4c3.tensormap.TensorMap import (
     TensorMap,
     PatientData,
@@ -48,7 +48,7 @@ def infer_mrn_column(df: pd.DataFrame, sample_csv: str) -> str:
             matches.append(col)
     if len(matches) == 0:
         return df.columns[0]
-    elif len(matches) > 1:
+    if len(matches) > 1:
         logging.warning(
             f"{sample_csv} has more than one potential column for MRNs. "
             "Inferring most likely column name, but recommend verifying "

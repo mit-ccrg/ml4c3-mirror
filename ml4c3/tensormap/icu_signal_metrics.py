@@ -6,7 +6,7 @@ import h5py
 import numpy as np
 
 # Imports: first party
-from ml4c3.definitions.icu import ICU_TMAPS_METADATA
+from definitions.icu import ICU_TMAPS_METADATA
 from ml4c3.tensormap.TensorMap import TensorMap
 
 

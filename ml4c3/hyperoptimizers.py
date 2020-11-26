@@ -25,8 +25,8 @@ from ml4c3.models import (
     make_multimodal_multitask_model,
 )
 from ml4c3.datasets import train_valid_test_datasets
+from definitions.types import Arguments
 from ml4c3.evaluations import predict_and_evaluate
-from ml4c3.definitions.types import Arguments
 from ml4c3.tensormap.TensorMap import TensorMap, update_tmaps
 
 # fmt: off

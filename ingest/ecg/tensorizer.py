@@ -17,8 +17,8 @@ import h5py
 import numpy as np
 
 # Imports: first party
-from ml4c3.definitions.ecg import MUSE_ECG_XML_MRN_COLUMN
-from ml4c3.definitions.globals import XML_EXT, TENSOR_EXT
+from definitions.ecg import MUSE_ECG_XML_MRN_COLUMN
+from definitions.globals import XML_EXT, TENSOR_EXT
 
 excluded_keys = {
     "acquisitiondate",

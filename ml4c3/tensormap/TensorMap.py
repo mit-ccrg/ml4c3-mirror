@@ -24,7 +24,7 @@ from ml4c3.metrics import (
     survival_likelihood_loss,
 )
 from ml4c3.normalizer import Normalizer
-from ml4c3.definitions.globals import TIMEZONE
+from definitions.globals import TIMEZONE
 
 Axis = Union[int, None]
 Dates = Union[List[str], pd.Series]
@@ -47,7 +47,7 @@ class PatientData:
     def __setitem__(self, key, value):
         if not isinstance(key, str):
             raise KeyError(f"Patient dictionary keys must be strings: {key}")
-        elif len(key.split("/")) != 1:
+        if len(key.split("/")) != 1:
             raise KeyError(f"Patient dictionary keys must not be nested: {key}")
         self.data[key] = value
 
@@ -58,8 +58,7 @@ class PatientData:
         splits = key.split("/", 1)
         if len(splits) == 1:
             return self.data[key]
-        else:
-            return self.data[splits[0]][splits[1]]
+        return self.data[splits[0]][splits[1]]
 
     def __contains__(self, key):
         if not isinstance(key, str):
@@ -68,8 +67,7 @@ class PatientData:
         splits = key.split("/", 1)
         if len(splits) == 1:
             return splits[0] in self.data
-        else:
-            return splits[0] in self.data and splits[1] in self.data[splits[0]]
+        return splits[0] in self.data and splits[1] in self.data[splits[0]]
 
 
 class Interpretation(Enum):

@@ -9,7 +9,7 @@ import pytest
 
 # Imports: first party
 # pylint: disable=no-member
-from ml4c3.ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
+from ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
 
 
 def get_patient_bedmaster_matcher(

@@ -8,6 +8,12 @@ from typing import Set, Dict, List
 import numpy as np
 
 # Imports: first party
+from definitions.ecg import (
+    ECG_PREFIX,
+    ECG_DATE_FORMAT,
+    ECG_REST_LEADS_ALL,
+    ECG_REST_LEADS_INDEPENDENT,
+)
 from ml4c3.normalizer import Standardize
 from ml4c3.validators import (
     RangeValidator,
@@ -17,13 +23,7 @@ from ml4c3.validators import (
     validator_not_all_zero,
     validator_voltage_no_zero_padding,
 )
-from ml4c3.definitions.ecg import (
-    ECG_PREFIX,
-    ECG_DATE_FORMAT,
-    ECG_REST_LEADS_ALL,
-    ECG_REST_LEADS_INDEPENDENT,
-)
-from ml4c3.definitions.globals import YEAR_DAYS
+from definitions.globals import YEAR_DAYS
 from ml4c3.tensormap.TensorMap import (
     TensorMap,
     Interpretation,

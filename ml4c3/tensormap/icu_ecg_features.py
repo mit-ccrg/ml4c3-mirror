@@ -6,6 +6,7 @@ from typing import Optional
 import numpy as np
 
 # Imports: first party
+from definitions.icu_tmap_list import DEFINED_TMAPS
 from ml4c3.tensormap.TensorMap import (
     TensorMap,
     Interpretation,
@@ -13,7 +14,6 @@ from ml4c3.tensormap.TensorMap import (
     get_local_timestamps,
 )
 from ml4c3.tensormap.icu_signals import get_tmap as get_signal_tmap
-from ml4c3.definitions.icu_tmap_list import DEFINED_TMAPS
 
 
 def make_ecg_peak_tensor_from_file(lead):

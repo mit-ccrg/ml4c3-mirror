@@ -13,6 +13,9 @@ from tensorflow.keras.utils import model_to_dot
 from tensorflow.keras.models import Model
 
 # Imports: first party
+from ingest.ecg import tensorize as tensorize_ecg
+from ingest.icu import tensorize as tensorize_icu
+from ingest.icu import tensorize_batched as tensorize_icu_batched
 from ml4c3.plots import plot_ecg, plot_architecture_diagram
 from ml4c3.models import (
     make_shallow_model,
@@ -23,20 +26,17 @@ from ml4c3.models import (
 from ml4c3.metrics import simclr_loss, simclr_accuracy
 from ml4c3.datasets import get_verbose_stats_string, train_valid_test_datasets
 from ml4c3.arguments import parse_args
-from ml4c3.ingest.ecg import tensorize as tensorize_ecg
-from ml4c3.ingest.icu import tensorize as tensorize_icu
-from ml4c3.ingest.icu import tensorize_batched as tensorize_icu_batched
 from ml4c3.evaluations import predict_and_evaluate
 from ml4c3.explorations import explore
+from definitions.globals import MODEL_EXT
 from ml4c3.visualizer.run import run_server
 from ml4c3.hyperoptimizers import hyperoptimize
-from ml4c3.definitions.globals import MODEL_EXT
 from ml4c3.tensormap.TensorMap import TensorMap
-from ml4c3.ecg_features_extraction import extract_ecg_features
-from ml4c3.ingest.icu.assess_coverage import assess_coverage
-from ml4c3.ingest.icu.check_icu_structure import check_icu_structure
-from ml4c3.ingest.icu.match_patient_bedmaster import match_data
-from ml4c3.ingest.icu.pre_tensorize_explorations import pre_tensorize_explore
+from ingest.icu.assess_coverage import assess_coverage
+from ingest.icu.check_structure import check_icu_structure
+from ingest.icu.ecg_features_extraction import extract_ecg_features
+from ingest.icu.match_patient_bedmaster import match_data
+from ingest.icu.pre_tensorize_explorations import pre_tensorize_explore
 
 # pylint: disable=redefined-outer-name, broad-except
 

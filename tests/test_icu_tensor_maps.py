@@ -10,9 +10,9 @@ import pandas as pd
 
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
+from ingest.icu.data_objects import ICUDataObject
 from ml4c3.tensormap.TensorMap import TensorMap
 from ml4c3.tensormap.icu_signals import get_tmap as get_signal_tmap
-from ml4c3.ingest.icu.data_objects import ICUDataObject
 from ml4c3.tensormap.icu_around_event import get_tmap as get_around_tmap
 
 TEST_DATA = Tuple[

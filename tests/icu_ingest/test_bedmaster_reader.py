@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 
 # Imports: first party
-from ml4c3.ingest.icu.readers import BedmasterReader
-from ml4c3.ingest.icu.data_objects import BedmasterSignal
+from ingest.icu.readers import BedmasterReader
+from ingest.icu.data_objects import BedmasterSignal
 
 # pylint: disable=invalid-name
 

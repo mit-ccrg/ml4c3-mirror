@@ -6,7 +6,7 @@ from typing import Dict
 import numpy as np
 
 # Imports: first party
-from ml4c3.definitions.icu import EDW_FILES, ALARMS_FILES
+from definitions.icu import EDW_FILES, ALARMS_FILES
 
 # pylint: disable=abstract-method, unnecessary-pass
 

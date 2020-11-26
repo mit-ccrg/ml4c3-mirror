@@ -3,8 +3,8 @@
 from typing import Optional
 
 # Imports: first party
+from definitions.icu import ICU_TMAPS_METADATA
 from ml4c3.normalizer import MinMax, Standardize, RobustScaler, ZeroMeanStd1
-from ml4c3.definitions.icu import ICU_TMAPS_METADATA
 from ml4c3.tensormap.TensorMap import TensorMap
 from ml4c3.tensormap.icu_around_event import get_tmap as get_around_tmap
 from ml4c3.tensormap.icu_static_around_event import get_tmap as get_static_around_tmap

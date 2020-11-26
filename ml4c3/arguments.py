@@ -14,7 +14,7 @@ import numpy as np
 # Imports: first party
 from ml4c3.logger import load_config
 from ml4c3.models import BottleneckType
-from ml4c3.definitions.icu import ML4C3_DIR
+from definitions.icu import ML4C3_DIR
 from ml4c3.tensormap.TensorMap import TensorMap, update_tmaps
 
 BOTTLENECK_STR_TO_ENUM = {
@@ -33,7 +33,11 @@ def parse_args() -> argparse.Namespace:
         title="ml4c3 modes",  # TODO add descriptions
         description="Select one of the following modes: \n"
         "\t * train: ADD DESCRIPTION. \n"
-        "\t * train_shallow: ADD DESCRIPTION. \n"
+        "\t * train_keras_logreg: ADD DESCRIPTION. \n"
+        "\t * train_sklearn_logreg: ADD DESCRIPTION. \n"
+        "\t * train_sklearn_svm: ADD DESCRIPTION. \n"
+        "\t * train_sklearn_randomforest: ADD DESCRIPTION. \n"
+        "\t * train_sklearn_xgboost: ADD DESCRIPTION. \n"
         "\t * train_simclr: ADD DESCRIPTION. \n"
         "\t * infer: ADD DESCRIPTION. \n"
         "\t * hyperoptimize: ADD DESCRIPTION. \n"
@@ -752,6 +756,7 @@ def parse_args() -> argparse.Namespace:
         parents=[
             model_parser,
             training_parser,
+            train_shallow_parser,
             io_parser,
             run_parser,
             tensormaps_parser,

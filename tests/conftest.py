@@ -17,13 +17,11 @@ import neurokit2 as nk
 
 # Imports: first party
 import ml4c3
+from definitions.icu import EDW_FILES
 from ml4c3.arguments import parse_args
-from ml4c3.definitions.icu import EDW_FILES
-from ml4c3.ingest.icu.writers import Writer
-from ml4c3.definitions.globals import TENSOR_EXT
-from ml4c3.tensormap.TensorMap import TensorMap, Interpretation, get_local_timestamps
-from ml4c3.tensormap.icu_signals import get_tmap as GET_SIGNAL_TMAP
-from ml4c3.ingest.icu.data_objects import (
+from ingest.icu.writers import Writer
+from definitions.globals import TENSOR_EXT
+from ingest.icu.data_objects import (
     Event,
     Procedure,
     Medication,
@@ -33,6 +31,8 @@ from ml4c3.ingest.icu.data_objects import (
     BedmasterAlarm,
     BedmasterSignal,
 )
+from ml4c3.tensormap.TensorMap import TensorMap, Interpretation, get_local_timestamps
+from ml4c3.tensormap.icu_signals import get_tmap as GET_SIGNAL_TMAP
 from ml4c3.tensormap.icu_list_signals import get_tmap as GET_LIST_TMAP
 
 # pylint: disable=redefined-outer-name, unused-argument, missing-class-docstring

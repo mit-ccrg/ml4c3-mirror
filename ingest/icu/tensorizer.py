@@ -11,16 +11,16 @@ from typing import Dict, List
 import pandas as pd
 
 # Imports: first party
-from ml4c3.definitions.icu import LM4_DIR, ML4C3_DIR, ICU_SCALE_UNITS
-from ml4c3.ingest.icu.utils import FileManager
-from ml4c3.ingest.icu.readers import (
+from definitions.icu import LM4_DIR, ML4C3_DIR, ICU_SCALE_UNITS
+from ingest.icu.utils import FileManager
+from ingest.icu.readers import (
     EDWReader,
     BedmasterReader,
     CrossReferencer,
     BedmasterAlarmsReader,
 )
-from ml4c3.ingest.icu.writers import Writer
-from ml4c3.ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
+from ingest.icu.writers import Writer
+from ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
 
 
 class Tensorizer:

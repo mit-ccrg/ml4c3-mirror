@@ -9,7 +9,7 @@ from typing import Dict, List
 import pandas as pd
 
 # Imports: first party
-from ml4c3.definitions.icu import MAPPING_DEPARTMENTS
+from definitions.icu import MAPPING_DEPARTMENTS
 
 
 class FileManager:

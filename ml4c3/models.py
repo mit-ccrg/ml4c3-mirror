@@ -77,7 +77,7 @@ from ml4c3.datasets import (
     get_dicts_of_arrays_from_dataset,
 )
 from ml4c3.optimizers import NON_KERAS_OPTIMIZERS, get_optimizer
-from ml4c3.definitions.globals import MODEL_EXT
+from definitions.globals import MODEL_EXT
 from ml4c3.tensormap.TensorMap import TensorMap, find_negative_label_and_channel
 
 CHANNEL_AXIS = -1  # Set to 1 for Theano backend
@@ -124,13 +124,14 @@ def make_shallow_model(
     :param l1: Optional float value to use for L1 regularization.
     :param l2: Optional float value to use for L2 regularization.
     :param model_file: Optional HD5 model file to load and return.
-    :param donor_layers: Optional HD5 model file whose weights will be loaded into this model when layer names match.
+    :param donor_layers: Optional HD5 model file whose weights will be loaded into
+                         this model when layer names match.
     :return: a compiled keras model
     """
     if model_file is not None:
         m = load_model(model_file, custom_objects=get_metric_dict(tensor_maps_out))
         m.summary()
-        logging.info("Loaded model file from: {}".format(model_file))
+        logging.info(f"Loaded model file from: {model_file}")
         return m
 
     losses = []
@@ -175,7 +176,7 @@ def make_shallow_model(
     model.summary()
     if donor_layers is not None:
         model.load_weights(donor_layers, by_name=True)
-        logging.info("Loaded model weights from:{}".format(donor_layers))
+        logging.info(f"Loaded model weights from: {donor_layers}")
 
     return model
 
@@ -268,17 +269,20 @@ def make_waveform_model_unet(
     Input and output tensor maps are set from the command line.
     Model summary printed to output
 
-    :param tensor_maps_in: List of input TensorMaps, only 1 input TensorMap is currently supported, otherwise there are layer name collisions.
+    :param tensor_maps_in: List of input TensorMaps, only 1 input TensorMap is
+                           currently supported, otherwise there are layer name
+                           collisions.
     :param tensor_maps_out: List of output TensorMaps
     :param learning_rate: Size of learning steps in SGD optimization
     :param model_file: Optional HD5 model file to load and return.
-    :param donor_layers: Optional HD5 model file whose weights will be loaded into this model when layer names match.
+    :param donor_layers: Optional HD5 model file whose weights will be loaded into
+                         this model when layer names match.
     :return: a compiled keras model
     """
     if model_file is not None:
         m = load_model(model_file, custom_objects=get_metric_dict(tensor_maps_out))
         m.summary()
-        logging.info("Loaded model file from: {}".format(model_file))
+        logging.info(f"Loaded model file from: {model_file}")
         return m
 
     neurons = 24
@@ -332,7 +336,7 @@ def make_waveform_model_unet(
 
     if donor_layers is not None:
         m.load_weights(donor_layers, by_name=True)
-        logging.info("Loaded model weights from:{}".format(donor_layers))
+        logging.info(f"Loaded model weights from:{donor_layers}")
 
     return m
 
@@ -532,16 +536,22 @@ class FullyConnectedBlock:
         name: str = None,
     ):
         """
-        Creates a fully connected block with dense, activation, regularization, and normalization layers
+        Creates a fully connected block with dense, activation, regularization, and
+        normalization layers
 
         :param widths: number of neurons in each dense layer
         :param activation: string name of activation function
         :param normalization: optional string name of normalization function
         :param regularization: optional string name of regularization function
-        :param regularization_rate: if regularization is applied, the rate at which each dense layer is regularized
-        :param layer_order: list of strings specifying the activation, normalization, and regularization layers after the dense layer
-        :param is_encoder: boolean indicator if fully connected block is an input block
-        :param name: name of last dense layer in fully connected block, otherwise all dense layers are named ordinally e.g. dense_3 for the third dense layer in the model
+        :param regularization_rate: if regularization is applied, the rate at which
+                                    each dense layer is regularized
+        :param layer_order: list of strings specifying the activation, normalization
+                            , and regularization layers after the dense layer
+        :param is_encoder: boolean indicator if fully connected block is an input
+                           block
+        :param name: name of last dense layer in fully connected block, otherwise
+                     all dense layers are named ordinally e.g. dense_3 for the
+                     third dense layer in the model
         """
         final_dense = (
             Dense(units=widths[-1], name=name) if name else Dense(units=widths[-1])
@@ -572,7 +582,10 @@ class FullyConnectedBlock:
 
 
 def adaptive_normalize_from_tensor(tensor: Tensor, target: Tensor) -> Tensor:
-    """Uses Dense layers to convert `tensor` to a mean and standard deviation to normalize `target`"""
+    """
+    Uses Dense layers to convert `tensor` to a mean and standard deviation to
+    normalize `target`
+    """
     return adaptive_normalization(
         mu=Dense(target.shape[-1])(tensor),
         sigma=Dense(target.shape[-1])(tensor),
@@ -679,7 +692,8 @@ class VariationalBottleNeck:
 
 class ConcatenateRestructure:
     """
-    Flattens or GAPs then concatenates all inputs, applies a dense layer, then restructures to provided shapes
+    Flattens or GAPs then concatenates all inputs, applies a dense layer, then
+    restructures to provided shapes
     """
 
     def __init__(
@@ -880,7 +894,8 @@ def _calc_start_shape(
     channels: int,
 ) -> Tuple[int, ...]:
     """
-    Given the number of blocks in the decoder and the upsample rates, return required input shape to get to output shape
+    Given the number of blocks in the decoder and the upsample rates, return
+    required input shape to get to output shape
     """
     upsample_rates = list(upsample_rates) + [1] * len(output_shape)
     return tuple(
@@ -1042,27 +1057,35 @@ def make_multimodal_multitask_model(
     freeze_donor_layers: bool = None,
     **kwargs,
 ) -> Model:
-    """Make multi-task, multi-modal feed forward neural network for all kinds of prediction
+    """
+    Make multi-task, multi-modal feed forward neural network for all kinds of prediction
 
-    This model factory can be used to make networks for classification, regression, and segmentation
+    This model factory can be used to make networks for classification, regression,
+    and segmentation
     The tasks attempted are given by the output TensorMaps.
-    The modalities and the first layers in the architecture are determined by the input TensorMaps.
+    The modalities and the first layers in the architecture are determined by the
+    input TensorMaps.
 
     Hyperparameters are exposed to the command line.
     Model summary printed to output
 
     :param tensor_maps_in: List of input TensorMaps
     :param tensor_maps_out: List of output TensorMaps
-    :param activation: Activation function as a string (e.g. 'relu', 'linear, or 'softmax)
+    :param activation: Activation function as a string (e.g. 'relu', 'linear, or
+                       'softmax)
     :param learning_rate: learning rate for optimizer
-    :param bottleneck_type: How to merge the representations coming from the different input modalities
+    :param bottleneck_type: How to merge the representations coming from the
+                            different input modalities
     :param dense_layers: List of number of filters in each dense layer.
     :param dropout: Dropout rate in dense layers
     :param conv_layers: List of number of filters in each convolutional layer
-    :param dense_blocks: List of number of filters in densenet modules for densenet convolutional models
-    :param block_size: Number of layers within each Densenet module for densenet convolutional models
+    :param dense_blocks: List of number of filters in densenet modules for densenet
+                         convolutional models
+    :param block_size: Number of layers within each Densenet module for densenet
+                       convolutional models
     :param conv_type: Type of convolution to use, e.g. separable
-    :param layer_normalization: Type of normalization layer for fully connected and convolutional layers, e.g. batch norm
+    :param layer_normalization: Type of normalization layer for fully connected and
+                                convolutional layers, e.g. batch norm
     :param conv_regularize: Type of regularization for convolutions, e.g. dropout
     :param layer_order: Order of activation, normalization, and regularization layers
     :param conv_x: Size of X dimension for 2D and 3D convolutional kernels
@@ -1079,11 +1102,19 @@ def make_multimodal_multitask_model(
     :return: a compiled keras model
     :param learning_rate_schedule: learning rate schedule to train with, e.g. triangular
     :param model_file: HD5 model file to load and return.
-    :param donor_layers: HD5 model file whose weights will be loaded into this model when layer names match.
+    :param donor_layers: HD5 model file whose weights will be loaded into this
+                         model when layer names match.
     :param freeze_donor_layers: Whether to freeze layers from loaded from donor_layers
-    :param remap_layer: Dictionary remapping layers from donor_layers to layers in current model
-    :param directly_embed_and_repeat: If set, directly embed input tensors (without passing to a dense layer) into concatenation layer, and repeat each input N times, where N is this argument's value. To directly embed a feature without repetition, set to 1.
-    :param nest_model: Embed a nested model ending at the specified layer before the bottleneck layer of the current model. List of models to embed and layer name of embedded layer.
+    :param remap_layer: Dictionary remapping layers from donor_layers to layers in
+                        current model
+    :param directly_embed_and_repeat: If set, directly embed input tensors (without
+                                      passing to a dense layer) into concatenation
+                                      layer, and repeat each input N times, where
+                                      N is this argument's value. To directly embed
+                                      a feature without repetition, set to 1.
+    :param nest_model: Embed a nested model ending at the specified layer before
+                       the bottleneck layer of the current model. List of models
+                       to embed and layer name of embedded layer.
     """
     custom_dict = _get_custom_objects(tensor_maps_out)
     opt = get_optimizer(
@@ -1105,7 +1136,8 @@ def make_multimodal_multitask_model(
     dense_regularize_rate = dropout
     conv_regularize_rate = conv_dropout
 
-    # list of filter dimensions should match the number of convolutional layers = len(dense_blocks) + [ + len(conv_layers) if convolving input tensors]
+    # list of filter dimensions should match the number of convolutional
+    # layers = len(dense_blocks) + [ + len(conv_layers) if convolving input tensors]
     num_dense = len(dense_blocks)
     num_res = len(conv_layers) if any(tm.axes > 1 for tm in tensor_maps_in) else 0
     num_filters_needed = num_res + num_dense
@@ -1349,7 +1381,8 @@ def train_model_from_datasets(
     Train a model from tensorflow.data.Datasets for validation and training data.
 
     Training data lives on disk and is dynamically loaded by the Datasets.
-    Plots the metric history after training. Creates a directory to save weights, if necessary.
+    Plots the metric history after training. Creates a directory to save weights,
+    if necessary.
 
     :param model: The model to optimize
     :param tensor_maps_in: List of input TensorMaps
@@ -1441,7 +1474,8 @@ def train_model_from_datasets(
         logging.info(f"{model.name} trained on data array with shape {X.shape}")
     else:
         raise NotImplementedError(
-            f"Cannot get data for inference from data of type {type(data).__name__}: {data}",
+            "Cannot get data for inference from data of type "
+            f"{type(data).__name__}: {data}",
         )
     return model
 
@@ -1600,15 +1634,21 @@ def saliency_map(
     output_layer_name: str,
     output_index: int,
 ) -> np.ndarray:
-    """Compute saliency maps of the given model (presumably already trained) on a batch of inputs with respect to the desired output layer and index.
+    """
+    Compute saliency maps of the given model (presumably already trained) on a
+    batch of inputs with respect to the desired output layer and index.
 
-    For example, with a trinary classification layer called quality and classes good, medium, and bad output layer name would be "quality_output"
-    and output_index would be 0 to get gradients w.r.t. good, 1 to get gradients w.r.t. medium, and 2 for gradients w.r.t. bad.
+    For example, with a trinary classification layer called quality and classes
+    good, medium, and bad output layer name would be "quality_output"
+    and output_index would be 0 to get gradients w.r.t. good, 1 to get gradients
+    w.r.t. medium, and 2 for gradients w.r.t. bad.
 
     :param input_tensor: A batch of input tensors
     :param model: A trained model expecting those inputs
-    :param output_layer_name: The name of the output layer that the derivative will be taken with respect to
-    :param output_index: The index within the output layer that the derivative will be taken with respect to
+    :param output_layer_name: The name of the output layer that the derivative will
+                              be taken with respect to
+    :param output_index: The index within the output layer that the derivative will
+                         be taken with respect to
 
     :return: Array of the gradients same shape as input_tensor
     """

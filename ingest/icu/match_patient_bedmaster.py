@@ -10,8 +10,8 @@ import pandas as pd
 
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
-from ml4c3.definitions.icu import EDW_FILES, BEDMASTER_EXT, MAPPING_DEPARTMENTS
-from ml4c3.ingest.icu.utils import get_files_in_directory
+from definitions.icu import EDW_FILES, BEDMASTER_EXT, MAPPING_DEPARTMENTS
+from ingest.icu.utils import get_files_in_directory
 
 # pylint: disable=too-many-branches, line-too-long
 

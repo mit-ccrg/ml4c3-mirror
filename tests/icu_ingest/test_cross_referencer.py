@@ -7,7 +7,7 @@ import unittest.mock
 import pytest
 
 # Imports: first party
-from ml4c3.ingest.icu.readers import CrossReferencer
+from ingest.icu.readers import CrossReferencer
 
 
 @pytest.yield_fixture(scope="function")

@@ -1,15 +1,15 @@
+# pylint: disable=redefined-outer-name
 # Imports: standard library
 import logging
 from typing import Dict, List, Union, Callable
 
 # Imports: third party
 import numpy as np
-import pandas as pd
 
 # Imports: first party
+from definitions.sts import STS_PREFIX, STS_DATE_FORMAT, STS_SURGERY_DATE_COLUMN
 from ml4c3.normalizer import MinMax, RobustScaler
 from ml4c3.validators import validator_no_nans, validator_not_all_zero
-from ml4c3.definitions.sts import STS_PREFIX, STS_DATE_FORMAT, STS_SURGERY_DATE_COLUMN
 from ml4c3.tensormap.TensorMap import (
     Dates,
     TensorMap,
@@ -136,13 +136,12 @@ def binarize(
 ) -> List[int]:
     if value == negative_value:
         return [1, 0]
-    elif value == positive_value:
+    if value == positive_value:
         return [0, 1]
-    else:
-        logging.debug(
-            f"STS {key} has value that is not {negative_value} or {positive_value}",
-        )
-        return [0, 0]
+    logging.debug(
+        f"STS {key} has value that is not {negative_value} or {positive_value}",
+    )
+    return [0, 0]
 
 
 def one_hot(channel_map: Dict[str, int], value: int) -> List[int]:

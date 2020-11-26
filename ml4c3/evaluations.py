@@ -25,8 +25,8 @@ from ml4c3.datasets import (
     get_array_from_dict_of_arrays,
     get_dicts_of_arrays_from_dataset,
 )
-from ml4c3.definitions.types import Path, Paths, Inputs, Outputs, Predictions
-from ml4c3.definitions.globals import CSV_EXT
+from definitions.types import Path, Paths, Inputs, Outputs, Predictions
+from definitions.globals import CSV_EXT
 from ml4c3.tensormap.TensorMap import TensorMap, find_negative_label_and_channel
 
 

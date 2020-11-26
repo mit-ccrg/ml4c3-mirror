@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 # Imports: first party
-from ml4c3.definitions.globals import EPS
+from definitions.globals import EPS
 
 # pylint: disable=unnecessary-pass, no-self-use, redefined-builtin
 

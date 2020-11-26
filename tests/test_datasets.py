@@ -16,7 +16,7 @@ from ml4c3.datasets import (
     sample_csv_to_set,
     get_train_valid_test_ids,
 )
-from ml4c3.definitions.globals import TENSOR_EXT
+from definitions.globals import TENSOR_EXT
 
 DATA_SPLIT = Tuple[str, Set[str]]
 DATA_SPLITS = Tuple[DATA_SPLIT, DATA_SPLIT, DATA_SPLIT]

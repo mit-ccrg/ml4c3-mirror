@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 # Imports: first party
-from ml4c3.definitions.globals import TIMEZONE
+from definitions.globals import TIMEZONE
 
 
 def get_unix_timestamps(time_stamp: np.ndarray) -> np.ndarray:

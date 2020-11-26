@@ -5,9 +5,9 @@ from typing import Optional
 import numpy as np
 
 # Imports: first party
-from ml4c3.definitions.icu import EDW_FILES
+from definitions.icu import EDW_FILES
+from definitions.icu_tmap_list import DEFINED_TMAPS
 from ml4c3.tensormap.TensorMap import TensorMap, Interpretation, get_visits
-from ml4c3.definitions.icu_tmap_list import DEFINED_TMAPS
 
 
 def make_first_visit_tensor_from_file():

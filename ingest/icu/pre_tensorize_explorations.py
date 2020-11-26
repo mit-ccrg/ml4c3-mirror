@@ -8,11 +8,10 @@ import numpy as np
 import pandas as pd
 
 # Imports: first party
-from ml4c3.definitions.icu import EDW_FILES, BEDMASTER_EXT
-from ml4c3.ingest.icu.utils import get_files_in_directory
-from ml4c3.ingest.icu.readers import EDWReader, BedmasterReader
-from ml4c3.ingest.icu.data_objects import EDWType, BedmasterType
-from ml4c3.ingest.icu.bedmaster_stats import BedmasterStats
+from definitions.icu import EDW_FILES, BEDMASTER_EXT
+from ingest.icu.utils import get_files_in_directory
+from ingest.icu.readers import EDWReader, BedmasterReader
+from ingest.icu.bedmaster_stats import BedmasterStats
 
 EXPECTED_FILES = []
 for FILE in EDW_FILES:

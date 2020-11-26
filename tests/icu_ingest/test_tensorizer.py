@@ -20,13 +20,13 @@ def test_tensorizer(
     monkeypatch,
     test_scale_units: Dict[str, Dict[str, Union[int, float, str]]],
 ):
-    monkeypatch.setattr("ml4c3.definitions.icu.ICU_SCALE_UNITS", test_scale_units)
+    monkeypatch.setattr("definitions.icu.ICU_SCALE_UNITS", test_scale_units)
     monkeypatch.setattr(
-        "ml4c3.ingest.icu.tensorizer.ICU_SCALE_UNITS",
+        "ingest.icu.tensorizer.ICU_SCALE_UNITS",
         test_scale_units,
     )
     monkeypatch.setattr(
-        "ml4c3.ingest.icu.readers.ICU_SCALE_UNITS",
+        "ingest.icu.readers.ICU_SCALE_UNITS",
         test_scale_units,
     )
 
