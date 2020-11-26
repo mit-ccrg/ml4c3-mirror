@@ -826,7 +826,6 @@ def get_train_valid_test_ids(
 
     :return: tuple of 3 sets of sample IDs
     """
-    all_ids: Set[str] = set()
     train_ids: Set[str] = set()
     valid_ids: Set[str] = set()
     test_ids: Set[str] = set()
@@ -872,25 +871,29 @@ def get_train_valid_test_ids(
         raise ValueError("validation and test samples overlap")
 
     # Get list of intersect of all IDs from all sources
+    all_source_ids = []
     for source in tensors:
         if isinstance(source, tuple):
             source = source[0]
 
         if os.path.isdir(source):
+            source_ids = set()
             for root, _, files in os.walk(source):
                 for fname in files:
                     if not fname.endswith(TENSOR_EXT):
                         continue
                     sample_id = os.path.splitext(fname)[0]
-                    all_ids.add(sample_id)
+                    source_ids.add(sample_id)
         elif source.endswith(CSV_EXT):
             source_ids = sample_csv_to_set(
                 sample_csv=source,
                 mrn_column_name=mrn_column_name,
             )
-            all_ids &= source_ids
         else:
             raise ValueError(f"Cannot get IDs from source: {source}")
+        all_source_ids.append(source_ids)
+
+    all_ids = set.intersection(*all_source_ids)
 
     # Split IDs among train/valid/test
     for sample_id in all_ids:
