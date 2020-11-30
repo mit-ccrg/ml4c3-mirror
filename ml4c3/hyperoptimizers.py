@@ -76,7 +76,7 @@ def hyperparameter_optimizer(
 ):
     histories = []
     aucs = []
-    results_path = os.path.join(args.output_folder, args.id)
+    results_path = args.output_folder
     i = 0
     seen_combinations = set()
 
@@ -153,7 +153,6 @@ def hyperparameter_optimizer(
                 valid_csv=args.valid_csv,
                 test_csv=args.test_csv,
                 output_folder=args.output_folder,
-                run_id=args.id,
                 cache_off=args.cache_off,
                 mixup_alpha=args.mixup_alpha,
             )
@@ -169,7 +168,6 @@ def hyperparameter_optimizer(
                 learning_rate_patience=args.learning_rate_patience,
                 learning_rate_reduction=args.learning_rate_reduction,
                 output_folder=trials_path,
-                run_id=trial_id,
                 image_ext=args.image_ext,
                 return_history=True,
                 plot=args.make_training_plots,
@@ -197,10 +195,9 @@ def hyperparameter_optimizer(
             auc = {"train": train_auc, "test": test_auc}
             aucs.append(auc)
             plot_metric_history(
-                history,
-                None,
-                "",
-                os.path.join(trials_path, trial_id),
+                history=history,
+                image_ext=args.image_ext,
+                prefix=os.path.join(trials_path, trial_id),
             )
             logging.info(
                 f"Current architecture:\n{_string_from_architecture_dict(x)}\nCurrent"

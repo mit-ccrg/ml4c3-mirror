@@ -1372,7 +1372,6 @@ def train_model_from_datasets(
     learning_rate_patience: int,
     learning_rate_reduction: float,
     output_folder: str,
-    run_id: str,
     image_ext: str,
     return_history: bool = False,
     plot: bool = True,
@@ -1396,14 +1395,13 @@ def train_model_from_datasets(
            to wait before reducing learning rate
     :param learning_rate_reduction: Scale factor to reduce learning rate by
     :param output_folder: Directory where output file will be stored
-    :param run_id: User-chosen string identifying this run
     :param image_ext: File format of saved image
     :param return_history: Whether or not to return history from training
     :param plot: Whether or not to plot metrics from training
     :return: The optimized model which achieved the best validation loss or training
              loss if validation data was not provided
     """
-    model_file = os.path.join(output_folder, run_id, "model_weights" + MODEL_EXT)
+    model_file = os.path.join(output_folder, "model_weights" + MODEL_EXT)
     if not os.path.exists(os.path.dirname(model_file)):
         os.makedirs(os.path.dirname(model_file))
 
@@ -1412,7 +1410,6 @@ def train_model_from_datasets(
         if plot:
             image_path = os.path.join(
                 output_folder,
-                run_id,
                 "architecture_graph" + image_ext,
             )
             plot_architecture_diagram(
@@ -1437,8 +1434,6 @@ def train_model_from_datasets(
         if plot:
             plot_metric_history(
                 history=history,
-                training_steps=None,
-                title=run_id,
                 image_ext=image_ext,
                 prefix=os.path.dirname(model_file),
             )

@@ -24,14 +24,12 @@ class TestRecipes:
         infer_multimodal_multitask(default_arguments_infer)
         path = os.path.join(
             default_arguments_infer.output_folder,
-            default_arguments_infer.id,
             "predictions_test.csv",
         )
         predictions = pd.read_csv(path)
         test_samples = pd.read_csv(
             os.path.join(
                 default_arguments_infer.output_folder,
-                default_arguments_infer.id,
                 "test.csv",
             ),
         )
@@ -62,7 +60,6 @@ class TestRecipes:
 
         csv_path = os.path.join(
             default_arguments_explore.output_folder,
-            default_arguments_explore.id,
             "tensors_union.csv",
         )
         explore_result = pd.read_csv(csv_path)

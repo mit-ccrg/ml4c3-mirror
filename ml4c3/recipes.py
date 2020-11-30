@@ -106,13 +106,12 @@ def run(args: argparse.Namespace):
 
 def build_multimodal_multitask(args: argparse.Namespace) -> Model:
     model = make_multimodal_multitask_model(**args.__dict__)
-    model_file = os.path.join(args.output_folder, args.id, "model_weights" + MODEL_EXT)
+    model_file = os.path.join(args.output_folder, "model_weights" + MODEL_EXT)
     model.save(model_file)
     plot_architecture_diagram(
         model_to_dot(model, show_shapes=True, expand_nested=True),
         os.path.join(
             args.output_folder,
-            args.id,
             "architecture_graph" + args.image_ext,
         ),
     )
@@ -139,7 +138,6 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
         valid_csv=args.valid_csv,
         test_csv=args.test_csv,
         output_folder=args.output_folder,
-        run_id=args.id,
         cache_off=args.cache_off,
         mixup_alpha=args.mixup_alpha,
     )
@@ -198,14 +196,13 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
         learning_rate_patience=args.learning_rate_patience,
         learning_rate_reduction=args.learning_rate_reduction,
         output_folder=args.output_folder,
-        run_id=args.id,
         image_ext=args.image_ext,
         return_history=True,
         plot=True,
     )
 
     # Evaluate trained model
-    plot_path = os.path.join(args.output_folder, args.id + "/")
+    plot_path = args.output_folder
     if args.mixup_alpha == 0:
         predict_and_evaluate(
             model=model,
@@ -264,13 +261,12 @@ def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         test_csv=args.test_csv,
         allow_empty_split=True,
         output_folder=args.output_folder,
-        run_id=args.id,
         cache_off=args.cache_off,
     )
     _, _, test_dataset = datasets
 
     model = make_multimodal_multitask_model(**args.__dict__)
-    out_path = os.path.join(args.output_folder, args.id + "/")
+    out_path = args.output_folder
     data_split = "test"
     if args.test_csv is not None:
         data_split = os.path.splitext(os.path.basename(args.test_csv))[0]
@@ -342,7 +338,6 @@ def train_simclr_model(args: argparse.Namespace):
         valid_csv=args.valid_csv,
         test_csv=args.test_csv,
         output_folder=args.output_folder,
-        run_id=args.id,
         cache_off=args.cache_off,
         mixup_alpha=args.mixup_alpha,
     )
@@ -359,7 +354,6 @@ def train_simclr_model(args: argparse.Namespace):
         learning_rate_patience=args.learning_rate_patience,
         learning_rate_reduction=args.learning_rate_reduction,
         output_folder=args.output_folder,
-        run_id=args.id,
         image_ext=args.image_ext,
         return_history=True,
         plot=True,

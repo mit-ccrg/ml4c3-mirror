@@ -39,8 +39,7 @@ def test_tensorizer(
     --path_bedmaster {test_dir}/data/bedmaster
     --path_edw {test_dir}/data/edw
     --path_alarms {test_dir}/data/bedmaster_alarms
-    --output_folder {temp_dir}
-    --id {pytest.run_id}
+    --output_folder {temp_dir}/{pytest.run_id}
     --tensors {os.path.join(temp_dir, pytest.run_id)}
     """.split()
 

@@ -413,7 +413,6 @@ def train_valid_test_datasets(
     test_csv: Optional[str] = None,
     allow_empty_split: bool = False,
     output_folder: Optional[str] = None,
-    run_id: Optional[str] = None,
     cache_off: bool = False,
     mixup_alpha: float = 0.0,
 ) -> Tuple[
@@ -445,7 +444,6 @@ def train_valid_test_datasets(
                      with test_ratio
     :param allow_empty_split: If true, allow one or more data splits to be empty
     :param output_folder: output folder of output files
-    :param run_id: id of experiment
     :param cache_off: if true, do not cache dataset in memory
     :param mixup_alpha: if non-zero, mixup batches with this alpha parameter for mixup
     :return: tuple of three tensorflow Datasets, three StatsWrapper objects, and
@@ -466,10 +464,10 @@ def train_valid_test_datasets(
         allow_empty_split=allow_empty_split,
     )
 
-    if output_folder is not None and run_id is not None:
+    if output_folder is not None:
 
         def save_ids(ids: Set[str], split: str):
-            fpath = os.path.join(output_folder, run_id, f"{split}{CSV_EXT}")
+            fpath = os.path.join(output_folder, f"{split}{CSV_EXT}")
             df = pd.DataFrame({"patient_id": list(ids)})
             df.to_csv(fpath, index=False)
             logging.info(f"--{split}_csv was not provided; saved sample IDs to {fpath}")

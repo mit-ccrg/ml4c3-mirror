@@ -385,10 +385,8 @@ def evaluate_predictions(
 
 def plot_metric_history(
     history,
-    training_steps: int,
-    title: str,
     image_ext: str,
-    prefix: str = "./figures/",
+    prefix: str,
 ):
     plt.rcParams["font.size"] = 14
     row = 0
@@ -440,7 +438,7 @@ def plot_metric_history(
                     break
 
     plt.tight_layout()
-    title = "metric_history" if title == "" else "metric_history_" + title
+    title = "metric_history"
     figure_path = os.path.join(prefix, title + image_ext)
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
@@ -1057,7 +1055,6 @@ def _plot_ecg_figure(
     plot_signal_function: Callable[[Dict[str, np.ndarray], plt.Axes], None],
     plot_mode: str,
     output_folder: str,
-    run_id: str,
     image_ext: str,
 ) -> None:
     plt.rcParams["font.family"] = "Times New Roman"
@@ -1140,8 +1137,8 @@ def _plot_ecg_figure(
 
     # save both pdf and image
     title = re.sub(r"[:/. ]", "", f'{plot_mode}_{data["patientid"]}_{data["datetime"]}')
-    plt.savefig(os.path.join(output_folder, run_id, f"{title}{PDF_EXT}"))
-    plt.savefig(os.path.join(output_folder, run_id, f"{title}{image_ext}"))
+    plt.savefig(os.path.join(output_folder, f"{title}{PDF_EXT}"))
+    plt.savefig(os.path.join(output_folder, f"{title}{image_ext}"))
     plt.close(fig)
 
 
@@ -1238,7 +1235,6 @@ def plot_ecg(args):
                         plot_signal_function=plot_signal_function,
                         plot_mode=args.plot_mode,
                         output_folder=args.output_folder,
-                        run_id=args.id,
                         image_ext=args.image_ext,
                     )
         except:

@@ -96,7 +96,6 @@ def explore(
         valid_csv=args.valid_csv,
         test_csv=args.test_csv,
         output_folder=args.output_folder,
-        run_id=args.id,
         export_error=args.explore_export_error,
         export_fpath=args.explore_export_fpath,
         export_generator=args.explore_export_generator,
@@ -172,7 +171,6 @@ def explore(
                 valid_csv=args.valid_csv,
                 test_csv=args.test_csv,
                 output_folder=args.output_folder,
-                run_id=args.id,
                 export_error=args.explore_export_error,
                 export_fpath=args.explore_export_fpath,
                 export_generator=args.explore_export_generator,
@@ -400,7 +398,6 @@ def explore(
                     window=window,
                     stratify_label=args.explore_stratify_label,
                     output_folder=args.output_folder,
-                    output_id=args.id,
                 )
 
         # Calculate cross-referenced cohort counts
@@ -455,7 +452,6 @@ def explore(
                                     tmap_name=name,
                                     df=_df,
                                     output_folder=args.output_folder,
-                                    output_id=args.id,
                                     window=window,
                                     stratify_label=args.explore_stratify_label,
                                     image_ext=args.image_ext,
@@ -515,7 +511,6 @@ def explore(
                     df_stats = pd.DataFrame(data=stats_all, index=[stats_keys])
                     fpath = os.path.join(
                         args.output_folder,
-                        args.id,
                         f"stats_{interpretation}_{window}_{union_or_intersect}.csv",
                     )
                     df_stats.round(3).to_csv(fpath)
@@ -525,7 +520,7 @@ def explore(
                     )
 
     # Save tensors, including column with window name
-    fpath = os.path.join(args.output_folder, args.id, "tensors_union.csv")
+    fpath = os.path.join(args.output_folder, "tensors_union.csv")
 
     # Time-windowed
     if use_time:
@@ -547,7 +542,7 @@ def explore(
         logging.info(f"Saved tensors to {fpath}")
 
     # Save cohort counts to CSV
-    fpath = os.path.join(args.output_folder, args.id, "cohort_counts.csv")
+    fpath = os.path.join(args.output_folder, "cohort_counts.csv")
     df_cohort_counts = pd.DataFrame.from_dict(
         cohort_counts,
         orient="index",
@@ -591,7 +586,6 @@ def _plot_histogram_continuous_tensor(
     tmap_name: str,
     df: pd.DataFrame,
     output_folder: str,
-    output_id: str,
     window: str,
     stratify_label: str,
     image_ext: str,
@@ -630,7 +624,6 @@ def _plot_histogram_continuous_tensor(
         plt.xlabel("Value")
     fpath = os.path.join(
         output_folder,
-        output_id,
         f"histogram_{tmap_name}_{window}{image_ext}",
     )
     plt.savefig(fpath, dpi=150, bbox_inches="tight")
@@ -731,7 +724,6 @@ def _save_label_distribution(
     window: str,
     stratify_label: str,
     output_folder: str,
-    output_id: str,
 ):
     # Get counts for each value of stratify_label in df
     label_counts = df[stratify_label].value_counts(dropna=False).to_dict()
@@ -751,7 +743,6 @@ def _save_label_distribution(
     ).T
     fpath = os.path.join(
         output_folder,
-        output_id,
         f"label_distribution_{title}_{window}.csv",
     )
     df_label_distribution.round(3).to_csv(fpath)
@@ -890,7 +881,6 @@ class TensorsToDataFrameParallelWrapper:
         paths,
         num_workers,
         output_folder,
-        run_id,
         export_error,
         export_fpath,
         export_generator,
@@ -900,7 +890,6 @@ class TensorsToDataFrameParallelWrapper:
         self.num_workers = num_workers
         self.total = len(paths)
         self.output_folder = output_folder
-        self.run_id = run_id
         self.export_error = export_error
         self.export_fpath = export_fpath
         self.export_generator = export_generator
@@ -918,7 +907,6 @@ class TensorsToDataFrameParallelWrapper:
         pid = mp.current_process().pid
         fpath = os.path.join(
             self.output_folder,
-            self.run_id,
             f"tensors_all_union_{pid}.csv",
         )
         write_header = not os.path.isfile(fpath)
@@ -1041,7 +1029,6 @@ def _tensors_to_df(
     valid_csv: str = None,
     test_csv: str = None,
     output_folder: str = "",
-    run_id: str = "",
     export_error: bool = False,
     export_fpath: bool = False,
     export_generator: bool = False,
@@ -1082,7 +1069,6 @@ def _tensors_to_df(
         paths=paths,
         num_workers=num_workers,
         output_folder=output_folder,
-        run_id=run_id,
         export_error=export_error,
         export_fpath=export_fpath,
         export_generator=export_generator,
@@ -1105,12 +1091,11 @@ def _tensors_to_df(
     str_cols = {key: "string" for key in str_cols_list}
 
     # Consolidate temporary CSV files into one dataframe
-    base = os.path.join(output_folder, run_id)
     temp_files = []
     df_list = []
-    for name in os.listdir(base):
+    for name in os.listdir(output_folder):
         if "tensors_all_union_" in name:
-            fpath = os.path.join(base, name)
+            fpath = os.path.join(output_folder, name)
             _df = pd.read_csv(fpath, dtype=str_cols)
             logging.debug(f"Loaded {fpath} into memory")
             df_list.append(_df)

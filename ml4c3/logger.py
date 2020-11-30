@@ -8,11 +8,7 @@ import logging.config
 
 
 def load_config(log_level, log_dir, log_file_basename):
-    try:
-        os.makedirs(log_dir)
-    except OSError as error:
-        if error.errno != errno.EEXIST:
-            raise error
+    os.makedirs(log_dir, exist_ok=True)
 
     logger = logging.getLogger(__name__)
 

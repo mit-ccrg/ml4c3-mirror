@@ -404,7 +404,7 @@ def get_adt_table(
 
         # Save results of department query
         result_name = "-".join(args.departments)
-        result_path = os.path.join(args.output_folder, args.id, f"{result_name}.csv")
+        result_path = os.path.join(args.output_folder, f"{result_name}.csv")
         dept_df.to_csv(result_path, index=False)
         logging.info(f"Saved cohort by departments to {result_path}")
 
@@ -448,7 +448,7 @@ def get_adt_table(
 
         # Save results of cohort query
         cohort_name = os.path.splitext(os.path.basename(args.cohort_query))[0]
-        cohort_path = os.path.join(args.output_folder, args.id, f"{cohort_name}.csv")
+        cohort_path = os.path.join(args.output_folder, f"{cohort_name}.csv")
         cohort_df.to_csv(cohort_path, index=False)
         logging.info(f"Saved cohort by query to {cohort_path}")
 

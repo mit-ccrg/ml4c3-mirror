@@ -100,14 +100,6 @@ def parse_args() -> argparse.Namespace:
         help="Path to output folder for recipes.py runs.",
     )
     io_parser.add_argument(
-        "--id",
-        default="no_id",
-        help=(
-            "Identifier for this run, user-defined string to keep experiments"
-            " organized."
-        ),
-    )
-    io_parser.add_argument(
         "--model_file",
         help="Path to a saved model architecture and weights (hd5).",
     )
@@ -1146,7 +1138,6 @@ def _process_args(args: argparse.Namespace):
     now_string = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
     args_file = os.path.join(
         args.output_folder,
-        args.id,
         "arguments_" + now_string + ".txt",
     )
     command_line = f"\n./scripts/tf.sh {' '.join(sys.argv)}\n"
@@ -1158,7 +1149,7 @@ def _process_args(args: argparse.Namespace):
             f.write(k + " = " + str(v) + "\n")
     load_config(
         args.logging_level,
-        os.path.join(args.output_folder, args.id),
+        args.output_folder,
         "log_" + now_string,
     )
 
