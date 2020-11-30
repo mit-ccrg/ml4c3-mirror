@@ -13,7 +13,7 @@ import pytest
 from ml4c3.datasets import (
     BATCH_IDS_INDEX,
     make_dataset,
-    sample_csv_to_set,
+    patient_csv_to_set,
     get_train_valid_test_ids,
 )
 from definitions.globals import TENSOR_EXT
@@ -26,35 +26,35 @@ ID_SPLITS = Tuple[ID_SPLIT, ID_SPLIT, ID_SPLIT]
 
 def _write_samples(
     csv_path: str,
-    sample_ids: Iterable[str],
+    patient_ids: Iterable[str],
     use_header: bool = False,
     write_dupes: bool = False,
 ):
     with open(csv_path, "w", newline="") as csv_file:
         csv_writer = csv.writer(csv_file)
         if use_header:
-            csv_writer.writerow(["sample_id"])
-        for sample_id in sample_ids:
-            csv_writer.writerow([sample_id])
+            csv_writer.writerow(["patient_id"])
+        for patient_id in patient_ids:
+            csv_writer.writerow([patient_id])
             if write_dupes:
-                csv_writer.writerow([sample_id])
+                csv_writer.writerow([patient_id])
 
 
 @pytest.fixture(scope="function")
-def sample_csv(tmpdir_factory, request) -> DATA_SPLIT:
+def patient_csv(tmpdir_factory, request) -> DATA_SPLIT:
     use_header = getattr(request, "param", None) == "header"
     write_dupes = getattr(request, "param", None) == "duplicates"
     csv_path = tmpdir_factory.mktemp("csvs").join("sample.csv")
-    sample_ids = {
-        str(sample_id)
-        for sample_id in np.random.choice(
+    patient_ids = {
+        str(patient_id)
+        for patient_id in np.random.choice(
             range(pytest.N_TENSORS),
             size=np.random.randint(pytest.N_TENSORS * 3 / 5, pytest.N_TENSORS * 4 / 5),
             replace=False,
         )
     }
-    _write_samples(csv_path, sample_ids, use_header, write_dupes)
-    return csv_path, sample_ids
+    _write_samples(csv_path, patient_ids, use_header, write_dupes)
+    return csv_path, patient_ids
 
 
 @pytest.fixture(scope="function")
@@ -68,9 +68,13 @@ def train_valid_test_csv(tmpdir_factory, request) -> DATA_SPLITS:
     n = int(pytest.N_TENSORS / 2)
     n1 = int(n / 3)
     n2 = int(n * 2 / 3)
-    sample_ids = [str(sample_id) for sample_id in range(n)]
-    np.random.shuffle(sample_ids)
-    train_ids, valid_ids, test_ids = sample_ids[:n1], sample_ids[n1:n2], sample_ids[n2:]
+    patient_ids = [str(patient_id) for patient_id in range(n)]
+    np.random.shuffle(patient_ids)
+    train_ids, valid_ids, test_ids = (
+        patient_ids[:n1],
+        patient_ids[n1:n2],
+        patient_ids[n2:],
+    )
     if "train" in overlap and "valid" in overlap:
         train_ids.append(valid_ids[0])
     elif "train" in overlap and "test" in overlap:
@@ -102,7 +106,7 @@ def train_valid_test_ids(
         tensors=args.tensors,
         valid_ratio=args.valid_ratio,
         test_ratio=args.test_ratio,
-        sample_csv=None,
+        patient_csv=None,
         train_csv=train_csv,
         valid_csv=valid_csv,
         test_csv=test_csv,
@@ -128,10 +132,10 @@ def test_ids(train_valid_test_ids: ID_SPLITS) -> ID_SPLIT:
 # used as parameters in pytest.mark.parametrize
 # https://github.com/pytest-dev/pytest/issues/349
 @pytest.fixture(scope="function")
-def sample_set(request, sample_csv: DATA_SPLIT) -> Optional[DATA_SPLIT]:
+def sample_set(request, patient_csv: DATA_SPLIT) -> Optional[DATA_SPLIT]:
     if request.param is None:
         return None
-    return sample_csv
+    return patient_csv
 
 
 @pytest.fixture(scope="function")
@@ -192,7 +196,7 @@ class TestDataset:
             dataset, stats, cleanup = make_dataset(
                 data_split="train",
                 tensors=default_arguments.tensors,
-                sample_ids=train_ids,
+                patient_ids=train_ids,
                 input_maps=default_arguments.tensor_maps_in,
                 output_maps=default_arguments.tensor_maps_out,
                 batch_size=batch_size,
@@ -204,11 +208,11 @@ class TestDataset:
             for batch in dataset:
                 rets.append(batch)
 
-            sample_ids = []
+            patient_ids = []
             for ret in rets:
-                sample_ids.extend(ret[BATCH_IDS_INDEX])
-            sample_ids = [sample_id.numpy().decode() for sample_id in sample_ids]
-            unique_ids, counts = np.unique(sample_ids, return_counts=True)
+                patient_ids.extend(ret[BATCH_IDS_INDEX])
+            patient_ids = [patient_id.numpy().decode() for patient_id in patient_ids]
+            unique_ids, counts = np.unique(patient_ids, return_counts=True)
             unique_counts = np.unique(counts)
 
             try:
@@ -222,29 +226,29 @@ class TestDataset:
 
 
 class TestSampleCsvToSet:
-    def test_sample_csv(self, sample_csv: DATA_SPLIT):
-        csv_path, sample_ids = sample_csv
-        sample_set = sample_csv_to_set(csv_path)
+    def test_patient_csv(self, patient_csv: DATA_SPLIT):
+        csv_path, patient_ids = patient_csv
+        sample_set = patient_csv_to_set(csv_path)
 
-        assert open(csv_path).readline() != "sample_id\n"
-        assert all([sample_id in sample_set for sample_id in sample_ids])
-        assert len(sample_ids) == len(sample_set)
+        assert open(csv_path).readline() != "patient_id\n"
+        assert all([patient_id in sample_set for patient_id in patient_ids])
+        assert len(patient_ids) == len(sample_set)
 
-    @pytest.mark.parametrize("sample_csv", ["header"], indirect=["sample_csv"])
-    def test_sample_csv_header(self, sample_csv: DATA_SPLIT):
-        csv_path, sample_ids = sample_csv
-        sample_set = sample_csv_to_set(csv_path)
-        assert open(csv_path).readline() == "sample_id\n"
-        assert all([sample_id in sample_set for sample_id in sample_ids])
-        assert len(sample_ids) == len(sample_set)
+    @pytest.mark.parametrize("patient_csv", ["header"], indirect=["patient_csv"])
+    def test_patient_csv_header(self, patient_csv: DATA_SPLIT):
+        csv_path, patient_ids = patient_csv
+        sample_set = patient_csv_to_set(csv_path)
+        assert open(csv_path).readline() == "patient_id\n"
+        assert all([patient_id in sample_set for patient_id in patient_ids])
+        assert len(patient_ids) == len(sample_set)
 
-    @pytest.mark.parametrize("sample_csv", ["duplicates"], indirect=["sample_csv"])
-    def test_sample_csv_duplicates(self, sample_csv: DATA_SPLIT):
-        csv_path, sample_ids = sample_csv
-        sample_set = sample_csv_to_set(csv_path)
-        assert open(csv_path).readline() != "sample_id\n"
-        assert all([sample_id in sample_set for sample_id in sample_ids])
-        assert len(sample_ids) == len(sample_set)
+    @pytest.mark.parametrize("patient_csv", ["duplicates"], indirect=["patient_csv"])
+    def test_patient_csv_duplicates(self, patient_csv: DATA_SPLIT):
+        csv_path, patient_ids = patient_csv
+        sample_set = patient_csv_to_set(csv_path)
+        assert open(csv_path).readline() != "patient_id\n"
+        assert all([patient_id in sample_set for patient_id in patient_ids])
+        assert len(patient_ids) == len(sample_set)
 
         with open(csv_path) as csv_file:
             dupe_set = set()
@@ -257,7 +261,7 @@ class TestSampleCsvToSet:
 
 
 class TestGetTrainValidTestPaths:
-    @pytest.mark.parametrize("sample_set", [None, "sample_csv"], indirect=True)
+    @pytest.mark.parametrize("sample_set", [None, "patient_csv"], indirect=True)
     @pytest.mark.parametrize("train_set", [None, "train_csv"], indirect=True)
     @pytest.mark.parametrize("valid_set", [None, "valid_csv"], indirect=True)
     @pytest.mark.parametrize("test_set", [None, "test_csv"], indirect=True)
@@ -276,13 +280,13 @@ class TestGetTrainValidTestPaths:
             assert len(all_ids - samples) == 0
             return True
 
-        sample_csv, sample_ids = sample_set or (None, None)
+        patient_csv, patient_ids = sample_set or (None, None)
         train_csv, train_ids = train_set or (None, None)
         valid_csv, valid_ids = valid_set or (None, None)
         test_csv, test_ids = test_set or (None, None)
         train, valid, test = get_train_valid_test_ids(
             tensors=args.tensors,
-            sample_csv=sample_csv,
+            patient_csv=patient_csv,
             valid_ratio=args.valid_ratio,
             test_ratio=args.test_ratio,
             train_csv=train_csv,
@@ -293,36 +297,36 @@ class TestGetTrainValidTestPaths:
         # make sure paths are disjoint and unique
         all_ids = train | valid | test
         counts = defaultdict(int)
-        for sample_id in all_ids:
-            counts[sample_id] += 1
+        for patient_id in all_ids:
+            counts[patient_id] += 1
         assert all(count == 1 for count in counts.values())
 
         # if sample csv was not given, find the files, just like how tensor_generator does
-        if sample_ids is None:
-            sample_ids = set()
+        if patient_ids is None:
+            patient_ids = set()
             for root, dirs, files in os.walk(default_arguments.tensors):
                 for name in files:
                     if os.path.splitext(name)[-1].lower() != TENSOR_EXT:
                         continue
-                    sample_ids.add(os.path.splitext(name)[0])
+                    patient_ids.add(os.path.splitext(name)[0])
 
         if train_ids is not None:
             # this block handles the cases where samples are discarded, which happens if train_csv is supplied
-            assert len(all_ids) <= len(sample_ids)
-            assert all(sample_id in sample_ids for sample_id in all_ids)
+            assert len(all_ids) <= len(patient_ids)
+            assert all(patient_id in patient_ids for patient_id in all_ids)
         else:
-            assert _ids_equal_samples(all_ids, sample_ids)
+            assert _ids_equal_samples(all_ids, patient_ids)
 
         if train_ids is not None:
-            train_ids &= sample_ids
+            train_ids &= patient_ids
             assert _ids_equal_samples(train, train_ids)
 
         if valid_ids is not None:
-            valid_ids &= sample_ids
+            valid_ids &= patient_ids
             assert _ids_equal_samples(valid, valid_ids)
 
         if test_ids is not None:
-            test_ids &= sample_ids
+            test_ids &= patient_ids
             assert _ids_equal_samples(test, test_ids)
 
     @pytest.mark.parametrize(
@@ -351,7 +355,7 @@ class TestGetTrainValidTestPaths:
                 tensors=args.tensors,
                 valid_ratio=args.valid_ratio,
                 test_ratio=args.test_ratio,
-                sample_csv=None,
+                patient_csv=None,
                 train_csv=train_csv,
                 valid_csv=valid_csv,
                 test_csv=test_csv,

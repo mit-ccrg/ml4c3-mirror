@@ -150,7 +150,7 @@ def generate_hyperoptimize_json_arrest(path_json: str):
         # Other parameters
         "input_tensors": input_tensors_set,
         "output_tensors": output_tensors_set,
-        "sample_csv": [
+        "patient_csv": [
             "/media/ml4c3/cohorts_lists/rr-and-codes.csv",
             "/media/ml4c3/cohorts_lists/rr-and-codes-non-icu.csv",
         ],
@@ -271,7 +271,7 @@ def generate_hyperoptimize_json_arrest(path_json: str):
         # Other parameters
         "input_tensors": input_tensors_set,
         "output_tensors": output_tensors_set,
-        "sample_csv": [
+        "patient_csv": [
             "/media/ml4c3/cohorts_lists/rr-and-codes.csv",
             "/media/ml4c3/cohorts_lists/rr-and-codes-non-icu.csv",
         ],

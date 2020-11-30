@@ -35,7 +35,7 @@ class TestRecipes:
                 "test.csv",
             ),
         )
-        assert len(set(predictions["sample_id"])) == len(test_samples)
+        assert len(set(predictions["patient_id"])) == len(test_samples)
 
     @staticmethod
     def test_explore(

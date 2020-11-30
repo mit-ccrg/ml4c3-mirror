@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 # Imports: first party
+from ingest.icu import tensorize
 from ml4c3.recipes import run
 from ml4c3.arguments import parse_args
 
@@ -33,7 +34,7 @@ def test_tensorizer(
     test_dir = os.path.dirname(__file__)
     sys.argv = f"""
     .
-    tensorize_icu
+    tensorize_icu_no_edw_pull
     --path_xref {test_dir}/data/xref_file_tensorize.csv
     --path_bedmaster {test_dir}/data/bedmaster
     --path_edw {test_dir}/data/edw
@@ -52,7 +53,7 @@ def test_tensorizer(
             pass
 
     # tensorize and check hd5 structure
-    run(args)
+    tensorize(args)
     with h5py.File(output_file, "r") as tens_file:
         assert sorted(list(tens_file.keys())) == ["bedmaster", "edw"]
 

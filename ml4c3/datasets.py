@@ -41,7 +41,7 @@ BATCH_INPUT_INDEX, BATCH_OUTPUT_INDEX, BATCH_IDS_INDEX = (
 # pylint: disable=line-too-long
 
 
-def infer_mrn_column(df: pd.DataFrame, sample_csv: str) -> str:
+def infer_mrn_column(df: pd.DataFrame, patient_csv: str) -> str:
     matches = []
     for col in df.columns.astype(str):
         if col.lower() in MRN_COLUMNS:
@@ -50,7 +50,7 @@ def infer_mrn_column(df: pd.DataFrame, sample_csv: str) -> str:
         return df.columns[0]
     if len(matches) > 1:
         logging.warning(
-            f"{sample_csv} has more than one potential column for MRNs. "
+            f"{patient_csv} has more than one potential column for MRNs. "
             "Inferring most likely column name, but recommend verifying "
             "data columns or not using column inference.",
         )
@@ -78,7 +78,7 @@ def _get_sample(
 def _tensor_worker(
     worker_name: str,
     tensors: Union[str, List[Union[str, Tuple[str, str]]]],
-    sample_ids: List[str],
+    patient_ids: List[str],
     start_signal: Event,
     tensor_queue: Queue,
     input_maps: List[TensorMap],
@@ -102,19 +102,19 @@ def _tensor_worker(
 
     # preload all CSVs into dataframes
     csv_data = []
-    sample_ids_set = set(sample_ids)
+    patient_ids_set = set(patient_ids)
     for csv_source, csv_name in csv_sources:
         df = pd.read_csv(csv_source, low_memory=False)
         mrn_col = infer_mrn_column(df, csv_source)
         df[mrn_col] = df[mrn_col].astype(str)
-        df = df[df[mrn_col].isin(sample_ids_set)]
+        df = df[df[mrn_col].isin(patient_ids_set)]
         csv_data.append((csv_name, df, mrn_col))
 
     while True:
         start_signal.wait()
         start_signal.clear()
-        np.random.shuffle(sample_ids)
-        for sample_id in sample_ids:
+        np.random.shuffle(patient_ids)
+        for patient_id in patient_ids:
             num_linked = 1
             open_hd5s = []
             try:
@@ -128,11 +128,11 @@ def _tensor_worker(
                 #     ...
                 # ]
                 tensors = []
-                data = PatientData(sample_id=sample_id)
+                data = PatientData(patient_id=patient_id)
 
                 # add top level groups in hd5s to patient dictionary
                 for hd5_source in hd5_sources:
-                    hd5_path = os.path.join(hd5_source, f"{sample_id}.hd5")
+                    hd5_path = os.path.join(hd5_source, f"{patient_id}.hd5")
                     if not os.path.isfile(hd5_path):
                         continue
                     hd5 = h5py.File(hd5_path, "r")
@@ -142,7 +142,7 @@ def _tensor_worker(
 
                 # add rows in csv with patient data accessible in patient dictionary
                 for csv_name, df, mrn_col in csv_data:
-                    mask = df[mrn_col] == sample_id
+                    mask = df[mrn_col] == patient_id
                     if not mask.any():
                         continue
                     data[csv_name] = df[mask]
@@ -179,7 +179,7 @@ def _tensor_worker(
                             data=data,
                         )
                         tensor_queue.put(
-                            ((in_tensors, out_tensors), sample_id, num_linked),
+                            ((in_tensors, out_tensors), patient_id, num_linked),
                         )
                     except (
                         IndexError,
@@ -192,12 +192,12 @@ def _tensor_worker(
                         # if sample was linked, fail all samples from this ID
                         if num_linked != 1:
                             raise ValueError("Linked sample failed")
-                        tensor_queue.put((SAMPLE_FAILED, sample_id, num_linked))
+                        tensor_queue.put((SAMPLE_FAILED, patient_id, num_linked))
                         continue
-                tensor_queue.put((ID_SUCCEEDED, sample_id, num_linked))
+                tensor_queue.put((ID_SUCCEEDED, patient_id, num_linked))
             except (IndexError, KeyError, ValueError, OSError, RuntimeError) as e:
                 # could not load samples from ID
-                tensor_queue.put((ID_FAILED, sample_id, num_linked))
+                tensor_queue.put((ID_FAILED, patient_id, num_linked))
             finally:
                 for hd5 in open_hd5s:
                     hd5.close()
@@ -212,7 +212,7 @@ def make_data_generator_factory(
     data_split: str,
     num_workers: int,
     tensors: Union[str, List[Union[str, Tuple[str, str]]]],
-    sample_ids: Set[str],
+    patient_ids: Set[str],
     input_maps: List[TensorMap],
     output_maps: List[TensorMap],
     augment: bool = False,
@@ -223,7 +223,7 @@ def make_data_generator_factory(
         tensors = [tensors]
 
     processes = []
-    worker_ids = np.array_split(list(sample_ids), num_workers)
+    worker_ids = np.array_split(list(patient_ids), num_workers)
     for i, _ids in enumerate(worker_ids):
         name = f"{data_split}_worker_{i}"
         start_signal = Event()
@@ -263,37 +263,37 @@ def make_data_generator_factory(
             process.start_signal.set()
 
         stats: Counter = Counter()
-        num_ids = len(sample_ids)
+        num_ids = len(patient_ids)
         linked_tensor_buffer: defaultdict = defaultdict(list)
         while stats["ids_completed"] < num_ids or len(linked_tensor_buffer) > 0:
-            sample, sample_id, num_linked = tensor_queue.get()
+            sample, patient_id, num_linked = tensor_queue.get()
             if sample == ID_SUCCEEDED:
                 stats["ids_succeeded"] += 1
                 stats["ids_completed"] += 1
             elif sample == ID_FAILED:
                 stats["ids_failed"] += 1
                 stats["ids_completed"] += 1
-                if sample_id in linked_tensor_buffer:
-                    del linked_tensor_buffer[sample_id]
+                if patient_id in linked_tensor_buffer:
+                    del linked_tensor_buffer[patient_id]
             elif sample == SAMPLE_FAILED:
                 stats["samples_failed"] += 1
                 stats["samples_completed"] += 1
             elif num_linked != 1:
-                linked_tensor_buffer[sample_id].append(sample)
-                if len(linked_tensor_buffer[sample_id]) == num_linked:
-                    for sample in linked_tensor_buffer[sample_id]:
+                linked_tensor_buffer[patient_id].append(sample)
+                if len(linked_tensor_buffer[patient_id]) == num_linked:
+                    for sample in linked_tensor_buffer[patient_id]:
                         stats["samples_succeeded"] += 1
                         stats["samples_completed"] += 1
                         _collect_sample_stats(stats, sample, input_maps, output_maps)
-                        yield sample if not keep_ids else sample + (sample_id,)
-                    del linked_tensor_buffer[sample_id]
+                        yield sample if not keep_ids else sample + (patient_id,)
+                    del linked_tensor_buffer[patient_id]
                 else:
                     continue
             else:
                 stats["samples_succeeded"] += 1
                 stats["samples_completed"] += 1
                 _collect_sample_stats(stats, sample, input_maps, output_maps)
-                yield sample if not keep_ids else sample + (sample_id,)
+                yield sample if not keep_ids else sample + (patient_id,)
 
         logging.info(
             f"{get_stats_string(name, stats, epoch_counter)}"
@@ -309,7 +309,7 @@ def make_data_generator_factory(
 def make_dataset(
     data_split: str,
     tensors: Union[str, List[Union[str, Tuple[str, str]]]],
-    sample_ids: Set[str],
+    patient_ids: Set[str],
     input_maps: List[TensorMap],
     output_maps: List[TensorMap],
     batch_size: int,
@@ -342,7 +342,7 @@ def make_dataset(
         data_split=data_split,
         num_workers=num_workers,
         tensors=tensors,
-        sample_ids=sample_ids,
+        patient_ids=patient_ids,
         input_maps=input_maps,
         output_maps=output_maps,
         augment=augment,
@@ -407,7 +407,7 @@ def train_valid_test_datasets(
     valid_ratio: float = 0.2,
     test_ratio: float = 0.1,
     mrn_column_name: Optional[str] = None,
-    sample_csv: Optional[str] = None,
+    patient_csv: Optional[str] = None,
     train_csv: Optional[str] = None,
     valid_csv: Optional[str] = None,
     test_csv: Optional[str] = None,
@@ -432,8 +432,8 @@ def train_valid_test_datasets(
     :param keep_ids: if true, return the patient ID for each sample
     :param keep_ids_test: if true, return the patient ID for each sample in the test set
     :param mrn_column_name: name of column in csv files with MRNs
-    :param sample_csv: CSV file of sample ids, sample ids are considered for
-                       train/valid/test only if it is in sample_csv
+    :param patient_csv: CSV file of sample ids, sample ids are considered for
+                       train/valid/test only if it is in patient_csv
     :param valid_ratio: rate of tensors to use for validation, mutually exclusive
                         with valid_csv
     :param test_ratio: rate of tensors to use for testing, mutually exclusive with
@@ -457,7 +457,7 @@ def train_valid_test_datasets(
     train_ids, valid_ids, test_ids = get_train_valid_test_ids(
         tensors=tensors,
         mrn_column_name=mrn_column_name,
-        sample_csv=sample_csv,
+        patient_csv=patient_csv,
         valid_ratio=valid_ratio,
         test_ratio=test_ratio,
         train_csv=train_csv,
@@ -470,7 +470,7 @@ def train_valid_test_datasets(
 
         def save_ids(ids: Set[str], split: str):
             fpath = os.path.join(output_folder, run_id, f"{split}{CSV_EXT}")
-            df = pd.DataFrame({"sample_id": list(ids)})
+            df = pd.DataFrame({"patient_id": list(ids)})
             df.to_csv(fpath, index=False)
             logging.info(f"--{split}_csv was not provided; saved sample IDs to {fpath}")
 
@@ -484,7 +484,7 @@ def train_valid_test_datasets(
     train_dataset, train_stats, train_cleanup = make_dataset(
         data_split="train",
         tensors=tensors,
-        sample_ids=train_ids,
+        patient_ids=train_ids,
         input_maps=tensor_maps_in,
         output_maps=tensor_maps_out,
         batch_size=batch_size,
@@ -497,7 +497,7 @@ def train_valid_test_datasets(
     valid_dataset, valid_stats, valid_cleanup = make_dataset(
         data_split="valid",
         tensors=tensors,
-        sample_ids=valid_ids,
+        patient_ids=valid_ids,
         input_maps=tensor_maps_in,
         output_maps=tensor_maps_out,
         batch_size=batch_size,
@@ -509,7 +509,7 @@ def train_valid_test_datasets(
     test_dataset, test_stats, test_cleanup = make_dataset(
         data_split="test",
         tensors=tensors,
-        sample_ids=test_ids,
+        patient_ids=test_ids,
         input_maps=tensor_maps_in,
         output_maps=tensor_maps_out,
         batch_size=batch_size,
@@ -756,16 +756,16 @@ def _get_train_valid_test_discard_ratios(
     return train_ratio, valid_ratio, test_ratio, discard_ratio
 
 
-def sample_csv_to_set(
-    sample_csv: Optional[str] = None,
+def patient_csv_to_set(
+    patient_csv: Optional[str] = None,
     mrn_column_name: Optional[str] = None,
 ) -> Union[None, Set[str]]:
 
-    if sample_csv is None:
+    if patient_csv is None:
         return None
 
     # Read CSV to dataframe and assume no header
-    df = pd.read_csv(sample_csv, header=None, low_memory=False)
+    df = pd.read_csv(patient_csv, header=None, low_memory=False)
 
     # If first row and column is castable to int, there is no header
     try:
@@ -781,18 +781,18 @@ def sample_csv_to_set(
         df.columns = [
             col.lower() if isinstance(col, str) else col for col in df.columns
         ]
-        mrn_column_name = infer_mrn_column(df, sample_csv)
+        mrn_column_name = infer_mrn_column(df, patient_csv)
 
     # Isolate MRN column from dataframe, cast to float -> int -> string
-    sample_ids = df[mrn_column_name].astype(float).astype(int).apply(str)
+    patient_ids = df[mrn_column_name].astype(float).astype(int).apply(str)
 
-    return set(sample_ids)
+    return set(patient_ids)
 
 
 def get_train_valid_test_ids(
     tensors: Union[str, List[Union[str, Tuple[str, str]]]],
     mrn_column_name: Optional[str] = None,
-    sample_csv: Optional[str] = None,
+    patient_csv: Optional[str] = None,
     valid_ratio: float = 0.2,
     test_ratio: float = 0.1,
     train_csv: Optional[str] = None,
@@ -810,9 +810,9 @@ def get_train_valid_test_ids(
 
     :param tensors: list of paths or tuples to directories or CSVs containing tensors
     :param mrn_column_name: name of column in csv files with MRNs
-    :param sample_csv: path to csv containing sample ids, only consider sample ids
+    :param patient_csv: path to csv containing sample ids, only consider sample ids
                        for splitting into train/valid/test sets if they appear in
-                       sample_csv
+                       patient_csv
     :param valid_ratio: rate of tensors in validation list, mutually exclusive with
                         valid_csv
     :param test_ratio: rate of tensors in testing list, mutually exclusive with
@@ -843,13 +843,19 @@ def get_train_valid_test_ids(
         test_csv=test_csv,
     )
 
-    sample_set = sample_csv_to_set(
-        sample_csv=sample_csv,
+    sample_set = patient_csv_to_set(
+        patient_csv=patient_csv,
         mrn_column_name=mrn_column_name,
     )
-    train_set = sample_csv_to_set(sample_csv=train_csv, mrn_column_name=mrn_column_name)
-    valid_set = sample_csv_to_set(sample_csv=valid_csv, mrn_column_name=mrn_column_name)
-    test_set = sample_csv_to_set(sample_csv=test_csv, mrn_column_name=mrn_column_name)
+    train_set = patient_csv_to_set(
+        patient_csv=train_csv,
+        mrn_column_name=mrn_column_name,
+    )
+    valid_set = patient_csv_to_set(
+        patient_csv=valid_csv,
+        mrn_column_name=mrn_column_name,
+    )
+    test_set = patient_csv_to_set(patient_csv=test_csv, mrn_column_name=mrn_column_name)
 
     if (
         train_set is not None
@@ -882,11 +888,11 @@ def get_train_valid_test_ids(
                 for fname in files:
                     if not fname.endswith(TENSOR_EXT):
                         continue
-                    sample_id = os.path.splitext(fname)[0]
-                    source_ids.add(sample_id)
+                    patient_id = os.path.splitext(fname)[0]
+                    source_ids.add(patient_id)
         elif source.endswith(CSV_EXT):
-            source_ids = sample_csv_to_set(
-                sample_csv=source,
+            source_ids = patient_csv_to_set(
+                patient_csv=source,
                 mrn_column_name=mrn_column_name,
             )
         else:
@@ -896,18 +902,18 @@ def get_train_valid_test_ids(
     all_ids = set.intersection(*all_source_ids)
 
     # Split IDs among train/valid/test
-    for sample_id in all_ids:
-        if sample_set is not None and sample_id not in sample_set:
+    for patient_id in all_ids:
+        if sample_set is not None and patient_id not in sample_set:
             continue
 
-        if train_set is not None and sample_id in train_set:
-            train_ids.add(sample_id)
-        elif valid_set is not None and sample_id in valid_set:
-            valid_ids.add(sample_id)
-        elif test_set is not None and sample_id in test_set:
-            test_ids.add(sample_id)
+        if train_set is not None and patient_id in train_set:
+            train_ids.add(patient_id)
+        elif valid_set is not None and patient_id in valid_set:
+            valid_ids.add(patient_id)
+        elif test_set is not None and patient_id in test_set:
+            test_ids.add(patient_id)
         else:
-            unassigned_ids.append(sample_id)
+            unassigned_ids.append(patient_id)
 
     np.random.shuffle(unassigned_ids)
     n = len(unassigned_ids)
@@ -973,12 +979,12 @@ def get_dicts_of_arrays_from_dataset(
         output_name: np.concatenate(output_data_batches[output_name])
         for output_name in output_data_batches
     }
-    sample_ids = None if len(id_batches) == 0 else np.concatenate(id_batches).tolist()
+    patient_ids = None if len(id_batches) == 0 else np.concatenate(id_batches).tolist()
 
     return (
         (input_data, output_data)
-        if not sample_ids
-        else (input_data, output_data, sample_ids)
+        if not patient_ids
+        else (input_data, output_data, patient_ids)
     )
 
 

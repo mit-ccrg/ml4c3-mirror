@@ -11,7 +11,7 @@ from ml4c3.ingest.icu.assess_coverage import ICUCoverageAssesser
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--sample_csv",
+        "--patient_csv",
         type=str,
         default="/media/ml4c3/adt.csv",
         help="File with a list of MRNs and CSNs to check their existance.",
@@ -40,7 +40,7 @@ def parse_arguments():
 def run(args: argparse.Namespace):
     remaining_patients = ICUCoverageAssesser._compare(
         ICUCoverageAssesser,
-        args.sample_csv,
+        args.patient_csv,
         args.path_edw,
         args.remove,
     )

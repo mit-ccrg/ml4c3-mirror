@@ -2,9 +2,6 @@
 import os
 from typing import Any, Dict, List
 
-ML4C3_DIR = "/media/ml4c3"
-LM4_DIR = "/media/lm4-bedmaster"
-
 EDW_PREFIX = "edw"
 EDW_EXT = ".csv"
 BEDMASTER_PREFIX = "bedmaster"

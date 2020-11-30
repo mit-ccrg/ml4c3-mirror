@@ -22,8 +22,8 @@ def test_pre_tensorize_explorations(temp_dir):
         if file.startswith("bedmaster_file-"):
             copy2(os.path.join(pytest.bedmaster_dir, file), temp_dir)
 
-    sample_csv = pd.DataFrame.from_dict({"MRN": [123, 456]})
-    sample_csv.to_csv(os.path.join(temp_dir, "sample_csv.csv"))
+    patient_csv = pd.DataFrame.from_dict({"MRN": [123, 456]})
+    patient_csv.to_csv(os.path.join(temp_dir, "patient_csv.csv"))
     sys.argv = [
         ".",
         "pre_tensorize_explore",
@@ -36,8 +36,8 @@ def test_pre_tensorize_explorations(temp_dir):
         "--output_folder",
         temp_dir,
         "--detailed_bedmaster",
-        "--sample_csv",
-        os.path.join(temp_dir, "sample_csv.csv"),
+        "--patient_csv",
+        os.path.join(temp_dir, "patient_csv.csv"),
     ]
     args = parse_args()
     run(args)
@@ -48,7 +48,7 @@ def test_pre_tensorize_explorations(temp_dir):
         f"{args.summary_stats_base_name}_signals_summary.csv",
         f"{args.summary_stats_base_name}_bedmaster_signal_stats.csv",
         f"{args.summary_stats_base_name}_bedmaster_files_stats.csv",
-        "sample_csv.csv",
+        "patient_csv.csv",
     ]
 
     output_files = [
@@ -136,15 +136,15 @@ def test_independent_args(temp_dir):
         for file in os.listdir(temp_dir):
             if file.endswith(".csv"):
                 os.remove(os.path.join(temp_dir, file))
-        sample_csv = pd.DataFrame.from_dict({"MRN": [123, 456]})
-        sample_csv.to_csv(os.path.join(temp_dir, "sample_csv.csv"))
+        patient_csv = pd.DataFrame.from_dict({"MRN": [123, 456]})
+        patient_csv.to_csv(os.path.join(temp_dir, "patient_csv.csv"))
 
     base_name = "pre_tensorize"
     expected_files = [
         f"{base_name}_edw_demographics.csv",
         f"{base_name}_coverage.csv",
         f"{base_name}_signals_summary.csv",
-        "sample_csv.csv",
+        "patient_csv.csv",
         f"{base_name}_bedmaster_signal_stats.csv",
         f"{base_name}_bedmaster_files_stats.csv",
     ]
@@ -161,8 +161,8 @@ def test_independent_args(temp_dir):
         temp_dir,
         "--output_folder",
         temp_dir,
-        "--sample_csv",
-        os.path.join(temp_dir, "sample_csv.csv"),
+        "--patient_csv",
+        os.path.join(temp_dir, "patient_csv.csv"),
     ]
     _reset_dir()
     parsed_args = parse_args()

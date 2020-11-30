@@ -1,12 +1,11 @@
 # pylint: disable=redefined-outer-name, broad-except
 # Imports: standard library
 import os
-import glob
 import shutil
 import getpass
-import pathlib
+import logging
 import argparse
-from timeit import default_timer as timer
+from typing import Set, List, Tuple, Optional
 
 # Imports: third party
 import numpy as np
@@ -30,56 +29,44 @@ DEPT_ID["procedurerm"] = "10020011402"
 DEPT_ID["bigelow6"] = "10020010614"
 
 
-def _format_sql_query(path: str, str_to_insert: str = None) -> str:
+def _format_sql_query(
+    query_path: str,
+    strings_to_insert: List[str] = [],
+) -> str:
     """
-    Formats a SQL query from a .sql file into a str, and inserts a str arg
-    into the query to enable iteration over lists of parameters
+    Loads a sql query from a file and inserts parameter strings
     """
-    with open(path, "r") as f:
-        # Get SQL query from file as str
-        sql_str = f.read()
+    # Get SQL query from file as string
+    with open(query_path, "r") as f:
+        sql = f.read()
 
     # Insert format string into {} in query string
-    sql_str = sql_str.format(str_to_insert)
+    sql = sql.format(*strings_to_insert)
 
     # Remove leading and trailing whitespaces
-    sql_str = sql_str.strip()
+    sql = sql.strip()
 
     # Remove carriage return characters
-    sql_str = sql_str.replace("\r", "")
-    return sql_str
+    sql = sql.replace("\r", "")
+
+    return sql
 
 
-def _run_sql_query(
+def query_to_dataframe(
     edw: pyodbc.Connection,
-    query_fpath: str,
-    str_to_insert: str = None,
-    fpath: str = None,
-    save_dir: str = "./",
-):
-    """
-    Run SQL query via an EDW network connection, and save output in dataframe
-    """
-    # Format and run ADT query
-    print(f"\tRunning query: {os.path.split(query_fpath)[1]}")
-    sql_str = _format_sql_query(query_fpath, str_to_insert)
+    query_path: str,
+    strings_to_insert: List[str] = [],
+) -> pd.DataFrame:
 
-    # Read SQL query into DataFrame
-    df = pd.read_sql_query(sql_str, edw)
-
-    # Isolate name of the query
-    if not fpath:
-        query_name = os.path.split(query_fpath)[-1][:-4]
-        fpath = os.path.join(save_dir, f"{query_name}.csv")
-
-    # Save DataFrame to disk
-    df.to_csv(fpath, index=False)
-    print(f"\tSaved query results at: {fpath}")
+    logging.info(f"Running query: {os.path.split(query_path)[-1]}")
+    sql = _format_sql_query(query_path, strings_to_insert)
+    df = pd.read_sql_query(sql, edw)
+    return df
 
 
 def _run_queries(
     edw: pyodbc.Connection,
-    query_fpaths: list,
+    query_paths: list,
     list_mrn: list,
     list_csn: list,
     batch_size: int,
@@ -87,10 +74,7 @@ def _run_queries(
     save_dir: str,
 ):
     save_dir = os.path.join(save_dir, folder_idx)
-
-    # Check if encounter ID dir exists; if not, make it
-    if not os.path.isdir(save_dir):
-        os.makedirs(save_dir)
+    os.makedirs(save_dir, exist_ok=True)
 
     # Save tables with lists of batched mrns and csns if there's batching
     if batch_size > 1:
@@ -98,58 +82,46 @@ def _run_queries(
             np.array((list_mrn, list_csn)).transpose(),
             columns=["MRN", "CSN"],
         )
-        batch_list.to_csv(os.path.join(save_dir, "batch_list.csv"))
+        batch_list.to_csv(os.path.join(save_dir, "batch_list.csv"), index=False)
 
     # Iterate through SQL queries
     list_csn_str = str(list_csn)[1:-1]
-    for query_fpath in query_fpaths:
-        _run_sql_query(
+    for query_path in query_paths:
+        query_df = query_to_dataframe(
             edw=edw,
-            query_fpath=query_fpath,
-            str_to_insert=list_csn_str,
-            save_dir=save_dir,
+            query_path=query_path,
+            strings_to_insert=[list_csn_str],
         )
+        query_name = os.path.splitext(os.path.basename(query_path))[0]
+        result_path = os.path.join(save_dir, f"{query_name}.csv")
+        query_df.to_csv(result_path, index=False)
+        logging.info(f"Saved results to: {result_path}")
 
 
 def _get_mrns_csns_at_destination(
-    parent_dir: str,
-    query_fpaths: list,
+    edw_dir: str,
+    query_paths: List[str],
     patients: pd.DataFrame,
-) -> tuple:
+) -> Tuple[List[str], List[str]]:
     """
     Given a directory, obtain a list of all MRN and CSN directories. Assumes a
     directory structure:
     /parent_dir
     ├── 12345 (mrn)
     │   ├── 78982336 (csn)
-    │   └── 78937589 (csn)
+    │   └── 78937589 (csn)
     ├── 12346 (mrn)
-    │   └── 12552657 (csn)
+    │   └── 12552657 (csn)
     etc.
     """
     # Determine the list of expected .csv files in each CSN folder
     expected_files = [
-        f"{os.path.split(query_fpath)[-1][:-4]}.csv" for query_fpath in query_fpaths
+        f"{os.path.basename(query_path)[:-4]}.csv" for query_path in query_paths
     ]
 
-    # Get MRNs of interest
-    if args.just_sample_csv_csns:
-        fpath = args.sample_csv
-    else:
-        fpath = args.path_adt
-    mrns = pd.read_csv(fpath)["MRN"].unique()
-    mrns = mrns[~np.isnan(mrns)]
-
     # Get full path to MRN-CSN directories
-    patients["paths"] = patients.apply(
-        lambda x: os.path.join(
-            parent_dir,
-            str(int(x["MRN"])),
-            str(int(x["PatientEncounterID"])),
-        ),
-        axis=1,
-    )
-    csn_dirs = list(patients["paths"].unique())
+    make_path = lambda row: os.path.join(edw_dir, row["MRN"], row["PatientEncounterID"])
+    csn_dirs = patients.apply(make_path, axis=1).unique()
 
     # Initialize empty master lists to store MRNs and CSNs
     mrns = []
@@ -158,29 +130,35 @@ def _get_mrns_csns_at_destination(
     # Iterate through MRN-CSN dir and update master lists
     for csn_dir in csn_dirs:
         try:
-            csv_files = [
+            csv_files = {
                 csv_file
                 for csv_file in os.listdir(csn_dir)
                 if csv_file.endswith(".csv")
-            ]
+            }
             for expected_file in expected_files:
                 if expected_file not in csv_files:
                     break
             else:
                 # Remove the parent_dir prefix to just get '/mrn/csn'
-                csn_dir = csn_dir.replace(parent_dir, "")
+                csn_dir = csn_dir.replace(edw_dir, "")
                 _, mrn, csn = csn_dir.split("/")
-                mrns.append(float(mrn))
-                csns.append(float(csn))
+                mrns.append(mrn)
+                csns.append(csn)
         except FileNotFoundError:
             continue
     return mrns, csns
 
 
-def _connect_edw(partners_username: str, pwd: str) -> pyodbc.Connection:
+def connect_edw() -> pyodbc.Connection:
     """
     Connect to EDW databse using user: partners_username and password: pwd.
     """
+    partners_username = input(
+        "=======================================================================\n"
+        "Enter EDW username: ",
+    )
+    pwd = getpass.getpass("Enter EDW password: ")
+
     # EDW
     host = "phsedw.partners.org,1433"
     user = f"PARTNERS\\{partners_username}"
@@ -194,129 +172,17 @@ def _connect_edw(partners_username: str, pwd: str) -> pyodbc.Connection:
             user=user,
             pwd=pwd,
         )
-        print(f"Connected to {host} using login {user}")
+        logging.info(f"Connected to {host} using login {user}")
     except Exception as e:
         raise Exception(f"Failed to connect to {host} using login {user}") from e
     return edw
 
 
-def _obtain_data(
-    edw,
-    path_to_queries: str,
-    args,
-):
-    # Load EDW queries
-    query_fpaths = glob.glob(f"{path_to_queries}/*.sql")
-    query_fpaths = [
-        query_fpath for query_fpath in query_fpaths if "adt" not in query_fpath
-    ]
-    print(f"\nFound {len(query_fpaths)} SQL queries in ./{path_to_queries}.")
-
-    # Get path to ADT query
-    if os.path.isfile(args.path_adt):
-        print("ADT table found, no need to run adt query.")
-    elif args.sample_csv:
-        if not args.path_adt:
-            args.path_adt = os.path.join(args.output_folder, "adt.csv")
-        mrns = pd.read_csv(args.sample_csv)["MRN"].unique()
-        mrns = mrns[~np.isnan(mrns)]
-        list_mrns = str(list(mrns))[1:-1]
-        str_to_insert = list_mrns
-        adt_query_fpath = os.path.join(path_to_queries, "adt.sql")
-        print(f"Path to ADT query: {adt_query_fpath}")
-        _run_sql_query(
-            edw=edw,
-            query_fpath=adt_query_fpath,
-            str_to_insert=str_to_insert,
-            fpath=args.path_adt,
-        )
-    else:
-        raise ValueError(
-            "Unable to obtain adt table. Specify a sample_csv or "
-            "a valid path_adt in args to proceed.",
-        )
-
-    # Isolate all unique PatientEncounterIDs and cast from np.array -> list
-    adt = pd.read_csv(args.path_adt)
-    if args.sample_csv:
-        mrns = pd.read_csv(args.sample_csv)["MRN"].unique()
-        mrns = mrns[~np.isnan(mrns)]
-        adt = adt[adt["MRN"].isin(list(mrns))]
-        if args.just_sample_csv_csns:
-            csns = pd.read_csv(args.sample_csv)["PatientEncounterID"].unique()
-            csns = csns[~np.isnan(csns)]
-            adt = adt[adt["PatientEncounterID"].isin(list(csns))]
-    patients = adt[["MRN", "PatientEncounterID"]].drop_duplicates()
-    patients = patients.sort_values(by=["MRN", "PatientEncounterID"], ascending=True)
-    num_rows = len(patients.index)
-    print(f"Extracted {num_rows} unique MRN-PatientEncounterID values from adt table.")
-
-    # Batch the patient encounter IDs
-    patients = patients[args.first : args.last]
-    patients = patients.reset_index()
-    num_rows = len(patients.index)
-    print(
-        f"\nReduced the number of unique MRN-PatientEncounterID values to {num_rows}.",
-    )
-
-    # Get MRNs and CSNs at the destination directory
-    if not args.overwrite:
-        _, csns = _get_mrns_csns_at_destination(
-            args.output_folder,
-            query_fpaths,
-            patients,
-        )
-    else:
-        csns = []
-
-    # Iterate through each MRN and CSN
-    list_mrn = []
-    list_csn = []
-    for index, row in patients.iterrows():
-        if row.PatientEncounterID in csns:
-            print(
-                f"\nMRN: {row.MRN:0.0f} ({index + 1}/{patients.shape[0]}), CSN: "
-                f"{row.PatientEncounterID:0.0f} already exists at destination; "
-                "skipping.",
-            )
-        else:
-            print(
-                f"\nMRN: {row.MRN:0.0f} ({index + 1}/{patients.shape[0]}), CSN: "
-                f"{row.PatientEncounterID:0.0f} does not yet exist at destination; "
-                "buffering for query...",
-            )
-            list_mrn.append(str(int(row.MRN)))
-            list_csn.append(str(int(row.PatientEncounterID)))
-
-        if (
-            len(list_mrn) > 0
-            and len(list_csn) > 0
-            and (len(list_mrn) == args.num_batch or (index + 1) == len(patients.index))
-        ):
-            if args.num_batch > 1:
-                folder_idx = args.batch_folder_name
-            else:
-                folder_idx = os.path.join(str(list_mrn[0]), str(list_csn[0]))
-            try:
-                _run_queries(
-                    edw=edw,
-                    query_fpaths=query_fpaths,
-                    list_mrn=list_mrn,
-                    list_csn=list_csn,
-                    batch_size=args.num_batch,
-                    folder_idx=folder_idx,
-                    save_dir=args.output_folder,
-                )
-            except Exception as e:
-                print(f"_run_queries failed due to error: {e}")
-            list_mrn = []
-            list_csn = []
-            if args.num_batch > 1:
-                _reorder_folders(args.output_folder, args.batch_folder_name)
-
-
 def _reorder_folders(save_dir: str, directory: str):
-    list_batch_df = pd.read_csv(os.path.join(save_dir, directory, "batch_list.csv"))
+    list_batch_df = pd.read_csv(
+        os.path.join(save_dir, directory, "batch_list.csv"),
+        low_memory=False,
+    )
     mrn_list = list(list_batch_df["MRN"])
     csn_list = list(list_batch_df["CSN"])
     tables = next(os.walk(os.path.join(save_dir, directory)))[2]
@@ -327,211 +193,327 @@ def _reorder_folders(save_dir: str, directory: str):
             os.makedirs(os.path.join(save_dir, mrn, csn))
         for table in tables:
             if table != "batch_list.csv":
-                tab_df = pd.read_csv(os.path.join(save_dir, directory, table))
+                tab_df = pd.read_csv(
+                    os.path.join(save_dir, directory, table),
+                    low_memory=False,
+                )
                 try:
                     filt_tab_df = tab_df[tab_df["PatientEncounterID"] == int(csn)]
                 except KeyError:
                     filt_tab_df = tab_df[tab_df["CSN"] == int(csn)]
                 filt_tab_df.to_csv(os.path.join(save_dir, mrn, csn, table), index=False)
     shutil.rmtree(os.path.join(save_dir, directory))
-    print("Batch of patients reorganized.")
+    logging.info("Batch of patients reorganized.")
 
 
-def _obtain_remaining_patients():
-    # Load EDW queries
-    query_fpaths = glob.glob(f"{path_to_queries}/*.sql")
-    query_fpaths = [
-        query_fpath for query_fpath in query_fpaths if "adt" not in query_fpath
+def _obtain_data(
+    args: argparse.Namespace,
+    edw: pyodbc.Connection,
+    query_directory: str,
+    adt: pd.DataFrame,
+):
+    if args.staging_dir is None:
+        raise ValueError("Must provide staging directory.")
+    batch_size = args.staging_batch_size or 1
+
+    query_paths = [
+        os.path.join(query_directory, query_path)
+        for query_path in os.listdir(query_directory)
+        if query_path.endswith(".sql")
+        and "adt" not in query_path
+        and "mrn" not in query_path
+        and "department" not in query_path
     ]
 
-    # EDW CSNs
-    if args.just_sample_csv_csns:
-        fpath = args.sample_csv
-    else:
-        fpath = args.path_adt
-    patients = pd.read_csv(fpath)[["MRN", "PatientEncounterID"]].drop_duplicates()
-
-    # Existing CSNs
-    _, csns = _get_mrns_csns_at_destination(
-        args.output_folder,
-        query_fpaths,
-        patients,
+    # Get unique patients and encounters, sort, and select data
+    patients = adt[["MRN", "PatientEncounterID"]].drop_duplicates()
+    patients = patients.sort_values(by=["MRN", "PatientEncounterID"], ascending=True)
+    num_patients = len(patients)
+    logging.info(
+        f"Extracted {num_patients} unique MRN-PatientEncounterID "
+        f"values from adt table.",
     )
 
-    # Get remaining patients
-    remaining_patients = patients[~patients["PatientEncounterID"].isin(csns)]
-    remaining_patients.to_csv(
-        os.path.join(args.output_folder, "remaining_patients.csv"),
+    patients = patients[args.adt_start_index : args.adt_end_index]
+    patients = patients.reset_index()
+    num_patients = len(patients.index)
+    logging.info(
+        f"Reduced the number of unique MRN-PatientEncounterID values to {num_patients}.",
     )
 
+    # Get MRNs and CSNs at the destination directory
+    csns = set()
+    if not args.overwrite:
+        _, csns = _get_mrns_csns_at_destination(
+            edw_dir=args.path_edw,
+            query_paths=query_paths,
+            patients=patients,
+        )
+        csns = set(csns)
 
-def parse_args() -> argparse.Namespace:
-    # Parse arguments
-    parser = argparse.ArgumentParser()
-    subparser = parser.add_subparsers(
-        title="edw modes",
-        description="Select one of the following modes: \n"
-        "\t * obtain_cohort: obtain a list of MRNs and CSNs of interest. \n"
-        "\t * pull_edw_data: obtain edw data of a list of MRNs and CSNs. \n",
-        dest="mode",
-    )
-    io_parser = argparse.ArgumentParser(add_help=False)
-    io_parser.add_argument(
-        "--output_folder",
-        type=str,
-        default="/media/ml4c3/edw",
-        help="Location to store output from EDW.",
-    )
-    pull_edw_data_parser = subparser.add_parser(
-        name="pull_edw_data",
-        parents=[io_parser],
-    )
-    pull_edw_data_parser.add_argument(
-        "--first",
-        type=int,
-        default=0,
-        help="First patient in ADT table to get data from.",
-    )
-    pull_edw_data_parser.add_argument(
-        "--last",
-        type=int,
-        default=None,
-        help="Last patient in ADT table to get data from.",
-    )
-    pull_edw_data_parser.add_argument(
-        "--sample_csv",
-        type=str,
-        default=None,
-        help="Path to .csv with list of MRNs and CSNs to get EDW data.",
-    )
-    pull_edw_data_parser.add_argument(
-        "--just_sample_csv_csns",
-        action="store_true",
-        help="If this parameter is set together with --sample_csv, just CSNs from "
-        "--sample_csv will be pulled.",
-    )
-    pull_edw_data_parser.add_argument(
-        "--path_adt",
-        type=str,
-        default=None,
-        help="Path to the ADT table. If it doesn't exist, it will be created using "
-        "MRNs in sample_csv.",
-    )
-    pull_edw_data_parser.add_argument(
-        "--num_batch",
-        type=int,
-        default=1,
-        help="Number of patients to batch for each query.",
-    )
-    pull_edw_data_parser.add_argument(
-        "--batch_folder_name",
-        type=str,
-        default="b",
-        help="Name of the folder where the batched results will be saved temporaly.",
-    )
-    pull_edw_data_parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="If this parameter is set, EDW data in --output_folder will be "
-        "overwriten.",
-    )
+    # Iterate through each MRN and CSN
+    list_mrn = []
+    list_csn = []
+    for index, row in patients.iterrows():
+        if row.PatientEncounterID in csns:
+            logging.info(
+                f"MRN: {row.MRN} ({index + 1}/{patients.shape[0]}), CSN: "
+                f"{row.PatientEncounterID} already exists at destination; "
+                "skipping.",
+            )
+        else:
+            logging.info(
+                f"MRN: {row.MRN} ({index + 1}/{patients.shape[0]}), CSN: "
+                f"{row.PatientEncounterID} does not yet exist at destination; "
+                "buffering for query...",
+            )
+            list_mrn.append(str(int(row.MRN)))
+            list_csn.append(str(int(row.PatientEncounterID)))
 
-    obtain_cohort_parser = subparser.add_parser(
-        name="obtain_cohort",
-        parents=[io_parser],
-    )
-    obtain_cohort_parser_exclusive = obtain_cohort_parser.add_mutually_exclusive_group(
-        required=True,
-    )
-    obtain_cohort_parser_exclusive.add_argument(
-        "--cohort_query",
-        type=str,
-        default=None,
-        choices=["cabg-arrest-blake8", "cabg", "rr-and-codes"],
-        help="Name of the SQL query to call in order to get a list of patients.",
-    )
-    obtain_cohort_parser_exclusive.add_argument(
-        "--department",
-        type=str,
-        default=None,
-        help="Department name to get a list of patients.",
-    )
-    obtain_cohort_parser_exclusive.add_argument(
-        "--sample_csv",
-        type=str,
-        default=None,
-        help="Path to list of MRNS in order to get a list of MRNs and CSNs.",
-    )
-    obtain_cohort_parser.add_argument(
-        "--do_not_compute_adt",
-        action="store_true",
-        help="Do not compute ADT table for the query obtained via --cohort_query, "
-        "--department or --query_mrns.",
-    )
-    args = parser.parse_args()
-    return args
+        if (
+            len(list_mrn) > 0
+            and len(list_csn) > 0
+            and (len(list_mrn) == batch_size or (index + 1) == len(patients.index))
+        ):
+            if batch_size > 1:
+                folder_idx = args.staging_dir
+            else:
+                folder_idx = os.path.join(str(list_mrn[0]), str(list_csn[0]))
+
+            _run_queries(
+                edw=edw,
+                query_paths=query_paths,
+                list_mrn=list_mrn,
+                list_csn=list_csn,
+                batch_size=batch_size,
+                folder_idx=folder_idx,
+                save_dir=args.path_edw,
+            )
+
+            list_mrn = []
+            list_csn = []
+            if args.staging_batch_size > 1:
+                _reorder_folders(args.path_edw, args.staging_dir)
 
 
-if __name__ == "__main__":
-    start_time = timer()
-    args = parse_args()
+def _mrns_csns_from_df(df: pd.DataFrame) -> Tuple[Set[str], Optional[Set[str]]]:
+    if "MRN" not in df:
+        raise ValueError("Must include MRN column in patient_csv.")
+    mrns = set(df["MRN"].dropna().astype(int).astype(str))
+    csns = None
+    if "PatientEncounterID" in df:
+        csns = set(df["PatientEncounterID"].dropna().astype(int).astype(str))
+    return mrns, csns
 
-    # Connect to EDW
-    partners_username = input("Enter EDW username: ")
-    pwd = getpass.getpass("Enter EDW password: ")
-    edw = _connect_edw(partners_username, pwd)
-    global_path = pathlib.Path(__file__).parent.absolute()
 
-    # File I/O
-    if not os.path.isdir(args.output_folder):
-        os.makedirs(args.output_folder)
+def _format_adt_table(adt: pd.DataFrame) -> pd.DataFrame:
+    """
+    Given ADT dataframe, returns the ADT table where the MRN and PatientEncounterID
+    columns are strings and the HospitalAdmitDTS column is datetime.
+    """
+    if (
+        "MRN" not in adt
+        or "PatientEncounterID" not in adt
+        or "HospitalAdmitDTS" not in adt
+    ):
+        raise ValueError(
+            "ADT table must contain MRN, PatientEncounterID, and HospitalAdmitDTS columns.",
+        )
+    adt["MRN"] = adt["MRN"].astype(int).astype(str)
+    adt["PatientEncounterID"] = adt["PatientEncounterID"].astype(int).astype(str)
+    adt["HospitalAdmitDTS"] = pd.to_datetime(adt["HospitalAdmitDTS"])
+    return adt
 
-    if args.mode == "obtain_cohort":
-        path_to_queries = os.path.join(global_path, "queries-cohorts")
-        if args.cohort_query:
-            query_fpath = os.path.join(path_to_queries, f"{args.cohort_query}.sql")
-            query_name = os.path.split(query_fpath)[-1][:-4]
-            str_to_insert = None
-        elif args.department:
-            query_fpath = os.path.join(path_to_queries, "department.sql")
-            query_name = args.department
-            str_to_insert = DEPT_ID[args.department]
-        elif args.sample_csv:
-            query_fpath = os.path.join(path_to_queries, "mrns.sql")
-            query_name = os.path.split(args.sample_csv)[-1]
-            query_name = ".".join(query_name.split(".")[:-1]) + "_all_csns"
-            mrns = pd.read_csv(args.sample_csv)["MRN"].unique()
-            mrns = mrns[~np.isnan(mrns)]
-            str_to_insert = str(list(mrns))[1:-1]
-        fpath = os.path.join(args.output_folder, f"{query_name}.csv")
-        _run_sql_query(
+
+def get_adt_table(
+    args: argparse.Namespace,
+    edw: pyodbc.Connection,
+    query_directory: str,
+) -> pd.DataFrame:
+    """
+    Get ADT table through one of the following methods:
+    1. Provide ADT table
+        i. Filter patients by MRN
+       ii. Filter temporally
+            a. By encounter (CSN)
+            b. By hospital admission time (between a start and end date)
+    2. Provide departments
+        i. Filter patients by MRN
+       ii. Filter temporally
+            a. By encounter (CSN)
+            b. By hospital admission time (between a start and end date)
+    3. Provide MRNs
+        i. Filter temporally
+            a. By encounter (CSN)
+            b. By hospital admission time (between a start and end date)
+    4. Provide cohort query
+        i. Filter temporally
+            a. By encounter (CSN)
+            b. By hospital admission time (between a start and end date)
+    """
+    if args.path_adt is None:
+        raise ValueError("Must provide path to save or load ADT table.")
+
+    csns = None
+
+    # Load initial ADT table
+    # 1. by using the path to an existing ADT table
+    if os.path.isfile(args.path_adt):
+        adt = pd.read_csv(args.path_adt, low_memory=False)
+        adt = _format_adt_table(adt)
+
+        # Restrict ADT table to MRNs found in patient_csv
+        if args.patient_csv is not None:
+            patient_df = pd.read_csv(args.patient_csv, low_memory=False)
+            mrns, csns = _mrns_csns_from_df(df=patient_df)
+            adt = adt[adt["MRN"].isin(mrns)]
+            logging.info(f"Filtered existing ADT table to MRNs in {args.patient_csv}")
+
+        logging.info(f"Loaded existing ADT table: {args.path_adt}")
+
+    # 2. by department
+    elif args.departments is not None:
+        # Run query to get patients by department
+        dept_query = os.path.join(query_directory, "department.sql")
+        dept_string = ", ".join([DEPT_ID[dept] for dept in args.departments])
+        dept_df = query_to_dataframe(
             edw=edw,
-            query_fpath=query_fpath,
-            str_to_insert=str_to_insert,
-            fpath=fpath,
+            query_path=dept_query,
+            strings_to_insert=[dept_string],
+        )
+        dept_df["MRN"] = dept_df["MRN"].astype(int).astype(str)
+        dept_df["PatientEncounterID"] = (
+            dept_df["PatientEncounterID"].astype(int).astype(str)
         )
 
-        if not args.do_not_compute_adt:
-            # Isolate name of the query
-            path_to_queries = os.path.join(global_path, "queries-pipeline")
-            query_fpath = os.path.join(path_to_queries, "adt.sql")
-            adt_fpath = os.path.join(args.output_folder, f"adt-{query_name}.csv")
-            mrns = pd.read_csv(fpath)["MRN"].unique()
-            mrns = mrns[~np.isnan(mrns)]
-            list_mrns = str(list(mrns))[1:-1]
-            _run_sql_query(
-                edw=edw,
-                query_fpath=query_fpath,
-                str_to_insert=list_mrns,
-                fpath=adt_fpath,
-            )
-    elif args.mode == "pull_edw_data":
-        path_to_queries = os.path.join(global_path, "queries-pipeline")
-        _obtain_data(edw, path_to_queries, args)
-        _obtain_remaining_patients()
-    else:
-        raise ValueError(f"Unknown mode: {args.mode}")
+        # Restrict to MRNs/CSNs found in patient_csv
+        if args.patient_csv is not None:
+            patient_df = pd.read_csv(args.patient_csv, low_memory=False)
+            mrns, csns = _mrns_csns_from_df(df=patient_df)
+            dept_df = dept_df[dept_df["MRN"].isin(mrns)]
+            logging.info(f"Filtered departments to MRNs in {args.patient_csv}")
+            if csns is not None:
+                dept_df = dept_df[dept_df["PatientEncounterID"].isin(csns)]
+                logging.info(f"Filtered departments to CSNs in {args.patient_csv}")
 
-    end_time = timer()
-    elapsed_time = end_time - start_time
-    print(f"\npulled EDW data in {elapsed_time:.2f} sec.")
+        # Process MRNs/CSNs from department query
+        mrns, dept_csns = _mrns_csns_from_df(dept_df)
+        mrns_string = ", ".join(mrns)
+        if len(mrns) == 0:
+            raise ValueError("No patients found by department query.")
+
+        # Save results of department query
+        result_name = "-".join(args.departments)
+        result_path = os.path.join(args.output_folder, args.id, f"{result_name}.csv")
+        dept_df.to_csv(result_path, index=False)
+        logging.info(f"Saved cohort by departments to {result_path}")
+
+        # Run query for ADT table
+        adt_query = os.path.join(query_directory, "adt.sql")
+        adt = query_to_dataframe(
+            edw=edw,
+            query_path=adt_query,
+            strings_to_insert=[mrns_string],
+        )
+        adt = _format_adt_table(adt)
+        adt = adt[adt["PatientEncounterID"].isin(dept_csns)]
+        logging.info(f"Pulled ADT table by departments: {', '.join(args.departments)}")
+
+    # 3. by using patient_csv containing MRNs and optionally CSNs
+    elif args.patient_csv is not None:
+        # Load data from patient_csv
+        patient_df = pd.read_csv(args.patient_csv, low_memory=False)
+        mrns, csns = _mrns_csns_from_df(df=patient_df)
+        mrns_string = ", ".join(mrns)
+
+        # Run query for ADT table
+        adt_query = os.path.join(query_directory, "adt.sql")
+        adt = query_to_dataframe(
+            edw=edw,
+            query_path=adt_query,
+            strings_to_insert=[mrns_string],
+        )
+        adt = _format_adt_table(adt)
+        logging.info(f"Pulled ADT table by patient_csv: {args.patient_csv}")
+
+    # 4. by using a query that gets MRNs and optionally CSNs
+    elif args.cohort_query is not None:
+        # Run query to obtain cohort
+        cohort_df = query_to_dataframe(
+            edw=edw,
+            query_path=args.cohort_query,
+        )
+        mrns, csns = _mrns_csns_from_df(df=cohort_df)
+        mrns_string = ", ".join(mrns)
+
+        # Save results of cohort query
+        cohort_name = os.path.splitext(os.path.basename(args.cohort_query))[0]
+        cohort_path = os.path.join(args.output_folder, args.id, f"{cohort_name}.csv")
+        cohort_df.to_csv(cohort_path, index=False)
+        logging.info(f"Saved cohort by query to {cohort_path}")
+
+        # Run query for ADT table
+        adt_query = os.path.join(query_directory, "adt.sql")
+        adt = query_to_dataframe(
+            edw=edw,
+            query_path=adt_query,
+            strings_to_insert=[mrns_string],
+        )
+        adt = _format_adt_table(adt)
+        logging.info(f"Pulled ADT table by cohort_query: {args.cohort_query}")
+
+    else:
+        raise ValueError(
+            "No method to get ADT table. Specify a valid path to an existing ADT "
+            "table, a patient_csv file containing MRNs, or an EDW query that gets MRNs.",
+        )
+
+    # Time filter in order of priority:
+    # 1. filter by CSN
+    if csns is not None:
+        adt = adt[adt["PatientEncounterID"].isin(csns)]
+        logging.info(f"Filtered ADT table by CSNs.")
+    # 2. filter by time
+    elif args.start_time is not None or args.end_time is not None:
+        if args.start_time is None:
+            args.start_time = "1800-01-01"
+        if args.end_time is None:
+            args.end_time = "2200-01-01"
+        start = pd.to_datetime(args.start_time, format="%Y-%m-%d")
+        end = pd.to_datetime(args.end_time, format="%Y-%m-%d")
+        after_start = adt["HospitalAdmitDTS"] > start
+        before_end = adt["HospitalAdmitDTS"] < end
+        adt = adt[after_start & before_end]
+        logging.info(f"Filtered ADT table by hospital admission time.")
+    # 3. do not filter
+
+    # Check that ADT table is not empty
+    if len(adt) == 0:
+        raise ValueError("ADT table is empty.")
+
+    # Save ADT table
+    if not os.path.isfile(args.path_adt):
+        os.makedirs(os.path.dirname(args.path_adt), exist_ok=True)
+        adt.to_csv(args.path_adt, index=False)
+        logging.info(f"Saved ADT table to {args.path_adt}")
+
+    return adt
+
+
+def pull_edw_data(args: argparse.Namespace, only_adt: bool = False):
+    edw = connect_edw()
+    query_directory = os.path.join(os.path.dirname(__file__), "queries-pipeline")
+    adt = get_adt_table(
+        args=args,
+        edw=edw,
+        query_directory=query_directory,
+    )
+    if only_adt:
+        return
+    _obtain_data(
+        args=args,
+        edw=edw,
+        query_directory=query_directory,
+        adt=adt,
+    )
+    logging.info(f"Saved EDW data to {args.path_edw}")

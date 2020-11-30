@@ -102,7 +102,7 @@ def _get_csv_mrns(args):
         # Iterate over paths to CSV files
         for fpath in fpaths:
             try:
-                _mrns = sample_csv_to_set(sample_csv=fpath)
+                _mrns = patient_csv_to_set(patient_csv=fpath)
             except ValueError:
                 print(f"Could not get MRNs from {fpath}, skipping de-identification")
                 global path_of_csv_to_skip

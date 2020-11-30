@@ -11,7 +11,7 @@ from typing import Dict, List
 import pandas as pd
 
 # Imports: first party
-from definitions.icu import LM4_DIR, ML4C3_DIR, ICU_SCALE_UNITS
+from definitions.icu import ICU_SCALE_UNITS
 from ingest.icu.utils import FileManager
 from ingest.icu.readers import (
     EDWReader,
@@ -292,18 +292,28 @@ def remove_folders(staging_dir: str):
     os.remove(os.path.join(staging_dir, "patient_list.csv"))
 
 
-def copy_source_data(file_manager: FileManager, staging_dir: str, workers: int):
+def copy_source_data(
+    file_manager: FileManager,
+    path_edw: str,
+    path_bedmaster: str,
+    path_alarms: str,
+    staging_dir: str,
+    workers: int,
+):
     """
     Copy files from desired patients.
 
     :param file_manager: <FileManager> Class to copy files.
+    :param path_edw: <str> Path to EDW CSV files.
+    :param path_bedmaster: <str> Path to bedmaster .mat files.
+    :param path_alarms: <str> Path to bedmaster alarms.
     :param staging_dir: <str> Path to temporary local directory.
     :param workers: <int> Number of workers for parallelization.
     """
     # Copy Bedmaster alarms from those patients
     init = time.time()
     file_manager.find_save_bedmaster_alarms(
-        os.path.join(ML4C3_DIR, "bedmaster_alarms"),
+        path_alarms,
         os.path.join(staging_dir, "patient_list.csv"),
     )
     elapsed_time = time.time() - init
@@ -312,7 +322,7 @@ def copy_source_data(file_manager: FileManager, staging_dir: str, workers: int):
     # Copy EDW files from those patients
     init = time.time()
     file_manager.find_save_edw_files(
-        os.path.join(ML4C3_DIR, "edw"),
+        path_edw,
         os.path.join(staging_dir, "patient_list.csv"),
         parallelize=True,
         n_workers=workers,
@@ -323,7 +333,7 @@ def copy_source_data(file_manager: FileManager, staging_dir: str, workers: int):
     # Copy Bedmaster files from those patients
     init = time.time()
     file_manager.find_save_bedmaster_files(
-        LM4_DIR,
+        path_bedmaster,
         os.path.join(staging_dir, "patient_list.csv"),
         parallelize=True,
         n_workers=workers,
@@ -363,15 +373,15 @@ def _copy_hd5(staging_dir, destination_dir, file):
 
 
 def tensorize(args):
-    tens = Tensorizer(
+    tensorizer = Tensorizer(
         args.path_bedmaster,
         args.path_alarms,
         args.path_edw,
         args.path_xref,
     )
-    tens.tensorize(
+    tensorizer.tensorize(
         tensors=args.tensors,
-        overwrite_hd5=args.overwrite_hd5,
+        overwrite_hd5=args.overwrite,
         n_patients=args.num_patients_to_tensorize,
         num_workers=args.num_workers,
         flag_one_source=args.allow_one_source,
@@ -383,7 +393,7 @@ def tensorize_batched(args):
     if not os.path.isfile(args.path_xref):
         # Match bedmaster files from lm4 with path_adt
         matcher = PatientBedmasterMatcher(
-            path_bedmaster=LM4_DIR,
+            path_bedmaster=args.path_bedmaster,
             path_adt=args.path_adt,
         )
         matcher.match_files(args.path_xref)
@@ -414,12 +424,19 @@ def tensorize_batched(args):
         get_files.get_patients(
             init_patient=first_patient,
             last_patient=last_patient,
-            overwrite_hd5=args.overwrite_hd5,
+            overwrite_hd5=args.overwrite,
             hd5_dir=args.tensors,
         )
 
         # Copy files from those patients
-        copy_source_data(get_files, args.staging_dir, args.num_workers)
+        copy_source_data(
+            file_manager=get_files,
+            path_edw=args.path_edw,
+            path_bedmaster=args.path_bedmaster,
+            path_alarms=args.path_alarms,
+            staging_dir=args.staging_dir,
+            workers=args.num_workers,
+        )
 
         # Run tensorization
         local_path = lambda f: os.path.join(args.staging_dir, f)
@@ -429,8 +446,8 @@ def tensorize_batched(args):
         xref_file = local_path("edw_temp/xref.csv")
         local_tensors = local_path("results_temp")
 
-        tens = Tensorizer(path_bedmaster, path_alarms, path_edw, xref_file)
-        tens.tensorize(
+        tensorizer = Tensorizer(path_bedmaster, path_alarms, path_edw, xref_file)
+        tensorizer.tensorize(
             tensors=local_tensors,
             num_workers=args.num_workers,
             flag_one_source=args.allow_one_source,

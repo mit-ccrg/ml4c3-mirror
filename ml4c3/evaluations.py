@@ -132,7 +132,7 @@ def predict_and_evaluate(
     if save_predictions:
         save_data = OrderedDict()
         if data_paths is not None:
-            save_data["sample_id"] = [
+            save_data["patient_id"] = [
                 os.path.splitext(os.path.basename(p))[0] for p in data_paths
             ]
         for y_prediction, tm in zip(y_predictions, tensor_maps_out):

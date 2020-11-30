@@ -14,11 +14,11 @@ CSV_EXT = ".csv"
 MRN_COLUMNS = {
     "mrn",
     "mgh_mrn",
-    "sampleid",
     "medrecn",
     "patient_id",
     "patientid",
     "sample_id",
+    "sampleid",
 }
 
 YEAR_DAYS = 365.26

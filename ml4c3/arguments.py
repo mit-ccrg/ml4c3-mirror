@@ -14,7 +14,6 @@ import numpy as np
 # Imports: first party
 from ml4c3.logger import load_config
 from ml4c3.models import BottleneckType
-from definitions.icu import ML4C3_DIR
 from ml4c3.tensormap.TensorMap import TensorMap, update_tmaps
 
 BOTTLENECK_STR_TO_ENUM = {
@@ -46,6 +45,8 @@ def parse_args() -> argparse.Namespace:
         "\t * explore_icu: ADD DESCRIPTION. \n"
         "\t * plot_ecg: ADD DESCRIPTION. \n"
         "\t * tensorize_ecg: ADD DESCRIPTION. \n"
+        "\t * pull_edw: ADD DESCRIPTION. \n"
+        "\t * tensorize_icu_no_edw_pull: ADD DESCRIPTION. \n"
         "\t * tensorize_icu: ADD DESCRIPTION. \n"
         "\t * tensorize_sts: ADD DESCRIPTION. \n"
         "\t * assess_icu_coverage: ADD DESCRIPTION. \n"
@@ -74,12 +75,12 @@ def parse_args() -> argparse.Namespace:
     # Input and Output files and directories
     io_parser = argparse.ArgumentParser(add_help=False)
     io_parser.add_argument(
-        "--sample_csv",
+        "--patient_csv",
         help="Path to CSV with Sample IDs to restrict tensor paths",
     )
     io_parser.add_argument(
         "--mrn_column_name",
-        help="Name of MRN column in sample_csv.csv to look for",
+        help="Name of MRN column in patient_csv to look for",
     )
     io_parser.add_argument(
         "--tensors",
@@ -203,104 +204,112 @@ def parse_args() -> argparse.Namespace:
     # ICU modes common arguments
     icu_parser = argparse.ArgumentParser(add_help=False)
     icu_parser.add_argument(
+        "--path_edw",
+        default="/media/ml4c3/edw/",
+        help="Directory to save or load EDW CSV files.",
+    )
+    icu_parser.add_argument(
         "--path_bedmaster",
         default="/media/lm4-bedmaster/",
-        help="Directory with Bedmaster .mat files.",
+        help="Directory containing Bedmaster .mat files.",
     )
     icu_parser.add_argument(
         "--path_alarms",
         default="/media/ml4c3/bedmaster_alarms/",
-        help="Directory with Bedmaster alarms .csv files.",
+        help="Directory containing Bedmaster alarms CSV files.",
     )
     icu_parser.add_argument(
-        "--path_edw",
-        default="/media/ml4c3/edw/",
-        help="Directory with EDW .csv files.",
-    )
-    icu_parser.add_argument(
-        "--path_xref",
-        default="/media/ml4c3/xref.csv",
-        help="Full path of the file where EDW and Bedmaster "
-        "are cross referenced. CSV file which indicates the "
-        "corresponding MRN and CSN of each Bedmaster file.",
+        "--cohort_query",
+        help="Path to SQL file with query to define a cohort of patients by MRNs and "
+        "optionally CSNs.",
     )
     icu_parser.add_argument(
         "--path_adt",
-        type=str,
-        default=f"{os.path.join(ML4C3_DIR, 'cohorts_lists', 'adt.csv')}",
-        help="Full path of ADT table.",
+        help="Path to save or load ADT table CSV file.",
     )
     icu_parser.add_argument(
-        "--desired_departments",
+        "--path_xref",
+        help="Path to CSV file cross referencing MRN and CSNs with Bedmaster .mat files.",
+    )
+    icu_parser.add_argument(
+        "--departments",
         nargs="+",
+        help="List of department names for which to process patient data.",
+    )
+    icu_parser.add_argument(
+        "--staging_dir",
+        help="Directory to store temporary files created during tensorization pipeline.",
+    )
+    icu_parser.add_argument(
+        "--staging_batch_size",
+        type=int,
+        default=1,
+        help="Number of patients to process locally before being moved to final location.",
+    )
+    icu_parser.add_argument(
+        "--adt_start_index",
+        type=int,
+        default=0,
+        help="Index of first patient in ADT table to process, inclusive.",
+    )
+    icu_parser.add_argument(
+        "--adt_end_index",
+        type=int,
         default=None,
-        help="List indicating all the desired departments in which Bedmaster"
-        "files are matched with patients.",
+        help="Index of last patient in ADT table to process, exclusive.",
     )
-
-    # ICU Tensorize arguments
-    icu_tensorization_parser = subparser.add_parser(
-        name="tensorize_icu",
-        description="TODO",
-        parents=[io_parser, run_parser, icu_parser],
+    icu_parser.add_argument(
+        "--start_time",
+        help="Only use patients admitted after this date, YYYY-MM-DD format.",
     )
-    icu_tensorization_parser.add_argument(
-        "--overwrite_hd5",
+    icu_parser.add_argument(
+        "--end_time",
+        help="Only use patients admitted before this date, YYYY-MM-DD format.",
+    )
+    icu_parser.add_argument(
+        "--overwrite",
         action="store_true",
-        help="Bool indicating whether the existing hd5 files should be overwritten.",
+        help="Bool indicating whether existing EDW and hd5 files should be overwritten.",
     )
-    icu_tensorization_parser.add_argument(
+    icu_parser.add_argument(
         "--num_patients_to_tensorize",
-        default=None,
         type=int,
         help="Maximum number of patients whose data will be tensorized. "
         "Useful for troubleshooting.",
     )
-    icu_tensorization_parser.add_argument(
+    icu_parser.add_argument(
         "--allow_one_source",
         action="store_true",
         help="If this parameter is set, patients with just one type of data "
         "will be tensorized.",
     )
-    icu_tensorization_parser.add_argument(
-        "--adt_start_index",
-        type=int,
-        default=0,
-        help="Index of first patient in ADT table to get data from",
-    )
-    icu_tensorization_parser.add_argument(
-        "--adt_end_index",
-        type=int,
-        default=None,
-        help="Index of last patient in ADT table to get data from",
-    )
-    icu_tensorization_parser.add_argument(
-        "--staging_dir",
-        type=str,
-        default=os.path.expanduser("~/icu-temp"),
-        help=(
-            "If --tensors is a location mounted over the network, tensorization speed "
-            "will be slower than tensorizing to a local directory. To tensorize "
-            "faster, tensorize to an intermediate local directory given by "
-            "--staging_dir. The pipeline will copy these HD5 files to --tensors, then "
-            "delete the HD5 files from --staging_dir."
-        ),
-    )
-    icu_tensorization_parser.add_argument(
-        "--staging_batch_size",
-        default=None,
-        type=int,
-        help=(
-            "Number of patients whose data to tensorize locally to --staging_dir "
-            "before being moved to --tensors"
-        ),
+
+    # Pull ADT table
+    pull_adt_parser = subparser.add_parser(
+        name="pull_adt",
+        description="TODO",
+        parents=[run_parser, io_parser, icu_parser],
     )
 
-    # STS Tensorize arguments
-    sts_tensorization_parser = subparser.add_parser(
-        name="tensorize_sts",
+    # Pull EDW data for ICU tensorization
+    pull_edw_parser = subparser.add_parser(
+        name="pull_edw",
         description="TODO",
-        parents=[io_parser, run_parser],
+        parents=[run_parser, io_parser, icu_parser],
+    )
+
+    # ICU tensorization with existing EDW data
+    icu_tensorization_parser = subparser.add_parser(
+        name="tensorize_icu_no_edw_pull",
+        description="TODO",
+        parents=[run_parser, io_parser, icu_parser],
+    )
+
+    # End to end ICU tensorization
+    end_to_end_icu_tensorization_parser = subparser.add_parser(
+        name="tensorize_icu",
+        description="TODO",
+        parents=[run_parser, io_parser, icu_parser],
     )
 
     # Model Architecture Parameters
@@ -1044,12 +1053,6 @@ def parse_args() -> argparse.Namespace:
         "assess_coverage",
         description="Assess Bedmaster and HD5 coverage by means of MRNs and CSNs.",
         parents=[io_parser, run_parser, icu_parser],
-    )
-    assess_coverage_parser.add_argument(
-        "--cohort_query",
-        type=str,
-        default=None,
-        help="Name of the query to obtain list of patients and ADT table.",
     )
     assess_coverage_parser.add_argument(
         "--event_column",

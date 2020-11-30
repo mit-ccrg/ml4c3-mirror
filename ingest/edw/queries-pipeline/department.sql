@@ -7,4 +7,4 @@ FROM
     left join Epic.Patient.Identity_MGH t2 on (t1.PatientID=t2.PatientID)
 WHERE
     t2.IdentityTypeID = 67
-    and t1.DepartmentID = '{}'
+    and t1.DepartmentID in ({})

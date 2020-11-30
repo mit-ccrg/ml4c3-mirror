@@ -88,7 +88,7 @@ def explore(
         tensor_maps_in=required_tmaps,
         tensors=args.tensors,
         num_workers=args.num_workers,
-        sample_csv=args.sample_csv,
+        patient_csv=args.patient_csv,
         mrn_column_name=args.mrn_column_name,
         valid_ratio=args.valid_ratio,
         test_ratio=args.test_ratio,
@@ -165,7 +165,7 @@ def explore(
                 tensor_maps_in=ref_tmaps,
                 tensors=args.reference_tensors,
                 num_workers=args.num_workers,
-                sample_csv=args.sample_csv,
+                patient_csv=args.patient_csv,
                 valid_ratio=args.valid_ratio,
                 test_ratio=args.test_ratio,
                 train_csv=args.train_csv,
@@ -1033,7 +1033,7 @@ def _tensors_to_df(
     tensor_maps_in: List[TensorMap],
     tensors: str,
     num_workers: int,
-    sample_csv: str = None,
+    patient_csv: str = None,
     mrn_column_name: Optional[str] = None,
     valid_ratio: float = None,
     test_ratio: float = None,
@@ -1054,7 +1054,7 @@ def _tensors_to_df(
     logging.info("Building generators for specified tensors")
     train_ids, valid_ids, test_ids = get_train_valid_test_ids(
         tensors=tensors,
-        sample_csv=sample_csv,
+        patient_csv=patient_csv,
         mrn_column_name=mrn_column_name,
         valid_ratio=valid_ratio,
         test_ratio=test_ratio,
@@ -1064,9 +1064,13 @@ def _tensors_to_df(
         allow_empty_split=True,
     )
 
-    train_paths = [os.path.join(tensors, f"{sample_id}.hd5") for sample_id in train_ids]
-    valid_paths = [os.path.join(tensors, f"{sample_id}.hd5") for sample_id in valid_ids]
-    test_paths = [os.path.join(tensors, f"{sample_id}.hd5") for sample_id in test_ids]
+    train_paths = [
+        os.path.join(tensors, f"{patient_id}.hd5") for patient_id in train_ids
+    ]
+    valid_paths = [
+        os.path.join(tensors, f"{patient_id}.hd5") for patient_id in valid_ids
+    ]
+    test_paths = [os.path.join(tensors, f"{patient_id}.hd5") for patient_id in test_ids]
     paths: List[Tuple[str, str]] = []
     paths.extend(zip(train_paths, ["train"] * len(train_paths)))
     paths.extend(zip(valid_paths, ["valid"] * len(valid_paths)))

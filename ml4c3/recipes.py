@@ -29,6 +29,7 @@ from ml4c3.arguments import parse_args
 from ml4c3.evaluations import predict_and_evaluate
 from ml4c3.explorations import explore
 from definitions.globals import MODEL_EXT
+from ingest.edw.pipeline import pull_edw_data
 from ml4c3.visualizer.run import run_server
 from ml4c3.hyperoptimizers import hyperoptimize
 from ml4c3.tensormap.TensorMap import TensorMap
@@ -61,11 +62,15 @@ def run(args: argparse.Namespace):
             hyperoptimize(args)
         elif args.mode == "tensorize_ecg":
             tensorize_ecg(args)
+        elif args.mode == "pull_adt":
+            pull_edw_data(args, only_adt=True)
+        elif args.mode == "pull_edw":
+            pull_edw_data(args)
+        elif args.mode == "tensorize_icu_no_edw_pull":
+            tensorize_icu_batched(args)
         elif args.mode == "tensorize_icu":
-            if args.staging_batch_size:
-                tensorize_icu_batched(args)
-            else:
-                tensorize_icu(args)
+            pull_edw_data(args)
+            tensorize_icu_batched(args)
         elif args.mode == "explore":
             explore(args=args, disable_saving_output=args.explore_disable_saving_output)
         elif args.mode == "plot_ecg":
@@ -126,7 +131,7 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
         tensors=args.tensors,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        sample_csv=args.sample_csv,
+        patient_csv=args.patient_csv,
         mrn_column_name=args.mrn_column_name,
         valid_ratio=args.valid_ratio,
         test_ratio=args.test_ratio,
@@ -251,7 +256,7 @@ def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         tensors=args.tensors,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        sample_csv=args.sample_csv,
+        patient_csv=args.patient_csv,
         valid_ratio=args.valid_ratio,
         test_ratio=args.test_ratio,
         train_csv=args.train_csv,
@@ -330,7 +335,7 @@ def train_simclr_model(args: argparse.Namespace):
         tensors=args.tensors,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        sample_csv=args.sample_csv,
+        patient_csv=args.patient_csv,
         valid_ratio=args.valid_ratio,
         test_ratio=args.test_ratio,
         train_csv=args.train_csv,

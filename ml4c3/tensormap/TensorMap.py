@@ -40,9 +40,9 @@ class PatientData:
     Wrapper around a patient's data from multiple sources.
     """
 
-    def __init__(self, sample_id):
+    def __init__(self, patient_id):
         self.data = dict()
-        self.id = sample_id
+        self.id = patient_id
 
     def __setitem__(self, key, value):
         if not isinstance(key, str):

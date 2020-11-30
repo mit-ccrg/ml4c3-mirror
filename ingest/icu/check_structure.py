@@ -8,7 +8,7 @@ import h5py
 import pandas as pd
 
 # Imports: first party
-from ml4c3.datasets import sample_csv_to_set
+from ml4c3.datasets import patient_csv_to_set
 from definitions.icu import (
     EDW_FILES,
     ALARMS_FILES,
@@ -68,11 +68,11 @@ class EDWChecker:
                 f"table and mrns folders should be stored in {self.edw_dir}.",
             )
 
-    def check_structure(self, sample_csv: str = None):
+    def check_structure(self, patient_csv: str = None):
         """
         Checks if edw_dir is structured properly.
 
-        :param sample_csv: <str> Path to CSV with Sample IDs to restrict MRNs.
+        :param patient_csv: <str> Path to CSV with MRNs to parse; no other MRNs will be parsed.
         """
         self._check_adt()
 
@@ -90,10 +90,10 @@ class EDWChecker:
             for folder in os.listdir(self.edw_dir)
             if os.path.isdir(os.path.join(self.edw_dir, folder))
         ]
-        if sample_csv:
-            mrns = sample_csv_to_set(sample_csv)
+        if patient_csv:
+            mrns = patient_csv_to_set(patient_csv)
         for mrn_folder in mrns_folders:
-            if sample_csv and mrn_folder not in mrns:
+            if patient_csv and mrn_folder not in mrns:
                 continue
             csns_folders = [
                 os.path.join(mrn_folder, folder)
@@ -159,13 +159,13 @@ class BedmasterChecker:
         self.bedmaster_dir = bedmaster_dir
         self.alarms_dir = alarms_dir
 
-    def check_mat_files_structure(self, sample_csv: str = None, path_xref: str = None):
+    def check_mat_files_structure(self, patient_csv: str = None, path_xref: str = None):
         """
         Checks if bedmaster_dir is structured properly.
 
         Checks that the .mat files in bedmaster_dir are in the right format and
         it doesn't have any unexpected file.
-        :param sample_csv: <str> Path to CSV with Sample IDs to restrict MRNs.
+        :param patient_csv: <str> Path to CSV with Sample IDs to restrict MRNs.
         :param path_xref: <str> Path to CSV with Sample IDs to restrict Bedmaster files.
         """
         bedmaster_files_paths, unexpected_files = get_files_in_directory(
@@ -173,8 +173,8 @@ class BedmasterChecker:
             extension=BEDMASTER_EXT,
         )
 
-        if sample_csv and path_xref:
-            mrns = list(pd.read_csv(sample_csv)["MRN"].unique())
+        if patient_csv and path_xref:
+            mrns = list(pd.read_csv(patient_csv)["MRN"].unique())
             xref_df = pd.read_csv(path_xref)
             bedmaster_files_names = list(
                 xref_df[xref_df["MRN"].isin(mrns)]["fileID"].unique(),
@@ -190,7 +190,7 @@ class BedmasterChecker:
         for bedmaster_file_path in bedmaster_files_paths:
             bedmaster_file_name = os.path.split(bedmaster_file_path)[-1].split(".")[0]
             if (
-                sample_csv
+                patient_csv
                 and path_xref
                 and bedmaster_file_name not in bedmaster_files_names
             ):
@@ -272,8 +272,8 @@ class BedmasterChecker:
 def check_icu_structure(args):
     if args.check_edw:
         edw_checker = EDWChecker(args.path_edw)
-        edw_checker.check_structure(args.sample_csv)
+        edw_checker.check_structure(args.patient_csv)
     if args.check_bedmaster:
         bedmaster_checker = BedmasterChecker(args.path_bedmaster, args.path_alarms)
-        bedmaster_checker.check_mat_files_structure(args.sample_csv, args.path_xref)
+        bedmaster_checker.check_mat_files_structure(args.patient_csv, args.path_xref)
         bedmaster_checker.check_alarms_files_structure()

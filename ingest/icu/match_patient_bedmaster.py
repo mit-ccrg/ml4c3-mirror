@@ -96,6 +96,7 @@ class PatientBedmasterMatcher:
         :param store_unmatched: <bool> Bool indicating if the unmatched Bedmaster files
                                 are saved in the xref table.
         """
+        logging.info("Cross referencing ADT table with Bedmaster files.")
         # Clear dictionary if it has any information
         if any(self.table_dic[key] for key in self.table_dic.keys()):
             self.table_dic = self._new_table_dic()
@@ -117,24 +118,30 @@ class PatientBedmasterMatcher:
             directory=self.path_bedmaster,
             extension=BEDMASTER_EXT,
         )
-        if self.desired_departments:
-            desired_folders = []
-            for dept in sorted(set(self.desired_departments) & set(adt_departments)):
-                try:
-                    desired_folders.extend(self.dept_to_folder[dept])
-                except KeyError:
-                    logging.warning(
-                        f"Department {dept} is not found in MAPPING_DEPARTMENTS "
-                        "(ml4c3/definitions/icu.py). No matching will be performed with "
-                        "patients from this department. Please, add this information "
-                        "in MAPPING_DEPARTMENTS (ml4c3/definitions/icu.py).",
-                    )
-            bedmaster_files = [
-                bedmaster_file
-                for bedmaster_file in bedmaster_files
-                if os.path.split(os.path.split(bedmaster_file)[0])[-1]
-                in desired_folders
-            ]
+
+        # Filter departments to only those that appear
+        # in ADT table and those given by user
+        departments = set(adt_departments)
+        if self.desired_departments is not None:
+            departments &= set(self.desired_departments)
+        logging.info(f"Checking Bedmaster files from {len(departments)} departments.")
+
+        desired_folders = []
+        for dept in sorted(departments):
+            try:
+                desired_folders.extend(self.dept_to_folder[dept])
+            except KeyError:
+                logging.warning(
+                    f"Department {dept} is not found in MAPPING_DEPARTMENTS "
+                    "(ml4c3/definitions/icu.py). No matching will be performed with "
+                    "patients from this department. Please add this missing department "
+                    "to MAPPING_DEPARTMENTS (ml4c3/definitions/icu.py).",
+                )
+        bedmaster_files = [
+            bedmaster_file
+            for bedmaster_file in bedmaster_files
+            if os.path.split(os.path.split(bedmaster_file)[0])[-1] in desired_folders
+        ]
         bedmaster_files = sorted(
             [os.path.split(bedmaster_file)[-1] for bedmaster_file in bedmaster_files],
         )
@@ -212,9 +219,9 @@ class PatientBedmasterMatcher:
 
         if len(unmatched_files) > 0:
             logging.warning(
-                f"Unmatched files: {sorted(unmatched_files)}. Those "
-                "files couldn't be matched with patient's MRN and CSN.",
+                f"Could not match {len(unmatched_files)} files with patients",
             )
+            logging.debug(f"Unmatched files: {unmatched_files}")
 
         if path_xref:
             xref_table = pd.DataFrame(self.table_dic)
@@ -225,6 +232,6 @@ def match_data(args):
     bedmaster_matcher = PatientBedmasterMatcher(
         path_bedmaster=args.path_bedmaster,
         path_adt=args.path_adt,
-        desired_departments=args.desired_departments,
+        desired_departments=args.departments,
     )
     bedmaster_matcher.match_files(path_xref=args.path_xref)

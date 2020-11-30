@@ -32,7 +32,7 @@ class PreTensorizeExplorer:
         path_bedmaster: str,
         path_edw: str,
         path_xref: str,
-        sample_csv: str,
+        patient_csv: str,
     ):
         self.path_bedmaster = path_bedmaster
         self.path_edw = path_edw
@@ -61,7 +61,7 @@ class PreTensorizeExplorer:
         ]
         self.signal_fields = ["signal", "count", "total", "%", "source"]
         self.edw_mrns, self.edw_csns, self.edw_mrns_csns = self.get_mrns_and_csns(
-            sample_csv,
+            patient_csv,
         )
 
     def reset(self, signals: Any = None):
@@ -95,11 +95,11 @@ class PreTensorizeExplorer:
             "latest_transfer_in": pd.to_datetime("1900"),
         }
 
-    def get_mrns_and_csns(self, sample_csv: str):
+    def get_mrns_and_csns(self, patient_csv: str):
         edw_mrns = set()
         edw_csns = set()
         edw_mrns_csns = set()
-        df = pd.read_csv(sample_csv)
+        df = pd.read_csv(patient_csv)
         if "PatientEncounterID" in df.columns:
             for _, row in df.iterrows():
                 mrn = str(int(row["MRN"]))
@@ -517,7 +517,7 @@ def pre_tensorize_explore(args):
         path_bedmaster=args.path_bedmaster,
         path_edw=args.path_edw,
         path_xref=args.path_xref,
-        sample_csv=args.sample_csv,
+        patient_csv=args.patient_csv,
     )
     explorer.write_pre_tensorize_summary(
         output_folder=args.output_folder,

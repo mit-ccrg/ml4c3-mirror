@@ -387,7 +387,7 @@ def assess_coverage(args):
         path_bedmaster=args.path_bedmaster,
         path_edw=args.path_edw,
         path_hd5=args.tensors,
-        desired_departments=args.desired_departments,
+        desired_departments=args.departments,
         event_column=args.event_column,
         time_column=args.time_column,
         count=args.count,

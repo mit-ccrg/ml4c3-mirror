@@ -146,7 +146,7 @@ def hyperparameter_optimizer(
                 tensors=args.tensors,
                 batch_size=args.batch_size,
                 num_workers=args.num_workers,
-                sample_csv=args.sample_csv,
+                patient_csv=args.patient_csv,
                 valid_ratio=args.valid_ratio,
                 test_ratio=args.test_ratio,
                 train_csv=args.train_csv,
