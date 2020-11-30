@@ -909,7 +909,7 @@ class BedmasterReader(h5py.File, Reader):
                 on the .mat file
         """
         if not self.contains_group("vs"):
-            logging.warning(f"No vs found on file {self.filename}")
+            logging.warning(f"No BM vitalsign found on file {self.filename}")
             if self.summary_stats:
                 self.summary_stats.add_file_stats("missing_vs")
             return []
@@ -929,7 +929,7 @@ class BedmasterReader(h5py.File, Reader):
         wv_signals: Dict[str, str] = {}
 
         if not self.contains_group("wv"):
-            logging.warning(f"No wv found on file {self.filename}")
+            logging.warning(f"No BM waveform found on file {self.filename}")
             if self.summary_stats:
                 self.summary_stats.add_file_stats("missing_wv")
             return wv_signals
@@ -1024,16 +1024,17 @@ class BedmasterReader(h5py.File, Reader):
 
         if values.dtype.char == "S":
             logging.warning(
-                f"In bedmaster_file {self.filename}, {signal_name} has unexpected "
+                f"{signal_name} on .mat file  {self.filename}, has unexpected "
                 "string values.",
             )
             return None
 
         if values.ndim >= 2:
             raise ValueError(
-                f"Something went wrong with signal {signal_name} "
-                f"on file: {self.filename}. Dimension of values "
-                f"formatted values is higher than expected (>1).",
+                f"Signal {signal_name} on file: {self.filename}. The values"
+                f"of the signal have higher dimension than expected (>1) after"
+                f"being formatted. The signal is probably in a bad format so it "
+                f"won't be written.",
             )
 
         time = np.transpose(self["vs_time_corrected"][signal_name]["res_vs"][:])[0]
@@ -1073,8 +1074,9 @@ class BedmasterReader(h5py.File, Reader):
 
         if signal.time.size == 0:
             logging.info(
-                f"In bedmaster_file {self.filename}, {signal} is completely "
-                "overlapped, it won't be written.",
+                f"Signal {signal} on .mat file {self.filename} doesn't contain new"
+                f"information (only contains overlapped values from previous bundles)."
+                f"It won't be written.",
             )
             if self.summary_stats:
                 self.summary_stats.add_signal_stats(
@@ -1248,7 +1250,8 @@ class BedmasterReader(h5py.File, Reader):
                 f"Something went wrong with signal: "
                 f"{signal.name} on file: {self.filename} "
                 f"'samples_per_ts' vector's sum isn't equal to "
-                f"values vector's length. The signal won't be written.",
+                f"values vector's length. This seems an error on the primitive "
+                f".stp file. The signal won't be written.",
             )
             if self.summary_stats:
                 self.summary_stats.add_signal_stats(
@@ -1276,8 +1279,8 @@ class BedmasterReader(h5py.File, Reader):
         if signals.ndim > 1:
             logging.warning(
                 f"Channel {channel} on file {self.filename} "
-                f"has multiple channels: {signals}. "
-                f"This situation is currently not supported. "
+                f"is a mix of different signals: {signals}. "
+                f"This situation is not supported. "
                 f"The channel will be ignored.",
             )
             if self.summary_stats:
@@ -1286,8 +1289,9 @@ class BedmasterReader(h5py.File, Reader):
 
         if signals.size == 0:
             logging.warning(
-                f"Channel {channel} on file {self.filename} "
-                f"has no label. May be empty.",
+                f"The signal on channel {channel} on file {self.filename} "
+                f"has no name. It is probably an empty signal or a badly"
+                f"recorded one. It won't be written to the tensorized file.",
             )
             if self.summary_stats:
                 self.summary_stats.add_file_stats("no_label_signal")
@@ -1300,9 +1304,10 @@ class BedmasterReader(h5py.File, Reader):
         sf_arr = self["wv_time_original"][channel]["SampleRate"][first_idx:].T[0]
         if sf_arr.shape[0] <= 0:
             logging.info(
-                "Sample frequency array is empty or has different length than values "
-                f"array for {channel} on file {self.filename}. No sample frequency "
-                "will be written.",
+                f"The signal on channel {channel} on file {self.filename} has an "
+                f"incorrect sample frequency format. Either it doesn't have sample"
+                f"frequency or it has an incongruent one. Sample frequency will be set"
+                f"to Nan for this signal.",
             )
             return np.array([(np.nan, 0)], dtype="float,int")
         changes = np.concatenate([[-1], np.where(sf_arr[:-1] != sf_arr[1:])[0]])
@@ -1329,7 +1334,8 @@ class BedmasterReader(h5py.File, Reader):
             except (KeyError, ValueError):
                 logging.warning(
                     f"Scaling factor or units not found "
-                    f"for signal {signal_name} on file {self.filename}",
+                    f"for signal {signal_name} on file {self.filename}. They will"
+                    f"be set to units: UNKNOWN, scaling_factor: 0. ",
                 )
                 scaling_factor = 0
                 units = "UNKNOWN"
