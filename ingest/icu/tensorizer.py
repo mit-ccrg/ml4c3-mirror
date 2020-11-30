@@ -1,3 +1,4 @@
+# pylint: disable=broad-except
 # Imports: standard library
 import os
 import math
@@ -48,6 +49,7 @@ class Tensorizer:
         self.alarms_dir = alarms_dir
         self.edw_dir = edw_dir
         self.xref_path = xref_path
+        self.untensorized_files: Dict[str, List[str]] = {"file": [], "error": []}
 
     def tensorize(
         self,
@@ -125,6 +127,11 @@ class Tensorizer:
                     for mrn, visits in files_per_mrn.items()
                 ],
             )
+        df = pd.DataFrame.from_dict(self.untensorized_files)
+        df.to_csv(
+            os.path.join(tensors, "untensorized_bedmaster_files.csv"),
+            index=False,
+        )
 
     def _main_write(
         self,
@@ -144,11 +151,13 @@ class Tensorizer:
                     writer.set_visit_id(visit_id)
 
                     # Write the data
-                    self._write_bedmaster_data(
+                    all_files, untensorized_files = self._write_bedmaster_data(
                         bedmaster_files,
                         writer=writer,
                         scaling_and_units=scaling_and_units,
                     )
+                    self.untensorized_files["file"].append(untensorized_files["file"])
+                    self.untensorized_files["error"].append(untensorized_files["error"])
                     self._write_bedmaster_alarms_data(
                         self.alarms_dir,
                         self.edw_dir,
@@ -156,7 +165,7 @@ class Tensorizer:
                         visit_id,
                         writer=writer,
                     )
-                    writer.write_completed_flag("bedmaster", True)
+                    writer.write_completed_flag("bedmaster", all_files)
                     self._write_edw_data(self.edw_dir, mrn, visit_id, writer=writer)
                     writer.write_completed_flag("edw", True)
                     logging.info(
@@ -173,28 +182,36 @@ class Tensorizer:
         writer: Writer,
         scaling_and_units: Dict,
     ):
-
+        all_files = True
         previous_max = None
+        untensorized_files: Dict[str, List[str]] = {"file": [], "error": []}
         for bedmaster_file in bedmaster_files:
-            with BedmasterReader(bedmaster_file, scaling_and_units) as reader:
-                if previous_max:
-                    reader.get_interbundle_correction(previous_max)
-                # These blocks can be easily parallelized with MPI:
-                # >>> rank = MPI.COMM_WORLD.rank
-                # >>> if rank == 1:
-                vs_signals = reader.list_vs()
-                for vs_signal_name in vs_signals:
-                    vs_signal = reader.get_vs(vs_signal_name)
-                    if vs_signal:
-                        writer.write_signal(vs_signal)
+            try:
+                with BedmasterReader(bedmaster_file, scaling_and_units) as reader:
+                    if previous_max:
+                        reader.get_interbundle_correction(previous_max)
+                    # These blocks can be easily parallelized with MPI:
+                    # >>> rank = MPI.COMM_WORLD.rank
+                    # >>> if rank == 1:
+                    vs_signals = reader.list_vs()
+                    for vs_signal_name in vs_signals:
+                        vs_signal = reader.get_vs(vs_signal_name)
+                        if vs_signal:
+                            writer.write_signal(vs_signal)
 
-                # >>> if rank == 2
-                wv_signals = reader.list_wv()
-                for wv_signal_name, channel in wv_signals.items():
-                    wv_signal = reader.get_wv(channel, wv_signal_name)
-                    if wv_signal:
-                        writer.write_signal(wv_signal)
-                previous_max = reader.max_segment
+                    # >>> if rank == 2
+                    wv_signals = reader.list_wv()
+                    for wv_signal_name, channel in wv_signals.items():
+                        wv_signal = reader.get_wv(channel, wv_signal_name)
+                        if wv_signal:
+                            writer.write_signal(wv_signal)
+                    previous_max = reader.max_segment
+            except Exception as error:
+                untensorized_files["file"].append(bedmaster_file)
+                untensorized_files["error"].append(repr(error))
+        if len(untensorized_files["file"]) > 0:
+            all_files = False
+        return all_files, untensorized_files
 
     @staticmethod
     def _write_bedmaster_alarms_data(

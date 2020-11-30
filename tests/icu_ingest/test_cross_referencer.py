@@ -1,3 +1,4 @@
+# pylint: disable=no-member, redefined-outer-name
 # Imports: standard library
 import os
 import logging
@@ -84,7 +85,7 @@ def test_stats(cross_referencer: CrossReferencer):
         f"CSNs in {test_dir}/data/xref_file.csv: 3\n"
         f"Union CSNs: 1\n"
         f"Intersect CSNs: 3\n"
-        f"Bedmaster files IDs in {test_dir}/data/xref_file.csv: 3\n"
+        f"Bedmaster files IDs in {test_dir}/data/xref_file.csv: 5\n"
         f"Intersect Bedmaster files: 5\n",
     ]
     log = unittest.TestCase()

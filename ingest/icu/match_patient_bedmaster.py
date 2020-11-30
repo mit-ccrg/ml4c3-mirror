@@ -114,10 +114,8 @@ class PatientBedmasterMatcher:
         # Get departments from ADT:
         adt_departments = np.array(adt_df["DepartmentDSC"].drop_duplicates(), dtype=str)
         # Get names of all the files
-        bedmaster_files, undesired_files = get_files_in_directory(
-            directory=self.path_bedmaster,
-            extension=BEDMASTER_EXT,
-        )
+        bedmaster_files = []
+        undesired_files = []
 
         # Filter departments to only those that appear
         # in ADT table and those given by user
@@ -126,22 +124,32 @@ class PatientBedmasterMatcher:
             departments &= set(self.desired_departments)
         logging.info(f"Checking Bedmaster files from {len(departments)} departments.")
 
-        desired_folders = []
         for dept in sorted(departments):
-            try:
-                desired_folders.extend(self.dept_to_folder[dept])
-            except KeyError:
+            if dept not in self.dept_to_folder:
                 logging.warning(
                     f"Department {dept} is not found in MAPPING_DEPARTMENTS "
-                    "(ml4c3/definitions/icu.py). No matching will be performed with "
-                    "patients from this department. Please add this missing department "
-                    "to MAPPING_DEPARTMENTS (ml4c3/definitions/icu.py).",
+                    "(definitions/icu.py). No matching will be performed with "
+                    "patients from this department. Please, add this information "
+                    "in MAPPING_DEPARTMENTS (definitions/icu.py).",
                 )
-        bedmaster_files = [
-            bedmaster_file
-            for bedmaster_file in bedmaster_files
-            if os.path.split(os.path.split(bedmaster_file)[0])[-1] in desired_folders
-        ]
+                continue
+            for subfolder in self.dept_to_folder[dept]:
+                bedmaster_files_set, undesired_files_set = get_files_in_directory(
+                    directory=os.path.join(self.path_bedmaster, subfolder),
+                    extension=BEDMASTER_EXT,
+                )
+                bedmaster_files.extend(bedmaster_files_set)
+                undesired_files.extend(undesired_files_set)
+        if len(bedmaster_files) == 0:
+            bedmaster_files, undesired_files = get_files_in_directory(
+                directory=self.path_bedmaster,
+                extension=BEDMASTER_EXT,
+            )
+        if len(bedmaster_files) == 0:
+            raise FileNotFoundError(
+                f"No Bedmaster files found in {self.path_bedmaster}.",
+            )
+
         bedmaster_files = sorted(
             [os.path.split(bedmaster_file)[-1] for bedmaster_file in bedmaster_files],
         )

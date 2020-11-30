@@ -14,7 +14,13 @@ import unidecode
 
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
-from definitions.icu import EDW_FILES, MED_ACTIONS, ALARMS_FILES, ICU_SCALE_UNITS
+from definitions.icu import (
+    EDW_FILES,
+    MED_ACTIONS,
+    ALARMS_FILES,
+    ICU_SCALE_UNITS,
+    MAPPING_DEPARTMENTS,
+)
 from definitions.globals import TIMEZONE
 from ingest.icu.data_objects import (
     Event,
@@ -28,7 +34,7 @@ from ingest.icu.data_objects import (
 from ingest.icu.bedmaster_stats import BedmasterStats
 from ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
 
-# pylint: disable=too-many-branches
+# pylint: disable=too-many-branches, dangerous-default-value
 
 
 class Reader(ABC):
@@ -743,7 +749,7 @@ class BedmasterReader(h5py.File, Reader):
     def __init__(
         self,
         file: str,
-        scaling_and_units: Dict = None,
+        scaling_and_units: Dict[str, Dict[str, Any]] = ICU_SCALE_UNITS,
         summary_stats: BedmasterStats = None,
     ):
         super().__init__(file, "r")
@@ -755,9 +761,7 @@ class BedmasterReader(h5py.File, Reader):
             "vs": None,
             "wv": None,
         }
-        if not scaling_and_units:
-            scaling_and_units = ICU_SCALE_UNITS
-        self.scaling_and_units = scaling_and_units
+        self.scaling_and_units: Dict[str, Dict[str, Any]] = scaling_and_units
         self.summary_stats = summary_stats
         if self.summary_stats:
             self.summary_stats.add_file_stats("total_files")
@@ -1630,17 +1634,37 @@ class CrossReferencer:
             except ValueError:
                 csn = str(row.PatientEncounterID)
             bedmaster_file_id = str(row.fileID)
-            bedmaster_path = [
-                os.path.join(self.bedmaster_dir, file)
-                for file in os.listdir(self.bedmaster_dir)
-                if file.startswith(bedmaster_file_id)
-            ]
+            bedmaster_path = os.path.join(
+                self.bedmaster_dir,
+                f"{bedmaster_file_id}.mat",
+            )
+            if (
+                not os.path.exists(bedmaster_path)
+                and str(row.Department) in MAPPING_DEPARTMENTS
+            ):
+                departments_folders = MAPPING_DEPARTMENTS[str(row.Department)]
+                for department_folder in departments_folders:
+                    bedmaster_path = os.path.join(
+                        self.bedmaster_dir,
+                        department_folder,
+                        f"{bedmaster_file_id}.mat",
+                    )
+                    if os.path.exists(bedmaster_path):
+                        break
+            if not os.path.exists(bedmaster_path):
+                bedmaster_path = os.path.join(
+                    self.bedmaster_dir,
+                    str(row.Department),
+                    f"{bedmaster_file_id}.mat",
+                )
+                if not os.path.exists(bedmaster_path):
+                    raise ValueError(f"Bedmaster file {bedmaster_file_id} not found.")
             if mrn not in self.crossref:
-                self.crossref[mrn] = {csn: bedmaster_path}
+                self.crossref[mrn] = {csn: [bedmaster_path]}
             elif csn not in self.crossref[mrn]:
-                self.crossref[mrn][csn] = bedmaster_path
+                self.crossref[mrn][csn] = [bedmaster_path]
             else:
-                self.crossref[mrn][csn].extend(bedmaster_path)
+                self.crossref[mrn][csn].append(bedmaster_path)
         for _mrn, visits in self.crossref.items():
             for _csn, bedmaster_files in visits.items():
                 bedmaster_files.sort(
