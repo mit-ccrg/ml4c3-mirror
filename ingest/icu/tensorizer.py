@@ -399,7 +399,6 @@ def tensorize(args):
     tensorizer.tensorize(
         tensors=args.tensors,
         overwrite_hd5=args.overwrite,
-        n_patients=args.num_patients_to_tensorize,
         num_workers=args.num_workers,
         flag_one_source=args.allow_one_source,
     )

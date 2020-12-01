@@ -264,12 +264,6 @@ def parse_args() -> argparse.Namespace:
         help="Bool indicating whether existing EDW and hd5 files should be overwritten.",
     )
     icu_parser.add_argument(
-        "--num_patients_to_tensorize",
-        type=int,
-        help="Maximum number of patients whose data will be tensorized. "
-        "Useful for troubleshooting.",
-    )
-    icu_parser.add_argument(
         "--allow_one_source",
         action="store_true",
         help="If this parameter is set, patients with just one type of data "

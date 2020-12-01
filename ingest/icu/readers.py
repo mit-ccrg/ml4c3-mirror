@@ -1614,7 +1614,7 @@ class CrossReferencer:
         # Get only the first n patients
         if (n_patients or 0) > len(self.crossref):
             logging.warning(
-                f"Number of patients set in --num_patients_to_tensorize "
+                f"Number of patients set to tensorize "
                 f"exceeds the amount of patients stored. "
                 f"Number of patients to tensorize will be changed to "
                 f"{len(self.crossref)}.",
