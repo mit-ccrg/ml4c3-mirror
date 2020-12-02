@@ -1,9 +1,12 @@
 # Imports: standard library
 import os
+import pickle
 import argparse
+import tempfile
 
 # Imports: third party
 import numpy as np
+import pandas as pd
 from ray import tune
 from data import (
     get_ecg_tmap,
@@ -13,6 +16,7 @@ from data import (
 )
 from regnet import ML4C3Regnet
 from tensorflow import config as tf_config
+from tensorflow.keras import models
 from ray.tune.schedulers import HyperBandForBOHB
 from ray.tune.suggest.bohb import TuneBOHB
 from tensorflow.keras.layers import Input
@@ -59,17 +63,50 @@ def build_pretraining_model(
     return model
 
 
-def _test_build_pretraining_model():
-    m = build_pretraining_model(
+def save_optimizer(folder: str, optimizer):
+    with open(os.path.join(folder, "optimizer.pkl"), "wb") as f:
+        pickle.dump(optimizer, f)
+
+
+def load_optimizer(folder: str, optimizer):
+    with open(os.path.join(folder, "optimizer.pkl"), "rb") as f:
+        return pickle.load(f)
+
+
+def save_model(folder: str, model) -> str:
+    checkpoint_path = os.path.join(folder, "pretraining_model.h5")
+    model.save_weights(checkpoint_path)
+    save_optimizer(folder, model.optimizer)
+    return folder
+
+
+def load_model(folder: str, model):
+    checkpoint_path = os.path.join(folder, "pretraining_model.h5")
+    model.load_weights(checkpoint_path)
+    optimizer = load_optimizer(folder, model.optimizer)
+    model.compile(optimizer=optimizer, loss=model.loss)
+    return model
+
+
+def get_optimizer_iterations(model) -> int:
+    return model.optimizer.iterations.numpy()
+
+
+def _build_test_model():
+    return build_pretraining_model(
         epochs=10,
         ecg_length=100,
         kernel_size=3,
         group_size=2,
         depth=10,
-        initial_width=32,
-        width_growth_rate=3,
+        initial_width=8,
+        width_growth_rate=2,
         width_quantization=1.5,
     )
+
+
+def _test_build_pretraining_model():
+    m = _build_test_model()
     m.summary()
     dummy_in = {m.input_name: np.zeros((10, 100, 12))}
     dummy_out = {
@@ -81,6 +118,18 @@ def _test_build_pretraining_model():
         batch_size=2,
         validation_data=(dummy_in, dummy_out),
     )
+    iters = get_optimizer_iterations(m)
+    assert "val_loss" in history.history
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = save_model(tmpdir, m)
+        m2 = load_model(path, m)
+    history = m2.fit(
+        dummy_in,
+        dummy_out,
+        batch_size=2,
+        validation_data=(dummy_in, dummy_out),
+    )
+    assert get_optimizer_iterations(m) == 10
     assert "val_loss" in history.history
 
 
@@ -151,20 +200,19 @@ class PretrainingTrainable(tune.Trainable):
             cleanup()
 
     def save_checkpoint(self, tmp_checkpoint_dir):
-        checkpoint_path = os.path.join(tmp_checkpoint_dir, "pretraining_model.h5")
-        self.model.save_weights(checkpoint_path)
-        return checkpoint_path
+        return save_model(tmp_checkpoint_dir, self.model)
 
     def load_checkpoint(self, checkpoint):
-        self.model.load_weights(checkpoint)
+        load_model(checkpoint, self.model)
 
     def step(self):
         history = self.model.fit(
             x=self.train_dataset,
             steps_per_epoch=100,
             validation_steps=10,
-            epochs=1,
+            epochs=self.iteration + 1,
             validation_data=self.valid_dataset,
+            initial_epoch=self.iteration,
         )
         history_dict = {name: np.mean(val) for name, val in history.history.items()}
         if "val_loss" not in history_dict:
@@ -185,7 +233,7 @@ def run(
     output_folder: str,
     num_trials: int,
 ):
-    cpus = 16  # TODO: should be an argument
+    cpus = 40  # TODO: should be an argument
     augmentation_params = {
         f"{aug_name}_strength": tune.uniform(0, 1)
         for aug_name in augmentation_dict()
