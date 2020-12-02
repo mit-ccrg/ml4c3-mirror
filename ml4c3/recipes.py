@@ -176,16 +176,20 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
         elif args.mode == "train_sklearn_xgboost":
             hyperparameters["n_estimators"] = args.n_estimators
             hyperparameters["max_depth"] = args.max_depth
+            hyperparameters["gamma"] = args.gamma
+            hyperparameters["l1_ratio"] = args.l1
+            hyperparameters["l2_ratio"] = args.l2
         else:
             raise ValueError("Uknown train mode: ", args.mode)
         assert len(args.tensor_maps_out) == 1
+        model_type = args.mode.split("_")[-1]
         model = make_sklearn_model(
-            model_type=args.sklearn_model_type,
+            model_type=model_type,
             hyperparameters=hyperparameters,
         )
 
     # Train model using datasets
-    model, history = train_model_from_datasets(
+    train_results = train_model_from_datasets(
         model=model,
         tensor_maps_in=args.tensor_maps_in,
         tensor_maps_out=args.tensor_maps_out,
@@ -200,6 +204,10 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
         return_history=True,
         plot=True,
     )
+    if isinstance(model, Model):
+        model, history = train_results
+    else:
+        model = train_results
 
     # Evaluate trained model
     plot_path = args.output_folder

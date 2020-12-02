@@ -1,10 +1,10 @@
+# pylint: disable=attribute-defined-outside-init
 # Imports: standard library
 import os
 import logging
 from enum import Enum, auto
 from typing import Any, Dict, List, Tuple, Union, Callable, Optional, Sequence
 from itertools import chain
-from collections import defaultdict
 
 # Imports: third party
 import numpy as np
@@ -13,6 +13,7 @@ import tensorflow_addons as tfa
 import tensorflow_probability as tfp
 from xgboost import XGBClassifier
 from sklearn.svm import LinearSVC
+from sklearn.metrics import log_loss, hinge_loss
 from sklearn.ensemble import RandomForestClassifier
 from tensorflow.keras import backend as K
 from sklearn.calibration import CalibratedClassifierCV
@@ -78,7 +79,7 @@ from ml4c3.datasets import (
 )
 from ml4c3.optimizers import NON_KERAS_OPTIMIZERS, get_optimizer
 from definitions.globals import MODEL_EXT
-from ml4c3.tensormap.TensorMap import TensorMap, find_negative_label_and_channel
+from ml4c3.tensormap.TensorMap import TensorMap
 
 CHANNEL_AXIS = -1  # Set to 1 for Theano backend
 LANGUAGE_MODEL_SUFFIX = "_next_character"
@@ -201,8 +202,12 @@ def make_sklearn_model(
             C=hyperparameters["c"],
             l1_ratio=hyperparameters["l1_ratio"],
         )
+        model.loss_function = log_loss
+        model.loss_name = "log"
     elif model_type == "svm":
         model = MySVM(class_weight="balanced", C=hyperparameters["c"])
+        model.loss_function = hinge_loss
+        model.loss_name = "hinge"
     elif model_type == "randomforest":
         model = RandomForestClassifier(
             class_weight="balanced",
@@ -211,11 +216,18 @@ def make_sklearn_model(
             min_samples_split=hyperparameters["min_samples_split"],
             min_samples_leaf=hyperparameters["min_samples_leaf"],
         )
+        model.loss_function = gini_loss
+        model.loss_name = "gini"
     elif model_type == "xgboost":
         model = XGBClassifier(
             n_estimators=hyperparameters["n_estimators"],
             max_depth=hyperparameters["max_depth"],
+            gamma=hyperparameters["gamma"],
+            reg_alpha=hyperparameters["l1_ratio"],
+            reg_lambda=hyperparameters["l2_ratio"],
         )
+        model.loss_function = log_loss
+        model.loss_name = "log"
     else:
         raise ValueError(f"Invalid model name: {model_type}")
     model.name = model_type
@@ -223,7 +235,11 @@ def make_sklearn_model(
 
 
 class MySVM(LinearSVC):
-    def __init__(self, class_weight, C, select_feature_ratio=None):
+    """
+    Modified Linear Support Vector Classification Sklearn class.
+    """
+
+    def __init__(self, class_weight, C):
         super().__init__(
             penalty="l2",
             dual=False,
@@ -523,6 +539,11 @@ class DenseConvolutionalBlock:
 
 
 class FullyConnectedBlock:
+    """
+    Creates a fully connected block with dense, activation, regularization, and
+    normalization layers
+    """
+
     def __init__(
         self,
         *,
@@ -536,9 +557,6 @@ class FullyConnectedBlock:
         name: str = None,
     ):
         """
-        Creates a fully connected block with dense, activation, regularization, and
-        normalization layers
-
         :param widths: number of neurons in each dense layer
         :param activation: string name of activation function
         :param normalization: optional string name of normalization function
@@ -988,7 +1006,7 @@ class ConvDecoder:
         intermediates: Dict[TensorMap, List[Tensor]],
         _,
     ) -> Tensor:
-        for i, (dense_block, upsample) in enumerate(
+        for _, (dense_block, upsample) in enumerate(
             zip(self.dense_blocks, self.upsamples),
         ):
             x = dense_block(x)
@@ -1548,33 +1566,32 @@ def _pool_layers_from_kind_and_dimension(
         return [
             MaxPooling3D(pool_size=(pool_x, pool_y, pool_z)) for _ in range(pool_number)
         ]
-    elif dimension == 3 and pool_type == "max":
+    if dimension == 3 and pool_type == "max":
         return [MaxPooling2D(pool_size=(pool_x, pool_y)) for _ in range(pool_number)]
-    elif dimension == 2 and pool_type == "max":
+    if dimension == 2 and pool_type == "max":
         return [MaxPooling1D(pool_size=pool_x) for _ in range(pool_number)]
-    elif dimension == 4 and pool_type == "average":
+    if dimension == 4 and pool_type == "average":
         return [
             AveragePooling3D(pool_size=(pool_x, pool_y, pool_z))
             for _ in range(pool_number)
         ]
-    elif dimension == 3 and pool_type == "average":
+    if dimension == 3 and pool_type == "average":
         return [
             AveragePooling2D(pool_size=(pool_x, pool_y)) for _ in range(pool_number)
         ]
-    elif dimension == 2 and pool_type == "average":
+    if dimension == 2 and pool_type == "average":
         return [AveragePooling1D(pool_size=pool_x) for _ in range(pool_number)]
-    else:
-        raise ValueError(
-            f"Unknown pooling type: {pool_type} for dimension: {dimension}",
-        )
+    raise ValueError(
+        f"Unknown pooling type: {pool_type} for dimension: {dimension}",
+    )
 
 
 def _upsampler(dimension, pool_x, pool_y, pool_z):
     if dimension == 4:
         return UpSampling3D(size=(pool_x, pool_y, pool_z))
-    elif dimension == 3:
+    if dimension == 3:
         return UpSampling2D(size=(pool_x, pool_y))
-    elif dimension == 2:
+    if dimension == 2:
         return UpSampling1D(size=pool_x)
 
 
@@ -1613,14 +1630,13 @@ def _normalization_layer(norm: str) -> Layer:
 def _regularization_layer(dimension: int, regularization_type: str, rate: float):
     if dimension == 4 and regularization_type == "spatial_dropout":
         return SpatialDropout3D(rate)
-    elif dimension == 3 and regularization_type == "spatial_dropout":
+    if dimension == 3 and regularization_type == "spatial_dropout":
         return SpatialDropout2D(rate)
-    elif dimension == 2 and regularization_type == "spatial_dropout":
+    if dimension == 2 and regularization_type == "spatial_dropout":
         return SpatialDropout1D(rate)
-    elif regularization_type == "dropout":
+    if regularization_type == "dropout":
         return Dropout(rate)
-    else:
-        return lambda x: x
+    return lambda x: x
 
 
 def saliency_map(
@@ -1648,7 +1664,7 @@ def saliency_map(
     :return: Array of the gradients same shape as input_tensor
     """
     get_gradients = _gradients_from_output(model, output_layer_name, output_index)
-    activation, gradients = get_gradients([input_tensor])
+    _, gradients = get_gradients([input_tensor])
     return gradients
 
 
@@ -1662,3 +1678,47 @@ def _gradients_from_output(model, output_layer, output_index):
     )  # normalization trick: we normalize the gradient
     iterate = K.function([input_tensor], [x, grads])
     return iterate
+
+
+def sklearn_model_loss_from_dataset(
+    model: SKLEARN_MODELS,
+    dataset: tf.data.Dataset,
+    tensor_maps_in: List[TensorMap],
+    tensor_maps_out: List[TensorMap],
+) -> Tuple[float, str]:
+    """
+    Given a sklearn model and a dataset, computes the logistic loss.
+    """
+    if not isinstance(model, SKLEARN_MODELS.__args__):
+        raise ValueError(f"Uknown sklearn model: {model}")
+    # Get dicts of arrays of data keyed by tmap name from the dataset
+    data = get_dicts_of_arrays_from_dataset(
+        dataset=dataset,
+    )
+    input_data, output_data = data[BATCH_INPUT_INDEX], data[BATCH_OUTPUT_INDEX]
+
+    # Get desired arrays from dicts of arrays
+    X = get_array_from_dict_of_arrays(
+        tensor_maps=tensor_maps_in,
+        data=input_data,
+        drop_redundant_columns=False,
+    )
+    y = get_array_from_dict_of_arrays(
+        tensor_maps=tensor_maps_out,
+        data=output_data,
+        drop_redundant_columns=True,
+    )
+    loss = model.loss_function(y, model.predict_proba(X))
+    return loss, model.loss_name
+
+
+def gini_loss(y_true: np.ndarray, y_est: np.ndarray):
+    y_est = np.array([np.where(x == max(x))[0][0] for x in y_est])
+    gini = 0
+    for label_est in np.unique(y_est):
+        indices = np.where(y_est == label_est)[0]
+        p = 0
+        for label_true in np.unique(y_true):
+            p = len(np.where(y_true[indices] == label_true)[0]) / len(indices)
+            gini += p * (1 - p) * len(indices)
+    return gini

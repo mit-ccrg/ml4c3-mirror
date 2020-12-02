@@ -86,7 +86,7 @@ def predict_and_evaluate(
         if isinstance(model, Model):
             coefficients = [c[0].round(3) for c in model.layers[-1].get_weights()[0]]
         else:
-            coefficients = _get_sklearn_model_coefficients(model=model)
+            coefficients = get_sklearn_model_coefficients(model=model)
 
         # Get feature names from TMaps
         feature_names = []
@@ -197,7 +197,7 @@ def predict_and_evaluate(
     return performance_metrics
 
 
-def _get_sklearn_model_coefficients(model: SKLEARN_MODELS) -> np.array:
+def get_sklearn_model_coefficients(model: SKLEARN_MODELS) -> np.array:
     if model.name == "logreg":
         return model.coef_.flatten()
     if model.name == "svm":

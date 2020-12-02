@@ -610,16 +610,6 @@ def parse_args() -> argparse.Namespace:
     # Train Shallow arguments
     train_shallow_parser = argparse.ArgumentParser(add_help=False)
     train_shallow_parser.add_argument(
-        "--sklearn_model_type",
-        nargs="?",
-        choices=["logreg", "svm", "randomforest", "xgboost"],
-        type=str,
-        help=(
-            "Type of scikit-learn algorithm to train. If blank, defaults to"
-            " TensorFlow linear or logistic model (inferred from output tensor maps)."
-        ),
-    )
-    train_shallow_parser.add_argument(
         "--l1",
         default=0.0,
         type=float,
@@ -660,6 +650,13 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=8,
         help="",
+    )
+    train_shallow_parser.add_argument(
+        "--gamma",
+        default=0.0,
+        type=float,
+        help="Minimum loss reduction required to make a further partition on a "
+        "leaf node of the tree.",
     )
 
     # Training modes parsers

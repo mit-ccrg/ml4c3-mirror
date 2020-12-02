@@ -1,5 +1,5 @@
 # pylint: disable=wrong-import-position, disable=wrong-import-order
-# pylint: disable=dangerous-default-value
+# pylint: disable=dangerous-default-value, broad-except
 # Imports: standard library
 import gc
 import os
@@ -15,6 +15,7 @@ import pandas as pd
 import hyperopt
 from hyperopt import hp, tpe, fmin
 from skimage.filters import threshold_otsu
+from tensorflow.keras.models import Model
 
 # Imports: first party
 from ml4c3.plots import plot_metric_history
@@ -23,10 +24,11 @@ from ml4c3.models import (
     make_sklearn_model,
     train_model_from_datasets,
     make_multimodal_multitask_model,
+    sklearn_model_loss_from_dataset,
 )
 from ml4c3.datasets import train_valid_test_datasets
 from definitions.types import Arguments
-from ml4c3.evaluations import predict_and_evaluate
+from ml4c3.evaluations import predict_and_evaluate, get_sklearn_model_coefficients
 from ml4c3.tensormap.TensorMap import TensorMap, update_tmaps
 
 # fmt: off
@@ -104,6 +106,17 @@ def hyperparameter_optimizer(
             if args.mode == "train":
                 model = make_multimodal_multitask_model(**args.__dict__)
             elif args.mode == "train_keras_logreg":
+                model = make_shallow_model(
+                    tensor_maps_in=args.tensor_maps_in,
+                    tensor_maps_out=args.tensor_maps_out,
+                    optimizer=args.optimizer,
+                    learning_rate=args.learning_rate,
+                    learning_rate_schedule=args.learning_rate_schedule,
+                    model_file=args.model_file,
+                    donor_layers=args.donor_layers,
+                    l1=args.l1,
+                    l2=args.l2,
+                )
                 model = make_shallow_model(**args.__dict__)
             else:
                 hyperparameters = {}
@@ -128,12 +141,13 @@ def hyperparameter_optimizer(
                     raise ValueError("Uknown train mode: ", args.mode)
                 # SKLearn only works with one output tmap
                 assert len(args.tensor_maps_out) == 1
+                model_type = args.mode.split("_")[-1]
                 model = make_sklearn_model(
-                    model_type=args.sklearn_model_type,
+                    model_type=model_type,
                     hyperparameters=hyperparameters,
                 )
 
-            if model.count_params() > args.max_parameters:
+            if isinstance(model, Model) and model.count_params() > args.max_parameters:
                 logging.info(
                     f"Model too big, max parameters is:{args.max_parameters}, model"
                     f" has:{model.count_params()}. Return max loss.",
@@ -157,7 +171,7 @@ def hyperparameter_optimizer(
                 mixup_alpha=args.mixup_alpha,
             )
             train_dataset, valid_dataset, test_dataset = datasets
-            model, history = train_model_from_datasets(
+            train_results = train_model_from_datasets(
                 model=model,
                 tensor_maps_in=args.tensor_maps_in,
                 tensor_maps_out=args.tensor_maps_out,
@@ -172,8 +186,34 @@ def hyperparameter_optimizer(
                 return_history=True,
                 plot=args.make_training_plots,
             )
-            history.history["parameter_count"] = [model.count_params()]
-            histories.append(history.history)
+            if isinstance(model, Model):
+                model, history = train_results
+                history.history["parameter_count"] = [model.count_params()]
+                histories.append(history.history)
+            else:
+                model = train_results
+                history = {
+                    "loss": [
+                        sklearn_model_loss_from_dataset(
+                            model,
+                            train_dataset,
+                            args.tensor_maps_in,
+                            args.tensor_maps_out,
+                        )[0],
+                    ],
+                    "val_loss": [
+                        sklearn_model_loss_from_dataset(
+                            model,
+                            valid_dataset,
+                            args.tensor_maps_in,
+                            args.tensor_maps_out,
+                        )[0],
+                    ],
+                    "parameter_count": [
+                        len(get_sklearn_model_coefficients(model=model)),
+                    ],
+                }
+                histories.append(history)
             train_auc = predict_and_evaluate(
                 model=model,
                 data=train_dataset,
@@ -194,30 +234,49 @@ def hyperparameter_optimizer(
             )
             auc = {"train": train_auc, "test": test_auc}
             aucs.append(auc)
-            plot_metric_history(
-                history=history,
-                image_ext=args.image_ext,
-                prefix=os.path.join(trials_path, trial_id),
-            )
-            logging.info(
-                f"Current architecture:\n{_string_from_architecture_dict(x)}\nCurrent"
-                f" model size: {model.count_params()}.",
-            )
+            if isinstance(model, Model):
+                plot_metric_history(
+                    history=history,
+                    image_ext=args.image_ext,
+                    prefix=os.path.join(trials_path, trial_id),
+                )
+                logging.info(
+                    f"Current architecture:\n{_string_from_architecture_dict(x)}\n"
+                    f"Current model size: {model.count_params()}.",
+                )
 
             logging.info(f"Iteration {i} / {args.max_evals} max evaluations")
 
-            loss_and_metrics = model.evaluate(train_dataset)
-            logging.info(f"Train loss: {loss_and_metrics[0]:0.3f}")
+            if isinstance(model, Model):
+                train_loss = model.evaluate(train_dataset)[0]
+                test_loss = model.evaluate(test_dataset)[0]
+                loss_function = ""
+                for ot in args.tensor_maps_out:
+                    loss_function += ot.loss
+            else:
+                train_loss, loss_function = sklearn_model_loss_from_dataset(
+                    model,
+                    train_dataset,
+                    args.tensor_maps_in,
+                    args.tensor_maps_out,
+                )
+                test_loss, _ = sklearn_model_loss_from_dataset(
+                    model,
+                    test_dataset,
+                    args.tensor_maps_in,
+                    args.tensor_maps_out,
+                )
 
-            loss_and_metrics = model.evaluate(test_dataset)
-            logging.info(f"Test loss: {loss_and_metrics[0]:0.3f}")
+            logging.info(f"Loss function: {loss_function}")
+            logging.info(f"Train loss: {train_loss:0.3f}")
+            logging.info(f"Test loss: {test_loss:0.3f}")
 
             logging.info(f"Train AUC(s): {train_auc}")
             logging.info(f"Test AUC(s): {test_auc}")
 
             for cleanup in cleanups:
                 cleanup()
-            return loss_and_metrics[0]
+            return test_loss
 
         except ValueError:
             logging.exception(
@@ -225,7 +284,7 @@ def hyperparameter_optimizer(
                 " Returning max loss.",
             )
             return MAX_LOSS
-        except:
+        except Exception:
             logging.exception(
                 "Error trying hyperparameter optimization. Returning max loss.",
             )
