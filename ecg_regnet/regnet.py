@@ -24,8 +24,10 @@ class GroupConv(Layer):
     def __init__(self, filters: int, groups: int, kernel_size: int, stride: int):
         super(GroupConv, self).__init__()
         self.filters = filters
-        self.splits = self._filters_per_conv(filters, groups)
+        self.kernel_size = kernel_size
+        self.stride = stride
         self.groups = groups
+        self.splits = self._filters_per_conv(filters, groups)
         self.convs = [
             Conv1D(
                 filters=split,
@@ -55,7 +57,7 @@ class GroupConv(Layer):
 
 
 class Stem(Layer):
-    def __init__(self, width: int, kernel_size: int, activation: Activation):
+    def __init__(self, width: int, kernel_size: int):
         super(Stem, self).__init__()
         self.conv = Conv1D(
             filters=width,
@@ -66,10 +68,9 @@ class Stem(Layer):
             use_bias=False,
         )
         self.bn = BatchNormalization()
-        self.activation = activation
 
     def call(self, inputs, **kwargs):
-        return self.activation(self.bn(self.conv(inputs)))
+        return tf.nn.relu(self.bn(self.conv(inputs)))
 
 
 class SqueezeExcite(Layer):
@@ -109,7 +110,6 @@ class Block(Layer):
         groups: int,
         stride: int,
         kernel_size: int,
-        activation: Callable,
     ):
         super(Block, self).__init__()
         if stride > 1:
@@ -150,7 +150,7 @@ class Block(Layer):
             use_bias=False,
         )
         self.bn_3 = BatchNormalization()
-        self.activation = activation
+        self.activation = tf.nn.relu
         self.se = SqueezeExcite()
         self.add = Add()
 
@@ -185,13 +185,12 @@ class Stage(Layer):
         depth: int,
         group_size: int,
         kernel_size: int,
-        activation: Callable,
     ):
         super(Stage, self).__init__()
         self.width = width
         self.group_size = group_size
         self.kernel_size = kernel_size
-        self.activation = activation
+        self.activation = tf.nn.relu
         self.depth = depth
 
     def build(self, input_shape):
@@ -207,7 +206,6 @@ class Stage(Layer):
                 groups=max(channels // self.group_size, 1),
                 stride=2,
                 kernel_size=self.kernel_size,
-                activation=self.activation,
             ),
         ]
         for _ in range(self.depth - 1):
@@ -217,7 +215,6 @@ class Stage(Layer):
                     groups=max(channels // self.group_size, 1),
                     stride=1,
                     kernel_size=self.kernel_size,
-                    activation=self.activation,
                 ),
             )
 
@@ -242,7 +239,6 @@ class RegNetYBody(Layer):
         self.stem = Stem(
             initial_width,
             kernel_size * 3,
-            tf.nn.swish,
         )
         widths = self.find_widths(
             depth,
@@ -257,7 +253,6 @@ class RegNetYBody(Layer):
                 depth=depth,
                 group_size=group_size,
                 kernel_size=kernel_size,
-                activation=tf.nn.swish,
             )
             for width, depth in zip(widths, depths)
         ]
