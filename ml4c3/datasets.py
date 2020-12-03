@@ -3,6 +3,7 @@ import os
 import math
 import logging
 from typing import Set, Dict, List, Tuple, Union, Callable, Optional, Generator
+from threading import Thread
 from collections import Counter, defaultdict
 from multiprocessing import Event, Queue, Process
 
@@ -77,7 +78,8 @@ def _get_sample(
 
 def _tensor_worker(
     worker_name: str,
-    tensors: Union[str, List[Union[str, Tuple[str, str]]]],
+    hd5_sources: List[str],
+    csv_data: List[Tuple[str, pd.DataFrame, str]],
     patient_ids: List[str],
     start_signal: Event,
     tensor_queue: Queue,
@@ -86,29 +88,6 @@ def _tensor_worker(
     augment: bool = False,
 ):
     tmaps = input_maps + output_maps
-    if not isinstance(tensors, list):
-        tensors = [tensors]
-
-    csv_sources = []
-    hd5_sources = []
-    for source in tensors:
-        if isinstance(source, tuple):
-            csv_sources.append(source)
-        elif source.endswith(CSV_EXT):
-            csv_name = os.path.splitext(os.path.basename(source))[0]
-            csv_sources.append((source, csv_name))
-        else:
-            hd5_sources.append(source)
-
-    # preload all CSVs into dataframes
-    csv_data = []
-    patient_ids_set = set(patient_ids)
-    for csv_source, csv_name in csv_sources:
-        df = pd.read_csv(csv_source, low_memory=False)
-        mrn_col = infer_mrn_column(df, csv_source)
-        df[mrn_col] = df[mrn_col].astype(str)
-        df = df[df[mrn_col].isin(patient_ids_set)]
-        csv_data.append((csv_name, df, mrn_col))
 
     while True:
         start_signal.wait()
@@ -217,22 +196,44 @@ def make_data_generator_factory(
     output_maps: List[TensorMap],
     augment: bool = False,
     keep_ids: bool = False,
+    debug: bool = False,
 ) -> Tuple[Callable[[], SampleGenerator], StatsWrapper, Cleanup]:
+    Method = Thread if debug else Process
     tensor_queue: Queue = Queue(MAX_QUEUE_SIZE)
     if not isinstance(tensors, list):
         tensors = [tensors]
+
+    csv_sources = []
+    hd5_sources = []
+    for source in tensors:
+        if isinstance(source, tuple):
+            csv_sources.append(source)
+        elif source.endswith(CSV_EXT):
+            csv_name = os.path.splitext(os.path.basename(source))[0]
+            csv_sources.append((source, csv_name))
+        else:
+            hd5_sources.append(source)
+
+    # preload all CSVs into dataframes
+    csv_data = []
+    for csv_source, csv_name in csv_sources:
+        df = pd.read_csv(csv_source, low_memory=False)
+        mrn_col = infer_mrn_column(df, csv_source)
+        df[mrn_col] = df[mrn_col].astype(str)
+        csv_data.append((csv_name, df, mrn_col))
 
     processes = []
     worker_ids = np.array_split(list(patient_ids), num_workers)
     for i, _ids in enumerate(worker_ids):
         name = f"{data_split}_worker_{i}"
         start_signal = Event()
-        process = Process(
+        process = Method(
             target=_tensor_worker,
             name=name,
             args=(
                 name,
-                tensors,
+                hd5_sources,
+                csv_data,
                 _ids,
                 start_signal,
                 tensor_queue,
@@ -249,6 +250,7 @@ def make_data_generator_factory(
     def cleanup_workers():
         for process in processes:
             process.terminate()
+
         tensor_queue.close()
         logging.info(f"Stopped {num_workers} {data_split} workers.")
 
@@ -318,6 +320,7 @@ def make_dataset(
     keep_ids: bool = False,
     cache_off: bool = False,
     mixup_alpha: float = 0,
+    debug: bool = False,
 ) -> Tuple[tf.data.Dataset, StatsWrapper, Cleanup]:
     if not isinstance(tensors, list):
         tensors = [tensors]
@@ -347,6 +350,7 @@ def make_dataset(
         output_maps=output_maps,
         augment=augment,
         keep_ids=keep_ids,
+        debug=debug,
     )
     dataset = (
         tf.data.Dataset.from_generator(
@@ -415,6 +419,7 @@ def train_valid_test_datasets(
     output_folder: Optional[str] = None,
     cache_off: bool = False,
     mixup_alpha: float = 0.0,
+    debug: bool = False,
 ) -> Tuple[
     Tuple[tf.data.Dataset, tf.data.Dataset, tf.data.Dataset],
     Tuple[StatsWrapper, StatsWrapper, StatsWrapper],
@@ -446,6 +451,7 @@ def train_valid_test_datasets(
     :param output_folder: output folder of output files
     :param cache_off: if true, do not cache dataset in memory
     :param mixup_alpha: if non-zero, mixup batches with this alpha parameter for mixup
+    :param debug: if true, use threads to allow pdb debugging
     :return: tuple of three tensorflow Datasets, three StatsWrapper objects, and
              three callbacks to cleanup worker processes
     """
@@ -491,6 +497,7 @@ def train_valid_test_datasets(
         keep_ids=keep_ids,
         cache_off=cache_off,
         mixup_alpha=mixup_alpha,
+        debug=debug,
     )
     valid_dataset, valid_stats, valid_cleanup = make_dataset(
         data_split="valid",
@@ -503,6 +510,7 @@ def train_valid_test_datasets(
         augment=False,
         keep_ids=keep_ids,
         cache_off=cache_off,
+        debug=debug,
     )
     test_dataset, test_stats, test_cleanup = make_dataset(
         data_split="test",
@@ -515,6 +523,7 @@ def train_valid_test_datasets(
         augment=False,
         keep_ids=keep_ids or keep_ids_test,
         cache_off=cache_off,
+        debug=debug,
     )
 
     return (

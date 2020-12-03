@@ -140,6 +140,7 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
         output_folder=args.output_folder,
         cache_off=args.cache_off,
         mixup_alpha=args.mixup_alpha,
+        debug=args.debug,
     )
     train_dataset, valid_dataset, test_dataset = datasets
 
@@ -270,6 +271,7 @@ def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         allow_empty_split=True,
         output_folder=args.output_folder,
         cache_off=args.cache_off,
+        debug=args.debug,
     )
     _, _, test_dataset = datasets
 
@@ -348,6 +350,7 @@ def train_simclr_model(args: argparse.Namespace):
         output_folder=args.output_folder,
         cache_off=args.cache_off,
         mixup_alpha=args.mixup_alpha,
+        debug=args.debug,
     )
     train_dataset, valid_dataset, _ = datasets
     model = make_multimodal_multitask_model(**args.__dict__)

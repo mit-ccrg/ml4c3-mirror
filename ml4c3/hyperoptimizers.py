@@ -160,6 +160,7 @@ def hyperparameter_optimizer(
                 tensors=args.tensors,
                 batch_size=args.batch_size,
                 num_workers=args.num_workers,
+                keep_ids_test=False,
                 patient_csv=args.patient_csv,
                 valid_ratio=args.valid_ratio,
                 test_ratio=args.test_ratio,
@@ -169,6 +170,7 @@ def hyperparameter_optimizer(
                 output_folder=args.output_folder,
                 cache_off=args.cache_off,
                 mixup_alpha=args.mixup_alpha,
+                debug=args.debug,
             )
             train_dataset, valid_dataset, test_dataset = datasets
             train_results = train_model_from_datasets(

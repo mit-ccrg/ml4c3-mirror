@@ -171,6 +171,12 @@ def parse_args() -> argparse.Namespace:
         type=int,
         help="Number of workers to use for every tensor generator.",
     )
+    run_parser.add_argument(
+        "--debug",
+        "-d",
+        action="store_true",
+        help="Changes behavior in code to facilitate debugging.",
+    )
 
     # ECG Tensorize arguments
     ecg_tensorization_parser = subparser.add_parser(
@@ -1006,12 +1012,6 @@ def parse_args() -> argparse.Namespace:
         parents=[io_parser, run_parser],
     )
     visualizer_parser.add_argument(
-        "--debug",
-        "-d",
-        action="store_true",
-        help="Launch the server in debug mode",
-    )
-    visualizer_parser.add_argument(
         "--port",
         "-p",
         default="8050",
@@ -1201,6 +1201,9 @@ def _process_args(args: argparse.Namespace):
         raise ValueError(
             f"num_workers must be a positive integer, got: {args.num_workers}",
         )
+
+    if "debug" in args and args.debug:
+        args.num_workers = 1
 
     if args.remap_layer is not None:
         args.remap_layer = {
