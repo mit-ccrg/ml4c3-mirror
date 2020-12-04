@@ -14,7 +14,6 @@ from tensorflow.keras.models import Model
 
 # Imports: first party
 from ingest.ecg import tensorize as tensorize_ecg
-from ingest.icu import tensorize as tensorize_icu
 from ingest.icu import tensorize_batched as tensorize_icu_batched
 from ml4c3.plots import plot_ecg, plot_architecture_diagram
 from ml4c3.models import (
@@ -25,12 +24,12 @@ from ml4c3.models import (
 )
 from ml4c3.metrics import simclr_loss, simclr_accuracy
 from ml4c3.datasets import get_verbose_stats_string, train_valid_test_datasets
+from visualizer.run import run_server
 from ml4c3.arguments import parse_args
 from ml4c3.evaluations import predict_and_evaluate
 from ml4c3.explorations import explore
 from definitions.globals import MODEL_EXT
 from ingest.edw.pipeline import pull_edw_data
-from ml4c3.visualizer.run import run_server
 from ml4c3.hyperoptimizers import hyperoptimize
 from ml4c3.tensormap.TensorMap import TensorMap
 from ingest.icu.assess_coverage import assess_coverage

@@ -1,9 +1,7 @@
 # Imports: standard library
 from typing import Dict
 
-# Imports: first party
 # pylint: disable=unused-import
-from ml4c3.visualizer.assets import themes  # noqa: F401
 
 
 class GraphGenerator:

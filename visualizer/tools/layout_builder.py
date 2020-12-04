@@ -6,6 +6,10 @@ import dash_core_components as dcc
 import dash_html_components as html
 from plotly import graph_objs as go
 
+# Imports: first party
+# pylint: disable=unused-import
+from visualizer.assets import themes
+
 
 class LayoutBuilder:
     """

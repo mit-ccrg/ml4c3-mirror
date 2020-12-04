@@ -3,8 +3,8 @@ import dash_core_components as dcc
 import dash_html_components as html
 
 # Imports: first party
-from ml4c3.visualizer.properties import LAYOUT
-from ml4c3.visualizer.tools.layout_builder import LayoutBuilder
+from visualizer.properties import LAYOUT
+from visualizer.tools.layout_builder import LayoutBuilder
 
 
 def create_options_menu(files_dir):

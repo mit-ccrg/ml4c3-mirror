@@ -2,9 +2,9 @@
 from flask_caching import Cache
 
 # Imports: first party
-from ml4c3.visualizer import app
-from ml4c3.visualizer.properties import load_config
-from ml4c3.visualizer.static_callbacks import set_static_callbacks
+from visualizer import app
+from visualizer.properties import load_config
+from visualizer.static_callbacks import set_static_callbacks
 
 
 # pylint: disable=import-outside-toplevel
@@ -22,8 +22,8 @@ def run(debug, port, address, files_dir, options):
 
     load_config(user_files=options)
     # Imports: first party
-    from ml4c3.visualizer.layout import create_layout
-    from ml4c3.visualizer.graphs_callbacks import set_dynamic_callbacks
+    from visualizer.layout import create_layout
+    from visualizer.graphs_callbacks import set_dynamic_callbacks
 
     app.layout = create_layout(files_dir)
     set_static_callbacks(app)

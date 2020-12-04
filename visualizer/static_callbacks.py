@@ -11,7 +11,7 @@ from dash.dependencies import Input, State, Output
 
 # Imports: first party
 from definitions.icu import STATIC_UNITS, VISUALIZER_PATH
-from ml4c3.visualizer.tools.tm_helper import TMapHelper
+from visualizer.tools.tm_helper import TMapHelper
 
 # pylint: disable=unused-variable, too-many-statements
 

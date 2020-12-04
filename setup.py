@@ -10,7 +10,7 @@ setup(
     install_requires=[],
     packages=find_packages(),
     package_data={
-        "ml4c3": ["visualizer/*", "visualizer/assets/*"],
+        "visualizer": ["*", "assets/*"],
         "ingest": ["edw/queries-pipeline/*"],
     },
     include_package_data=True,

@@ -13,10 +13,10 @@ from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, State, Output
 
 # Imports: first party
-from ml4c3.visualizer.properties import LAYOUT, MESSAGES, SIGNAL_INTERPRETATION
-from ml4c3.visualizer.tools.tm_helper import TMapHelper
-from ml4c3.visualizer.static_callbacks import get_static_data
-from ml4c3.visualizer.tools.graph_generator import GraphGenerator
+from visualizer.properties import LAYOUT, MESSAGES, SIGNAL_INTERPRETATION
+from visualizer.tools.tm_helper import TMapHelper
+from visualizer.static_callbacks import get_static_data
+from visualizer.tools.graph_generator import GraphGenerator
 
 # pylint: disable=unused-variable, too-many-statements
 

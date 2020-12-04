@@ -4,6 +4,9 @@ import os
 # Imports: third party
 import yaml
 
+# Imports: first party
+from definitions.icu import VISUALIZER_PATH
+
 LAYOUT = {}
 
 # pylint: disable=global-statement
@@ -11,8 +14,7 @@ LAYOUT = {}
 
 def load_config(user_files, defaults_file=None):
     if defaults_file is None:
-        file_path = os.path.realpath(__file__)
-        defaults_file = os.path.join(os.path.dirname(file_path), "graphs.yml")
+        defaults_file = os.path.join(VISUALIZER_PATH, "graphs.yml")
 
     with open(defaults_file) as file:
         defaults = yaml.load(file, Loader=yaml.FullLoader)
