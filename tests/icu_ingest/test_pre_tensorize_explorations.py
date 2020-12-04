@@ -74,7 +74,7 @@ def test_pre_tensorize_explorations(temp_dir):
         ["field", "count", "min", "max", "mean", "total", "%"],
     )
 
-    assert len(cross_ref_df.index) == 8
+    assert len(cross_ref_df.index) == 10
     assert sorted(cross_ref_df.columns) == sorted(["field", "count"])
 
     assert len(signals_df.index) == len(signals_df["signal"].unique())

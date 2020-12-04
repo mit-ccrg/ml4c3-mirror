@@ -42,9 +42,11 @@ class PreTensorizeExplorer:
             "edw_mrns",
             "bedmaster_mrns",
             "common_mrns",
+            "cross_referenced_mrns",
             "edw_csns",
             "bedmaster_csns",
             "common_csns",
+            "cross_referenced_csns",
             "bedmaster_files",
             "cross_referenced_bedmaster_files",
         ]
@@ -54,9 +56,9 @@ class PreTensorizeExplorer:
             "Deceased",
             "Alive",
             "age",
-            "weight[pounds]",
-            "height[m]",
-            "length_stay[h]",
+            "weight (lbs)",
+            "height (m)",
+            "length_stay (h)",
             "transfer_in",
         ]
         self.signal_fields = ["signal", "count", "total", "%", "source"]
@@ -307,32 +309,16 @@ class PreTensorizeExplorer:
 
         xref_rows = []
         for field in self.xref_fields:
-            xref_rows.append([field, self.summary[field]])
+            field_name = field.replace("_", " ").replace("edw", "EDW")
+            field_name = field_name.replace("bedmaster", "Bedmaster")
+            field_name = field_name.replace("csn", "CSN").replace("mrn", "MRN")
+            xref_rows.append([field_name.capitalize(), self.summary[field]])
 
         columns = ["field", "count"]
         cross_ref_summary_df = pd.DataFrame(xref_rows, columns=columns).round(3)
         return cross_ref_summary_df
 
     def _get_edw_df(self):
-        def _add_edw_row(
-            field,
-            count=None,
-            total=None,
-            percent=None,
-            min_value=None,
-            max_value=None,
-            mean_value=None,
-        ):
-            return [
-                field,
-                count,
-                total,
-                percent,
-                min_value,
-                max_value,
-                mean_value,
-            ]
-
         logging.info("Obtaining demographics stats...")
         self._get_demo_stats()
         logging.info("Demographics stats obtained.")
@@ -341,30 +327,35 @@ class PreTensorizeExplorer:
         if "edw_csns" not in self.summary:
             self.summary["edw_csns"] = len(self.edw_csns)
 
-        total = self.summary["edw_csns"]
+        total = int(self.summary["edw_csns"])
 
         for field in self.edw_fields[:4]:
-            field_count = self.summary[field]
+            field_count = int(self.summary[field])
             percent = (field_count / total) * 100 if total else 0
-            edw_rows.append([field, field_count, total, percent])
+            edw_rows.append([field, field_count, total, percent, None, None, None])
         for field in self.edw_fields[4:-1]:
-            field_name = field.split("[")[0]
+            field_name = field.split(" (")[0]
             edw_rows.append(
-                _add_edw_row(
-                    field,
-                    total=total,
-                    min_value=self.summary[f"min_{field_name}"],
-                    max_value=self.summary[f"max_{field_name}"],
-                    mean_value=self.summary[f"mean_{field_name}"],
-                ),
+                [
+                    field.replace("_", " ").capitalize(),
+                    None,
+                    total,
+                    None,
+                    round(self.summary[f"min_{field_name}"], 3),
+                    round(self.summary[f"max_{field_name}"], 3),
+                    round(self.summary[f"mean_{field_name}"], 3),
+                ],
             )
         edw_rows.append(
-            _add_edw_row(
-                self.edw_fields[-1],
-                total=self.summary["edw_csns"],
-                min_value=self.summary["earliest_transfer_in"],
-                max_value=self.summary["latest_transfer_in"],
-            ),
+            [
+                self.edw_fields[-1].replace("_", " ").capitalize(),
+                None,
+                total,
+                None,
+                self.summary["earliest_transfer_in"],
+                self.summary["latest_transfer_in"],
+                None,
+            ],
         )
         columns = ["field", "count", "total", "%", "min", "max", "mean"]
         edw_df = pd.DataFrame(edw_rows, columns=columns).round(3)
@@ -488,22 +479,28 @@ class PreTensorizeExplorer:
 
         if not no_xref:
             edw_df = self._get_edw_df()
-            file_name = f"{summary_stats_base_name}_edw_demographics.csv"
-            edw_df.to_csv(os.path.join(output_folder, file_name), index=False)
-            logging.info(f"Demographics stats saved as {file_name}.")
+            file_name = os.path.join(
+                output_folder,
+                f"{summary_stats_base_name}_edw_demographics.csv",
+            )
+            edw_df.to_csv(file_name, index=False)
+            logging.info(f"Demographics stats saved {file_name}.")
 
             xref_df = self._get_xref_df()
-            file_name = f"{summary_stats_base_name}_coverage.csv"
-            xref_df.to_csv(os.path.join(output_folder, file_name), index=False)
-            logging.info(f"Cross reference stats saved as {file_name}.")
+            file_name = os.path.join(
+                output_folder,
+                f"{summary_stats_base_name}_coverage.csv",
+            )
+            xref_df.to_csv(file_name, index=False)
+            logging.info(f"Cross reference stats saved {file_name}.")
 
             signals_summary_df = self._get_signals_df()
-            file_name = f"{summary_stats_base_name}_signals_summary.csv"
-            signals_summary_df.to_csv(
-                os.path.join(output_folder, file_name),
-                index=False,
+            file_name = os.path.join(
+                output_folder,
+                f"{summary_stats_base_name}_signals_summary.csv",
             )
-            logging.info(f"Signals stats saved as {file_name}.")
+            signals_summary_df.to_csv(file_name, index=False)
+            logging.info(f"Signals stats saved {file_name}.")
 
         if detailed_bedmaster:
             logging.info("Starting detailed report. This might take a long time")
