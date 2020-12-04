@@ -888,16 +888,6 @@ interval_key_map = {
     "ecg_taxis_std":     ("taxis",           999, RangeValidator(-90, 360),  Standardize(mean=58, std=63)),
     "ecg_qrs_count":     ("qrscount",        -1,  RangeValidator(0, 100),    None),
     "ecg_qrs_count_std": ("qrscount",        -1,  RangeValidator(0, 100),    Standardize(mean=12, std=3)),
-    "ecg_qonset":        ("qonset",          -1,  RangeValidator(0, 500),    None),
-    "ecg_qonset_std":    ("qonset",          -1,  RangeValidator(0, 500),    Standardize(mean=204, std=36)),
-    "ecg_qoffset":       ("qoffset",         -1,  RangeValidator(0, 500),    None),
-    "ecg_qoffset_std":   ("qoffset",         -1,  RangeValidator(0, 500),    Standardize(mean=252, std=44)),
-    "ecg_ponset":        ("ponset",          -1,  RangeValidator(0, 1000),   None),
-    "ecg_ponset_std":    ("ponset",          -1,  RangeValidator(0, 1000),   Standardize(mean=122, std=27)),
-    "ecg_poffset":       ("poffset",         -1,  RangeValidator(10, 500),   None),
-    "ecg_poffset_std":   ("poffset",         -1,  RangeValidator(10, 500),   Standardize(mean=170, std=42)),
-    "ecg_toffset":       ("toffset",         -1,  RangeValidator(0, 1000),   None),
-    "ecg_toffset_std":   ("toffset",         -1,  RangeValidator(0, 1000),   Standardize(mean=397, std=73)),
 }
 # fmt: on
 
