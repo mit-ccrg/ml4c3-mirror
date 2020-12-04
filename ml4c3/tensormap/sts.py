@@ -208,7 +208,7 @@ def _make_sts_tff_categorical(key: str) -> Callable:
 def _make_sts_categorical_channel_map(feature: str) -> ChannelMap:
     """Create channel map for categorical STS feature;
     e.g. turns {"classnyh": [1, 2, 3, 4]} into
-               {classnyh_1: 0, classnyh_2: 1, classnyh_3: 2, classnyh_4: 3}"""
+               {"classnyh_1": 0, "classnyh_2": 1, "classnyh_3": 2, "classnyh_4": 3}"""
     values = sts_features_categorical[feature]
     channel_map = dict()
     for idx, value in enumerate(values):
