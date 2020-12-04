@@ -114,7 +114,7 @@ def tensor_from_file_aortic_stenosis_category(
             category = "none"
         elif 10 <= av_mean_gradient < 20:
             category = "mild"
-        elif 20 <= av_mean_gradient < 39:
+        elif 20 <= av_mean_gradient < 40:
             category = "moderate"
         elif av_mean_gradient >= 40:
             category = "severe"
