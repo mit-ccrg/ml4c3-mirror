@@ -7,7 +7,7 @@ import numpy as np
 # Imports: first party
 from definitions.echo import ECHO_PREFIX, ECHO_DATETIME_COLUMN
 from ml4c3.normalizer import RobustScaler
-from ml4c3.validators import RangeValidator, validator_no_nans, validator_not_all_zeros
+from ml4c3.validators import RangeValidator, validator_no_nans, validator_not_all_zero
 from ml4c3.tensormap.TensorMap import (
     Dates,
     TensorMap,
@@ -131,7 +131,7 @@ tmaps[tmap_name] = TensorMap(
     interpretation=Interpretation.CATEGORICAL,
     path_prefix=ECHO_PREFIX,
     tensor_from_file=tensor_from_file_aortic_stenosis_category,
-    validators=validator_not_all_zeros,
+    validators=validator_not_all_zero,
     time_series_limit=0,
     time_series_filter=get_echo_dates,
 )
