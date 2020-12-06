@@ -11,7 +11,6 @@ from tensorflow.keras.layers import (
     Conv1D,
     Flatten,
     Multiply,
-    Activation,
     BatchNormalization,
     GlobalAveragePooling1D,
 )

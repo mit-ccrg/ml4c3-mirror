@@ -3,6 +3,7 @@ import os
 import pickle
 import argparse
 import tempfile
+from collections import defaultdict
 
 # Imports: third party
 import numpy as np
@@ -16,7 +17,6 @@ from data import (
 )
 from regnet import ML4C3Regnet
 from tensorflow import config as tf_config
-from tensorflow.keras import models
 from ray.tune.schedulers import HyperBandForBOHB
 from ray.tune.suggest.bohb import TuneBOHB
 from tensorflow.keras.layers import Input
@@ -25,15 +25,35 @@ from tensorflow.keras.experimental import CosineDecay
 from tensorflow.python.keras.utils.layer_utils import count_params
 
 
+class EarlyStopping(tune.stopper.Stopper):
+    """Stop a trial early once its validation loss has plateaued"""
+    def __init__(
+        self,
+        patience: int,  # number of epochs to wait before stopping
+    ):
+        self.patience = patience
+        self._trial_to_loss = defaultdict(list)
+
+    def __call__(self, trial_id, result) -> bool:
+        losses = self._trial_to_loss[trial_id]
+        losses.append(result['val_loss'])
+        best_loss_idx = np.argmin(losses)
+        return best_loss_idx + self.patience < len(losses)
+
+    def stop_all(self) -> bool:
+        return False
+
+
 def build_pretraining_model(
-    epochs: int,
     ecg_length: int,
     kernel_size: int,
     group_size: int,
     depth: int,
     initial_width: int,
     width_growth_rate: int,
-    width_quantization: int,
+    width_quantization: float,
+    epochs: int,  # optimizer settings
+    learning_rate: float,
     **kwargs,
 ):
     tmaps_out = get_pretraining_tasks()
@@ -50,14 +70,14 @@ def build_pretraining_model(
         output_name_to_shape,
     )
     lr_schedule = CosineDecay(
-        initial_learning_rate=0.005,
+        initial_learning_rate=learning_rate,
         decay_steps=epochs,
     )
     optimizer = SGDW(
         learning_rate=lr_schedule,
         momentum=0.9,
         weight_decay=5 * 5e-5,
-    )  # following regnet's setup
+    )  # following RegNet's setup
     model({input_name: Input(shape=(ecg_length, 12))})  # initialize model
     model.compile(loss=[tm.loss for tm in tmaps_out], optimizer=optimizer)
     return model
@@ -102,6 +122,7 @@ def _build_test_model():
         initial_width=8,
         width_growth_rate=2,
         width_quantization=1.5,
+        learning_rate=1e-5,
     )
 
 
@@ -143,6 +164,7 @@ def _test_build_pretraining_model_bad_group_size():
         initial_width=28,
         width_growth_rate=2.11,
         width_quantization=2.6,
+        learning_rate=1e-5,
     )
     m.summary()
     dummy_in = {m.input_name: np.zeros((10, 100, 12))}
@@ -228,12 +250,12 @@ def run(
     test_csv: str,
     epochs: int,
     hd5_folder: str,
+    cpus: int,
     cpus_per_model: int,
     gpus_per_model: float,
     output_folder: str,
     num_trials: int,
 ):
-    cpus = 40  # TODO: should be an argument
     augmentation_params = {
         f"{aug_name}_strength": tune.uniform(0, 1)
         for aug_name in augmentation_dict()
@@ -244,8 +266,8 @@ def run(
 
     model_params = {
         "ecg_length": tune.qrandint(1250, 5000, 250),
-        "kernel_size": tune.randint(3, 10),
-        "group_size": tune.qrandint(1, 32, 8),
+        "kernel_size": tune.randint(3, 30),
+        "group_size": tune.qrandint(1, 64, 8),
         "depth": tune.randint(12, 28),
         "initial_width": tune.qrandint(16, 64, 4),  # TODO: too small?
         "width_growth_rate": tune.uniform(0, 4),
@@ -255,11 +277,14 @@ def run(
         "train_csv": train_csv,
         "valid_csv": valid_csv,
         "test_csv": test_csv,
-        "epochs": epochs,
         "hd5_folder": hd5_folder,
         "num_workers": cpus_per_model,
     }
-    hyperparams = {**augmentation_params, **model_params}
+    optimizer_params = {
+        "learning_rate": tune.loguniform(1e-1, 1e-6),
+        "epochs": tune.randint(max(epochs // 2, 1), epochs),
+    }
+    hyperparams = {**augmentation_params, **model_params, **optimizer_params}
 
     max_concurrent = min(
         cpus // cpus_per_model,
@@ -283,6 +308,8 @@ def run(
         f"Running BOHB tune for {num_trials} trials with {max_concurrent} maximum concurrent trials",
     )
     print(f"Results will appear in {output_folder}")
+
+    stopper = EarlyStopping(patience=5)
     analysis = tune.run(
         PretrainingTrainable,
         verbose=1,
@@ -295,6 +322,7 @@ def run(
         },
         local_dir=output_folder,
         config={**hyperparams, **training_config},
+        stop=stopper,
     )
     analysis.results_df.to_csv(os.path.join(output_folder, "results.tsv"), sep="\t")
 
@@ -326,6 +354,12 @@ def parse_args():
         "--num_trials",
         type=int,
         help="Number of models to train.",
+        required=True,
+    )
+    parser.add_argument(
+        "--cpus",
+        type=int,
+        help="Number of cpus available.",
         required=True,
     )
     parser.add_argument(
