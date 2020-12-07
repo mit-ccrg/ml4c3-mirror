@@ -1131,7 +1131,7 @@ def _process_args(args: argparse.Namespace):
         args.output_folder,
         "arguments_" + now_string + ".txt",
     )
-    command_line = f"\n./scripts/tf.sh {' '.join(sys.argv)}\n"
+    command_line = f"\n./scripts/run.sh {' '.join(sys.argv)}\n"
     if not os.path.exists(os.path.dirname(args_file)):
         os.makedirs(os.path.dirname(args_file))
     with open(args_file, "w") as f:
