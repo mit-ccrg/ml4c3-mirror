@@ -8,7 +8,16 @@ import unittest.mock
 import pytest
 
 # Imports: first party
+from definitions.icu import MAPPING_DEPARTMENTS
 from ingest.icu.check_structure import BedmasterChecker
+
+DEPARTMENTS = set()
+for department in MAPPING_DEPARTMENTS:
+    DEPARTMENTS.update(MAPPING_DEPARTMENTS[department])
+alarms_files = os.listdir(pytest.alarms_dir)
+for alarm_file in alarms_files:
+    department = alarm_file.replace("bedmaster_alarms_", "").replace(".csv", "")
+    DEPARTMENTS.remove(department)
 
 
 def get_bedmaster_checker(directory: str) -> BedmasterChecker:
@@ -21,62 +30,11 @@ def get_bedmaster_checker(directory: str) -> BedmasterChecker:
 
 def test_check_bedmaster_structure():
     test_dir = os.path.join(os.path.dirname(__file__))
-    depts = [
-        "BIG06",
-        "BIG09",
-        "BIG09PU",
-        "BIG11",
-        "BIG12",
-        "BIG13",
-        "BIG14",
-        "BIG7",
-        "BIG9",
-        "BLAKE6",
-        "BLK07",
-        "BLK10",
-        "BLK12",
-        "BLK13",
-        "ELL-7",
-        "ELL04",
-        "ELL09",
-        "ELL10",
-        "ELL11",
-        "ELL12",
-        "ELL13",
-        "ELL14",
-        "ELL16",
-        "ELL17",
-        "ELL18",
-        "ELL19",
-        "ELL4",
-        "ELL6",
-        "ELL9",
-        "LUN06",
-        "LUN06IM",
-        "LUN07",
-        "LUN08",
-        "LUN09",
-        "LUN10",
-        "PH22",
-        "PICU",
-        "WANG3",
-        "WHITE08",
-        "WHITE09",
-        "WHITE10",
-        "WHITE11",
-        "WHT06",
-        "WHT07",
-        "WHT08",
-        "WHT09",
-        "WHT12",
-        "WHT13",
-        "None",
-    ]
     expected_warning_message = [
         "ERROR:root:Wrong file format: the groups ['vs', 'wv'] were not found in the "
         f"input file {test_dir}/data/bedmaster/error_file.mat.",
     ]
-    for dept in depts:
+    for dept in DEPARTMENTS:
         expected_warning_message.append(
             f"WARNING:root:Missing file: the mapping name {dept} in "
             "ALARMS_FILES['names'] doesn't have its corresponding file "
@@ -97,58 +55,7 @@ def test_check_bedmaster_structure():
             if not file.endswith(".mat"):
                 edw_files.append(os.path.join(root, file))
     expected_warning_message = []
-    depts = [
-        "BIG06",
-        "BIG09",
-        "BIG09PU",
-        "BIG11",
-        "BIG12",
-        "BIG13",
-        "BIG14",
-        "BIG7",
-        "BIG9",
-        "BLAKE6",
-        "BLK07",
-        "BLK10",
-        "BLK12",
-        "BLK13",
-        "ELL-7",
-        "ELL04",
-        "ELL09",
-        "ELL10",
-        "ELL11",
-        "ELL12",
-        "ELL13",
-        "ELL14",
-        "ELL16",
-        "ELL17",
-        "ELL18",
-        "ELL19",
-        "ELL4",
-        "ELL6",
-        "ELL9",
-        "LUN06",
-        "LUN06IM",
-        "LUN07",
-        "LUN08",
-        "LUN09",
-        "LUN10",
-        "PH22",
-        "PICU",
-        "WANG3",
-        "WHITE08",
-        "WHITE09",
-        "WHITE10",
-        "WHITE11",
-        "WHT06",
-        "WHT07",
-        "WHT08",
-        "WHT09",
-        "WHT12",
-        "WHT13",
-        "None",
-    ]
-    for dept in depts:
+    for dept in DEPARTMENTS:
         expected_warning_message.append(
             f"WARNING:root:Missing file: the mapping name {dept} in "
             "ALARMS_FILES['names'] doesn't have its corresponding file "

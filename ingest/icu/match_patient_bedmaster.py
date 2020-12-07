@@ -39,10 +39,13 @@ class PatientBedmasterMatcher:
         self.desired_departments = desired_departments
 
         self.dept_to_folder = MAPPING_DEPARTMENTS
-        self.folder_to_dept = {}
+        self.folder_to_dept: Dict[str, List[str]] = {}
         for key, values in MAPPING_DEPARTMENTS.items():
             for value in values:
-                self.folder_to_dept.update({value: key})
+                if value not in self.folder_to_dept:
+                    self.folder_to_dept[value] = [key]
+                else:
+                    self.folder_to_dept[value].append(key)
 
         self.table_dic: Dict[str, List[Any]] = self._new_table_dic()
 
@@ -164,18 +167,6 @@ class PatientBedmasterMatcher:
         unmatched_files = []
         for _, bedmaster_file in enumerate(bedmaster_files):
             dept, room_bed, start_time = self._take_bedmaster_file_info(bedmaster_file)
-            if dept not in self.folder_to_dept:
-                self.folder_to_dept[dept] = dept
-                logging.warning(
-                    f"Bedmaster department {dept} doesn't have it's corresponding "
-                    "mapping.",
-                )
-
-            if (
-                self.desired_departments
-                and self.folder_to_dept[dept] not in self.desired_departments
-            ):
-                continue
             # Set room and bed string properly, if it has no room already, add
             # letter A (default in ADT)
             if any(s.isalpha() for s in room_bed):
@@ -204,6 +195,7 @@ class PatientBedmasterMatcher:
                 csn = int(filt_adt_df["PatientEncounterID"].values[0])
                 t_start = filt_adt_df["TransferInDTS"].values[0]
                 t_end = filt_adt_df["TransferOutDTS"].values[0]
+                department = filt_adt_df["DepartmentDSC"].values[0]
 
                 self.table_dic["MRN"].append(mrn)
                 self.table_dic["PatientEncounterID"].append(csn)
@@ -212,7 +204,7 @@ class PatientBedmasterMatcher:
                 self.table_dic["fileID"].append(bedmaster_file[:-4])
                 self.table_dic["unixFileStartTime"].append(start_time)
                 self.table_dic["unixFileEndTime"].append(t_end)
-                self.table_dic["Department"].append(self.folder_to_dept[dept])
+                self.table_dic["Department"].append(department)
             elif store_unmatched:
                 self.table_dic["MRN"].append(None)
                 self.table_dic["PatientEncounterID"].append(None)
