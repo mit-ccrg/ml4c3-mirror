@@ -83,11 +83,11 @@ def _tensor_worker(
     patient_ids: List[str],
     start_signal: Event,
     tensor_queue: Queue,
-    input_maps: List[TensorMap],
-    output_maps: List[TensorMap],
+    input_tmaps: List[TensorMap],
+    output_tmaps: List[TensorMap],
     augment: bool = False,
 ):
-    tmaps = input_maps + output_maps
+    tmaps = input_tmaps + output_tmaps
 
     while True:
         start_signal.wait()
@@ -109,7 +109,7 @@ def _tensor_worker(
                 tensors = []
                 data = PatientData(patient_id=patient_id)
 
-                # add top level groups in hd5s to patient dictionary
+                # Add top level groups in hd5s to patient dictionary
                 for hd5_source in hd5_sources:
                     hd5_path = os.path.join(hd5_source, f"{patient_id}.hd5")
                     if not os.path.isfile(hd5_path):
@@ -119,17 +119,18 @@ def _tensor_worker(
                         data[key] = hd5[key]
                     open_hd5s.append(hd5)
 
-                # add rows in csv with patient data accessible in patient dictionary
+                # Add rows in csv with patient data accessible in patient dictionary
                 for csv_name, df, mrn_col in csv_data:
                     mask = df[mrn_col] == patient_id
                     if not mask.any():
                         continue
                     data[csv_name] = df[mask]
 
-                # load all samples found at ID
+                # Load all samples found at ID
                 for tm in tmaps:
                     _tensor = tm.tensor_from_file(tm, data)
-                    # if tensor is not dynamically shaped,
+
+                    # If tensor is not dynamically shaped,
                     # wrap in extra dimension to simulate time series with 1 sample
                     if tm.time_series_limit is None:
                         _tensor = np.array([_tensor])
@@ -137,28 +138,28 @@ def _tensor_worker(
                         num_linked = len(_tensor)
                     tensors.append(_tensor)
 
-                # individually yield samples
+                # Individually yield samples
                 for i in range(len(tensors[0])):
                     sample_tensors = {
                         tm.name: tensor[i] for tm, tensor in zip(tmaps, tensors)
                     }
                     try:
                         in_tensors = _get_sample(
-                            tmaps=input_maps,
+                            tmaps=input_tmaps,
                             sample_tensors=sample_tensors,
                             is_input=True,
                             augment=augment,
                             data=data,
                         )
                         out_tensors = _get_sample(
-                            tmaps=output_maps,
+                            tmaps=output_tmaps,
                             sample_tensors=sample_tensors,
                             is_input=False,
                             augment=augment,
                             data=data,
                         )
                         tensor_queue.put(
-                            ((in_tensors, out_tensors), patient_id, num_linked),
+                            ((in_tensors, out_tensors), patient_id, num_linked, None),
                         )
                     except (
                         IndexError,
@@ -166,17 +167,25 @@ def _tensor_worker(
                         ValueError,
                         OSError,
                         RuntimeError,
-                    ) as e:
-                        # sample failed postprocessing
+                    ) as exception:
+                        # Sample failed postprocessing;
                         # if sample was linked, fail all samples from this ID
                         if num_linked != 1:
                             raise ValueError("Linked sample failed")
-                        tensor_queue.put((SAMPLE_FAILED, patient_id, num_linked))
+                        tensor_queue.put(
+                            (SAMPLE_FAILED, patient_id, num_linked, exception),
+                        )
                         continue
-                tensor_queue.put((ID_SUCCEEDED, patient_id, num_linked))
-            except (IndexError, KeyError, ValueError, OSError, RuntimeError) as e:
-                # could not load samples from ID
-                tensor_queue.put((ID_FAILED, patient_id, num_linked))
+                tensor_queue.put((ID_SUCCEEDED, patient_id, num_linked, None))
+            except (
+                IndexError,
+                KeyError,
+                ValueError,
+                OSError,
+                RuntimeError,
+            ) as exception:
+                # Could not load samples from ID
+                tensor_queue.put((ID_FAILED, patient_id, num_linked, exception))
             finally:
                 for hd5 in open_hd5s:
                     hd5.close()
@@ -187,13 +196,31 @@ class StatsWrapper:
         self.stats = Counter()
 
 
+def _csv_data_source_name_among_tmap_path_prefixes(
+    tmaps: List[TensorMap],
+    csv_sources: List[Tuple],
+):
+    """Iterate over CSV data source names, and check if name is among TMap path
+    prefixes. If not, either a) no TMaps require the CSV source, or b) the CSV source
+    name is wrong in --tensors"""
+    tmap_path_prefixes = [tm.path_prefix for tm in tmaps]
+    for csv_source in csv_sources:
+        csv_source_name = csv_source[1]
+        if csv_source_name not in tmap_path_prefixes:
+            logging.warning(
+                f"CSV source name {csv_source_name} is not found in any TMap path "
+                f"prefixes. This CSV data source may not be needed. Alternatively, "
+                f"the CSV source name given to --tensors is incorrect.",
+            )
+
+
 def make_data_generator_factory(
     data_split: str,
     num_workers: int,
     tensors: Union[str, List[Union[str, Tuple[str, str]]]],
     patient_ids: Set[str],
-    input_maps: List[TensorMap],
-    output_maps: List[TensorMap],
+    input_tmaps: List[TensorMap],
+    output_tmaps: List[TensorMap],
     augment: bool = False,
     keep_ids: bool = False,
     debug: bool = False,
@@ -214,13 +241,20 @@ def make_data_generator_factory(
         else:
             hd5_sources.append(source)
 
-    # preload all CSVs into dataframes
+    # Load all CSVs into dataframes
     csv_data = []
     for csv_source, csv_name in csv_sources:
         df = pd.read_csv(csv_source, low_memory=False)
         mrn_col = infer_mrn_column(df, csv_source)
         df[mrn_col] = df[mrn_col].astype(str)
         csv_data.append((csv_name, df, mrn_col))
+        logging.info(f"Loaded dataframe with shape {df.shape} from {csv_source}")
+
+    tmaps_all = input_tmaps + output_tmaps
+    _csv_data_source_name_among_tmap_path_prefixes(
+        tmaps=tmaps_all,
+        csv_sources=csv_sources,
+    )
 
     processes = []
     worker_ids = np.array_split(list(patient_ids), num_workers)
@@ -237,8 +271,8 @@ def make_data_generator_factory(
                 _ids,
                 start_signal,
                 tensor_queue,
-                input_maps,
-                output_maps,
+                input_tmaps,
+                output_tmaps,
                 augment,
             ),
         )
@@ -250,7 +284,6 @@ def make_data_generator_factory(
     def cleanup_workers():
         for process in processes:
             process.terminate()
-
         tensor_queue.close()
         logging.info(f"Stopped {num_workers} {data_split} workers.")
 
@@ -268,7 +301,12 @@ def make_data_generator_factory(
         num_ids = len(patient_ids)
         linked_tensor_buffer: defaultdict = defaultdict(list)
         while stats["ids_completed"] < num_ids or len(linked_tensor_buffer) > 0:
-            sample, patient_id, num_linked = tensor_queue.get()
+            sample, patient_id, num_linked, exception = tensor_queue.get()
+            if exception is not None:
+                exception_message = str(exception).strip("'")
+                stats[
+                    f"exception - {type(exception).__name__} - {exception_message}"
+                ] += 1
             if sample == ID_SUCCEEDED:
                 stats["ids_succeeded"] += 1
                 stats["ids_completed"] += 1
@@ -286,7 +324,7 @@ def make_data_generator_factory(
                     for sample in linked_tensor_buffer[patient_id]:
                         stats["samples_succeeded"] += 1
                         stats["samples_completed"] += 1
-                        _collect_sample_stats(stats, sample, input_maps, output_maps)
+                        _collect_sample_stats(stats, sample, input_tmaps, output_tmaps)
                         yield sample if not keep_ids else sample + (patient_id,)
                     del linked_tensor_buffer[patient_id]
                 else:
@@ -294,14 +332,21 @@ def make_data_generator_factory(
             else:
                 stats["samples_succeeded"] += 1
                 stats["samples_completed"] += 1
-                _collect_sample_stats(stats, sample, input_maps, output_maps)
+                _collect_sample_stats(stats, sample, input_tmaps, output_tmaps)
                 yield sample if not keep_ids else sample + (patient_id,)
 
+        # If no successful tensors were obtained, iterate over stats, find exceptions,
+        # and log the exception message and the count into an error message
+        if stats["samples_succeeded"] == 0:
+            error_message = "No samples succeeded. Errors collected during parsing:\n"
+            for key in stats:
+                if "exception" in key:
+                    error_message += f"{key}: {stats[key]} instances occurred\n"
+            raise ValueError(error_message)
         logging.info(
             f"{get_stats_string(name, stats, epoch_counter)}"
-            f"{get_verbose_stats_string({data_split: stats}, input_maps, output_maps)}",
+            f"{get_verbose_stats_string({data_split: stats}, input_tmaps, output_tmaps)}",
         )
-
         nonlocal stats_wrapper
         stats_wrapper.stats = stats
 
@@ -312,8 +357,8 @@ def make_dataset(
     data_split: str,
     tensors: Union[str, List[Union[str, Tuple[str, str]]]],
     patient_ids: Set[str],
-    input_maps: List[TensorMap],
-    output_maps: List[TensorMap],
+    input_tmaps: List[TensorMap],
+    output_tmaps: List[TensorMap],
     batch_size: int,
     num_workers: int,
     augment: bool = False,
@@ -327,27 +372,28 @@ def make_dataset(
     output_types = (
         {
             tm.input_name: tf.string if tm.is_language else tf.float32
-            for tm in input_maps
+            for tm in input_tmaps
         },
         {
             tm.output_name: tf.string if tm.is_language else tf.float32
-            for tm in output_maps
+            for tm in output_tmaps
         },
     )
     output_shapes = (
-        {tm.input_name: tm.shape for tm in input_maps},
-        {tm.output_name: tm.shape for tm in output_maps},
+        {tm.input_name: tm.shape for tm in input_tmaps},
+        {tm.output_name: tm.shape for tm in output_tmaps},
     )
     if keep_ids:
         output_types += (tf.string,)
         output_shapes += (tuple(),)
+
     data_generator_factory, stats_wrapper, cleanup = make_data_generator_factory(
         data_split=data_split,
         num_workers=num_workers,
         tensors=tensors,
         patient_ids=patient_ids,
-        input_maps=input_maps,
-        output_maps=output_maps,
+        input_tmaps=input_tmaps,
+        output_tmaps=output_tmaps,
         augment=augment,
         keep_ids=keep_ids,
         debug=debug,
@@ -375,7 +421,7 @@ def make_dataset(
             """
             in_batch, out_batch = batch[BATCH_INPUT_INDEX], batch[BATCH_OUTPUT_INDEX]
             # last batch in epoch may not be exactly batch_size, get actual _size
-            _size = tf.shape(in_batch[input_maps[0].input_name])[:1]
+            _size = tf.shape(in_batch[input_tmaps[0].input_name])[:1]
             # roll samples for masking [1,2,3] -> [3,1,2]
             in_roll = {k: tf.roll(in_batch[k], 1, 0) for k in in_batch}
             out_roll = {k: tf.roll(out_batch[k], 1, 0) for k in out_batch}
@@ -469,7 +515,6 @@ def train_valid_test_datasets(
         test_csv=test_csv,
         allow_empty_split=allow_empty_split,
     )
-
     if output_folder is not None:
 
         def save_ids(ids: Set[str], split: str):
@@ -489,8 +534,8 @@ def train_valid_test_datasets(
         data_split="train",
         tensors=tensors,
         patient_ids=train_ids,
-        input_maps=tensor_maps_in,
-        output_maps=tensor_maps_out,
+        input_tmaps=tensor_maps_in,
+        output_tmaps=tensor_maps_out,
         batch_size=batch_size,
         num_workers=num_workers,
         augment=True,
@@ -503,8 +548,8 @@ def train_valid_test_datasets(
         data_split="valid",
         tensors=tensors,
         patient_ids=valid_ids,
-        input_maps=tensor_maps_in,
-        output_maps=tensor_maps_out,
+        input_tmaps=tensor_maps_in,
+        output_tmaps=tensor_maps_out,
         batch_size=batch_size,
         num_workers=num_workers,
         augment=False,
@@ -516,8 +561,8 @@ def train_valid_test_datasets(
         data_split="test",
         tensors=tensors,
         patient_ids=test_ids,
-        input_maps=tensor_maps_in,
-        output_maps=tensor_maps_out,
+        input_tmaps=tensor_maps_in,
+        output_tmaps=tensor_maps_out,
         batch_size=batch_size,
         num_workers=num_workers,
         augment=False,
@@ -525,7 +570,6 @@ def train_valid_test_datasets(
         cache_off=cache_off,
         debug=debug,
     )
-
     return (
         (train_dataset, valid_dataset, test_dataset),
         (train_stats, valid_stats, test_stats),
@@ -536,8 +580,8 @@ def train_valid_test_datasets(
 def _collect_sample_stats(
     stats: Counter,
     sample: Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]],
-    input_maps: List[TensorMap],
-    output_maps: List[TensorMap],
+    input_tmaps: List[TensorMap],
+    output_tmaps: List[TensorMap],
 ) -> None:
     in_tensors, out_tensors = sample
 
@@ -559,8 +603,8 @@ def _collect_sample_stats(
                     stats[f"{tm.name}_sum"] += value
                     stats[f"{tm.name}_squared_sum"] += value ** 2
 
-    _update_stats(tmaps=input_maps, tensors=in_tensors, is_input=True)
-    _update_stats(tmaps=output_maps, tensors=out_tensors, is_input=False)
+    _update_stats(tmaps=input_tmaps, tensors=in_tensors, is_input=True)
+    _update_stats(tmaps=output_tmaps, tensors=out_tensors, is_input=False)
 
 
 def get_stats_string(name: str, stats: Counter, epoch_count: int) -> str:
@@ -577,17 +621,17 @@ def get_stats_string(name: str, stats: Counter, epoch_count: int) -> str:
 
 def get_verbose_stats_string(
     split_stats: Dict[str, Counter],
-    input_maps: List[TensorMap],
-    output_maps: List[TensorMap],
+    input_tmaps: List[TensorMap],
+    output_tmaps: List[TensorMap],
 ) -> str:
     if len(split_stats) == 1:
         stats = list(split_stats.values())[0]
-        dataframes = _get_stats_as_dataframes(stats, input_maps, output_maps)
+        dataframes = _get_stats_as_dataframes(stats, input_tmaps, output_tmaps)
     else:
         dataframes = _get_stats_as_dataframes_from_multiple_datasets(
             split_stats,
-            input_maps,
-            output_maps,
+            input_tmaps,
+            output_tmaps,
         )
     continuous_tm_df, categorical_tm_df, other_tm_df = dataframes
 
@@ -626,13 +670,13 @@ def get_verbose_stats_string(
 
 def _get_stats_as_dataframes(
     stats: Counter,
-    input_maps: List[TensorMap],
-    output_maps: List[TensorMap],
+    input_tmaps: List[TensorMap],
+    output_tmaps: List[TensorMap],
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     continuous_tmaps = []
     categorical_tmaps = []
     other_tmaps = []
-    for tm in input_maps + output_maps:
+    for tm in input_tmaps + output_tmaps:
         if tm.axes == 1 and tm.is_continuous:
             continuous_tmaps.append(tm)
         elif tm.axes == 1 and tm.is_categorical:
@@ -686,14 +730,14 @@ def _get_stats_as_dataframes(
 
 def _get_stats_as_dataframes_from_multiple_datasets(
     split_stats: Dict[str, Counter],
-    input_maps: List[TensorMap],
-    output_maps: List[TensorMap],
+    input_tmaps: List[TensorMap],
+    output_tmaps: List[TensorMap],
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     split_to_dataframes = {
         split: _get_stats_as_dataframes(
             stats=stats,
-            input_maps=input_maps,
-            output_maps=output_maps,
+            input_tmaps=input_tmaps,
+            output_tmaps=output_tmaps,
         )
         for split, stats in split_stats.items()
     }

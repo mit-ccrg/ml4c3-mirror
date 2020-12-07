@@ -56,9 +56,12 @@ class PatientData:
             raise KeyError(f"Patient dictionary keys must be strings: {key}")
         key = key.strip("/")
         splits = key.split("/", 1)
-        if len(splits) == 1:
-            return self.data[key]
-        return self.data[splits[0]][splits[1]]
+        try:
+            if len(splits) == 1:
+                return self.data[key]
+            return self.data[splits[0]][splits[1]]
+        except KeyError:
+            raise KeyError(f"No {key} key in PatientData object")
 
     def __contains__(self, key):
         if not isinstance(key, str):

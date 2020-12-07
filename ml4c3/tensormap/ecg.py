@@ -1002,7 +1002,7 @@ def ecg_bmi(tm, data):
         path = lambda key: make_hd5_path(tm, ecg_date, key)
         try:
             weight_lbs = data[path("weightlbs")][()]
-            weight_kg = 0.453592 * float(weight_lbs)
+            weight_kg = 0.454 * float(weight_lbs)
             height_in = data[path("heightin")][()]
             height_m = 0.0254 * float(height_in)
             bmi = weight_kg / (height_m * height_m)

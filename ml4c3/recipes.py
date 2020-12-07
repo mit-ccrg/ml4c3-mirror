@@ -198,8 +198,8 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
                 "valid": stats[1].stats,
                 "test": stats[2].stats,
             },
-            input_maps=args.tensor_maps_in,
-            output_maps=args.tensor_maps_out,
+            input_tmaps=args.tensor_maps_in,
+            output_tmaps=args.tensor_maps_out,
         ),
     )
     return performance_metrics
