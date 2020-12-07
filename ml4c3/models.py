@@ -105,6 +105,57 @@ class BottleneckType(Enum):
     Variational = auto()
 
 
+def make_model(args):
+    """
+    Create a model to train according the input arguments.
+    """
+    if args.mode in ["train", "train_simclr", "infer", "build"]:
+        model = make_multimodal_multitask_model(**args.__dict__)
+    elif args.mode == "train_keras_logreg":
+        model = make_shallow_model(
+            tensor_maps_in=args.tensor_maps_in,
+            tensor_maps_out=args.tensor_maps_out,
+            optimizer=args.optimizer,
+            learning_rate=args.learning_rate,
+            learning_rate_schedule=args.learning_rate_schedule,
+            model_file=args.model_file,
+            donor_layers=args.donor_layers,
+            l1=args.l1,
+            l2=args.l2,
+        )
+    else:
+        hyperparameters = {}
+        if args.mode == "train_sklearn_logreg":
+            if args.l1 == 0 and args.l2 == 0:
+                args.c = 1e7
+            else:
+                args.c = 1 / (args.l1 + args.l2)
+            hyperparameters["c"] = args.c
+            hyperparameters["l1_ratio"] = args.c * args.l1
+        elif args.mode == "train_sklearn_svm":
+            hyperparameters["c"] = args.c
+        elif args.mode == "train_sklearn_randomforest":
+            hyperparameters["n_estimators"] = args.n_estimators
+            hyperparameters["max_depth"] = args.max_depth
+            hyperparameters["min_samples_split"] = args.min_samples_split
+            hyperparameters["min_samples_leaf"] = args.min_samples_leaf
+        elif args.mode == "train_sklearn_xgboost":
+            hyperparameters["n_estimators"] = args.n_estimators
+            hyperparameters["max_depth"] = args.max_depth
+            hyperparameters["gamma"] = args.gamma
+            hyperparameters["l1_ratio"] = args.l1
+            hyperparameters["l2_ratio"] = args.l2
+        else:
+            raise ValueError("Unknown train mode: ", args.mode)
+        assert len(args.tensor_maps_out) == 1
+        model_type = args.mode.split("_")[-1]
+        model = make_sklearn_model(
+            model_type=model_type,
+            hyperparameters=hyperparameters,
+        )
+    return model
+
+
 def make_shallow_model(
     tensor_maps_in: List[TensorMap],
     tensor_maps_out: List[TensorMap],

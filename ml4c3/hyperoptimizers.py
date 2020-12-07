@@ -20,10 +20,8 @@ from tensorflow.keras.models import Model
 # Imports: first party
 from ml4c3.plots import plot_metric_history
 from ml4c3.models import (
-    make_shallow_model,
-    make_sklearn_model,
+    make_model,
     train_model_from_datasets,
-    make_multimodal_multitask_model,
     sklearn_model_loss_from_dataset,
 )
 from ml4c3.datasets import train_valid_test_datasets
@@ -78,7 +76,6 @@ def hyperparameter_optimizer(
 ):
     histories = []
     aucs = []
-    results_path = args.output_folder
     i = 0
     seen_combinations = set()
 
@@ -91,7 +88,7 @@ def hyperparameter_optimizer(
 
         try:
             trial_id = f"{i - 1}"
-            trials_path = os.path.join(results_path, "trials")
+            trial_path = os.path.join(args.output_folder, "trials", trial_id)
 
             # only try unique parameter combinations
             params = str(x)
@@ -103,49 +100,7 @@ def hyperparameter_optimizer(
             seen_combinations.add(params)
 
             set_args_from_x(args, x)
-            if args.mode == "train":
-                model = make_multimodal_multitask_model(**args.__dict__)
-            elif args.mode == "train_keras_logreg":
-                model = make_shallow_model(
-                    tensor_maps_in=args.tensor_maps_in,
-                    tensor_maps_out=args.tensor_maps_out,
-                    optimizer=args.optimizer,
-                    learning_rate=args.learning_rate,
-                    learning_rate_schedule=args.learning_rate_schedule,
-                    model_file=args.model_file,
-                    donor_layers=args.donor_layers,
-                    l1=args.l1,
-                    l2=args.l2,
-                )
-                model = make_shallow_model(**args.__dict__)
-            else:
-                hyperparameters = {}
-                if args.mode == "train_sklearn_logreg":
-                    if args.l1 == 0 and args.l2 == 0:
-                        args.c = 1e7
-                    else:
-                        args.c = 1 / (args.l1 + args.l2)
-                    hyperparameters["c"] = args.c
-                    hyperparameters["l1_ratio"] = args.c * args.l1
-                elif args.mode == "train_sklearn_svm":
-                    hyperparameters["c"] = args.c
-                elif args.mode == "train_sklearn_randomforest":
-                    hyperparameters["n_estimators"] = args.n_estimators
-                    hyperparameters["max_depth"] = args.max_depth
-                    hyperparameters["min_samples_split"] = args.min_samples_split
-                    hyperparameters["min_samples_leaf"] = args.min_samples_leaf
-                elif args.mode == "train_sklearn_xgboost":
-                    hyperparameters["n_estimators"] = args.n_estimators
-                    hyperparameters["max_depth"] = args.max_depth
-                else:
-                    raise ValueError("Uknown train mode: ", args.mode)
-                # SKLearn only works with one output tmap
-                assert len(args.tensor_maps_out) == 1
-                model_type = args.mode.split("_")[-1]
-                model = make_sklearn_model(
-                    model_type=model_type,
-                    hyperparameters=hyperparameters,
-                )
+            model = make_model(args)
 
             if isinstance(model, Model) and model.count_params() > args.max_parameters:
                 logging.info(
@@ -167,7 +122,7 @@ def hyperparameter_optimizer(
                 train_csv=args.train_csv,
                 valid_csv=args.valid_csv,
                 test_csv=args.test_csv,
-                output_folder=args.output_folder,
+                output_folder=trial_path,
                 cache_off=args.cache_off,
                 mixup_alpha=args.mixup_alpha,
                 debug=args.debug,
@@ -183,7 +138,7 @@ def hyperparameter_optimizer(
                 patience=args.patience,
                 learning_rate_patience=args.learning_rate_patience,
                 learning_rate_reduction=args.learning_rate_reduction,
-                output_folder=trials_path,
+                output_folder=trial_path,
                 image_ext=args.image_ext,
                 return_history=True,
                 plot=args.make_training_plots,
@@ -221,7 +176,7 @@ def hyperparameter_optimizer(
                 data=train_dataset,
                 tensor_maps_in=args.tensor_maps_in,
                 tensor_maps_out=args.tensor_maps_out,
-                plot_path=os.path.join(trials_path, trial_id),
+                plot_path=trial_path,
                 data_split="train",
                 image_ext=args.image_ext,
             )
@@ -230,7 +185,7 @@ def hyperparameter_optimizer(
                 data=test_dataset,
                 tensor_maps_in=args.tensor_maps_in,
                 tensor_maps_out=args.tensor_maps_out,
-                plot_path=os.path.join(trials_path, trial_id),
+                plot_path=trial_path,
                 data_split="test",
                 image_ext=args.image_ext,
             )
@@ -240,7 +195,7 @@ def hyperparameter_optimizer(
                 plot_metric_history(
                     history=history,
                     image_ext=args.image_ext,
-                    prefix=os.path.join(trials_path, trial_id),
+                    prefix=trial_path,
                 )
                 logging.info(
                     f"Current architecture:\n{_string_from_architecture_dict(x)}\n"
@@ -317,7 +272,7 @@ def hyperparameter_optimizer(
         trials=trials,
         histories=histories,
         aucs=aucs,
-        figure_path=results_path,
+        figure_path=args.output_folder,
         image_ext=args.image_ext,
         param_lists=param_lists,
     )

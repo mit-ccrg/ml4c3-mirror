@@ -16,12 +16,7 @@ from tensorflow.keras.models import Model
 from ingest.ecg import tensorize as tensorize_ecg
 from ingest.icu import tensorize_batched as tensorize_icu_batched
 from ml4c3.plots import plot_ecg, plot_architecture_diagram
-from ml4c3.models import (
-    make_shallow_model,
-    make_sklearn_model,
-    train_model_from_datasets,
-    make_multimodal_multitask_model,
-)
+from ml4c3.models import make_model, train_model_from_datasets
 from ml4c3.metrics import simclr_loss, simclr_accuracy
 from ml4c3.datasets import get_verbose_stats_string, train_valid_test_datasets
 from visualizer.run import run_server
@@ -104,7 +99,7 @@ def run(args: argparse.Namespace):
 
 
 def build_multimodal_multitask(args: argparse.Namespace) -> Model:
-    model = make_multimodal_multitask_model(**args.__dict__)
+    model = make_model(args)
     model_file = os.path.join(args.output_folder, "model_weights" + MODEL_EXT)
     model.save(model_file)
     plot_architecture_diagram(
@@ -143,50 +138,7 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
     )
     train_dataset, valid_dataset, test_dataset = datasets
 
-    if args.mode == "train":
-        model = make_multimodal_multitask_model(**args.__dict__)
-    elif args.mode == "train_keras_logreg":
-        model = make_shallow_model(
-            tensor_maps_in=args.tensor_maps_in,
-            tensor_maps_out=args.tensor_maps_out,
-            optimizer=args.optimizer,
-            learning_rate=args.learning_rate,
-            learning_rate_schedule=args.learning_rate_schedule,
-            model_file=args.model_file,
-            donor_layers=args.donor_layers,
-            l1=args.l1,
-            l2=args.l2,
-        )
-    else:
-        hyperparameters = {}
-        if args.mode == "train_sklearn_logreg":
-            if args.l1 == 0 and args.l2 == 0:
-                args.c = 1e7
-            else:
-                args.c = 1 / (args.l1 + args.l2)
-            hyperparameters["c"] = args.c
-            hyperparameters["l1_ratio"] = args.c * args.l1
-        elif args.mode == "train_sklearn_svm":
-            hyperparameters["c"] = args.c
-        elif args.mode == "train_sklearn_randomforest":
-            hyperparameters["n_estimators"] = args.n_estimators
-            hyperparameters["max_depth"] = args.max_depth
-            hyperparameters["min_samples_split"] = args.min_samples_split
-            hyperparameters["min_samples_leaf"] = args.min_samples_leaf
-        elif args.mode == "train_sklearn_xgboost":
-            hyperparameters["n_estimators"] = args.n_estimators
-            hyperparameters["max_depth"] = args.max_depth
-            hyperparameters["gamma"] = args.gamma
-            hyperparameters["l1_ratio"] = args.l1
-            hyperparameters["l2_ratio"] = args.l2
-        else:
-            raise ValueError("Uknown train mode: ", args.mode)
-        assert len(args.tensor_maps_out) == 1
-        model_type = args.mode.split("_")[-1]
-        model = make_sklearn_model(
-            model_type=model_type,
-            hyperparameters=hyperparameters,
-        )
+    model = make_model(args)
 
     # Train model using datasets
     train_results = train_model_from_datasets(
@@ -274,8 +226,8 @@ def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
     )
     _, _, test_dataset = datasets
 
-    model = make_multimodal_multitask_model(**args.__dict__)
-    out_path = args.output_folder
+    model = make_model(args)
+
     data_split = "test"
     if args.test_csv is not None:
         data_split = os.path.splitext(os.path.basename(args.test_csv))[0]
@@ -284,7 +236,7 @@ def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         data=test_dataset,
         tensor_maps_in=args.tensor_maps_in,
         tensor_maps_out=args.tensor_maps_out,
-        plot_path=out_path,
+        plot_path=args.output_folder,
         data_split=data_split,
         save_predictions=True,
         image_ext=args.image_ext,
@@ -352,7 +304,7 @@ def train_simclr_model(args: argparse.Namespace):
         debug=args.debug,
     )
     train_dataset, valid_dataset, _ = datasets
-    model = make_multimodal_multitask_model(**args.__dict__)
+    model = make_model(args)
     model, history = train_model_from_datasets(
         model=model,
         tensor_maps_in=args.tensor_maps_in,
