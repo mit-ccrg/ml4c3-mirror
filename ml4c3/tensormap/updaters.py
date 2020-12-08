@@ -1,9 +1,8 @@
 # Imports: standard library
 import re
 import copy
-import logging
 import datetime
-from typing import Dict, List, Union, Optional
+from typing import Dict, List, Tuple, Union, Optional
 
 # Imports: third party
 import numpy as np
@@ -11,9 +10,9 @@ import pandas as pd
 
 # Imports: first party
 from ml4c3.metrics import weighted_crossentropy
-from definitions.ecg import ECG_PREFIX, ECG_DATETIME_FORMAT
-from definitions.sts import STS_PREFIX, STS_DATE_FORMAT, STS_SURGERY_DATE_COLUMN
-from definitions.echo import ECHO_PREFIX, ECHO_DATETIME_COLUMN, ECHO_DATETIME_FORMAT
+from definitions.ecg import ECG_PREFIX
+from definitions.sts import STS_PREFIX, STS_SURGERY_DATE_COLUMN
+from definitions.echo import ECHO_PREFIX, ECHO_DATETIME_COLUMN
 from ml4c3.tensormap.TensorMap import Dates, TensorMap, PatientData
 
 
@@ -101,29 +100,22 @@ def update_tmaps_time_series(
     return tmaps
 
 
-def _offset_date(date: str, offset_days: int, date_format: str) -> str:
-    return (
-        datetime.datetime.strptime(date, date_format)
-        + datetime.timedelta(days=offset_days)
-    ).strftime(date_format)
-
-
-def _get_dataset_specific_metadata(data_descriptor: str) -> tuple:
-    if data_descriptor == "sts":
-        data_prefix = STS_PREFIX
+def _get_dataset_metadata(dataset_name: str) -> Tuple[str, str]:
+    if dataset_name == "sts":
+        prefix = STS_PREFIX
         datetime_column = STS_SURGERY_DATE_COLUMN
-        datetime_format = STS_DATE_FORMAT
-    elif data_descriptor == "echo":
-        data_prefix = ECHO_PREFIX
+    elif dataset_name == "echo":
+        prefix = ECHO_PREFIX
         datetime_column = ECHO_DATETIME_COLUMN
-        datetime_format = ECHO_DATETIME_FORMAT
-    elif data_descriptor == "ecg":
-        data_prefix = ECG_PREFIX
+    elif dataset_name == "ecg":
+        prefix = ECG_PREFIX
         datetime_column = None
-        datetime_format = ECG_DATETIME_FORMAT
     else:
         raise ValueError("{data_descriptor} is not a valid data descriptor")
-    return data_prefix, datetime_column, datetime_format
+    return prefix, datetime_column
+
+
+CROSS_REFERENCE_SOURCES = [ECG_PREFIX, STS_PREFIX, ECHO_PREFIX]
 
 
 def update_tmaps_window(
@@ -139,95 +131,79 @@ def update_tmaps_window(
         av_peak_gradient_30_days_post_echo
     """
 
-    # Given a tmap name such as "ecg_2500_30_days_pre_echo", obtain:
-    # offset in days, e.g. "30"
-    time_suffix = "_days"
-    offset_days = re.findall(fr"_(\d+){time_suffix}", tmap_name)
-    if len(offset_days) == 0:
-        return tmaps
-    offset_days = offset_days[0]
-
-    # time window: pre vs post
-    if "_pre_" in tmap_name:
-        pre_or_post = "pre"
-    elif "_post_" in tmap_name:
-        pre_or_post = "post"
-    else:
-        logging.warning(f"Cannot identify pre or post in {tmap_name}")
+    pattern = fr"(.*)_(\d+)_days_(pre|post)_({'|'.join(CROSS_REFERENCE_SOURCES)})"
+    match = re.match(pattern, tmap_name)
+    if match is None:
         return tmaps
 
-    # dataset descriptor;
-    # given "ecg_2500_30_days_pre_echo", isolate "echo"
-    # given "ecg_2500_30_days_pre_echo_newest", isolate "echo_newest"
-    text_after_descriptor_prefix = tmap_name.split(f"_{pre_or_post}_")[1]
+    base_name = match[1]
+    offset_days = int(match[2])
+    pre_or_post = match[3]
+    reference_dataset = match[4]
 
-    # If "echo_newest", isolate "echo"
-    data_descriptor = text_after_descriptor_prefix.split("_")[0]
-
-    offset_days = int(offset_days)
-    base_name = re.findall(fr"(.*)_{offset_days}", tmap_name)[0]
+    prefix, dt_col = _get_dataset_metadata(dataset_name=reference_dataset)
+    new_name = f"{base_name}_{offset_days}_days_{pre_or_post}_{reference_dataset}"
 
     if base_name not in tmaps:
         raise ValueError(
-            f"Base tmap {base_name} not in existing tmaps; cannot create {tmap_name}",
+            f"Base tmap {base_name} not in existing tmaps; cannot create {new_name}",
         )
 
     base_tmap = tmaps[base_name]
     new_tmap = copy.deepcopy(base_tmap)
-    new_tmap_name = f"{base_name}_{offset_days}_days_{pre_or_post}_{data_descriptor}"
-    new_tmap.name = new_tmap_name
+    new_tmap.name = new_name
 
+    # One-to-one matching algorithm maximizes the number of matches by pairing events
+    # nearest in time, starting from the most recent event.
+
+    # 1. Sort source dates from newest -> oldest
+    # 2. Sort reference dates from newest -> oldest
+    # 3. For each reference date, starting from the newest reference date
+    #     a. Compute relative time window
+    #     b. Take the newest source date in range
     def get_cross_referenced_dates(data: PatientData) -> Dates:
-        original_dates = base_tmap.time_series_filter(data)
-        (
-            data_prefix,
-            datetime_column,
-            datetime_format,
-        ) = _get_dataset_specific_metadata(data_descriptor=data_descriptor)
+        source_dates = base_tmap.time_series_filter(data)
 
-        # If data for this prefix holds a dataframe
-        if isinstance(data[data_prefix], pd.DataFrame):
-            xref_dates = data[data_prefix][datetime_column]
-
-        # If data is an HD5 group (e.g. if we are working with ECGs)
+        # Get dates from reference data
+        reference_data = data[prefix]
+        if isinstance(reference_data, pd.DataFrame):
+            reference_dates = reference_data[dt_col]  # Reference data is CSV
         else:
-            xref_dates = list(data[data_prefix])
+            reference_dates = list(reference_data)  # Reference data is HD5
 
-        dates = pd.Series(dtype=str) if isinstance(original_dates, pd.Series) else []
+        # Convert everything to pd.Series of pd.Timestamp
+        source_is_list = isinstance(source_dates, list)
+        source_dates = pd.Series(source_dates).sort_values(ascending=False)
+        source_dates_dt = pd.to_datetime(source_dates)
+        reference_dates = pd.Series(reference_dates).sort_values(ascending=False)
+        reference_dates = pd.to_datetime(reference_dates)
 
-        for xref_date in xref_dates:
+        # Set start and end dates relative to an event
+        if pre_or_post == "pre":
+            start_dates = reference_dates + datetime.timedelta(days=offset_days * -1)
+            end_dates = reference_dates
+        else:
+            start_dates = reference_dates
+            end_dates = reference_dates + datetime.timedelta(days=offset_days)
 
-            if pd.isnull(xref_date):
-                continue
+        dates = pd.Series(dtype=str)
+        for start_date, end_date in zip(start_dates, end_dates):
+            # Get newest source date in range of start and end dates
+            matched_date = source_dates_dt[
+                source_dates_dt.between(start_date, end_date, inclusive=False)
+            ][:1].index
 
-            # If time window is "pre"
-            if pre_or_post == "pre":
-                start_date = _offset_date(
-                    date=xref_date,
-                    offset_days=offset_days * -1,
-                    date_format=datetime_format,
-                )
-                end_date = xref_date
-            # If time window is "post"
-            else:
-                start_date = xref_date
-                end_date = _offset_date(
-                    date=xref_date,
-                    offset_days=offset_days,
-                    date_format=datetime_format,
-                )
+            # Computation is done on pd.Timestamp objects but returned list should use
+            # original strings/format
+            dates = dates.append(source_dates[matched_date])
 
-            if isinstance(original_dates, pd.Series):
-                dates = dates.append(
-                    original_dates[
-                        original_dates.between(start_date, end_date, inclusive=False)
-                    ],
-                )
-            else:
-                for date in original_dates:
-                    if start_date < date < end_date:
-                        dates.append(date)
-        return dates
+            # Remove the matched date from further matching
+            source_dates_dt = source_dates_dt.drop(matched_date)
+
+        if len(dates) == 0:
+            raise ValueError("No cross referenced dates")
+
+        return list(dates) if source_is_list else dates
 
     new_tmap.time_series_filter = get_cross_referenced_dates
     tmaps[tmap_name] = new_tmap

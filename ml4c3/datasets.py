@@ -80,7 +80,7 @@ def _tensor_worker(
     worker_name: str,
     hd5_sources: List[str],
     csv_data: List[Tuple[str, pd.DataFrame, str]],
-    patient_ids: List[str],
+    patient_ids: List[int],
     start_signal: Event,
     tensor_queue: Queue,
     input_tmaps: List[TensorMap],
@@ -198,7 +198,7 @@ class StatsWrapper:
 
 def _csv_data_source_name_among_tmap_path_prefixes(
     tmaps: List[TensorMap],
-    csv_sources: List[Tuple],
+    csv_sources: List[Tuple[str, str]],
 ):
     """Iterate over CSV data source names, and check if name is among TMap path
     prefixes. If not, either a) no TMaps require the CSV source, or b) the CSV source
@@ -217,8 +217,9 @@ def _csv_data_source_name_among_tmap_path_prefixes(
 def make_data_generator_factory(
     data_split: str,
     num_workers: int,
-    tensors: Union[str, List[Union[str, Tuple[str, str]]]],
-    patient_ids: Set[str],
+    hd5_sources: List[str],
+    csv_sources: List[Tuple[str, str]],
+    patient_ids: Set[int],
     input_tmaps: List[TensorMap],
     output_tmaps: List[TensorMap],
     augment: bool = False,
@@ -227,34 +228,15 @@ def make_data_generator_factory(
 ) -> Tuple[Callable[[], SampleGenerator], StatsWrapper, Cleanup]:
     Method = Thread if debug else Process
     tensor_queue: Queue = Queue(MAX_QUEUE_SIZE)
-    if not isinstance(tensors, list):
-        tensors = [tensors]
-
-    csv_sources = []
-    hd5_sources = []
-    for source in tensors:
-        if isinstance(source, tuple):
-            csv_sources.append(source)
-        elif source.endswith(CSV_EXT):
-            csv_name = os.path.splitext(os.path.basename(source))[0]
-            csv_sources.append((source, csv_name))
-        else:
-            hd5_sources.append(source)
 
     # Load all CSVs into dataframes
     csv_data = []
     for csv_source, csv_name in csv_sources:
         df = pd.read_csv(csv_source, low_memory=False)
         mrn_col = infer_mrn_column(df, csv_source)
-        df[mrn_col] = df[mrn_col].astype(str)
+        df[mrn_col] = df[mrn_col].astype(int)
         csv_data.append((csv_name, df, mrn_col))
         logging.info(f"Loaded dataframe with shape {df.shape} from {csv_source}")
-
-    tmaps_all = input_tmaps + output_tmaps
-    _csv_data_source_name_among_tmap_path_prefixes(
-        tmaps=tmaps_all,
-        csv_sources=csv_sources,
-    )
 
     processes = []
     worker_ids = np.array_split(list(patient_ids), num_workers)
@@ -355,8 +337,9 @@ def make_data_generator_factory(
 
 def make_dataset(
     data_split: str,
-    tensors: Union[str, List[Union[str, Tuple[str, str]]]],
-    patient_ids: Set[str],
+    hd5_sources: List[str],
+    csv_sources: List[Tuple[str, str]],
+    patient_ids: Set[int],
     input_tmaps: List[TensorMap],
     output_tmaps: List[TensorMap],
     batch_size: int,
@@ -367,8 +350,6 @@ def make_dataset(
     mixup_alpha: float = 0,
     debug: bool = False,
 ) -> Tuple[tf.data.Dataset, StatsWrapper, Cleanup]:
-    if not isinstance(tensors, list):
-        tensors = [tensors]
     output_types = (
         {
             tm.input_name: tf.string if tm.is_language else tf.float32
@@ -384,13 +365,14 @@ def make_dataset(
         {tm.output_name: tm.shape for tm in output_tmaps},
     )
     if keep_ids:
-        output_types += (tf.string,)
+        output_types += (tf.int64,)
         output_shapes += (tuple(),)
 
     data_generator_factory, stats_wrapper, cleanup = make_data_generator_factory(
         data_split=data_split,
         num_workers=num_workers,
-        tensors=tensors,
+        hd5_sources=hd5_sources,
+        csv_sources=csv_sources,
         patient_ids=patient_ids,
         input_tmaps=input_tmaps,
         output_tmaps=output_tmaps,
@@ -501,8 +483,6 @@ def train_valid_test_datasets(
     :return: tuple of three tensorflow Datasets, three StatsWrapper objects, and
              three callbacks to cleanup worker processes
     """
-    if not isinstance(tensors, list):
-        tensors = [tensors]
 
     train_ids, valid_ids, test_ids = get_train_valid_test_ids(
         tensors=tensors,
@@ -515,9 +495,11 @@ def train_valid_test_datasets(
         test_csv=test_csv,
         allow_empty_split=allow_empty_split,
     )
+
+    # Save train/validation/test splits if not given
     if output_folder is not None:
 
-        def save_ids(ids: Set[str], split: str):
+        def save_ids(ids: Set[int], split: str):
             fpath = os.path.join(output_folder, f"{split}{CSV_EXT}")
             df = pd.DataFrame({"patient_id": list(ids)})
             df.to_csv(fpath, index=False)
@@ -530,9 +512,28 @@ def train_valid_test_datasets(
         if test_csv is None:
             save_ids(ids=test_ids, split="test")
 
+    # Parse tensors into hd5 sources or csv sources with a csv name
+    if not isinstance(tensors, list):
+        tensors = [tensors]
+    csv_sources = []
+    hd5_sources = []
+    for source in tensors:
+        if isinstance(source, tuple):
+            csv_sources.append(source)
+        elif source.endswith(CSV_EXT):
+            csv_name = os.path.splitext(os.path.basename(source))[0]
+            csv_sources.append((source, csv_name))
+        else:
+            hd5_sources.append(source)
+    _csv_data_source_name_among_tmap_path_prefixes(
+        tmaps=tensor_maps_in + tensor_maps_out,
+        csv_sources=csv_sources,
+    )
+
     train_dataset, train_stats, train_cleanup = make_dataset(
         data_split="train",
-        tensors=tensors,
+        hd5_sources=hd5_sources,
+        csv_sources=csv_sources,
         patient_ids=train_ids,
         input_tmaps=tensor_maps_in,
         output_tmaps=tensor_maps_out,
@@ -546,7 +547,8 @@ def train_valid_test_datasets(
     )
     valid_dataset, valid_stats, valid_cleanup = make_dataset(
         data_split="valid",
-        tensors=tensors,
+        hd5_sources=hd5_sources,
+        csv_sources=csv_sources,
         patient_ids=valid_ids,
         input_tmaps=tensor_maps_in,
         output_tmaps=tensor_maps_out,
@@ -559,7 +561,8 @@ def train_valid_test_datasets(
     )
     test_dataset, test_stats, test_cleanup = make_dataset(
         data_split="test",
-        tensors=tensors,
+        hd5_sources=hd5_sources,
+        csv_sources=csv_sources,
         patient_ids=test_ids,
         input_tmaps=tensor_maps_in,
         output_tmaps=tensor_maps_out,
@@ -810,7 +813,7 @@ def _get_train_valid_test_discard_ratios(
 def patient_csv_to_set(
     patient_csv: Optional[str] = None,
     mrn_column_name: Optional[str] = None,
-) -> Union[None, Set[str]]:
+) -> Union[None, Set[int]]:
 
     if patient_csv is None:
         return None
@@ -834,8 +837,8 @@ def patient_csv_to_set(
         ]
         mrn_column_name = infer_mrn_column(df, patient_csv)
 
-    # Isolate MRN column from dataframe, cast to float -> int -> string
-    patient_ids = df[mrn_column_name].astype(float).astype(int).apply(str)
+    # Isolate MRN column from dataframe, cast to int
+    patient_ids = df[mrn_column_name].astype(int)
 
     return set(patient_ids)
 
@@ -850,7 +853,7 @@ def get_train_valid_test_ids(
     valid_csv: Optional[str] = None,
     test_csv: Optional[str] = None,
     allow_empty_split: bool = False,
-) -> Tuple[Set[str], Set[str], Set[str]]:
+) -> Tuple[Set[int], Set[int], Set[int]]:
     """
     Return 3 disjoint sets of IDs.
 
@@ -877,11 +880,11 @@ def get_train_valid_test_ids(
 
     :return: tuple of 3 sets of sample IDs
     """
-    train_ids: Set[str] = set()
-    valid_ids: Set[str] = set()
-    test_ids: Set[str] = set()
-    discard_ids: Set[str] = set()
-    unassigned_ids: List[str] = []
+    train_ids: Set[int] = set()
+    valid_ids: Set[int] = set()
+    test_ids: Set[int] = set()
+    discard_ids: Set[int] = set()
+    unassigned_ids: Set[int] = set()
 
     if not isinstance(tensors, list):
         tensors = [tensors]
@@ -939,7 +942,10 @@ def get_train_valid_test_ids(
                 for fname in files:
                     if not fname.endswith(TENSOR_EXT):
                         continue
-                    patient_id = os.path.splitext(fname)[0]
+                    try:
+                        patient_id = int(os.path.splitext(fname)[0])
+                    except ValueError:
+                        continue
                     source_ids.add(patient_id)
         elif source.endswith(CSV_EXT):
             source_ids = patient_csv_to_set(
@@ -964,8 +970,9 @@ def get_train_valid_test_ids(
         elif test_set is not None and patient_id in test_set:
             test_ids.add(patient_id)
         else:
-            unassigned_ids.append(patient_id)
+            unassigned_ids.add(patient_id)
 
+    unassigned_ids: List[int] = list(unassigned_ids)
     np.random.shuffle(unassigned_ids)
     n = len(unassigned_ids)
     n_train, n_valid, n_test = (
@@ -974,7 +981,7 @@ def get_train_valid_test_ids(
         round(test_ratio * n),
     )
     indices = [n_train, n_train + n_valid, n_train + n_valid + n_test]
-    _train, _valid, _test, _discard = np.split(list(unassigned_ids), indices)
+    _train, _valid, _test, _discard = np.split(unassigned_ids, indices)
     train_ids |= set(_train)
     valid_ids |= set(_valid)
     test_ids |= set(_test)
@@ -1020,7 +1027,7 @@ def get_dicts_of_arrays_from_dataset(
             output_data_batches[output_name].append(output_tensor.numpy())
 
         if len(batch) == 3:
-            id_batches.append(batch[BATCH_IDS_INDEX].numpy().astype(str))
+            id_batches.append(batch[BATCH_IDS_INDEX].numpy().astype(int))
 
     input_data = {
         input_name: np.concatenate(input_data_batches[input_name])

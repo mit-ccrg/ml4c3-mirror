@@ -1,3 +1,6 @@
+# Imports: standard library
+import logging
+
 # Imports: third party
 import numpy as np
 import pandas as pd
@@ -13,30 +16,30 @@ def validator_clean_mrn(tm: TensorMap, tensor: np.ndarray, data: PatientData):
 
 def validator_not_all_zero(tm: TensorMap, tensor: np.ndarray, data: PatientData):
     if np.count_nonzero(tensor) == 0:
-        raise ValueError(
-            f"TensorMap {tm.name} failed all-zero check on sample {data.id}",
-        )
+        error_message = f"TensorMap {tm.name} failed all-zero check"
+        logging.debug(f"{error_message} on sample {data.id}")
+        raise ValueError(error_message)
 
 
 def validator_no_empty(tm: TensorMap, tensor: np.ndarray, data: PatientData):
     if any(tensor == ""):
-        raise ValueError(
-            f"TensorMap {tm.name} failed empty string check on sample {data.id}",
-        )
+        error_message = f"TensorMap {tm.name} failed empty string check"
+        logging.debug(f"{error_message} on sample {data.id}")
+        raise ValueError(error_message)
 
 
 def validator_no_nans(tm: TensorMap, tensor: np.ndarray, data: PatientData):
     if pd.isnull(tensor).any():
-        raise ValueError(
-            f"TensorMap {tm.name} failed no nans check on sample {data.id}.",
-        )
+        error_message = f"TensorMap {tm.name} failed no nans check"
+        logging.debug(f"{error_message} on sample {data.id}")
+        raise ValueError(error_message)
 
 
 def validator_no_negative(tm: TensorMap, tensor: np.ndarray, data: PatientData):
     if any(tensor < 0):
-        raise ValueError(
-            f"TensorMap {tm.name} failed non-negative check on sample {data.id}",
-        )
+        error_message = f"TensorMap {tm.name} failed non-negative check"
+        logging.debug(f"{error_message} on sample {data.id}")
+        raise ValueError(error_message)
 
 
 def validator_voltage_no_zero_padding(
@@ -49,7 +52,9 @@ def validator_voltage_no_zero_padding(
         lead = tensor[..., tm.channel_map[cm]]
         num_zero = lead_length - np.count_nonzero(lead)
         if num_zero > ECG_ZERO_PADDING_THRESHOLD * lead_length:
-            raise ValueError(f"Lead {cm} is zero-padded for ECG in {data.id}")
+            error_message = f"Lead {cm} is zero-padded"
+            logging.debug(f"{error_message} on sample {data.id}")
+            raise ValueError(error_message)
 
 
 class RangeValidator:
@@ -59,7 +64,9 @@ class RangeValidator:
 
     def __call__(self, tm: TensorMap, tensor: np.ndarray, data: PatientData):
         if not ((tensor > self.minimum).all() and (tensor < self.maximum).all()):
-            raise ValueError(f"TensorMap {tm.name} failed range check.")
+            error_message = f"TensorMap {tm.name} failed range check"
+            logging.info(f"{error_message} on sample {data.id}")
+            raise ValueError(error_message)
 
     def __str__(self):
         return f"Range Validator (min, max) = ({self.minimum}, {self.maximum})"

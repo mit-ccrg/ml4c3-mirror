@@ -7,7 +7,7 @@ from typing import Dict, List, Union, Callable
 import numpy as np
 
 # Imports: first party
-from definitions.sts import STS_PREFIX, STS_DATE_FORMAT, STS_SURGERY_DATE_COLUMN
+from definitions.sts import STS_PREFIX, STS_SURGERY_DATE_COLUMN
 from ml4c3.normalizer import MinMax, RobustScaler
 from ml4c3.validators import validator_no_nans, validator_not_all_zero
 from ml4c3.tensormap.TensorMap import (

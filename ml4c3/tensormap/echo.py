@@ -100,13 +100,10 @@ def tensor_from_file_aortic_stenosis_category(
     from aortic valve mean gradient"""
     echo_dates = tm.time_series_filter(data)
     av_mean_gradient_key = continuous_tmap_names_and_keys["av_mean_gradient"]
-    av_mean_gradients = (
-        data[ECHO_PREFIX].loc[echo_dates.index, av_mean_gradient_key].to_numpy()
-    )
+    av_mean_gradients = data[ECHO_PREFIX].loc[echo_dates.index, av_mean_gradient_key]
 
     # Initialize tensor array of zeros where each row is the channel map
-    num_echos = len(av_mean_gradients)
-    tensor = np.zeros((num_echos, 4))
+    tensor = np.zeros((len(av_mean_gradients), 4))
 
     # Iterate through the peak velocities and mean gradients from all echos
     for idx, av_mean_gradient in enumerate(av_mean_gradients):
@@ -124,7 +121,7 @@ def tensor_from_file_aortic_stenosis_category(
     return tensor
 
 
-tmap_name = "aortic_stenosis_category"
+tmap_name = "as"
 tmaps[tmap_name] = TensorMap(
     name=tmap_name,
     channel_map={"none": 0, "mild": 1, "moderate": 2, "severe": 3},
@@ -135,3 +132,75 @@ tmaps[tmap_name] = TensorMap(
     time_series_limit=0,
     time_series_filter=get_echo_dates,
 )
+
+
+def make_aortic_stenosis_binary(threshold: float) -> Callable:
+    def tensor_from_file(
+        tm: TensorMap,
+        data: PatientData,
+    ) -> np.ndarray:
+        echo_dates = tm.time_series_filter(data)
+        mean_gradient_key = continuous_tmap_names_and_keys["av_mean_gradient"]
+        mean_gradients = data[ECHO_PREFIX].loc[echo_dates.index, mean_gradient_key]
+        tensor = np.zeros((len(echo_dates), 2))
+        for idx, mean_gradient in enumerate(mean_gradients):
+            if np.isnan(mean_gradient):
+                continue
+            tensor[idx, 1 if mean_gradient >= threshold else 0] = 1
+        return tensor
+
+    return tensor_from_file
+
+
+tmap_name = "as_any"
+tmaps[tmap_name] = TensorMap(
+    name=tmap_name,
+    channel_map={"no_as": 0, "as": 1},
+    interpretation=Interpretation.CATEGORICAL,
+    path_prefix=ECHO_PREFIX,
+    tensor_from_file=make_aortic_stenosis_binary(threshold=10),
+    validators=validator_not_all_zero,
+    time_series_limit=0,
+    time_series_filter=get_echo_dates,
+)
+
+
+def make_aortic_stenosis_single_category(severity: str) -> Callable:
+    if severity == "mild":
+        low = 10
+        high = 20
+    elif severity == "moderate":
+        low = 20
+        high = 40
+    elif severity == "severe":
+        low = 40
+        high = 10000
+    else:
+        raise ValueError(f"Unknown Aortic Stenosis severity: {severity}")
+
+    def tensor_from_file(tm: TensorMap, data: PatientData) -> np.ndarray:
+        echo_dates = tm.time_series_filter(data)
+        mean_gradient_key = continuous_tmap_names_and_keys["av_mean_gradient"]
+        mean_gradients = data[ECHO_PREFIX].loc[echo_dates.index, mean_gradient_key]
+        tensor = np.zeros((len(echo_dates), 2))
+        for idx, mean_gradient in enumerate(mean_gradients):
+            if np.isnan(mean_gradient):
+                continue
+            tensor[idx, 1 if low <= mean_gradient < high else 0] = 1
+        return tensor
+
+    return tensor_from_file
+
+
+for severity in ["mild", "moderate", "severe"]:
+    tmap_name = f"as_{severity}"
+    tmaps[tmap_name] = TensorMap(
+        name=tmap_name,
+        channel_map={f"not_{severity}": 0, severity: 1},
+        interpretation=Interpretation.CATEGORICAL,
+        path_prefix=ECHO_PREFIX,
+        tensor_from_file=make_aortic_stenosis_single_category(severity),
+        validators=validator_not_all_zero,
+        time_series_limit=0,
+        time_series_filter=get_echo_dates,
+    )

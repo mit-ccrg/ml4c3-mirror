@@ -18,15 +18,15 @@ from ml4c3.datasets import (
 )
 from definitions.globals import TENSOR_EXT
 
-DATA_SPLIT = Tuple[str, Set[str]]
+DATA_SPLIT = Tuple[str, Set[int]]
 DATA_SPLITS = Tuple[DATA_SPLIT, DATA_SPLIT, DATA_SPLIT]
-ID_SPLIT = Set[str]
+ID_SPLIT = Set[int]
 ID_SPLITS = Tuple[ID_SPLIT, ID_SPLIT, ID_SPLIT]
 
 
 def _write_samples(
     csv_path: str,
-    patient_ids: Iterable[str],
+    patient_ids: Iterable[int],
     use_header: bool = False,
     write_dupes: bool = False,
 ):
@@ -46,7 +46,7 @@ def patient_csv(tmpdir_factory, request) -> DATA_SPLIT:
     write_dupes = getattr(request, "param", None) == "duplicates"
     csv_path = tmpdir_factory.mktemp("csvs").join("sample.csv")
     patient_ids = {
-        str(patient_id)
+        patient_id
         for patient_id in np.random.choice(
             range(pytest.N_TENSORS),
             size=np.random.randint(pytest.N_TENSORS * 3 / 5, pytest.N_TENSORS * 4 / 5),
@@ -68,7 +68,7 @@ def train_valid_test_csv(tmpdir_factory, request) -> DATA_SPLITS:
     n = int(pytest.N_TENSORS / 2)
     n1 = int(n / 3)
     n2 = int(n * 2 / 3)
-    patient_ids = [str(patient_id) for patient_id in range(n)]
+    patient_ids = list(range(n))
     np.random.shuffle(patient_ids)
     train_ids, valid_ids, test_ids = (
         patient_ids[:n1],
@@ -195,7 +195,8 @@ class TestDataset:
         for _ in range(repeat_test):
             dataset, stats, cleanup = make_dataset(
                 data_split="train",
-                tensors=default_arguments.tensors,
+                hd5_sources=[default_arguments.tensors],
+                csv_sources=[],
                 patient_ids=train_ids,
                 input_tmaps=default_arguments.tensor_maps_in,
                 output_tmaps=default_arguments.tensor_maps_out,
@@ -211,7 +212,7 @@ class TestDataset:
             patient_ids = []
             for ret in rets:
                 patient_ids.extend(ret[BATCH_IDS_INDEX])
-            patient_ids = [patient_id.numpy().decode() for patient_id in patient_ids]
+            patient_ids = [patient_id.numpy() for patient_id in patient_ids]
             unique_ids, counts = np.unique(patient_ids, return_counts=True)
             unique_counts = np.unique(counts)
 
@@ -275,7 +276,7 @@ class TestGetTrainValidTestPaths:
     ):
         args = default_arguments
 
-        def _ids_equal_samples(all_ids: Set[str], samples: Set[str]):
+        def _ids_equal_samples(all_ids: Set[int], samples: Set[int]):
             assert len(all_ids) == len(samples)
             assert len(all_ids - samples) == 0
             return True
@@ -308,7 +309,7 @@ class TestGetTrainValidTestPaths:
                 for name in files:
                     if os.path.splitext(name)[-1].lower() != TENSOR_EXT:
                         continue
-                    patient_ids.add(os.path.splitext(name)[0])
+                    patient_ids.add(int(os.path.splitext(name)[0]))
 
         if train_ids is not None:
             # this block handles the cases where samples are discarded, which happens if train_csv is supplied
