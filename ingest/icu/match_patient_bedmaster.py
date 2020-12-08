@@ -137,6 +137,8 @@ class PatientBedmasterMatcher:
                 )
                 continue
             for subfolder in self.dept_to_folder[dept]:
+                if not subfolder:
+                    continue
                 bedmaster_files_set, undesired_files_set = get_files_in_directory(
                     directory=os.path.join(self.path_bedmaster, subfolder),
                     extension=BEDMASTER_EXT,
