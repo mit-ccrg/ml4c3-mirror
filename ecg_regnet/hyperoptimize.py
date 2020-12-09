@@ -3,6 +3,7 @@ import os
 import pickle
 import argparse
 import tempfile
+from typing import List, DefaultDict
 from collections import defaultdict
 
 # Imports: third party
@@ -24,19 +25,32 @@ from tensorflow_addons.optimizers import SGDW
 from tensorflow.keras.experimental import CosineDecay
 from tensorflow.python.keras.utils.layer_utils import count_params
 
+STEPS_PER_EPOCH = 100
+VALIDATION_STEPS_PER_EPOCH = 10
+BATCH_SIZE = 128  # following RegNet
+
 
 class EarlyStopping(tune.stopper.Stopper):
     """Stop a trial early once its validation loss has plateaued"""
+
     def __init__(
         self,
         patience: int,  # number of epochs to wait before stopping
     ):
         self.patience = patience
-        self._trial_to_loss = defaultdict(list)
+        self._trial_to_loss: DefaultDict[str, List[float]] = defaultdict(list)
 
     def __call__(self, trial_id, result) -> bool:
+        """
+        If patience is 5, and the loss each epoch is [1, 2, 2, 2, 2],
+        the model will stop training the __next__ epoch if there is still no improvement,
+        since in the current iteration the following evaluates to false:
+        (argmin(loss) = 0) + (patience = 5) < (len(losses) = 5)
+        """
+        if np.isnan(result["val_loss"]):
+            return True
         losses = self._trial_to_loss[trial_id]
-        losses.append(result['val_loss'])
+        losses.append(result["val_loss"])
         best_loss_idx = np.argmin(losses)
         return best_loss_idx + self.patience < len(losses)
 
@@ -52,7 +66,7 @@ def build_pretraining_model(
     initial_width: int,
     width_growth_rate: int,
     width_quantization: float,
-    epochs: int,  # optimizer settings
+    decay_steps: int,  # optimizer settings
     learning_rate: float,
     **kwargs,
 ):
@@ -71,7 +85,7 @@ def build_pretraining_model(
     )
     lr_schedule = CosineDecay(
         initial_learning_rate=learning_rate,
-        decay_steps=epochs,
+        decay_steps=decay_steps,
     )
     optimizer = SGDW(
         learning_rate=lr_schedule,
@@ -112,9 +126,15 @@ def get_optimizer_iterations(model) -> int:
     return model.optimizer.iterations.numpy()
 
 
+def get_optimizer_lr(model) -> float:
+    """Assumes optimizer is using a learning rate schedule"""
+    iters = get_optimizer_iterations(model)
+    return model.optimizer.learning_rate(iters).numpy()
+
+
 def _build_test_model():
     return build_pretraining_model(
-        epochs=10,
+        decay_steps=10,
         ecg_length=100,
         kernel_size=3,
         group_size=2,
@@ -133,6 +153,7 @@ def _test_build_pretraining_model():
     dummy_out = {
         tm.output_name: np.zeros((10,) + tm.shape) for tm in get_pretraining_tasks()
     }
+    assert np.isclose(get_optimizer_lr(m), 1e-5)
     history = m.fit(
         dummy_in,
         dummy_out,
@@ -140,10 +161,15 @@ def _test_build_pretraining_model():
         validation_data=(dummy_in, dummy_out),
     )
     iters = get_optimizer_iterations(m)
+    lr = get_optimizer_lr(m)
     assert "val_loss" in history.history
     with tempfile.TemporaryDirectory() as tmpdir:
         path = save_model(tmpdir, m)
         m2 = load_model(path, m)
+    assert np.isclose(
+        get_optimizer_lr(m),
+        lr,
+    )  # does the learning rate stay the same after loading?
     history = m2.fit(
         dummy_in,
         dummy_out,
@@ -156,7 +182,7 @@ def _test_build_pretraining_model():
 
 def _test_build_pretraining_model_bad_group_size():
     m = build_pretraining_model(
-        epochs=10,
+        decay_steps=10,
         ecg_length=2250,
         kernel_size=3,
         group_size=32,
@@ -204,7 +230,7 @@ class PretrainingTrainable(tune.Trainable):
             num_augmentations=config["num_augmentations"],
             hd5_folder=config["hd5_folder"],
             num_workers=config["num_workers"],
-            batch_size=128,  # following RegNet
+            batch_size=BATCH_SIZE,
             train_csv=config["train_csv"],
             valid_csv=config["valid_csv"],
             test_csv=config["test_csv"],
@@ -230,8 +256,8 @@ class PretrainingTrainable(tune.Trainable):
     def step(self):
         history = self.model.fit(
             x=self.train_dataset,
-            steps_per_epoch=100,
-            validation_steps=10,
+            steps_per_epoch=STEPS_PER_EPOCH,
+            validation_steps=VALIDATION_STEPS_PER_EPOCH,
             epochs=self.iteration + 1,
             validation_data=self.valid_dataset,
             initial_epoch=self.iteration,
@@ -240,6 +266,8 @@ class PretrainingTrainable(tune.Trainable):
         if "val_loss" not in history_dict:
             raise ValueError(f"No val loss in epoch {self.iteration}")
         history_dict["epoch"] = self.iteration
+        history_dict["optimizer_lr"] = get_optimizer_lr(self.model)
+        history_dict["optimizer_iter"] = get_optimizer_iterations(self.model)
         print(f"Completed epoch {self.iteration}")
         return history_dict
 
@@ -255,6 +283,7 @@ def run(
     gpus_per_model: float,
     output_folder: str,
     num_trials: int,
+    patience: int,
 ):
     augmentation_params = {
         f"{aug_name}_strength": tune.uniform(0, 1)
@@ -281,8 +310,8 @@ def run(
         "num_workers": cpus_per_model,
     }
     optimizer_params = {
-        "learning_rate": tune.loguniform(1e-1, 1e-6),
-        "epochs": tune.randint(max(epochs // 2, 1), epochs),
+        "learning_rate": tune.loguniform(1e-6, 1e-1),
+        "decay_steps": STEPS_PER_EPOCH * epochs,
     }
     hyperparams = {**augmentation_params, **model_params, **optimizer_params}
 
@@ -309,7 +338,7 @@ def run(
     )
     print(f"Results will appear in {output_folder}")
 
-    stopper = EarlyStopping(patience=5)
+    stopper = EarlyStopping(patience=patience)
     analysis = tune.run(
         PretrainingTrainable,
         verbose=1,
@@ -347,7 +376,13 @@ def parse_args():
     parser.add_argument(
         "--epochs",
         type=int,
-        help="Number of training epochs of size 128 (batch size) * 100 (steps per epoch).",
+        help=f"Number of training epochs of size 128 (batch size) * {STEPS_PER_EPOCH} (steps per epoch).",
+        required=True,
+    )
+    parser.add_argument(
+        "--patience",
+        type=int,
+        help=f"Number of epochs without progress before halting training of a model.",
         required=True,
     )
     parser.add_argument(

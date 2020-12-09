@@ -25,7 +25,10 @@ def analyze_results(results_folder: str, output_folder: str) -> pd.DataFrame:
     best_val_loss_col = "best validation loss"
     df[best_val_loss_col] = best_val_loss
     cleaned_df = df.copy()
-    cutoff = np.quantile(df[best_val_loss_col], 0.9)
+    cutoff = np.quantile(
+        df[best_val_loss_col],
+        0.5,
+    )  # what percentage of results to show
     cleaned_df = cleaned_df.loc[cleaned_df[best_val_loss_col] < cutoff]
 
     config_cols = [col for col in df.columns if "config" in col]
@@ -38,6 +41,18 @@ def analyze_results(results_folder: str, output_folder: str) -> pd.DataFrame:
         if (tdf["val_loss"] > cutoff).any():
             continue
         plt.plot(tdf["epoch"], tdf["loss"])
+    tdf = training_dfs[np.nanargmin(best_val_loss)]
+    plt.plot(
+        tdf["epoch"],
+        tdf["loss"],
+        linestyle="--",
+        c="k",
+        label="best model",
+        linewidth=6,
+    )
+    plt.legend()
+    plt.ylabel("validation loss")
+    plt.xlabel("epoch")
     plt.savefig(os.path.join(output_folder, f"training_curves.png"), dpi=200)
 
     # plot best validation loss vs. config columns
@@ -45,7 +60,7 @@ def analyze_results(results_folder: str, output_folder: str) -> pd.DataFrame:
         cleaned_col = col.replace("config/", "").replace("_", " ")
         plt.figure(figsize=(7, 7))
         if cleaned_df[col].nunique() > len(cleaned_df) / 2:
-            x = cleaned_df[col]
+            x = cleaned_df[col].dropna()
             vals, bins = pd.qcut(x, 10, labels=False, retbins=True)
             cleaned_col = f"{cleaned_col} bin center"
             xtics = np.round((bins[:-1] + bins[1:]) / 2, 2)  # bin centers
