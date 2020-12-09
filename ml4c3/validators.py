@@ -65,7 +65,7 @@ class RangeValidator:
     def __call__(self, tm: TensorMap, tensor: np.ndarray, data: PatientData):
         if not ((tensor > self.minimum).all() and (tensor < self.maximum).all()):
             error_message = f"TensorMap {tm.name} failed range check"
-            logging.info(f"{error_message} on sample {data.id}")
+            logging.debug(f"{error_message} on sample {data.id}")
             raise ValueError(error_message)
 
     def __str__(self):

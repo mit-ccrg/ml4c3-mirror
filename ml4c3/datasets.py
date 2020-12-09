@@ -265,7 +265,8 @@ def make_data_generator_factory(
 
     def cleanup_workers():
         for process in processes:
-            process.terminate()
+            if isinstance(process, Process):
+                process.terminate()
         tensor_queue.close()
         logging.info(f"Stopped {num_workers} {data_split} workers.")
 
