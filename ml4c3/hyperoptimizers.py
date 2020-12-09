@@ -488,6 +488,7 @@ def plot_trials(
     loss_path = os.path.join(figure_path, "loss_per_trial" + image_ext)
     plt.legend()
     plt.savefig(loss_path)
+    plt.close()
     logging.info(f"Saved loss plot to {loss_path}")
 
     _, [ax1, ax3, ax2] = plt.subplots(
@@ -537,4 +538,5 @@ def plot_trials(
     learning_path = os.path.join(figure_path, "learning_curves_all_trials" + image_ext)
     plt.tight_layout()
     plt.savefig(learning_path)
+    plt.close()
     logging.info(f"Saved learning curve plot to {learning_path}")

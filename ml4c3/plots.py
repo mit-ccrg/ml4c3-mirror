@@ -443,7 +443,7 @@ def plot_metric_history(
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
     plt.savefig(figure_path, bbox_inches="tight")
-    plt.clf()
+    plt.close()
     logging.info(f"Saved learning curves at: {figure_path}")
 
 
@@ -550,7 +550,7 @@ def plot_prediction_calibration(
         os.makedirs(os.path.dirname(figure_path))
     plt.savefig(figure_path, bbox_inches="tight")
     logging.info(f"{data_split} split: saved calibration plot at: {figure_path}")
-    plt.clf()
+    plt.close()
 
 
 def plot_confusion_matrix(
@@ -605,7 +605,7 @@ def plot_confusion_matrix(
         os.makedirs(os.path.dirname(figure_path))
     plt.tight_layout()
     plt.savefig(figure_path, bbox_inches="tight")
-    plt.clf()
+    plt.close()
     logging.info(f"{data_split} split: saved confusion matrix at: {figure_path}")
     return cms
 
@@ -688,7 +688,7 @@ def plot_scatter(
         os.makedirs(os.path.dirname(figure_path))
     logging.info(f"Try to save scatter plot at: {figure_path}")
     plt.savefig(figure_path)
-    plt.clf()
+    plt.close()
     return {title + "_pearson": pearson}
 
 
@@ -768,6 +768,7 @@ def subplot_scatters(
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
     plt.savefig(figure_path)
+    plt.close()
     logging.info(f"{data_split} split: saved scatters together at: {figure_path}")
 
 
@@ -1322,7 +1323,7 @@ def plot_roc_per_class(
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
     plt.savefig(figure_path, bbox_inches="tight")
-    plt.clf()
+    plt.close()
     logging.info(f"{data_split} split: saved ROC curve at: {figure_path}")
     return labels_to_areas
 
@@ -1390,6 +1391,7 @@ def subplot_rocs(
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
     plt.savefig(figure_path)
+    plt.close()
 
 
 def plot_precision_recall_per_class(
@@ -1445,7 +1447,7 @@ def plot_precision_recall_per_class(
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
     plt.savefig(figure_path, bbox_inches="tight")
-    plt.clf()
+    plt.close()
     logging.info(f"{data_split} split: saved precision-recall curve at: {figure_path}")
     return labels_to_areas
 
