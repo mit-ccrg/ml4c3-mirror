@@ -48,11 +48,17 @@ class EarlyStopping(tune.stopper.Stopper):
         (argmin(loss) = 0) + (patience = 5) < (len(losses) = 5)
         """
         if np.isnan(result["val_loss"]):
+            print(f"Stopping {trial_id} for NaN loss")
             return True
         losses = self._trial_to_loss[trial_id]
         losses.append(result["val_loss"])
         best_loss_idx = np.argmin(losses)
-        return best_loss_idx + self.patience < len(losses)
+        if best_loss_idx + self.patience < len(losses):
+            print(
+                f"Stopping {trial_id} for no improvement after {self.patience} trials.",
+            )
+            return True
+        return False
 
     def stop_all(self) -> bool:
         return False
