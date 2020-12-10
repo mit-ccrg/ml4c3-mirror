@@ -13,7 +13,14 @@ from ml4c3.metrics import weighted_crossentropy
 from definitions.ecg import ECG_PREFIX
 from definitions.sts import STS_PREFIX, STS_SURGERY_DATE_COLUMN
 from definitions.echo import ECHO_PREFIX, ECHO_DATETIME_COLUMN
-from ml4c3.tensormap.TensorMap import Dates, TensorMap, PatientData
+from definitions.globals import SECONDS_IN_DAY
+from ml4c3.tensormap.TensorMap import (
+    Dates,
+    TensorMap,
+    PatientData,
+    Interpretation,
+    make_default_time_series_filter,
+)
 
 
 def update_tmaps_weighted_loss(
@@ -118,40 +125,99 @@ def _get_dataset_metadata(dataset_name: str) -> Tuple[str, str]:
 CROSS_REFERENCE_SOURCES = [ECG_PREFIX, STS_PREFIX, ECHO_PREFIX]
 
 
+def _days_between_tensor_from_file(tm: TensorMap, data: PatientData) -> np.ndarray:
+    # Time series filter will be updated to return days for this tensor from file
+    days = tm.time_series_filter(data)
+    return days.to_numpy()[:, None]
+
+
 def update_tmaps_window(
     tmap_name: str,
     tmaps: Dict[str, TensorMap],
 ) -> Dict[str, TensorMap]:
-    """Make new tensor map from base tensor map, making conditional on a date from
-    another source of data. This requires a precis format for tensor map name:
+    """
+    Make new tensor map from base tensor map, making conditional on a date from
+    another source of data. This requires a precise format for tensor map name:
         [base_tmap_name]_[N]_days_[pre/post]_[other_data_source]
     e.g.
         ecg_2500_365_days_pre_echo
         ecg_2500_365_days_pre_sts_newest
         av_peak_gradient_30_days_post_echo
+
+    Additionally, a special tensor map can be created to get the days between
+    cross referenced events by the following format:
+        [source_name]_[N]_days_[pre/post]_[other_data_source]_days_between_matched_events
+    e.g.
+        ecg_180_days_pre_echo_days_between_matched_events
     """
 
-    pattern = fr"(.*)_(\d+)_days_(pre|post)_({'|'.join(CROSS_REFERENCE_SOURCES)})"
+    pattern = (
+        fr"(.*)_(\d+)_days_(pre|post)_({'|'.join(CROSS_REFERENCE_SOURCES)})"
+        fr"(_days_between_matched_events)?"
+    )
     match = re.match(pattern, tmap_name)
     if match is None:
         return tmaps
 
-    base_name = match[1]
-    offset_days = int(match[2])
-    pre_or_post = match[3]
-    reference_dataset = match[4]
+    # ecg_2500_std_180_days_pre_echo
+    source_name = match[1]         # ecg_2500_std
+    offset_days = int(match[2])    # 180
+    pre_or_post = match[3]         # pre
+    reference_name = match[4]      # echo
+    days_between = match[5] or ""  # (empty string)
 
-    prefix, dt_col = _get_dataset_metadata(dataset_name=reference_dataset)
-    new_name = f"{base_name}_{offset_days}_days_{pre_or_post}_{reference_dataset}"
+    new_name = (
+        f"{source_name}_{offset_days}_days_{pre_or_post}_{reference_name}{days_between}"
+    )
 
-    if base_name not in tmaps:
-        raise ValueError(
-            f"Base tmap {base_name} not in existing tmaps; cannot create {new_name}",
+    # If the tmap should return the number of days between matched events,
+    # source_name is the name of a source dataset
+    if days_between:
+        if source_name not in CROSS_REFERENCE_SOURCES:
+            raise ValueError(
+                f"Source dataset {source_name} not in known cross reference sources; "
+                f"cannot create {new_name}",
+            )
+        source_prefix, source_dt_col = _get_dataset_metadata(dataset_name=source_name)
+
+        # Setup time series filter, using the default time series filter if the source
+        # datetime column is None
+        if source_dt_col is not None:
+            time_series_filter = lambda data: data[source_prefix][source_dt_col]
+        else:
+            time_series_filter = make_default_time_series_filter(source_prefix)
+
+        # Create a fake base tmap which will be modified with a time series filter
+        # function which returns the number of days between events
+        base_tmap = TensorMap(
+            name=source_name,
+            shape=(1,),
+            interpretation=Interpretation.CONTINUOUS,
+            path_prefix=source_prefix,
+            tensor_from_file=_days_between_tensor_from_file,
+            time_series_limit=0,
+            time_series_filter=time_series_filter,
         )
 
-    base_tmap = tmaps[base_name]
+    # If not getting days between events, source_name is the name of an underlying tmap
+    # to filter and must exist
+    elif source_name not in tmaps:
+        raise ValueError(
+            f"Base tmap {source_name} not in existing tmaps; cannot create {new_name}",
+        )
+
+    # If all checks pass, get base_tmap in the case that it is an existing tmap
+    else:
+        base_tmap = tmaps[source_name]
+
+    # Copy the base_tmap to modify, either a real tmap or the fake one setup to get
+    # the days between events
     new_tmap = copy.deepcopy(base_tmap)
     new_tmap.name = new_name
+
+    reference_prefix, reference_dt_col = _get_dataset_metadata(
+        dataset_name=reference_name,
+    )
 
     # One-to-one matching algorithm maximizes the number of matches by pairing events
     # nearest in time, starting from the most recent event.
@@ -165,9 +231,9 @@ def update_tmaps_window(
         source_dates = base_tmap.time_series_filter(data)
 
         # Get dates from reference data
-        reference_data = data[prefix]
+        reference_data = data[reference_prefix]
         if isinstance(reference_data, pd.DataFrame):
-            reference_dates = reference_data[dt_col]  # Reference data is CSV
+            reference_dates = reference_data[reference_dt_col]  # Reference data is CSV
         else:
             reference_dates = list(reference_data)  # Reference data is HD5
 
@@ -186,24 +252,43 @@ def update_tmaps_window(
             start_dates = reference_dates
             end_dates = reference_dates + datetime.timedelta(days=offset_days)
 
-        dates = pd.Series(dtype=str)
-        for start_date, end_date in zip(start_dates, end_dates):
+        dates = pd.Series(dtype=object)
+        day_differences = pd.Series(dtype=object)
+        for start_date, end_date, reference_date in zip(
+            start_dates,
+            end_dates,
+            reference_dates,
+        ):
             # Get newest source date in range of start and end dates
             matched_date = source_dates_dt[
                 source_dates_dt.between(start_date, end_date, inclusive=False)
-            ][:1].index
+            ][:1]
 
-            # Computation is done on pd.Timestamp objects but returned list should use
-            # original strings/format
-            dates = dates.append(source_dates[matched_date])
+            # If computing the days between events, calculate the day difference between
+            # the reference date and the matched date
+            if days_between:
+                difference = reference_date - matched_date
+                difference = difference.dt.total_seconds() / SECONDS_IN_DAY
+                day_differences = day_differences.append(difference)
+
+            # If not computing the days between events, return the actual dates
+            else:
+                # Computation is done on pd.Timestamp objects but returned list should
+                # use the original strings/format in source_dates
+                dates = dates.append(source_dates[matched_date.index])
 
             # Remove the matched date from further matching
-            source_dates_dt = source_dates_dt.drop(matched_date)
+            source_dates_dt = source_dates_dt.drop(matched_date.index)
 
         if len(dates) == 0:
             raise ValueError("No cross referenced dates")
 
-        return list(dates) if source_is_list else dates
+        if days_between:
+            return day_differences
+        elif source_is_list:
+            return list(dates)
+        else:
+            return dates
 
     new_tmap.time_series_filter = get_cross_referenced_dates
     tmaps[tmap_name] = new_tmap
