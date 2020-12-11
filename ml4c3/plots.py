@@ -30,6 +30,13 @@ from tensorflow.keras.optimizers.schedules import LearningRateSchedule
 
 # Imports: first party
 from ml4c3.metrics import coefficient_of_determination
+from ml4c3.datasets import (
+    BATCH_IDS_INDEX,
+    BATCH_INPUT_INDEX,
+    make_dataset,
+    tensors_to_sources,
+    get_train_valid_test_ids,
+)
 from definitions.ecg import ECG_DATE_FORMAT, ECG_DATETIME_FORMAT
 from definitions.globals import PDF_EXT, TENSOR_EXT
 from ml4c3.tensormap.TensorMap import (
@@ -787,7 +794,6 @@ def _plot_ecg_text(
     age = -1
     if not np.isnan(data["age"]):
         age = int(data["age"])
-    sex = {value: key for key, value in data["sex"].items()}
 
     fig.text(
         0.17 / w,
@@ -800,7 +806,7 @@ def _plot_ecg_text(
     fig.text(6.05 / w, 8.04 / h, f"{data['sitename']}", weight="bold")
 
     fig.text(0.17 / w, 7.77 / h, f"{dob} ({age} yr)", weight="bold")
-    fig.text(0.17 / w, 7.63 / h, f"{sex[1]}".title(), weight="bold")
+    fig.text(0.17 / w, 7.63 / h, f"{data['sex']}".title(), weight="bold")
     fig.text(0.17 / w, 7.35 / h, "Room: ", weight="bold")
     fig.text(0.17 / w, 7.21 / h, f"Loc: {data['location']}", weight="bold")
 
@@ -1052,12 +1058,13 @@ def _plot_ecg_clinical(voltage: Dict[str, np.ndarray], ax: plt.Axes) -> None:
 
 
 def _plot_ecg_figure(
-    data: Dict[str, Union[np.ndarray, str, Dict]],
+    patient_id: int,
+    data: Dict[str, Union[np.ndarray, str, float]],
     plot_signal_function: Callable[[Dict[str, np.ndarray], plt.Axes], None],
     plot_mode: str,
     output_folder: str,
     image_ext: str,
-) -> None:
+) -> str:
     plt.rcParams["font.family"] = "Times New Roman"
     plt.rcParams["font.size"] = 9.5
 
@@ -1137,10 +1144,11 @@ def _plot_ecg_figure(
     )
 
     # save both pdf and image
-    title = re.sub(r"[:/. ]", "", f'{plot_mode}_{data["patientid"]}_{data["datetime"]}')
-    plt.savefig(os.path.join(output_folder, f"{title}{PDF_EXT}"))
-    plt.savefig(os.path.join(output_folder, f"{title}{image_ext}"))
+    title = re.sub(r"[:/. ]", "", f'{patient_id}_{data["datetime"]}_{plot_mode}')
+    fpath = os.path.join(output_folder, f"{title}{image_ext}")
+    plt.savefig(fpath)
     plt.close(fig)
+    return fpath
 
 
 def plot_ecg(args):
@@ -1172,12 +1180,6 @@ def plot_ecg(args):
         tmaps = update_tmaps(needed_tensor, tmaps)
     tensor_maps_in = [tmaps[it] for it in needed_tensors]
 
-    tensor_paths = [
-        os.path.join(args.tensors, tp)
-        for tp in os.listdir(args.tensors)
-        if os.path.splitext(tp)[-1].lower() == TENSOR_EXT
-    ]
-
     if args.plot_mode == "clinical":
         plot_signal_function = _plot_ecg_clinical
     elif args.plot_mode == "full":
@@ -1185,61 +1187,79 @@ def plot_ecg(args):
     else:
         raise ValueError(f"Unsupported plot mode: {args.plot_mode}")
 
-    # TODO use Dataset here https://github.com/aguirre-lab/ml4c3/issues/578
-    # Get tensors for all hd5
-    for tp in tensor_paths:
-        try:
-            with h5py.File(tp, "r") as hd5:
-                skip_hd5 = False
-                tdict = defaultdict(dict)
-                for tm in tensor_maps_in:
-                    key = tm.name.split("ecg_")[1]
-                    try:
-                        tensors = tm.tensor_from_file(tm, hd5)
+    patient_ids, _, _ = get_train_valid_test_ids(
+        tensors=args.tensors,
+        mrn_column_name=args.mrn_column_name,
+        patient_csv=args.patient_csv,
+        valid_ratio=0,
+        test_ratio=0,
+        allow_empty_split=True,
+    )
+    hd5_sources, _ = tensors_to_sources(args.tensors, tensor_maps_in)
+    dataset, stats, cleanup = make_dataset(
+        data_split="plot_ecg",
+        hd5_sources=hd5_sources,
+        csv_sources=[],
+        patient_ids=patient_ids,
+        input_tmaps=tensor_maps_in,
+        output_tmaps=[],
+        batch_size=1,
+        num_workers=args.num_workers,
+        cache_off=True,
+        augment=False,
+        validate=False,
+        normalize=False,
+        keep_ids=True,
+        verbose=False,
+    )
 
-                        if tm.time_series_limit is None:
-                            tensors = np.array([tensors])
-                        for i, tensor in enumerate(tensors):
-                            if tm.channel_map:
-                                tdict[i][key] = dict()
-                                for cm in tm.channel_map:
-                                    tdict[i][key][cm] = (
-                                        tensor[:, tm.channel_map[cm]]
-                                        if tm.name == voltage_tensor
-                                        else tensor[tm.channel_map[cm]]
-                                    )
-                            else:
-                                if tm.shape[0] == 1:
-                                    tensor = tensor.item()
-                                tdict[i][key] = tensor
-                    except (
-                        IndexError,
-                        KeyError,
-                        ValueError,
-                        OSError,
-                        RuntimeError,
-                    ):
-                        logging.warning(
-                            f"Could not obtain {tm.name}. Skipping plotting for all"
-                            f" ECGs at {tp}",
-                        )
-                        skip_hd5 = True
-                    if skip_hd5:
-                        break
-                if skip_hd5:
-                    continue
+    dataset = dataset.unbatch()
 
-                # plot each ecg
-                for i in tdict:
-                    _plot_ecg_figure(
-                        data=tdict[i],
-                        plot_signal_function=plot_signal_function,
-                        plot_mode=args.plot_mode,
-                        output_folder=args.output_folder,
-                        image_ext=args.image_ext,
-                    )
-        except:
-            logging.exception(f"Broken tensor at: {tp}")
+    # Unbatched dataset returns tuples of dictionaries of tensors:
+    # The elements of the tuples are the input and output data.
+    # The elements of the dictionaries are tensor names and values.
+    i = -1
+    for i, ecg in enumerate(dataset):
+        patient_id = ecg[BATCH_IDS_INDEX]
+        ecg = ecg[BATCH_INPUT_INDEX]
+
+        # Make dictionary keys friendlier, extract and process tensors
+        data = {}
+        for k, v in ecg.items():
+            # "input_ecg_patientid_language" --> "patientid"
+            new_k = k.split("ecg_", 1)[1].rsplit("_", 1)[0]
+
+            # Extract voltage tensor into dictionary of numpy arrays, keyed by lead
+            if new_k == "2500":
+                new_v = {}
+                for (
+                    lead,
+                    idx,
+                ) in tmaps[voltage_tensor].channel_map.items():
+                    new_v[lead] = ecg[k][:, idx].numpy()
+            # Extract categorical variable as category label
+            elif new_k == "sex":
+                idx_to_label = {v: k for k, v in tmaps["ecg_sex"].channel_map.items()}
+                new_v = idx_to_label[ecg[k].numpy().argmax()]
+            # Extract all other tensors, cast to string if necessary
+            else:
+                new_v = ecg[k][0].numpy()
+                if isinstance(new_v, bytes):
+                    new_v = new_v.decode()
+            data[new_k] = new_v
+
+        fpath = _plot_ecg_figure(
+            patient_id=patient_id,
+            data=data,
+            plot_signal_function=plot_signal_function,
+            plot_mode=args.plot_mode,
+            output_folder=args.output_folder,
+            image_ext=args.image_ext,
+        )
+        logging.info(f"Saved ECG {i + 1} to {fpath}")
+    logging.info(f"Saved {i + 1} ECGs to {args.output_folder}")
+
+    cleanup()
 
 
 def get_fpr_tpr_roc_pred(y_pred, test_truth, labels):

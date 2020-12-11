@@ -123,7 +123,7 @@ def hyperparameter_optimizer(
                 valid_csv=args.valid_csv,
                 test_csv=args.test_csv,
                 output_folder=trial_path,
-                cache_off=args.cache_off,
+                cache=args.cache,
                 mixup_alpha=args.mixup_alpha,
                 debug=args.debug,
             )

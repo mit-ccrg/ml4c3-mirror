@@ -346,10 +346,15 @@ class TensorMap:
         tensor: np.ndarray,
         data: PatientData,
         augment: bool,
+        validate: bool = True,
+        normalize: bool = True,
     ) -> np.ndarray:
-        self.validate(tensor, data)
-        tensor = self.augment(tensor) if augment else tensor
-        tensor = self.normalize(tensor)
+        if validate:
+            self.validate(tensor, data)
+        if augment:
+            tensor = self.augment(tensor)
+        if normalize:
+            tensor = self.normalize(tensor)
         return tensor
 
     def validate(self, tensor: np.ndarray, data: PatientData):

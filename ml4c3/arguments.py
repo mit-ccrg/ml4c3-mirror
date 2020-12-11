@@ -133,11 +133,20 @@ def parse_args() -> argparse.Namespace:
 
     # Run specific and debugging arguments
     run_parser = argparse.ArgumentParser(add_help=False)
-    run_parser.add_argument(
-        "--cache_off",
+    cache_parser = run_parser.add_mutually_exclusive_group(required=False)
+    cache_parser.add_argument(
+        "--cache",
+        dest="cache",
         action="store_true",
+        help="Enable caching of tf.data.Dataset, on by default.",
+    )
+    cache_parser.add_argument(
+        "--no-cache",
+        dest="cache",
+        action="store_false",
         help="Disable caching of tf.data.Dataset.",
     )
+    cache_parser.set_defaults(cache=True)
     run_parser.add_argument(
         "--random_seed",
         default=12878,

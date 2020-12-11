@@ -132,7 +132,7 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
         valid_csv=args.valid_csv,
         test_csv=args.test_csv,
         output_folder=args.output_folder,
-        cache_off=args.cache_off,
+        cache=args.cache,
         mixup_alpha=args.mixup_alpha,
         debug=args.debug,
     )
@@ -221,7 +221,7 @@ def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         test_csv=args.test_csv,
         allow_empty_split=True,
         output_folder=args.output_folder,
-        cache_off=args.cache_off,
+        cache=args.cache,
         debug=args.debug,
     )
     _, _, test_dataset = datasets
@@ -299,7 +299,7 @@ def train_simclr_model(args: argparse.Namespace):
         valid_csv=args.valid_csv,
         test_csv=args.test_csv,
         output_folder=args.output_folder,
-        cache_off=args.cache_off,
+        cache=args.cache,
         mixup_alpha=args.mixup_alpha,
         debug=args.debug,
     )

@@ -63,6 +63,8 @@ def _get_sample(
     sample_tensors: Dict[str, np.ndarray],
     is_input: bool,
     augment: bool,
+    validate: bool,
+    normalize: bool,
     data: PatientData,
 ) -> Dict[str, np.ndarray]:
     sample = dict()
@@ -72,6 +74,8 @@ def _get_sample(
             tensor=sample_tensors[tm.name],
             data=data,
             augment=augment,
+            validate=validate,
+            normalize=normalize,
         )
     return sample
 
@@ -86,6 +90,8 @@ def _tensor_worker(
     input_tmaps: List[TensorMap],
     output_tmaps: List[TensorMap],
     augment: bool = False,
+    validate: bool = True,
+    normalize: bool = True,
 ):
     tmaps = input_tmaps + output_tmaps
 
@@ -149,6 +155,8 @@ def _tensor_worker(
                             sample_tensors=sample_tensors,
                             is_input=True,
                             augment=augment,
+                            validate=validate,
+                            normalize=normalize,
                             data=data,
                         )
                         out_tensors = _get_sample(
@@ -156,6 +164,8 @@ def _tensor_worker(
                             sample_tensors=sample_tensors,
                             is_input=False,
                             augment=augment,
+                            validate=validate,
+                            normalize=normalize,
                             data=data,
                         )
                         tensor_queue.put(
@@ -223,8 +233,11 @@ def make_data_generator_factory(
     input_tmaps: List[TensorMap],
     output_tmaps: List[TensorMap],
     augment: bool = False,
+    validate: bool = True,
+    normalize: bool = True,
     keep_ids: bool = False,
     debug: bool = False,
+    verbose: bool = True,
 ) -> Tuple[Callable[[], SampleGenerator], StatsWrapper, Cleanup]:
     Method = Thread if debug else Process
     tensor_queue: Queue = Queue(MAX_QUEUE_SIZE)
@@ -256,6 +269,8 @@ def make_data_generator_factory(
                 input_tmaps,
                 output_tmaps,
                 augment,
+                validate,
+                normalize,
             ),
         )
         process.start()
@@ -326,10 +341,12 @@ def make_data_generator_factory(
                 if "exception" in key:
                     error_message += f"{key}: {stats[key]} instances occurred\n"
             raise ValueError(error_message)
-        logging.info(
-            f"{get_stats_string(name, stats, epoch_counter)}"
-            f"{get_verbose_stats_string({data_split: stats}, input_tmaps, output_tmaps)}",
-        )
+
+        if verbose:
+            logging.info(
+                f"{get_stats_string(name, stats, epoch_counter)}"
+                f"{get_verbose_stats_string({data_split: stats}, input_tmaps, output_tmaps)}",
+            )
         nonlocal stats_wrapper
         stats_wrapper.stats = stats
 
@@ -346,10 +363,12 @@ def make_dataset(
     batch_size: int,
     num_workers: int,
     augment: bool = False,
+    validate: bool = True,
+    normalize: bool = True,
     keep_ids: bool = False,
-    cache_off: bool = False,
-    mixup_alpha: float = 0,
+    cache: bool = True,
     debug: bool = False,
+    verbose: bool = True,
 ) -> Tuple[tf.data.Dataset, StatsWrapper, Cleanup]:
     output_types = (
         {
@@ -378,8 +397,11 @@ def make_dataset(
         input_tmaps=input_tmaps,
         output_tmaps=output_tmaps,
         augment=augment,
+        validate=validate,
+        normalize=normalize,
         keep_ids=keep_ids,
         debug=debug,
+        verbose=verbose,
     )
     dataset = (
         tf.data.Dataset.from_generator(
@@ -391,42 +413,68 @@ def make_dataset(
         .prefetch(16)
     )
 
-    if not cache_off:
+    if cache:
         dataset = dataset.cache()
 
-    if mixup_alpha != 0:
-        dist = tfd.Beta(mixup_alpha, mixup_alpha)
-
-        def mixup(*batch):
-            """
-            Augments a batch of samples by overlaying consecutive samples weighted by
-            samples taken from a beta distribution.
-            """
-            in_batch, out_batch = batch[BATCH_INPUT_INDEX], batch[BATCH_OUTPUT_INDEX]
-            # last batch in epoch may not be exactly batch_size, get actual _size
-            _size = tf.shape(in_batch[input_tmaps[0].input_name])[:1]
-            # roll samples for masking [1,2,3] -> [3,1,2]
-            in_roll = {k: tf.roll(in_batch[k], 1, 0) for k in in_batch}
-            out_roll = {k: tf.roll(out_batch[k], 1, 0) for k in out_batch}
-            # sample from beta distribution
-            lambdas = dist.sample(_size)
-            for k in in_batch:
-                # lambdas is shape (_size,), reshape to match rank of tensor for math
-                _dims = [_size, tf.ones(tf.rank(in_batch[k]) - 1, tf.int32)]
-                _shape = tf.concat(_dims, 0)
-                _lambdas = tf.reshape(lambdas, _shape)
-                # augment samples with mixup
-                in_batch[k] = in_batch[k] * _lambdas + in_roll[k] * (1 - _lambdas)
-            for k in out_batch:
-                _dims = [_size, tf.ones(tf.rank(out_batch[k]) - 1, tf.int32)]
-                _shape = tf.concat(_dims, 0)
-                _lambdas = tf.reshape(lambdas, _shape)
-                out_batch[k] = out_batch[k] * _lambdas + out_roll[k] * (1 - _lambdas)
-            return batch
-
-        dataset = dataset.map(mixup)
-
     return dataset, stats_wrapper, cleanup
+
+
+def mixup_dataset(dataset: tf.data.Dataset, mixup_alpha: float) -> tf.data.Dataset:
+
+    dist = tfd.Beta(mixup_alpha, mixup_alpha)
+
+    def mixup(*batch):
+        """
+        Augments a batch of samples by overlaying consecutive samples weighted by
+        samples taken from a beta distribution.
+        """
+        in_batch, out_batch = batch[BATCH_INPUT_INDEX], batch[BATCH_OUTPUT_INDEX]
+        # last batch in epoch may not be exactly batch_size, get actual _size
+        _size = tf.shape(in_batch[next(iter(in_batch))])[:1]
+        # roll samples for masking [1,2,3] -> [3,1,2]
+        in_roll = {k: tf.roll(in_batch[k], 1, 0) for k in in_batch}
+        out_roll = {k: tf.roll(out_batch[k], 1, 0) for k in out_batch}
+        # sample from beta distribution
+        lambdas = dist.sample(_size)
+        for k in in_batch:
+            # lambdas is shape (_size,), reshape to match rank of tensor for math
+            _dims = [_size, tf.ones(tf.rank(in_batch[k]) - 1, tf.int32)]
+            _shape = tf.concat(_dims, 0)
+            _lambdas = tf.reshape(lambdas, _shape)
+            # augment samples with mixup
+            in_batch[k] = in_batch[k] * _lambdas + in_roll[k] * (1 - _lambdas)
+        for k in out_batch:
+            _dims = [_size, tf.ones(tf.rank(out_batch[k]) - 1, tf.int32)]
+            _shape = tf.concat(_dims, 0)
+            _lambdas = tf.reshape(lambdas, _shape)
+            out_batch[k] = out_batch[k] * _lambdas + out_roll[k] * (1 - _lambdas)
+        return batch
+
+    dataset = dataset.map(mixup)
+    return dataset
+
+
+def tensors_to_sources(
+    tensors: Union[str, List[Union[str, Tuple[str, str]]]],
+    tmaps: List[TensorMap],
+) -> Tuple[List[str], List[Tuple[str, str]]]:
+    if not isinstance(tensors, list):
+        tensors = [tensors]
+    csv_sources = []
+    hd5_sources = []
+    for source in tensors:
+        if isinstance(source, tuple):
+            csv_sources.append(source)
+        elif source.endswith(CSV_EXT):
+            csv_name = os.path.splitext(os.path.basename(source))[0]
+            csv_sources.append((source, csv_name))
+        else:
+            hd5_sources.append(source)
+    _csv_data_source_name_among_tmap_path_prefixes(
+        tmaps=tmaps,
+        csv_sources=csv_sources,
+    )
+    return hd5_sources, csv_sources
 
 
 def train_valid_test_datasets(
@@ -446,7 +494,7 @@ def train_valid_test_datasets(
     test_csv: Optional[str] = None,
     allow_empty_split: bool = False,
     output_folder: Optional[str] = None,
-    cache_off: bool = False,
+    cache: bool = True,
     mixup_alpha: float = 0.0,
     debug: bool = False,
 ) -> Tuple[
@@ -478,7 +526,7 @@ def train_valid_test_datasets(
                      with test_ratio
     :param allow_empty_split: If true, allow one or more data splits to be empty
     :param output_folder: output folder of output files
-    :param cache_off: if true, do not cache dataset in memory
+    :param cache: if true, cache dataset in memory
     :param mixup_alpha: if non-zero, mixup batches with this alpha parameter for mixup
     :param debug: if true, use threads to allow pdb debugging
     :return: tuple of three tensorflow Datasets, three StatsWrapper objects, and
@@ -514,21 +562,9 @@ def train_valid_test_datasets(
             save_ids(ids=test_ids, split="test")
 
     # Parse tensors into hd5 sources or csv sources with a csv name
-    if not isinstance(tensors, list):
-        tensors = [tensors]
-    csv_sources = []
-    hd5_sources = []
-    for source in tensors:
-        if isinstance(source, tuple):
-            csv_sources.append(source)
-        elif source.endswith(CSV_EXT):
-            csv_name = os.path.splitext(os.path.basename(source))[0]
-            csv_sources.append((source, csv_name))
-        else:
-            hd5_sources.append(source)
-    _csv_data_source_name_among_tmap_path_prefixes(
+    hd5_sources, csv_sources = tensors_to_sources(
+        tensors=tensors,
         tmaps=tensor_maps_in + tensor_maps_out,
-        csv_sources=csv_sources,
     )
 
     train_dataset, train_stats, train_cleanup = make_dataset(
@@ -542,8 +578,7 @@ def train_valid_test_datasets(
         num_workers=num_workers,
         augment=True,
         keep_ids=keep_ids,
-        cache_off=cache_off,
-        mixup_alpha=mixup_alpha,
+        cache=cache,
         debug=debug,
     )
     valid_dataset, valid_stats, valid_cleanup = make_dataset(
@@ -557,7 +592,7 @@ def train_valid_test_datasets(
         num_workers=num_workers,
         augment=False,
         keep_ids=keep_ids,
-        cache_off=cache_off,
+        cache=cache,
         debug=debug,
     )
     test_dataset, test_stats, test_cleanup = make_dataset(
@@ -571,9 +606,13 @@ def train_valid_test_datasets(
         num_workers=num_workers,
         augment=False,
         keep_ids=keep_ids or keep_ids_test,
-        cache_off=cache_off,
+        cache=cache,
         debug=debug,
     )
+
+    if mixup_alpha != 0:
+        train_dataset = mixup_dataset(dataset=train_dataset, mixup_alpha=mixup_alpha)
+
     return (
         (train_dataset, valid_dataset, test_dataset),
         (train_stats, valid_stats, test_stats),
