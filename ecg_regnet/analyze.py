@@ -25,10 +25,7 @@ def analyze_results(results_folder: str, output_folder: str) -> pd.DataFrame:
     best_val_loss_col = "best validation loss"
     df[best_val_loss_col] = best_val_loss
     cleaned_df = df.copy()
-    cutoff = np.quantile(
-        df[best_val_loss_col],
-        0.5,
-    )  # what percentage of results to show
+    cutoff = 7  # there are 7 standardized objectives with MSE loss -> guessing 0 should give loss ~= 7
     cleaned_df = cleaned_df.loc[cleaned_df[best_val_loss_col] < cutoff]
 
     config_cols = [col for col in df.columns if "config" in col]
