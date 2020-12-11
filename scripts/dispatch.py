@@ -66,6 +66,7 @@ def setup_job(
     cohort: str,
     output_tensor: str,
     outcome_short_name: str,
+    regularization: str,
 ) -> subprocess.Popen:
     """
     Setup environment variables, launch job, and return job object.
@@ -78,6 +79,7 @@ def setup_job(
     env["COHORT"] = cohort
     env["OUTPUT_TENSOR"] = output_tensor
     env["OUTCOME_SHORT_NAME"] = outcome_short_name
+    env["REG"] = regularization
 
     job = subprocess.Popen(
         f"bash {script}_temp".split(),
@@ -94,6 +96,8 @@ def setup_job(
         append_str += f", output tensor {output_tensor}"
     if outcome_short_name != "":
         append_str += f", outcome short name {outcome_short_name}"
+    if regularization:
+        append_str += f", L1 and L2 value of {regularization}"
     logging.info(
         f"Dispatched {script} with bootstrap {bootstrap} on gpu {gpu}{append_str}",
     )
@@ -110,10 +114,16 @@ def run(args: argparse.Namespace):
         for script in args.scripts:
             with open(script, "r") as original, open(f"{script}_temp", "w") as temp:
                 temp.write(original.read().replace("run.sh", "run.sh -n"))
-            for (bootstrap, cohort, output_tensor_and_short_name) in itertools.product(
+            for (
+                bootstrap,
+                cohort,
+                output_tensor_and_short_name,
+                regularization,
+            ) in itertools.product(
                 args.bootstraps,
                 args.cohorts,
                 zip(args.output_tensors, args.outcome_short_names),
+                args.regularizations,
             ):
                 output_tensor = output_tensor_and_short_name[0]
                 outcome_short_name = output_tensor_and_short_name[1]
@@ -131,6 +141,7 @@ def run(args: argparse.Namespace):
                             cohort=cohort,
                             output_tensor=output_tensor,
                             outcome_short_name=outcome_short_name,
+                            regularization=regularization,
                         )
                         gpu_jobs[gpu] = job
                         assigned = True
@@ -166,7 +177,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--bootstraps",
         nargs="+",
-        default=["0-9"],
+        default=["0"],
         help="List of bootstraps to run on; same specification as gpus. default: 0-9",
     )
     parser.add_argument(
@@ -192,6 +203,12 @@ def parse_args() -> argparse.Namespace:
         nargs="+",
         default=[""],
         help="List of outcome short names to iterate over in bash script",
+    )
+    parser.add_argument(
+        "--regularizations",
+        nargs="+",
+        default=[""],
+        help="List of regularization strengths (L1 and L2) to iterate over in bash script",
     )
 
     args = parser.parse_args()

@@ -20,28 +20,27 @@ from ml4c3.tensormap.TensorMap import TensorMap
 MEAN_PRECISION_EPS = 0.02  # how much mean precision degradation is acceptable
 DEFAULT_PARAMS = {
     "activation": "relu",
-    "dense_layers": [4, 2],
-    "dense_blocks": [5, 3],
     "block_size": 3,
-    "conv_width": 3,
-    "learning_rate": 1e-3,
-    "optimizer": "adam",
-    "conv_type": "conv",
+    "bottleneck_type": BottleneckType.FlattenRestructure,
     "conv_layers": [6, 5, 3],
+    "conv_type": "conv",
+    "conv_width": 3,
     "conv_x": [3],
     "conv_y": [3],
     "conv_z": [2],
-    "padding": "same",
+    "dense_blocks": [5, 3],
+    "dense_dropout": 0,
+    "dense_layers": [4, 2],
+    "layer_order": ["activation", "regularization", "normalization"],
+    "learning_rate": 1e-3,
     "max_pools": [],
+    "optimizer": "adam",
+    "padding": "same",
     "pool_type": "max",
     "pool_x": 1,
     "pool_y": 1,
     "pool_z": 1,
-    "dropout": 0,
-    "bottleneck_type": BottleneckType.FlattenRestructure,
-    "layer_order": ["activation", "regularization", "normalization"],
 }
-
 
 TrainType = Dict[str, np.ndarray]
 
@@ -71,8 +70,8 @@ def assert_model_trains(
 ):
     if m is None:
         m = make_multimodal_multitask_model(
-            input_tmaps,
-            output_tmaps,
+            tensor_maps_in=input_tmaps,
+            tensor_maps_out=output_tmaps,
             **DEFAULT_PARAMS,
         )
     for tmap, tensor in zip(input_tmaps, m.inputs):
@@ -157,15 +156,15 @@ class TestMakeMultimodalMultitaskModel:
     )
     def test_load_unimodal(self, tmpdir, input_tmap: TensorMap, output_tmap: TensorMap):
         m = make_multimodal_multitask_model(
-            [input_tmap],
-            [output_tmap],
+            tensor_maps_in=[input_tmap],
+            tensor_maps_out=[output_tmap],
             **DEFAULT_PARAMS,
         )
         path = os.path.join(tmpdir, f"m{MODEL_EXT}")
         m.save(path)
         make_multimodal_multitask_model(
-            [input_tmap],
-            [output_tmap],
+            tensor_maps_in=[input_tmap],
+            tensor_maps_out=[output_tmap],
             model_file=path,
             **DEFAULT_PARAMS,
         )
@@ -179,12 +178,14 @@ class TestMakeMultimodalMultitaskModel:
         inp, out = pytest.CONTINUOUS_TMAPS[:2], pytest.CATEGORICAL_TMAPS[:2]
         params = DEFAULT_PARAMS.copy()
         params["activation"] = activation
-        m = make_multimodal_multitask_model(inp, out, **params)
+        m = make_multimodal_multitask_model(
+            tensor_maps_in=inp, tensor_maps_out=out, **params
+        )
         path = os.path.join(tmpdir, f"m{MODEL_EXT}")
         m.save(path)
         make_multimodal_multitask_model(
-            inp,
-            out,
+            tensor_maps_in=inp,
+            tensor_maps_out=out,
             model_file=path,
             **params,
         )
@@ -205,15 +206,15 @@ class TestMakeMultimodalMultitaskModel:
         output_tmaps: List[TensorMap],
     ):
         m = make_multimodal_multitask_model(
-            input_tmaps,
-            output_tmaps,
+            tensor_maps_in=input_tmaps,
+            tensor_maps_out=output_tmaps,
             **DEFAULT_PARAMS,
         )
         path = os.path.join(tmpdir, f"m{MODEL_EXT}")
         m.save(path)
         make_multimodal_multitask_model(
-            input_tmaps,
-            output_tmaps,
+            tensor_maps_in=input_tmaps,
+            tensor_maps_out=output_tmaps,
             model_file=path,
             **DEFAULT_PARAMS,
         )
@@ -238,15 +239,17 @@ class TestMakeMultimodalMultitaskModel:
         params["bottleneck_type"] = BottleneckType.Variational
         params["pool_x"] = params["pool_y"] = 2
         m = make_multimodal_multitask_model(
-            input_output_tmaps[0], input_output_tmaps[1], **params
+            tensor_maps_in=input_output_tmaps[0],
+            tensor_maps_out=input_output_tmaps[1],
+            **params,
         )
         assert_model_trains(input_output_tmaps[0], input_output_tmaps[1], m)
         m.save(os.path.join(tmpdir, "vae.h5"))
         path = os.path.join(tmpdir, f"m{MODEL_EXT}")
         m.save(path)
         make_multimodal_multitask_model(
-            input_output_tmaps[0],
-            input_output_tmaps[1],
+            tensor_maps_in=input_output_tmaps[0],
+            tensor_maps_out=input_output_tmaps[1],
             model_file=path,
             **DEFAULT_PARAMS,
         )
@@ -255,5 +258,7 @@ class TestMakeMultimodalMultitaskModel:
         params = DEFAULT_PARAMS.copy()
         params["dense_layers"] = []
         inp, out = pytest.CONTINUOUS_TMAPS[:2], pytest.CATEGORICAL_TMAPS[:2]
-        m = make_multimodal_multitask_model(inp, out, **DEFAULT_PARAMS)
+        m = make_multimodal_multitask_model(
+            tensor_maps_in=inp, tensor_maps_out=out, **DEFAULT_PARAMS
+        )
         assert_model_trains(inp, out, m)

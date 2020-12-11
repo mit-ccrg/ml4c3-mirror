@@ -162,8 +162,10 @@ def make_shallow_model(
     optimizer: str,
     learning_rate: float,
     learning_rate_schedule: str,
-    model_file: str = None,
     donor_layers: str = None,
+    model_file: str = None,
+    l1: float = 0,
+    l2: float = 0,
     **kwargs,
 ) -> Model:
     """Make a shallow model (e.g. linear or logistic regression)
@@ -173,11 +175,11 @@ def make_shallow_model(
     :param optimizer: which optimizer to use. See optimizers.py.
     :param learning_rate: Size of learning steps in SGD optimization
     :param learning_rate_schedule: learning rate schedule to train with, e.g. triangular
-    :param l1: Optional float value to use for L1 regularization.
-    :param l2: Optional float value to use for L2 regularization.
-    :param model_file: Optional HD5 model file to load and return.
     :param donor_layers: Optional HD5 model file whose weights will be loaded into
                          this model when layer names match.
+    :param model_file: Optional HD5 model file to load and return.
+    :param l1: Optional float value to use for L1 regularization.
+    :param l2: Optional float value to use for L2 regularization.
     :return: a compiled keras model
     """
     if model_file is not None:
@@ -190,10 +192,7 @@ def make_shallow_model(
     outputs = []
     my_metrics = {}
     loss_weights = []
-    regularizer = l1_l2(
-        l1=kwargs.get("l1") if "l1" in kwargs else 0,
-        l2=kwargs.get("l2") if "l2" in kwargs else 0,
-    )
+    regularizer = l1_l2(l1=l1, l2=l2)
 
     input_tensors = [Input(shape=tm.shape, name=tm.input_name) for tm in tensor_maps_in]
     it = concatenate(input_tensors) if len(input_tensors) > 1 else input_tensors[0]
@@ -208,6 +207,7 @@ def make_shallow_model(
                 activation=ot.activation,
                 name=ot.output_name,
                 kernel_regularizer=regularizer,
+                bias_regularizer=regularizer,
             )(it),
         )
 
@@ -412,12 +412,12 @@ def _order_layers(
     layer_order: List[str],
     activate: Layer = None,
     normalize: Layer = None,
-    regularize: Layer = None,
+    dropout: Layer = None,
 ) -> Layer:
     identity = lambda x: x
     activate = activate or identity
     normalize = normalize or identity
-    regularize = regularize or identity
+    dropout = dropout or identity
 
     def ordered_layers(x):
         for order in layer_order:
@@ -425,8 +425,8 @@ def _order_layers(
                 x = activate(x)
             elif order == "normalization":
                 x = normalize(x)
-            elif order == "regularization":
-                x = regularize(x)
+            elif order == "dropout":
+                x = dropout(x)
             else:
                 pass
         return x
@@ -455,43 +455,74 @@ class ResidualBlock:
         conv_z: List[int],
         activation: str,
         normalization: str,
-        regularization: str,
-        regularization_rate: float,
+        dropout_type: str,
+        dropout_rate: float,
         layer_order: List[str],
         dilate: bool,
+        regularizer: tf.keras.regularizers = None,
     ):
         block_size = len(filters_per_conv)
         assert len(conv_x) == len(conv_y) == len(conv_z) == block_size
-        conv_layer, kernels = _conv_layer_from_kind_and_dimension(
-            dimension,
-            conv_layer_type,
-            conv_x,
-            conv_y,
-            conv_z,
+        conv_layer, kernels = _build_conv_layer(
+            dimension=dimension,
+            conv_layer_type=conv_layer_type,
+            conv_x=conv_x,
+            conv_y=conv_y,
+            conv_z=conv_z,
         )
-        self.conv_layers = [
-            conv_layer(
-                filters=num_filters,
-                kernel_size=kernel,
-                padding="same",
-                dilation_rate=2 ** i if dilate else 1,
-            )
-            for i, (num_filters, kernel) in enumerate(zip(filters_per_conv, kernels))
-        ]
+        self.conv_layers = []
+
+        # Regularization differs by convolutional layer class
+        for i, (filters, kernel) in enumerate(zip(filters_per_conv, kernels)):
+            if conv_layer == Conv3D or conv_layer == Conv2D or conv_layer == Conv1D:
+                c = conv_layer(
+                    filters=filters,
+                    kernel_size=kernel,
+                    padding="same",
+                    dilation_rate=2 ** i if dilate else 1,
+                    kernel_regularizer=regularizer,
+                    bias_regularizer=regularizer,
+                )
+            # Separable 1 and 2D conv layers have depth and pointwise kernel matrices
+            elif conv_layer == SeparableConv2D or conv_layer == SeparableConv1D:
+                c = conv_layer(
+                    filters=filters,
+                    kernel_size=kernel,
+                    padding="same",
+                    dilation_rate=2 ** i if dilate else 1,
+                    depthwise_regularizer=regularizer,
+                    pointwise_regularizer=regularizer,
+                    bias_regularizer=regularizer,
+                )
+            # Depthwise 2D conv layer lacks pointwise kernel matrix to regularize
+            elif conv_layer == DepthwiseConv2D:
+                c = conv_layer(
+                    kernel_size=kernel,
+                    padding="same",
+                    dilation_rate=2 ** i if dilate else 1,
+                    depthwise_regularizer=regularizer,
+                    bias_regularizer=regularizer,
+                )
+            else:
+                raise ValueError(
+                    f"{conv_layer} is not a valid convolutional layer class",
+                )
+            self.conv_layers.append(c)
+
         self.activations = [_activation_layer(activation) for _ in range(block_size)]
         self.normalizations = [
             _normalization_layer(normalization) for _ in range(block_size)
         ]
-        self.regularizations = [
-            _regularization_layer(dimension, regularization, regularization_rate)
+        self.dropout_layers = [
+            _dropout_layer(dimension, dropout_type, dropout_rate)
             for _ in range(block_size)
         ]
-        residual_conv_layer, _ = _conv_layer_from_kind_and_dimension(
-            dimension,
-            "conv",
-            conv_x,
-            conv_y,
-            conv_z,
+        residual_conv_layer, _ = _build_conv_layer(
+            dimension=dimension,
+            conv_layer_type=conv_layer_type,
+            conv_x=conv_x,
+            conv_y=conv_y,
+            conv_z=conv_z,
         )
         self.residual_convs = [
             residual_conv_layer(
@@ -508,14 +539,14 @@ class ResidualBlock:
 
     def __call__(self, x: Tensor) -> Tensor:
         previous = x
-        for convolve, activate, normalize, regularize, one_by_n_convolve in zip(
+        for convolve, activate, normalize, dropout, one_by_n_convolve in zip(
             self.conv_layers,
             self.activations,
             self.normalizations,
-            self.regularizations,
+            self.dropout_layers,
             [None] + self.residual_convs,
         ):
-            x = _order_layers(self.layer_order, activate, normalize, regularize)(
+            x = _order_layers(self.layer_order, activate, normalize, dropout)(
                 convolve(x),
             )
             if one_by_n_convolve is not None:  # Do not residual add the input
@@ -537,27 +568,59 @@ class DenseConvolutionalBlock:
         conv_z: List[int],
         activation: str,
         normalization: str,
-        regularization: str,
-        regularization_rate: float,
+        dropout_type: str,
+        dropout_rate: float,
         layer_order: List[str],
+        regularizer: tf.keras.regularizers = None,
     ):
-        conv_layer, kernels = _conv_layer_from_kind_and_dimension(
-            dimension,
-            conv_layer_type,
-            conv_x,
-            conv_y,
-            conv_z,
+        conv_layer, kernels = _build_conv_layer(
+            dimension=dimension,
+            conv_layer_type=conv_layer_type,
+            conv_x=conv_x,
+            conv_y=conv_y,
+            conv_z=conv_z,
         )
-        self.conv_layers = [
-            conv_layer(filters=filters, kernel_size=kernel, padding="same")
-            for kernel in kernels
-        ]
+
+        self.conv_layers = []
+        for kernel in kernels:
+            if conv_layer == Conv3D or conv_layer == Conv2D or conv_layer == Conv1D:
+                c = conv_layer(
+                    filters=filters,
+                    kernel_size=kernel,
+                    padding="same",
+                    kernel_regularizer=regularizer,
+                    bias_regularizer=regularizer,
+                )
+            # Separable 1 and 2D conv layers have depth and pointwise kernel matrices
+            elif conv_layer == SeparableConv2D or conv_layer == SeparableConv1D:
+                c = conv_layer(
+                    filters=filters,
+                    kernel_size=kernel,
+                    padding="same",
+                    depthwise_regularizer=regularizer,
+                    pointwise_regularizer=regularizer,
+                    bias_regularizer=regularizer,
+                )
+            # Depthwise 2D conv layer lacks pointwise kernel matrix to regularize
+            elif conv_layer == DepthwiseConv2D:
+                c = conv_layer(
+                    kernel_size=kernel,
+                    padding="same",
+                    depthwise_regularizer=regularizer,
+                    bias_regularizer=regularizer,
+                )
+            else:
+                raise ValueError(
+                    f"{conv_layer} is not a valid convolutional layer type",
+                )
+            self.conv_layers.append(c)
+
         self.activations = [_activation_layer(activation) for _ in range(block_size)]
         self.normalizations = [
             _normalization_layer(normalization) for _ in range(block_size)
         ]
-        self.regularizations = [
-            _regularization_layer(dimension, regularization, regularization_rate)
+        self.dropout_layers = [
+            _dropout_layer(dimension, dropout_type, dropout_rate)
             for _ in range(block_size)
         ]
         self.layer_order = layer_order
@@ -568,24 +631,21 @@ class DenseConvolutionalBlock:
 
     def __call__(self, x: Tensor) -> Tensor:
         dense_connections = [x]
-        for i, (convolve, activate, normalize, regularize) in enumerate(
+        for i, (convolve, activate, normalize, dropout_layer) in enumerate(
             zip(
                 self.conv_layers,
                 self.activations,
                 self.normalizations,
-                self.regularizations,
+                self.dropout_layers,
             ),
         ):
-            x = _order_layers(self.layer_order, activate, normalize, regularize)(
+            x = _order_layers(self.layer_order, activate, normalize, dropout_layer)(
                 convolve(x),
             )
-            if (
-                i < len(self.conv_layers) - 1
-            ):  # output of block does not get concatenated to
+            # Output of block does not get concatenated to
+            if i < len(self.conv_layers) - 1:
                 dense_connections.append(x)
-                x = Concatenate()(
-                    dense_connections[:],
-                )  # [:] is necessary because of tf weirdness
+                x = Concatenate()(dense_connections[:])
         return x
 
 
@@ -601,21 +661,21 @@ class FullyConnectedBlock:
         widths: List[int],
         activation: str,
         normalization: str,
-        regularization: str,
-        regularization_rate: float,
+        dropout_type: str,
+        dropout_rate: float,
         layer_order: List[str],
-        is_encoder: bool = False,
         name: str = None,
+        is_encoder: bool = False,
+        regularizer: tf.keras.regularizers = None,
     ):
         """
         :param widths: number of neurons in each dense layer
         :param activation: string name of activation function
         :param normalization: optional string name of normalization function
-        :param regularization: optional string name of regularization function
-        :param regularization_rate: if regularization is applied, the rate at which
-                                    each dense layer is regularized
-        :param layer_order: list of strings specifying the activation, normalization
-                            , and regularization layers after the dense layer
+        :param dropout_type: optional string name of dropout function
+        :param dropout_rate: if dropout is applied, this is the rate
+        :param layer_order: list of strings specifying the activation, normalization,
+                            and dropout layers after the dense layer
         :param is_encoder: boolean indicator if fully connected block is an input
                            block
         :param name: name of last dense layer in fully connected block, otherwise
@@ -623,28 +683,48 @@ class FullyConnectedBlock:
                      third dense layer in the model
         """
         final_dense = (
-            Dense(units=widths[-1], name=name) if name else Dense(units=widths[-1])
+            Dense(
+                units=widths[-1],
+                name=name,
+                kernel_regularizer=regularizer,
+                bias_regularizer=regularizer,
+            )
+            if name
+            else Dense(
+                units=widths[-1],
+                kernel_regularizer=regularizer,
+                bias_regularizer=regularizer,
+            )
         )
-        self.denses = [Dense(units=width) for width in widths[:-1]] + [final_dense]
+        self.denses = [
+            Dense(
+                units=width,
+                kernel_regularizer=regularizer,
+                bias_regularizer=regularizer,
+            )
+            for width in widths[:-1]
+        ] + [final_dense]
         self.activations = [_activation_layer(activation) for _ in widths]
-        self.regularizations = [
-            _regularization_layer(1, regularization, regularization_rate)
-            for _ in widths
+        self.dropout_layers = [
+            _dropout_layer(1, dropout_type, dropout_rate) for _ in widths
         ]
         self.norms = [_normalization_layer(normalization) for _ in widths]
         self.is_encoder = is_encoder
         self.layer_order = layer_order
 
     def __call__(self, x: Tensor) -> Union[Tensor, Tuple[Tensor, List[Tensor]]]:
-        for dense, normalize, activate, regularize in zip(
+        for dense, normalize, activate, dropout in zip(
             self.denses,
             self.norms,
             self.activations,
-            self.regularizations,
+            self.dropout_layers,
         ):
-            x = _order_layers(self.layer_order, activate, normalize, regularize)(
-                dense(x),
-            )
+            x = _order_layers(
+                layer_order=self.layer_order,
+                activate=activate,
+                normalize=normalize,
+                dropout=dropout,
+            )(dense(x))
         if self.is_encoder:
             return x, []
         return x
@@ -707,18 +787,20 @@ class VariationalBottleNeck:
         normalization: str,
         fully_connected_widths: List[int],
         latent_size: int,
-        regularization: str,
-        regularization_rate: float,
+        dropout_type: str,
+        dropout_rate: float,
         layer_order: List[str],
         pre_decoder_shapes: Dict[TensorMap, Optional[Tuple[int, ...]]],
+        regularizer: tf.keras.regularizers = None,
     ):
         self.fully_connected = (
             FullyConnectedBlock(
                 widths=fully_connected_widths,
                 activation=activation,
                 normalization=normalization,
-                regularization=regularization,
-                regularization_rate=regularization_rate,
+                dropout_type=dropout_type,
+                dropout_rate=dropout_rate,
+                regularizer=regularizer,
                 layer_order=layer_order,
             )
             if fully_connected_widths
@@ -727,6 +809,7 @@ class VariationalBottleNeck:
         self.restructures = {
             tm: FlatToStructure(
                 output_shape=shape,
+                regularizer=regularizer,
                 activation=activation,
                 normalization=normalization,
                 layer_order=layer_order,
@@ -739,6 +822,7 @@ class VariationalBottleNeck:
         self.no_restructures = [
             tm for tm, shape in pre_decoder_shapes.items() if shape is None
         ]
+        self.regularizer = regularizer
 
     def __call__(
         self,
@@ -751,7 +835,12 @@ class VariationalBottleNeck:
             y = y[0]
         y = self.fully_connected(y) if self.fully_connected else y
         mu = Dense(self.latent_size, name="embed")(y)
-        log_sigma = Dense(self.latent_size, name="log_sigma")(y)
+        log_sigma = Dense(
+            units=self.latent_size,
+            name="log_sigma",
+            kernel_regularizer=self.regularizer,
+            bias_regularizer=self.regularizer,
+        )(y)
         y = self.sampler(mu, log_sigma)
         return {
             **{tm: restructure(y) for tm, restructure in self.restructures.items()},
@@ -767,22 +856,24 @@ class ConcatenateRestructure:
 
     def __init__(
         self,
-        pre_decoder_shapes: Dict[TensorMap, Optional[Tuple[int, ...]]],
         activation: str,
-        normalization: str,
-        widths: List[int],
-        regularization: str,
-        regularization_rate: float,
-        layer_order: List[str],
         bottleneck_type: BottleneckType,
+        dropout_rate: float,
+        dropout_type: str,
+        layer_order: List[str],
+        normalization: str,
+        pre_decoder_shapes: Dict[TensorMap, Optional[Tuple[int, ...]]],
+        widths: List[int],
+        regularizer: tf.keras.regularizers = None,
     ):
         self.fully_connected = (
             FullyConnectedBlock(
                 widths=widths,
                 activation=activation,
                 normalization=normalization,
-                regularization=regularization,
-                regularization_rate=regularization_rate,
+                dropout_type=dropout_type,
+                dropout_rate=dropout_rate,
+                regularizer=regularizer,
                 layer_order=layer_order,
             )
             if widths
@@ -844,9 +935,14 @@ class FlatToStructure:
         activation: str,
         normalization: str,
         layer_order: List[str],
+        regularizer: tf.keras.regularizers = None,
     ):
         self.input_shapes = output_shape
-        self.dense = Dense(units=int(np.prod(output_shape)))
+        self.dense = Dense(
+            units=int(np.prod(output_shape)),
+            kernel_regularizer=regularizer,
+            bias_regularizer=regularizer,
+        )
         self.activation = _activation_layer(activation)
         self.reshape = Reshape(output_shape)
         self.norm = _normalization_layer(normalization)
@@ -862,25 +958,26 @@ class ConvEncoder:
     def __init__(
         self,
         *,
-        filters_per_dense_block: List[int],
-        dimension: int,
-        res_filters: List[int],
+        activation: str,
+        block_size: int,
         conv_layer_type: str,
         conv_x: List[int],
         conv_y: List[int],
         conv_z: List[int],
-        block_size: int,
-        activation: str,
-        normalization: str,
-        regularization: str,
-        regularization_rate: float,
-        layer_order: List[str],
         dilate: bool,
+        dimension: int,
+        dropout_rate: float,
+        dropout_type: str,
+        filters_per_dense_block: List[int],
+        layer_order: List[str],
+        normalization: str,
         pool_after_final_dense_block: bool,
         pool_type: str,
         pool_x: int,
         pool_y: int,
         pool_z: int,
+        res_filters: List[int],
+        regularizer: tf.keras.regularizers = None,
     ):
 
         num_res = len(res_filters)
@@ -894,10 +991,11 @@ class ConvEncoder:
             conv_z=res_z,
             activation=activation,
             normalization=normalization,
-            regularization=regularization,
-            regularization_rate=regularization_rate,
-            dilate=dilate,
+            dropout_type=dropout_type,
+            dropout_rate=dropout_rate,
+            regularizer=regularizer,
             layer_order=layer_order,
+            dilate=dilate,
         )
 
         dense_x, dense_y, dense_z = conv_x[num_res:], conv_y[num_res:], conv_z[num_res:]
@@ -912,8 +1010,9 @@ class ConvEncoder:
                 block_size=block_size,
                 activation=activation,
                 normalization=normalization,
-                regularization=regularization,
-                regularization_rate=regularization_rate,
+                dropout_type=dropout_type,
+                dropout_rate=dropout_rate,
+                regularizer=regularizer,
                 layer_order=layer_order,
             )
             for filters, x, y, z in zip(
@@ -999,21 +1098,22 @@ class ConvDecoder:
     def __init__(
         self,
         *,
-        tensor_map_out: TensorMap,
-        filters_per_dense_block: List[int],
+        activation: str,
+        block_size: int,
         conv_layer_type: str,
         conv_x: List[int],
         conv_y: List[int],
         conv_z: List[int],
-        block_size: int,
-        activation: str,
-        normalization: str,
-        regularization: str,
-        regularization_rate: float,
+        dropout_rate: float,
+        dropout_type: str,
+        filters_per_dense_block: List[int],
         layer_order: List[str],
+        normalization: str,
+        tensor_map_out: TensorMap,
         upsample_x: int,
         upsample_y: int,
         upsample_z: int,
+        regularizer: tf.keras.regularizers = None,
     ):
         dimension = tensor_map_out.axes
         self.dense_blocks = [
@@ -1027,25 +1127,53 @@ class ConvDecoder:
                 block_size=block_size,
                 activation=activation,
                 normalization=normalization,
-                regularization=regularization,
-                regularization_rate=regularization_rate,
+                dropout_type=dropout_type,
+                dropout_rate=dropout_rate,
+                regularizer=regularizer,
                 layer_order=layer_order,
             )
             for filters, x, y, z in zip(filters_per_dense_block, conv_x, conv_y, conv_z)
         ]
-        conv_layer, _ = _conv_layer_from_kind_and_dimension(
-            dimension,
-            "conv",
-            conv_x,
-            conv_y,
-            conv_z,
+        conv_layer, _ = _build_conv_layer(
+            dimension=dimension,
+            conv_layer_type=conv_layer_type,
+            conv_x=conv_x,
+            conv_y=conv_y,
+            conv_z=conv_z,
         )
-        self.conv_label = conv_layer(
-            tensor_map_out.shape[-1],
-            _one_by_n_kernel(dimension),
-            activation=tensor_map_out.activation,
-            name=tensor_map_out.output_name,
-        )
+
+        if conv_layer == Conv3D or conv_layer == Conv2D or conv_layer == Conv1D:
+            self.conv_label = conv_layer(
+                filters=tensor_map_out.shape[-1],
+                kernel_size=_one_by_n_kernel(dimension),
+                activation=tensor_map_out.activation,
+                name=tensor_map_out.output_name,
+                kernel_regularizer=regularizer,
+                bias_regularizer=regularizer,
+            )
+        # Separable 1 and 2D conv layers have depth and pointwise kernel matrices
+        elif conv_layer == SeparableConv2D or conv_layer == SeparableConv1D:
+            self.conv_label = conv_layer(
+                filters=tensor_map_out.shape[-1],
+                kernel_size=_one_by_n_kernel(dimension),
+                activation=tensor_map_out.activation,
+                name=tensor_map_out.output_name,
+                depthwise_regularizer=regularizer,
+                pointwise_regularizer=regularizer,
+                bias_regularizer=regularizer,
+            )
+        # Depthwise 2D conv layer lacks pointwise kernel matrix to regularize
+        elif conv_layer == DepthwiseConv2D:
+            self.conv_label = conv_layer(
+                kernel_size=_one_by_n_kernel(dimension),
+                activation=tensor_map_out.activation,
+                name=tensor_map_out.output_name,
+                depthwise_regularizer=regularizer,
+                bias_regularizer=regularizer,
+            )
+        else:
+            raise ValueError(f"{conv_layer} is not a valid convolutional layer type")
+
         self.upsamples = [
             _upsampler(dimension, upsample_x, upsample_y, upsample_z)
             for _ in range(len(filters_per_dense_block) + 1)
@@ -1092,38 +1220,39 @@ def _repeat_dimension(dim: List[int], name: str, num_filters_needed: int) -> Lis
 
 
 def make_multimodal_multitask_model(
+    activation: str,
+    bottleneck_type: BottleneckType,
+    learning_rate: float,
+    optimizer: str,
     tensor_maps_in: List[TensorMap],
     tensor_maps_out: List[TensorMap],
-    activation: str,
-    learning_rate: float,
-    bottleneck_type: BottleneckType,
-    optimizer: str,
-    dense_layers: List[int] = None,
-    dropout: float = None,
-    conv_layers: List[int] = None,
-    dense_blocks: List[int] = None,
     block_size: int = None,
+    conv_dilate: bool = None,
+    conv_layers: List[int] = None,
     conv_type: str = None,
-    layer_normalization: str = None,
-    conv_regularize: str = None,
-    layer_order: List[str] = None,
     conv_x: List[int] = None,
     conv_y: List[int] = None,
     conv_z: List[int] = None,
-    conv_dropout: float = None,
-    conv_dilate: bool = None,
+    dense_blocks: List[int] = None,
+    dense_dropout: float = 0,
+    dense_layers: List[int] = None,
+    directly_embed_and_repeat: int = None,
+    donor_layers: str = None,
+    freeze_donor_layers: bool = None,
+    l1: float = 0,
+    l2: float = 0,
+    layer_normalization: str = None,
+    layer_order: List[str] = None,
+    learning_rate_schedule: str = None,
+    model_file: str = None,
+    nest_model: List[List[str]] = None,
     pool_after_final_dense_block: bool = None,
     pool_type: str = None,
     pool_x: int = None,
     pool_y: int = None,
     pool_z: int = None,
-    learning_rate_schedule: str = None,
-    directly_embed_and_repeat: int = None,
-    nest_model: List[List[str]] = None,
-    model_file: str = None,
-    donor_layers: str = None,
     remap_layer: Dict[str, str] = None,
-    freeze_donor_layers: bool = None,
+    spatial_dropout: float = 0,
     **kwargs,
 ) -> Model:
     """
@@ -1136,54 +1265,45 @@ def make_multimodal_multitask_model(
     input TensorMaps.
 
     Hyperparameters are exposed to the command line.
-    Model summary printed to output
+    Model summary is printed to output.
 
-    :param tensor_maps_in: List of input TensorMaps
-    :param tensor_maps_out: List of output TensorMaps
-    :param activation: Activation function as a string (e.g. 'relu', 'linear, or
-                       'softmax)
-    :param learning_rate: learning rate for optimizer
-    :param bottleneck_type: How to merge the representations coming from the
-                            different input modalities
-    :param dense_layers: List of number of filters in each dense layer.
-    :param dropout: Dropout rate in dense layers
+    :param activation: Activation function as a string ('relu', 'linear', 'softmax')
+    :param block_size: Number of layers within each Densenet module for densenet convolutional models
+    :param bottleneck_type: How to merge the representations coming from the different input modalities
+    :param conv_dilate: whether to use dilation in conv layers
     :param conv_layers: List of number of filters in each convolutional layer
-    :param dense_blocks: List of number of filters in densenet modules for densenet
-                         convolutional models
-    :param block_size: Number of layers within each Densenet module for densenet
-                       convolutional models
-    :param conv_type: Type of convolution to use, e.g. separable
-    :param layer_normalization: Type of normalization layer for fully connected and
-                                convolutional layers, e.g. batch norm
     :param conv_regularize: Type of regularization for convolutions, e.g. dropout
-    :param layer_order: Order of activation, normalization, and regularization layers
+    :param conv_type: Type of convolution to use, e.g. separable
     :param conv_x: Size of X dimension for 2D and 3D convolutional kernels
     :param conv_y: Size of Y dimension for 2D and 3D convolutional kernels
     :param conv_z: Size of Z dimension for 3D convolutional kernels
-    :param conv_dropout: Dropout rate in convolutional layers
-    :param conv_dilate: whether to use dilation in conv layers
+    :param dense_blocks: List of number of filters in densenet modules for densenet convolutional models
+    :param dense_layer_dropout: Dropout rate of dense layers; must be in [0, 1].
+    :param dense_layers: List of number of filters in each dense layer.
+    :param directly_embed_and_repeat: If set, directly embed input tensors (without passing to a dense layer) into concatenation layer, and repeat each input N times, where N is this argument's value. To directly embed a feature without repetition, set to 1.
+    :param donor_layers: HD5 model file whose weights will be loaded into this model when layer names match.
+    :param dropout: Dropout rate in dense layers
+    :param freeze_donor_layers: Whether to freeze layers from loaded from donor_layers
+    :param layer_normalization: Type of normalization layer for fully connected and convolutional layers, e.g. batch norm
+    :param layer_normalization: Type of normalization layer for fully connected and convolutional layers, e.g. batch norm
+    :param layer_order: Order of activation, normalization, and regularization layers
+    :param learning_rate: learning rate for optimizer
+    :param learning_rate_schedule: learning rate schedule to train with, e.g. triangular
+    :param l1: Optional float value to use for L1 regularization.
+    :param l2: Optional float value to use for L2 regularization.
+    :param model_file: HD5 model file to load and return.
+    :param nest_model: Embed a nested model ending at the specified layer before the bottleneck layer of the current model. List of models to embed and layer name of embedded layer.
+    :param optimizer: which optimizer to use. See optimizers.py.
     :param pool_after_final_dense_block: Add pooling layer after final dense block
     :param pool_type: Max or average pooling following convolutional blocks
     :param pool_x: Pooling in the X dimension for Convolutional models.
     :param pool_y: Pooling in the Y dimension for Convolutional models.
     :param pool_z: Pooling in the Z dimension for 3D Convolutional models.
-    :param optimizer: which optimizer to use. See optimizers.py.
+    :param remap_layer: Dictionary remapping layers from donor_layers to layers in current model
+    :param spatial_dropout: Rate of spatial dropout in convolutional layers.
+    :param tensor_maps_in: List of input TensorMaps
+    :param tensor_maps_out: List of output TensorMaps
     :return: a compiled keras model
-    :param learning_rate_schedule: learning rate schedule to train with, e.g. triangular
-    :param model_file: HD5 model file to load and return.
-    :param donor_layers: HD5 model file whose weights will be loaded into this
-                         model when layer names match.
-    :param freeze_donor_layers: Whether to freeze layers from loaded from donor_layers
-    :param remap_layer: Dictionary remapping layers from donor_layers to layers in
-                        current model
-    :param directly_embed_and_repeat: If set, directly embed input tensors (without
-                                      passing to a dense layer) into concatenation
-                                      layer, and repeat each input N times, where
-                                      N is this argument's value. To directly embed
-                                      a feature without repetition, set to 1.
-    :param nest_model: Embed a nested model ending at the specified layer before
-                       the bottleneck layer of the current model. List of models
-                       to embed and layer name of embedded layer.
     """
     custom_dict = _get_custom_objects(tensor_maps_out)
     opt = get_optimizer(
@@ -1201,9 +1321,6 @@ def make_multimodal_multitask_model(
         return m
 
     dense_normalize = layer_normalization
-    dense_regularize = "dropout" if dropout else None
-    dense_regularize_rate = dropout
-    conv_regularize_rate = conv_dropout
 
     # list of filter dimensions should match the number of convolutional
     # layers = len(dense_blocks) + [ + len(conv_layers) if convolving input tensors]
@@ -1227,6 +1344,7 @@ def make_multimodal_multitask_model(
         for nested_model, _ in nested_models
         for input_layer in nested_model.inputs
     }
+    regularizer = l1_l2(l1=l1, l2=l2)
 
     encoders: Dict[TensorMap] = {}
     for tm in tensor_maps_in:
@@ -1244,9 +1362,10 @@ def make_multimodal_multitask_model(
                 block_size=block_size,
                 activation=activation,
                 normalization=layer_normalization,
-                regularization=conv_regularize,
+                dropout_type="spatial_dropout" if spatial_dropout > 0 else None,
+                dropout_rate=spatial_dropout,
+                regularizer=regularizer,
                 layer_order=layer_order,
-                regularization_rate=conv_regularize_rate,
                 dilate=conv_dilate,
                 pool_after_final_dense_block=pool_after_final_dense_block,
                 pool_type=pool_type,
@@ -1265,9 +1384,10 @@ def make_multimodal_multitask_model(
                     widths=[tm.annotation_units],
                     activation=activation,
                     normalization=dense_normalize,
-                    regularization=dense_regularize,
+                    dropout_type="dropout" if dense_dropout > 0 else None,
+                    dropout_rate=dense_dropout,
+                    regularizer=regularizer,
                     layer_order=layer_order,
-                    regularization_rate=dense_regularize_rate,
                     is_encoder=True,
                 )
 
@@ -1290,8 +1410,9 @@ def make_multimodal_multitask_model(
         bottleneck = ConcatenateRestructure(
             widths=dense_layers,
             activation=activation,
-            regularization=dense_regularize,
-            regularization_rate=dense_regularize_rate,
+            dropout_type="dropout" if dense_dropout > 0 else None,
+            dropout_rate=dense_dropout,
+            regularizer=regularizer,
             normalization=dense_normalize,
             layer_order=layer_order,
             pre_decoder_shapes=pre_decoder_shapes,
@@ -1302,8 +1423,9 @@ def make_multimodal_multitask_model(
             fully_connected_widths=dense_layers[:-1],
             latent_size=dense_layers[-1],
             activation=activation,
-            regularization=dense_regularize,
-            regularization_rate=dense_regularize_rate,
+            dropout_type="dropout" if dense_dropout > 0 else None,
+            dropout_rate=dense_dropout,
+            regularizer=regularizer,
             normalization=dense_normalize,
             layer_order=layer_order,
             pre_decoder_shapes=pre_decoder_shapes,
@@ -1325,8 +1447,9 @@ def make_multimodal_multitask_model(
                 block_size=1,
                 activation=activation,
                 normalization=layer_normalization,
-                regularization=conv_regularize,
-                regularization_rate=conv_regularize_rate,
+                dropout_type="spatial_dropout" if spatial_dropout > 0 else None,
+                dropout_rate=spatial_dropout,
+                regularizer=regularizer,
                 layer_order=layer_order,
                 upsample_x=pool_x,
                 upsample_y=pool_y,
@@ -1343,7 +1466,7 @@ def make_multimodal_multitask_model(
         freeze=freeze_donor_layers or False,
     )
 
-    # load layers for transfer learning
+    # Load layers for transfer learning
     if donor_layers is not None:
         loaded = 0
         freeze = freeze_donor_layers or False
@@ -1477,10 +1600,7 @@ def train_model_from_datasets(
     # If keras instead of sklearn model
     if isinstance(model, Model):
         if plot:
-            image_path = os.path.join(
-                output_folder,
-                "architecture_graph" + image_ext,
-            )
+            image_path = os.path.join(output_folder, "architecture_graph" + image_ext)
             plot_architecture_diagram(
                 dot=model_to_dot(model, show_shapes=True, expand_nested=True),
                 image_path=image_path,
@@ -1516,9 +1636,7 @@ def train_model_from_datasets(
     elif isinstance(model, SKLEARN_MODELS.__args__):
 
         # Get dicts of arrays of data keyed by tmap name from the dataset
-        data = get_dicts_of_arrays_from_dataset(
-            dataset=train_dataset,
-        )
+        data = get_dicts_of_arrays_from_dataset(dataset=train_dataset)
         input_data, output_data = data[BATCH_INPUT_INDEX], data[BATCH_OUTPUT_INDEX]
 
         # Get desired arrays from dicts of arrays
@@ -1573,7 +1691,7 @@ def _one_by_n_kernel(dimension):
     return tuple([1] * (dimension - 1))
 
 
-def _conv_layer_from_kind_and_dimension(
+def _build_conv_layer(
     dimension: int,
     conv_layer_type: str,
     conv_x: List[int],
@@ -1599,9 +1717,7 @@ def _conv_layer_from_kind_and_dimension(
         conv_layer = DepthwiseConv2D
         kernel = zip(conv_x, conv_y)
     else:
-        raise ValueError(
-            f"Unknown convolution type: {conv_layer_type} for dimension: {dimension}",
-        )
+        raise ValueError(f"{conv_layer_type} is an unknown convolution layer type")
     return conv_layer, list(kernel)
 
 
@@ -1632,9 +1748,7 @@ def _pool_layers_from_kind_and_dimension(
         ]
     if dimension == 2 and pool_type == "average":
         return [AveragePooling1D(pool_size=pool_x) for _ in range(pool_number)]
-    raise ValueError(
-        f"Unknown pooling type: {pool_type} for dimension: {dimension}",
-    )
+    raise ValueError(f"Unknown pooling type: {pool_type} for dimension: {dimension}")
 
 
 def _upsampler(dimension, pool_x, pool_y, pool_z):
@@ -1678,15 +1792,15 @@ def _normalization_layer(norm: str) -> Layer:
     return NORMALIZATION_CLASSES[norm]()
 
 
-def _regularization_layer(dimension: int, regularization_type: str, rate: float):
-    if dimension == 4 and regularization_type == "spatial_dropout":
-        return SpatialDropout3D(rate)
-    if dimension == 3 and regularization_type == "spatial_dropout":
-        return SpatialDropout2D(rate)
-    if dimension == 2 and regularization_type == "spatial_dropout":
-        return SpatialDropout1D(rate)
-    if regularization_type == "dropout":
-        return Dropout(rate)
+def _dropout_layer(dimension: int, dropout_type: str, dropout_rate: float):
+    if dimension == 4 and dropout_type == "spatial_dropout":
+        return SpatialDropout3D(dropout_rate)
+    if dimension == 3 and dropout_type == "spatial_dropout":
+        return SpatialDropout2D(dropout_rate)
+    if dimension == 2 and dropout_type == "spatial_dropout":
+        return SpatialDropout1D(dropout_rate)
+    if dropout_type == "dropout":
+        return Dropout(dropout_rate)
     return lambda x: x
 
 
@@ -1743,9 +1857,7 @@ def sklearn_model_loss_from_dataset(
     if not isinstance(model, SKLEARN_MODELS.__args__):
         raise ValueError(f"Uknown sklearn model: {model}")
     # Get dicts of arrays of data keyed by tmap name from the dataset
-    data = get_dicts_of_arrays_from_dataset(
-        dataset=dataset,
-    )
+    data = get_dicts_of_arrays_from_dataset(dataset=dataset)
     input_data, output_data = data[BATCH_INPUT_INDEX], data[BATCH_OUTPUT_INDEX]
 
     # Get desired arrays from dicts of arrays

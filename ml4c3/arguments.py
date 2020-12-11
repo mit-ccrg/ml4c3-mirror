@@ -390,15 +390,10 @@ def parse_args() -> argparse.Namespace:
         help="Dilate the convolutional layers.",
     )
     model_parser.add_argument(
-        "--conv_dropout",
+        "--spatial_dropout",
         default=0.0,
         type=float,
-        help="Dropout rate of convolutional kernels must be in [0.0, 1.0].",
-    )
-    model_parser.add_argument(
-        "--conv_regularize",
-        choices=["dropout", "spatial_dropout"],
-        help="Type of regularization layer for convolutions.",
+        help="Dropout rate of convolutional kernels; must be in [0, 1].",
     )
     model_parser.add_argument(
         "--conv_type",
@@ -416,9 +411,15 @@ def parse_args() -> argparse.Namespace:
     model_parser.add_argument(
         "--dense_layers",
         nargs="*",
-        default=[16, 64],
+        default=[32, 16],
         type=int,
         help="List of number of hidden units in neural nets dense layers.",
+    )
+    model_parser.add_argument(
+        "--dense_dropout",
+        default=0.0,
+        type=float,
+        help="Dropout rate of dense (fully connected) layers; must be in [0, 1].",
     )
     model_parser.add_argument(
         "--directly_embed_and_repeat",
@@ -428,10 +429,16 @@ def parse_args() -> argparse.Namespace:
         " argument's value. To directly embed a feature without repetition, set to 1.",
     )
     model_parser.add_argument(
-        "--dropout",
+        "--l1",
         default=0.0,
         type=float,
-        help="Dropout rate of dense layers must be in [0.0, 1.0].",
+        help="L1 value for regularizing the kernel and bias of each layer.",
+    )
+    model_parser.add_argument(
+        "--l2",
+        default=0.0,
+        type=float,
+        help="L2 value for regularizing the kernel and bias of each layer.",
     )
     model_parser.add_argument(
         "--layer_normalization",
@@ -441,10 +448,10 @@ def parse_args() -> argparse.Namespace:
     model_parser.add_argument(
         "--layer_order",
         nargs=3,
-        default=["normalization", "activation", "regularization"],
-        choices=["normalization", "activation", "regularization"],
+        default=["normalization", "activation", "dropout"],
+        choices=["normalization", "activation", "dropout"],
         help=(
-            "Order of normalization, activation and regularization after "
+            "Order of normalization, activation, and dropout after "
             "dense or convolutional layers."
         ),
     )
@@ -624,18 +631,6 @@ def parse_args() -> argparse.Namespace:
 
     # Train Shallow arguments
     train_shallow_parser = argparse.ArgumentParser(add_help=False)
-    train_shallow_parser.add_argument(
-        "--l1",
-        default=0.0,
-        type=float,
-        help="L1 value for regularization in shallow model.",
-    )
-    train_shallow_parser.add_argument(
-        "--l2",
-        default=0.0,
-        type=float,
-        help="L2 value for regularization in shallow model.",
-    )
     train_shallow_parser.add_argument(
         "--c",
         type=float,
@@ -1136,10 +1131,7 @@ def parse_args() -> argparse.Namespace:
 
 def _process_args(args: argparse.Namespace):
     now_string = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
-    args_file = os.path.join(
-        args.output_folder,
-        "arguments_" + now_string + ".txt",
-    )
+    args_file = os.path.join(args.output_folder, "arguments_" + now_string + ".txt")
     command_line = f"\n./scripts/run.sh {' '.join(sys.argv)}\n"
     if not os.path.exists(os.path.dirname(args_file)):
         os.makedirs(os.path.dirname(args_file))
@@ -1202,7 +1194,7 @@ def _process_args(args: argparse.Namespace):
 
     if "layer_order" in args and len(set(args.layer_order)) != 3:
         raise ValueError(
-            "Activation, normalization, and regularization layers must each be listed"
+            "Activation, normalization, and dropout layers must each be listed"
             f" exactly once for valid ordering. Got : {args.layer_order}",
         )
 
