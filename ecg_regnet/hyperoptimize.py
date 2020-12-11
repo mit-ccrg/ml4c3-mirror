@@ -166,7 +166,6 @@ def _test_build_pretraining_model():
         batch_size=2,
         validation_data=(dummy_in, dummy_out),
     )
-    iters = get_optimizer_iterations(m)
     lr = get_optimizer_lr(m)
     assert "val_loss" in history.history
     with tempfile.TemporaryDirectory() as tmpdir:

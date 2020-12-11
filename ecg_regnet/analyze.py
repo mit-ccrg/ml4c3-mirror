@@ -10,17 +10,13 @@ from ray import tune
 from matplotlib import pyplot as plt
 
 
-def get_training_dfs(analysis_df: pd.DataFrame) -> List[pd.DataFrame]:
-    return [
-        pd.read_csv(os.path.join(folder, "progress.csv"))
-        for folder in analysis_df["logdir"]
-    ]
+from ecg_regnet.compare_pretrained import _get_training_dfs
 
 
 def analyze_results(results_folder: str, output_folder: str) -> pd.DataFrame:
     os.makedirs(output_folder, exist_ok=True)
     df = tune.Analysis(results_folder).dataframe()
-    training_dfs = get_training_dfs(df)
+    training_dfs = _get_training_dfs(df)
     best_val_loss = [tdf["val_loss"].min() for tdf in training_dfs]
     best_val_loss_col = "best validation loss"
     df[best_val_loss_col] = best_val_loss
