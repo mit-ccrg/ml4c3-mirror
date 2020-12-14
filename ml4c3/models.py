@@ -1024,6 +1024,7 @@ class ConvEncoder:
         ]
 
         self.pool_after_final_dense_block = pool_after_final_dense_block
+        self.pool_before_first_dense_block = num_res > 0
 
         self.pools = _pool_layers_from_kind_and_dimension(
             dimension,
@@ -1038,7 +1039,8 @@ class ConvEncoder:
         intermediates = []
         x = self.res_block(x)
         intermediates.append(x)
-        x = self.pools[0](x)
+        if self.pool_before_first_dense_block:
+            x = self.pools[0](x)
 
         for i, (dense_block, pool) in enumerate(zip(self.dense_blocks, self.pools[1:])):
             x = dense_block(x)
