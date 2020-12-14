@@ -55,13 +55,24 @@ def _resample_voltage(voltage: np.array, desired_samples: int, fs: float) -> np.
     return np.interp(x_interp, x, voltage)
 
 
-def make_voltage_tff(exact_length=False):
+def make_voltage_tff(exact_length=False, no_pacemaker=False):
+    if no_pacemaker:
+        # Imports: first party
+        from ml4c3.tensormap.ecg_labels import tmaps as label_tmaps
+
+        pacemaker_tm = label_tmaps["pacemaker"]
+
     def tensor_from_file(tm, data):
         ecg_dates = tm.time_series_filter(data)
+        if no_pacemaker:
+            pacemaker_tm.time_series_filter = tm.time_series_filter
+            pacemaker_tensor = pacemaker_tm.tensor_from_file(pacemaker_tm, data)
         dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
         voltage_length = shape[1] if dynamic else shape[0]
         tensor = np.zeros(shape, dtype=np.float32)
         for i, ecg_date in enumerate(ecg_dates):
+            if no_pacemaker and pacemaker_tensor[i, 1] == 1:
+                continue
             for cm in tm.channel_map:
                 try:
                     path = make_hd5_path(tm=tm, date_key=ecg_date, value_key=cm)
@@ -166,7 +177,7 @@ def update_tmaps_ecg_voltage(
         tmap appropriately.
     """
     voltage_tm_pattern = re.compile(
-        r"^(12_lead_)?ecg_\d+(_exact)?(_std)?(_warp|_crop|_noise)*",
+        r"^(8_lead_)?ecg_\d+(_exact)?(_std)?(_no_pacemaker)?(_warp|_crop|_noise)*",
     )
     match = voltage_tm_pattern.match(tmap_name)
     if match is None:
@@ -177,6 +188,7 @@ def update_tmaps_ecg_voltage(
     leads = ECG_REST_LEADS_INDEPENDENT if "8_lead" in tmap_name else ECG_REST_LEADS_ALL
     length = int(tmap_name.split("ecg_")[1].split("_")[0])
     exact = "exact" in tmap_name
+    no_pacemaker = "no_pacemaker" in tmap_name
     normalizer = Standardize(mean=0, std=2000) if "std" in tmap_name else None
     augmenters = [
         augment_function
@@ -187,7 +199,10 @@ def update_tmaps_ecg_voltage(
         name=match_tmap_name,
         shape=(length, len(leads)),
         path_prefix=ECG_PREFIX,
-        tensor_from_file=make_voltage_tff(exact_length=exact),
+        tensor_from_file=make_voltage_tff(
+            exact_length=exact,
+            no_pacemaker=no_pacemaker,
+        ),
         normalizers=normalizer,
         channel_map=leads,
         time_series_limit=0,
