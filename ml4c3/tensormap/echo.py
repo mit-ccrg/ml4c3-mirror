@@ -103,13 +103,12 @@ def tensor_from_file_aortic_stenosis_category(
     av_mean_gradients = data[ECHO_PREFIX].loc[echo_dates.index, av_mean_gradient_key]
 
     # Initialize tensor array of zeros where each row is the channel map
-    tensor = np.zeros((len(av_mean_gradients), 4))
+    num_categories = len(tm.channel_map)
+    tensor = np.zeros((len(av_mean_gradients), num_categories))
 
     # Iterate through the peak velocities and mean gradients from all echos
     for idx, av_mean_gradient in enumerate(av_mean_gradients):
-        if av_mean_gradient < 10:
-            category = "none"
-        elif 10 <= av_mean_gradient < 20:
+        if av_mean_gradient < 20:
             category = "mild"
         elif 20 <= av_mean_gradient < 40:
             category = "moderate"
@@ -124,7 +123,7 @@ def tensor_from_file_aortic_stenosis_category(
 tmap_name = "as"
 tmaps[tmap_name] = TensorMap(
     name=tmap_name,
-    channel_map={"none": 0, "mild": 1, "moderate": 2, "severe": 3},
+    channel_map={"mild": 0, "moderate": 1, "severe": 2},
     interpretation=Interpretation.CATEGORICAL,
     path_prefix=ECHO_PREFIX,
     tensor_from_file=tensor_from_file_aortic_stenosis_category,
@@ -167,7 +166,7 @@ tmaps[tmap_name] = TensorMap(
 
 def make_aortic_stenosis_single_category(severity: str) -> Callable:
     if severity == "mild":
-        low = 10
+        low = 0
         high = 20
     elif severity == "moderate":
         low = 20

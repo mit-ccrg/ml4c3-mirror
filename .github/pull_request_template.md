@@ -1,9 +1,8 @@
-Closes #
+<!-- Each bullet point should link to the issue it closes --> 
 
-## Proposed Changes
--
--
--
+## Changelog
+- [x]
+- [x]
 
 ## Checklist
 - [ ] Added docstrings to important functions.

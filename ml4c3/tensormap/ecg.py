@@ -174,7 +174,7 @@ def update_tmaps_ecg_voltage(
 
     # Isolate matching components of tmap name and build it
     match_tmap_name = match[0]
-    leads = ECG_REST_LEADS_ALL if "12_lead" in tmap_name else ECG_REST_LEADS_INDEPENDENT
+    leads = ECG_REST_LEADS_INDEPENDENT if "8_lead" in tmap_name else ECG_REST_LEADS_ALL
     length = int(tmap_name.split("ecg_")[1].split("_")[0])
     exact = "exact" in tmap_name
     normalizer = Standardize(mean=0, std=2000) if "std" in tmap_name else None
