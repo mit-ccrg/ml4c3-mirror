@@ -151,13 +151,13 @@ def make_aortic_stenosis_binary(threshold: float) -> Callable:
     return tensor_from_file
 
 
-tmap_name = "as_any"
+tmap_name = "as_significant"
 tmaps[tmap_name] = TensorMap(
     name=tmap_name,
-    channel_map={"no_as": 0, "as": 1},
+    channel_map={"no_significant_as": 0, "significant_as": 1},
     interpretation=Interpretation.CATEGORICAL,
     path_prefix=ECHO_PREFIX,
-    tensor_from_file=make_aortic_stenosis_binary(threshold=10),
+    tensor_from_file=make_aortic_stenosis_binary(threshold=20),
     validators=validator_not_all_zero,
     time_series_limit=0,
     time_series_filter=get_echo_dates,
