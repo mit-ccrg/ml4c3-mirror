@@ -159,12 +159,14 @@ def update_tmaps_window(
     if match is None:
         return tmaps
 
+    # fmt: off
     # ecg_2500_std_180_days_pre_echo
     source_name = match[1]         # ecg_2500_std
     offset_days = int(match[2])    # 180
     pre_or_post = match[3]         # pre
     reference_name = match[4]      # echo
     days_between = match[5] or ""  # (empty string)
+    # fmt: on
 
     new_name = (
         f"{source_name}_{offset_days}_days_{pre_or_post}_{reference_name}{days_between}"
@@ -280,7 +282,7 @@ def update_tmaps_window(
             # Remove the matched date from further matching
             source_dates_dt = source_dates_dt.drop(matched_date.index)
 
-        if len(dates) == 0:
+        if len(dates) == 0 and len(day_differences) == 0:
             raise ValueError("No cross referenced dates")
 
         if days_between:

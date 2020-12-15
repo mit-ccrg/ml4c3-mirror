@@ -65,18 +65,35 @@ def _get_sample(
     augment: bool,
     validate: bool,
     normalize: bool,
+    return_nan: bool,
     data: PatientData,
 ) -> Dict[str, np.ndarray]:
     sample = dict()
     for tm in tmaps:
         name = tm.input_name if is_input else tm.output_name
-        sample[name] = tm.postprocess_tensor(
-            tensor=sample_tensors[tm.name],
-            data=data,
-            augment=augment,
-            validate=validate,
-            normalize=normalize,
-        )
+        try:
+            sample[name] = tm.postprocess_tensor(
+                tensor=sample_tensors[tm.name],
+                data=data,
+                augment=augment,
+                validate=validate,
+                normalize=normalize,
+            )
+        except (
+            TypeError,
+            IndexError,
+            KeyError,
+            ValueError,
+            OSError,
+            RuntimeError,
+        ) as exception:
+            if return_nan:
+                nans = np.empty(tm.shape)
+                nans.fill("" if tm.is_language else np.nan)
+                sample[name] = nans
+            else:
+                raise exception
+
     return sample
 
 
@@ -92,6 +109,7 @@ def _tensor_worker(
     augment: bool = False,
     validate: bool = True,
     normalize: bool = True,
+    return_nan: bool = False,
 ):
     tmaps = input_tmaps + output_tmaps
 
@@ -133,19 +151,42 @@ def _tensor_worker(
                     data[csv_name] = df[mask]
 
                 # Load all samples found at ID
+                max_len = 1
                 for tm in tmaps:
-                    _tensor = tm.tensor_from_file(tm, data)
+                    try:
+                        _tensor = tm.tensor_from_file(tm, data)
+                    except (
+                        TypeError,
+                        IndexError,
+                        KeyError,
+                        ValueError,
+                        OSError,
+                        RuntimeError,
+                    ) as exception:
+                        if return_nan:
+                            tensors.append(None)
+                            continue
+                        raise exception
 
                     # If tensor is not dynamically shaped,
                     # wrap in extra dimension to simulate time series with 1 sample
                     if tm.time_series_limit is None:
                         _tensor = np.array([_tensor])
+                    if len(_tensor) > max_len:
+                        max_len = len(_tensor)
                     if tm.linked_tensors:
                         num_linked = len(_tensor)
                     tensors.append(_tensor)
 
+                # If returning nans, replace None with lists of nans of length max_len
+                for i, tm in enumerate(tmaps):
+                    if tensors[i] is None:
+                        nans = np.empty((max_len,) + tm.shape)
+                        nans.fill("" if tm.is_language else np.nan)
+                        tensors[i] = nans
+
                 # Individually yield samples
-                for i in range(len(tensors[0])):
+                for i in range(max_len):
                     sample_tensors = {
                         tm.name: tensor[i] for tm, tensor in zip(tmaps, tensors)
                     }
@@ -157,6 +198,7 @@ def _tensor_worker(
                             augment=augment,
                             validate=validate,
                             normalize=normalize,
+                            return_nan=return_nan,
                             data=data,
                         )
                         out_tensors = _get_sample(
@@ -166,12 +208,14 @@ def _tensor_worker(
                             augment=augment,
                             validate=validate,
                             normalize=normalize,
+                            return_nan=return_nan,
                             data=data,
                         )
                         tensor_queue.put(
                             ((in_tensors, out_tensors), patient_id, num_linked, None),
                         )
                     except (
+                        TypeError,
                         IndexError,
                         KeyError,
                         ValueError,
@@ -188,6 +232,7 @@ def _tensor_worker(
                         continue
                 tensor_queue.put((ID_SUCCEEDED, patient_id, num_linked, None))
             except (
+                TypeError,
                 IndexError,
                 KeyError,
                 ValueError,
@@ -238,6 +283,7 @@ def make_data_generator_factory(
     keep_ids: bool = False,
     debug: bool = False,
     verbose: bool = True,
+    return_nan: bool = False,
 ) -> Tuple[Callable[[], SampleGenerator], StatsWrapper, Cleanup]:
     Method = Thread if debug else Process
     tensor_queue: Queue = Queue(MAX_QUEUE_SIZE)
@@ -271,6 +317,7 @@ def make_data_generator_factory(
                 augment,
                 validate,
                 normalize,
+                return_nan,
             ),
         )
         process.start()
@@ -369,6 +416,7 @@ def make_dataset(
     cache: bool = True,
     debug: bool = False,
     verbose: bool = True,
+    return_nan: bool = False,
 ) -> Tuple[tf.data.Dataset, StatsWrapper, Cleanup]:
     output_types = (
         {
@@ -402,6 +450,7 @@ def make_dataset(
         keep_ids=keep_ids,
         debug=debug,
         verbose=verbose,
+        return_nan=return_nan,
     )
     dataset = (
         tf.data.Dataset.from_generator(
@@ -1057,7 +1106,9 @@ def get_dicts_of_arrays_from_dataset(
     output_data_batches = defaultdict(list)
     id_batches = []
 
-    for batch in dataset:
+    for i, batch in enumerate(dataset):
+        if (i + 1) % 1000 == 0:
+            logging.info(f"Completed batch {i + 1}")
         input_data_batch = batch[BATCH_INPUT_INDEX]
         for input_name, input_tensor in input_data_batch.items():
             input_data_batches[input_name].append(input_tensor.numpy())

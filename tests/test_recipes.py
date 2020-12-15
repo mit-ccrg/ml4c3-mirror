@@ -69,7 +69,7 @@ class TestRecipes:
             for tm in tmaps:
                 row_expected = explore_expected[(row["fpath"], tm)]
                 if _tmap_requires_modification_for_explore(tm):
-                    actual = getattr(row, continuous_explore_header(tm))
+                    actual = getattr(row, continuous_explore_header(tm) + "_mean")
                     assert not np.isnan(actual)
                     continue
                 if tm.is_continuous:

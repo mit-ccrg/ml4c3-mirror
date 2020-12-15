@@ -7,7 +7,7 @@ import logging
 import argparse
 import datetime
 import multiprocessing as mp
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Union, Optional
 from functools import reduce
 from collections import OrderedDict, defaultdict
 
@@ -19,9 +19,15 @@ import seaborn as sns
 
 # Imports: first party
 from ml4c3.plots import SUBPLOT_SIZE
-from ml4c3.datasets import get_train_valid_test_ids
+from ml4c3.datasets import (
+    make_dataset,
+    tensors_to_sources,
+    get_train_valid_test_ids,
+    get_dicts_of_arrays_from_dataset,
+)
 from ml4c3.tensormap.TensorMap import (
     TensorMap,
+    PatientData,
     Interpretation,
     update_tmaps,
     binary_channel_map,
@@ -84,22 +90,32 @@ def explore(
             tmap = _modify_tmap_to_return_mean(tmap=tmap)
         required_tmaps.append(tmap)
 
-    df = _tensors_to_df(
-        tensor_maps_in=required_tmaps,
-        tensors=args.tensors,
-        num_workers=args.num_workers,
-        patient_csv=args.patient_csv,
-        mrn_column_name=args.mrn_column_name,
-        valid_ratio=args.valid_ratio,
-        test_ratio=args.test_ratio,
-        train_csv=args.train_csv,
-        valid_csv=args.valid_csv,
-        test_csv=args.test_csv,
-        output_folder=args.output_folder,
-        export_error=args.explore_export_error,
-        export_fpath=args.explore_export_fpath,
-        export_generator=args.explore_export_generator,
-    )
+    if isinstance(args.tensors, list) and len(args.tensors) > 1:
+        df = _tensors_to_df_with_dataset(
+            tensors=args.tensors,
+            patient_csv=args.patient_csv,
+            mrn_column_name=args.mrn_column_name,
+            tensor_maps_in=required_tmaps,
+            num_workers=args.num_workers,
+            batch_size=args.batch_size,
+        )
+    else:
+        df = _tensors_to_df(
+            tensor_maps_in=required_tmaps,
+            tensors=args.tensors,
+            num_workers=args.num_workers,
+            patient_csv=args.patient_csv,
+            mrn_column_name=args.mrn_column_name,
+            valid_ratio=args.valid_ratio,
+            test_ratio=args.test_ratio,
+            train_csv=args.train_csv,
+            valid_csv=args.valid_csv,
+            test_csv=args.test_csv,
+            output_folder=args.output_folder,
+            export_error=args.explore_export_error,
+            export_fpath=args.explore_export_fpath,
+            export_generator=args.explore_export_generator,
+        )
 
     # Remove redundant columns for binary labels from df
     df = _remove_redundant_cols(tmaps=required_tmaps, df=df)
@@ -1017,6 +1033,67 @@ class TensorsToDataFrameParallelWrapper:
             worker.join()
 
 
+def _tensors_to_df_with_dataset(
+    tensors: Union[str, List[Union[str, Tuple[str, str]]]],
+    patient_csv: str,
+    tensor_maps_in: List[TensorMap],
+    num_workers: int,
+    batch_size: int,
+    mrn_column_name: Optional[str] = None,
+):
+    patient_ids, _, _ = get_train_valid_test_ids(
+        tensors=tensors,
+        mrn_column_name=mrn_column_name,
+        patient_csv=patient_csv,
+        valid_ratio=0,
+        test_ratio=0,
+        allow_empty_split=True,
+    )
+    hd5_sources, csv_sources = tensors_to_sources(tensors, tensor_maps_in)
+    dataset, stats, cleanup = make_dataset(
+        data_split="explore",
+        hd5_sources=hd5_sources,
+        csv_sources=csv_sources,
+        patient_ids=patient_ids,
+        input_tmaps=tensor_maps_in,
+        output_tmaps=[],
+        batch_size=batch_size,
+        num_workers=num_workers,
+        cache=False,
+        augment=False,
+        validate=True,
+        normalize=True,
+        keep_ids=True,
+        verbose=False,
+        return_nan=True,
+    )
+
+    data, _, patient_ids = get_dicts_of_arrays_from_dataset(dataset)
+    logging.info(f"Extracted {len(data[tensor_maps_in[0].input_name])} tensors")
+    cleanup()
+
+    df = pd.DataFrame()
+    df["patientid"] = patient_ids
+    for tm in tensor_maps_in:
+        tensor = data[tm.input_name]
+        if tm.is_language:
+            tensor = tensor.astype(str)
+        if tm.channel_map is not None:
+            for cm, idx in tm.channel_map.items():
+                df[f"{tm.name}_{cm}"] = tensor[:, idx]
+        else:
+            df[tm.name] = tensor[:, 0]
+    logging.info("Reorganized tensors into dataframe")
+
+    # Dataset should return tensors for a single patient in order, however tensors for
+    # many patients may be interleaved. Stable sort by patientid groups tensors for
+    # patients together and preserves order returned.
+    df = df.sort_values("patientid", kind="mergesort")
+    logging.info("Sorted tensors by patient ID")
+
+    return df
+
+
 def _tensors_to_df(
     tensor_maps_in: List[TensorMap],
     tensors: str,
@@ -1122,9 +1199,17 @@ def _modify_tmap_to_return_mean(tmap: TensorMap) -> TensorMap:
     new_tm.shape = (1,)
     new_tm.interpretation = Interpretation.CONTINUOUS
     new_tm.channel_map = None
+    new_tm.validators = None
+    new_tm.augmenters = None
+    new_tm.normalizers = None
+    new_tm.name = f"{tmap.name}_mean"
 
-    def tff(_: TensorMap, hd5: h5py.File):
-        return tmap.tensor_from_file(tmap, hd5).mean()
+    def tff(_: TensorMap, data: PatientData):
+        _tensor = tmap.tensor_from_file(tmap, data)
+        _tensor = tmap.postprocess_tensor(_tensor, data, augment=False)
+        if tmap.time_series_limit is None:
+            return np.array([_tensor.mean()])
+        return _tensor.mean(axis=tuple(range(len(_tensor.shape)))[1:])[:, None]
 
     new_tm.tensor_from_file = tff
     return new_tm
