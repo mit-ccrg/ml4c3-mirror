@@ -23,7 +23,11 @@ from ml4c3.tensormap.ecg import (
     make_voltage_tff,
     get_ecg_age_from_hd5,
 )
+from ml4c3.tensormap.ecg_labels import tmaps as ecg_label_tmaps
 from ml4c3.tensormap.TensorMap import TensorMap
+
+
+DOWNSTREAM_SIZES = 500, 1000, 10000
 
 
 def most_recent_ecg_date(hd5: h5py.File) -> List[str]:
@@ -157,6 +161,7 @@ def get_pretraining_tasks() -> List[TensorMap]:
 
 
 # Downstream tmaps
+# Secondary tasks
 def get_age_tmap() -> TensorMap:
     return TensorMap(
         name="age",
@@ -169,6 +174,34 @@ def get_age_tmap() -> TensorMap:
         validators=RangeValidator(20, 90),
         normalizers=Standardize(54, 21),
     )
+
+
+def get_sex_tmap() -> TensorMap:
+    sex = tmaps["ecg_sex"]
+    sex.time_series_filter = most_recent_ecg_date
+    return sex
+
+
+# Primary tasks
+def get_afib_tmap() -> TensorMap:
+    afib = ecg_label_tmaps["atrial_fibrillation"]
+    afib.time_series_filter = most_recent_ecg_date
+    return afib
+
+
+def get_lvh_tmap() -> TensorMap:
+    lvh = ecg_label_tmaps["lvh"]
+    lvh.time_series_filter = most_recent_ecg_date
+    return lvh
+
+
+def get_downstream_tmaps() -> List[TensorMap]:
+    return [
+        get_age_tmap(),
+        get_sex_tmap(),
+        get_afib_tmap(),
+        get_lvh_tmap(),
+    ]
 
 
 # Data generators
@@ -191,6 +224,35 @@ def get_pretraining_datasets(
     return train_valid_test_datasets(
         [ecg_tmap],
         get_pretraining_tasks(),
+        tensors=hd5_folder,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        train_csv=train_csv,
+        valid_csv=valid_csv,
+        test_csv=test_csv,
+    )
+
+
+def get_downstream_datasets(
+    downstream_tmap: TensorMap,
+    ecg_length: int,
+    augmentation_strengths: Dict[str, float],
+    num_augmentations: int,
+    hd5_folder: str,
+    num_workers: int,
+    batch_size: int,
+    train_csv: str,
+    valid_csv: str,
+    test_csv: str,
+):
+    augmentations = apply_augmentation_strengths(
+        augmentation_strengths,
+        num_augmentations,
+    )
+    ecg_tmap = get_ecg_tmap(ecg_length, augmentations)
+    return train_valid_test_datasets(
+        [ecg_tmap],
+        [downstream_tmap],
         tensors=hd5_folder,
         batch_size=batch_size,
         num_workers=num_workers,
@@ -249,7 +311,17 @@ def demo_augmentations(
         cleanup()
 
 
-def explore_pretraining(
+def get_downstream_csv_name(folder: str, name: str, tmap: TensorMap, size: int) -> str:
+    return os.path.join(folder, f"{name}_{tmap.name}_{size}.csv")
+
+
+def _get_null_check_col(tmap: TensorMap) -> str:
+    if tmap.channel_map is None:
+        return tmap.name
+    return f"{tmap.name}_{list(tmap.channel_map)[0]}"
+
+
+def explore_all_data(
     hd5_folder: str,
     output_folder: str,
     sample_csv: str,
@@ -260,7 +332,11 @@ def explore_pretraining(
     sample_freq_tmap = tmaps["ecg_sampling_frequency_pc_continuous"]
     sample_freq_tmap.time_series_filter = most_recent_ecg_date
 
-    explore_tmaps = [get_ecg_tmap(2500, []), sample_freq_tmap] + get_pretraining_tasks()
+    ecg_tmaps = [get_ecg_tmap(2500, []), sample_freq_tmap]
+    pretraining_tmaps = get_downstream_tmaps()
+    downstream_tmaps = get_downstream_tmaps()
+
+    explore_tmaps = ecg_tmaps + pretraining_tmaps + downstream_tmaps
     df = _tensors_to_df(
         tensor_maps_in=explore_tmaps,
         tensors=hd5_folder,
@@ -284,29 +360,39 @@ def explore_pretraining(
         sep="\t",
     )
 
-    working_sample_ids = df.dropna()["sample_id"].sample(frac=1, random_state=3005)
-    names = (
-        "pretrain_train",
-        "pretrain_valid",
-        "finetune_train",
-        "finetune_valid",
-        "test",
+    shuffled_df = df.sample(frac=1, random_state=3005).dropna(
+        subset=list(map(_get_null_check_col, ecg_tmaps))  # make sure ECG is always present
     )
     sizes = [
-        int(frac * len(working_sample_ids)) for frac in np.cumsum([0.7, 0.1, 0.1, 0.05])
+        # pretrain train, pretrain valid, downstream train, downstream valid, test
+        int(frac * len(shuffled_df)) for frac in np.cumsum([0.0, 0.7, 0.1, 0.1, 0.05, 0.05])
     ]
-    splits = np.split(working_sample_ids, sizes)
-    for name, ids in zip(names, splits):
-        print(f"Writing {len(ids)} {name} ids.")
-        pd.DataFrame({"sample_id": ids}).to_csv(
-            os.path.join(output_folder, f"{name}_ids.csv"),
-            index=False,
+    split_dfs = [shuffled_df.iloc[sizes[i]: sizes[i + 1]] for i in range(len(sizes) - 1)]
+
+    # pretraining data
+    pretraining_cols = list(map(_get_null_check_col, pretraining_tmaps))  # exclude errors in these cols
+    for name, split_df in zip(
+            ["pretrain_train", "pretrain_valid", "pretrain_test"],
+            [split_dfs[0], split_dfs[1], split_dfs[-1]]
+    ):
+        path = os.path.join(output_folder, f"{name}_ids.csv"),
+        print(f"Writing {len(split_df)} {name} ids to {path}.")
+        split_df["sample_id"].dropna(subset=[pretraining_cols]).to_csv(
+            path, index=False,
         )
+    # finetuning data
+    for name, split_df in zip(["downstream_train", "downstream_valid", "downstream_test"], split_dfs[2:]):
+        for tmap in downstream_tmaps:
+            not_null_df = split_df.dropna([_get_null_check_col(tmap)])
+            for size in DOWNSTREAM_SIZES:
+                path = get_downstream_csv_name(name=name, size=size, folder=output_folder, tmap=tmap)
+                print(f"Writing {size} {name} ids to {path}.")
+                not_null_df["sample_id"].iloc[:size].to_csv()
 
 
 MODES: Dict[str, Callable] = {
     "augmentation_demo": demo_augmentations,
-    "explore_pretraining": explore_pretraining,
+    "explore": explore_all_data,
 }
 
 
