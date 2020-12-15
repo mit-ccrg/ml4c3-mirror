@@ -35,9 +35,11 @@ class EarlyStopping(tune.stopper.Stopper):
 
     def __init__(
         self,
-        patience: int,  # number of epochs to wait before stopping
+        patience: int,  # number of epochs without progress to wait before stopping
+        max_epochs: int,  # trial will stop no matter what after this many epochs
     ):
         self.patience = patience
+        self.max_epochs = max_epochs
         self._trial_to_loss: DefaultDict[str, List[float]] = defaultdict(list)
 
     def __call__(self, trial_id, result) -> bool:
@@ -52,6 +54,9 @@ class EarlyStopping(tune.stopper.Stopper):
             return True
         losses = self._trial_to_loss[trial_id]
         losses.append(result["val_loss"])
+        if len(losses) >= self.max_epochs:
+            print(f"Stopping {trial_id} after reaching {self.max_epochs} epochs")
+            return True
         best_loss_idx = np.argmin(losses)
         if best_loss_idx + self.patience < len(losses):
             print(
@@ -343,7 +348,7 @@ def run(
     )
     print(f"Results will appear in {output_folder}")
 
-    stopper = EarlyStopping(patience=patience)
+    stopper = EarlyStopping(patience=patience, max_epochs=epochs)
     analysis = tune.run(
         PretrainingTrainable,
         verbose=1,
