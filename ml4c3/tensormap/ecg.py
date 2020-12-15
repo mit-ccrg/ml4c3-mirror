@@ -923,19 +923,6 @@ for interval, (key, fill, validator, normalizer) in interval_key_map.items():
         )
 
 
-tmap_name = "ecg_weight_lbs"
-tmaps[tmap_name] = TensorMap(
-    name=tmap_name,
-    interpretation=Interpretation.CONTINUOUS,
-    path_prefix=ECG_PREFIX,
-    loss="logcosh",
-    tensor_from_file=make_ecg_tensor(key="weightlbs"),
-    shape=(1,),
-    time_series_limit=0,
-    validators=RangeValidator(100, 800),
-)
-
-
 def get_ecg_age_from_hd5(tm, data):
     ecg_dates = tm.time_series_filter(data)
     dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
@@ -1009,6 +996,12 @@ tmaps["ecg_acquisition_year"] = TensorMap(
 )
 
 
+MIN_HEIGHT_IN = 48
+MAX_HEIGHT_IN = 96
+MIN_WEIGHT_LBS = 60
+MAX_WEIGHT_LBS = 800
+
+
 def ecg_bmi(tm, data):
     ecg_dates = tm.time_series_filter(data)
     dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
@@ -1016,14 +1009,21 @@ def ecg_bmi(tm, data):
     for i, ecg_date in enumerate(ecg_dates):
         path = lambda key: make_hd5_path(tm, ecg_date, key)
         try:
-            weight_lbs = data[path("weightlbs")][()]
-            weight_kg = 0.454 * float(weight_lbs)
-            height_in = data[path("heightin")][()]
-            height_m = 0.0254 * float(height_in)
-            bmi = weight_kg / (height_m * height_m)
-            logging.info(f" Height was {height_in} weight: {weight_lbs} bmi is {bmi}")
+            weight_lbs = float(data[path("weightlbs")][()])
+            height_in = float(data[path("heightin")][()])
+            if (
+                height_in < MIN_HEIGHT_IN
+                or height_in > MAX_HEIGHT_IN
+                or weight_lbs < MIN_WEIGHT_LBS
+                or weight_lbs > MAX_WEIGHT_LBS
+            ):
+                raise ValueError(f"Height/Weight outside valid range")
+
+            weight_kg = 0.454 * weight_lbs
+            height_m = 0.0254 * height_in
+            bmi = weight_kg / (height_m ** 2)
             tensor[i] = bmi
-        except KeyError:
+        except (KeyError, ZeroDivisionError, ValueError):
             pass
     return tensor
 
@@ -1031,9 +1031,71 @@ def ecg_bmi(tm, data):
 tmaps["ecg_bmi"] = TensorMap(
     "ecg_bmi",
     path_prefix=ECG_PREFIX,
-    channel_map={"bmi": 0},
-    tensor_from_file=ecg_bmi,
+    shape=(1,),
     time_series_limit=0,
+    tensor_from_file=ecg_bmi,
+    validators=validator_not_all_zero,
+)
+
+
+tmaps["ecg_bmi_std"] = TensorMap(
+    "ecg_bmi_std",
+    path_prefix=ECG_PREFIX,
+    shape=(1,),
+    time_series_limit=0,
+    tensor_from_file=ecg_bmi,
+    normalizers=Standardize(mean=29, std=6),
+    validators=validator_not_all_zero,
+)
+
+
+tmap_name = "ecg_weight_lbs"
+tmaps[tmap_name] = TensorMap(
+    name=tmap_name,
+    interpretation=Interpretation.CONTINUOUS,
+    path_prefix=ECG_PREFIX,
+    tensor_from_file=make_ecg_tensor(key="weightlbs"),
+    shape=(1,),
+    time_series_limit=0,
+    validators=RangeValidator(MIN_WEIGHT_LBS, MAX_WEIGHT_LBS),
+)
+
+
+tmap_name = "ecg_weight_lbs_std"
+tmaps[tmap_name] = TensorMap(
+    name=tmap_name,
+    interpretation=Interpretation.CONTINUOUS,
+    path_prefix=ECG_PREFIX,
+    tensor_from_file=make_ecg_tensor(key="weightlbs"),
+    shape=(1,),
+    time_series_limit=0,
+    validators=RangeValidator(MIN_WEIGHT_LBS, MAX_WEIGHT_LBS),
+    normalizers=Standardize(mean=182, std=45),
+)
+
+
+tmap_name = "ecg_height_in"
+tmaps[tmap_name] = TensorMap(
+    name=tmap_name,
+    interpretation=Interpretation.CONTINUOUS,
+    path_prefix=ECG_PREFIX,
+    tensor_from_file=make_ecg_tensor(key="heightin"),
+    shape=(1,),
+    time_series_limit=0,
+    validators=RangeValidator(MIN_HEIGHT_IN, MAX_HEIGHT_IN),
+)
+
+
+tmap_name = "ecg_height_in_std"
+tmaps[tmap_name] = TensorMap(
+    name=tmap_name,
+    interpretation=Interpretation.CONTINUOUS,
+    path_prefix=ECG_PREFIX,
+    tensor_from_file=make_ecg_tensor(key="heightin"),
+    shape=(1,),
+    time_series_limit=0,
+    validators=RangeValidator(MIN_HEIGHT_IN, MAX_HEIGHT_IN),
+    normalizers=Standardize(mean=66, std=4),
 )
 
 
