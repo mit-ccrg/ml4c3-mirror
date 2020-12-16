@@ -649,6 +649,37 @@ def test_around_event_tmaps(hd5_data: TEST_DATA):
     assert np.array_equal(original4, tensor4)
 
 
+def test_sliding_window_tmaps(hd5_data: TEST_DATA):
+    hd5, data = hd5_data
+    events = data["events"]
+
+    event_time = min(
+        np.append(
+            events[0]["code_start"].start_date,
+            events[0]["rapid_response_start"].start_date,
+        ),
+    )
+    admin_date = get_unix_timestamps(data["demo"][0].admin_date)
+
+    step = 200
+    window = 50
+    num_of_windows = (
+        int((event_time - window * 60 * 60 - admin_date) / 60 / 60 / step) + 1
+    )
+
+    tm1 = get_around_tmap(
+        f"blood_pressure_systolic_value_{window}_hrs_sliding_window_admin_date_to"
+        f"_arrest_start_date_{step}_hrs_step_min",
+    )
+    tm2 = get_around_tmap(
+        f"{window}_hrs_sliding_window_admin_date_to_arrest_start_date"
+        f"_{step}_hrs_step_12_hrs_prediction",
+    )
+    tensor1 = tm1.tensor_from_file(tm1, hd5)
+    tensor2 = tm2.tensor_from_file(tm2, hd5)
+    assert tensor1.shape[0] == tensor2.shape[0] == num_of_windows
+
+
 def test_signal_metrics_tmaps(hd5_data: TEST_DATA):
     hd5, data = hd5_data
     measurements = data["measurements"]

@@ -127,11 +127,11 @@ def make_model(args):
         hyperparameters = {}
         if args.mode == "train_sklearn_logreg":
             if args.l1 == 0 and args.l2 == 0:
-                args.c = 1e7
+                c = 1e7
             else:
-                args.c = 1 / (args.l1 + args.l2)
-            hyperparameters["c"] = args.c
-            hyperparameters["l1_ratio"] = args.c * args.l1
+                c = 1 / (args.l1 + args.l2)
+            hyperparameters["c"] = c
+            hyperparameters["l1_ratio"] = c * args.l1
         elif args.mode == "train_sklearn_svm":
             hyperparameters["c"] = args.c
         elif args.mode == "train_sklearn_randomforest":

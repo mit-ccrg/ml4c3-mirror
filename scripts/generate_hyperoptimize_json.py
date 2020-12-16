@@ -38,12 +38,13 @@ def generate_hyperoptimize_json(parameters: Dict[str, List[Any]], path_json: str
     print(f"Saved hyperoptimize json file at: {path_json}")
 
 
-def generate_hyperoptimize_json_arrest(path_json: str):
+def generate_hyperoptimize_json_arrest(path_json: str, model_type: str):
     """
     Generates and saves a dictionary with parameter values to hyperoptimize as a
     .json file. This file is used by the hyperoptimize recipe.
 
     :param path_json: <str> Full path where the .json file will be saved.
+    :param model_type: <str> Model type to create the set of hyperparameters.
     """
     tmaps: Dict[str, TensorMap] = {}
 
@@ -53,28 +54,32 @@ def generate_hyperoptimize_json_arrest(path_json: str):
             tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
 
     windows = [
-        (1, 73, 24),
-        (1, 73, 48),
-        (1, 73, 72),
-        (1, 97, 24),
-        (1, 97, 48),
-        (1, 97, 72),
+        (1, 24, 24),
+        (1, 24, 48),
+        (1, 24, 72),
+        (1, 48, 24),
+        (1, 48, 48),
+        (1, 48, 72),
     ]
     signals = [
-        "blood_pressure_systolic",
-        "blood_pressure_diastolic",
-        "respirations",
-        "pulse",
-        "temperature",
-        "urine_output",
-        "calcium",
-        "sodium",
-        "potassium",
-        "chloride",
-        "bun",
-        "creatinine",
-        "wbc",
-        "hgb",
+        "blood_pressure_systolic_value",
+        "blood_pressure_diastolic_value",
+        "respirations_value",
+        "pulse_value",
+        "temperature_value",
+        "urine_output_value",
+        "calcium_value",
+        "sodium_value",
+        "potassium_value",
+        "chloride_value",
+        "bun_value",
+        "creatinine_value",
+        "wbc_value",
+        "hgb_value",
+        "glucose_value",
+        "anion_gap_value",
+        "ppi_value",
+        "ppt_value",
     ]
     features = [
         "min",
@@ -90,26 +95,111 @@ def generate_hyperoptimize_json_arrest(path_json: str):
     input_tensors_set: List[List[str]] = []
     for T1, T2, T3 in windows:
         input_tmaps = []
+        window = (
+            f"{T1}_hrs_pre_arrest_start_date_{T2}_hrs_post_admin_date_{T3}_hrs_window"
+        )
         for signal in signals:
             for feature in features:
-                input_tmaps.append(
-                    f"{signal}_value_{T1}_and_{T2}_hrs_pre_arrest_start_date"
-                    f"_{T3}_hrs_window_{feature}",
-                )
-        input_tensors_set.append(input_tmaps)
-    for T1, T2, T3 in [windows[0], windows[3]]:
-        input_tmaps = []
-        for signal in signals:
-            input_tmaps.append(
-                f"{signal}_value_{T1}_and_{T2}_hrs_pre_arrest_start_date"
-                f"_{T3}_hrs_window_last",
-            )
+                input_tmaps.append(f"{signal}_{window}_{feature}")
+        input_tmaps.append("age_first_visit_arrest_start_date_double")
+        input_tmaps.append(f"length_of_stay_{T1}_hrs_pre_arrest_start_date")
         input_tensors_set.append(input_tmaps)
     for tmap_list in input_tensors_set:
         for tmap_name in tmap_list:
             tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
 
+    parameters: Dict[str, List[Any]] = generate_model_dict(model_type)
+    parameters.update(
+        {
+            "input_tensors": input_tensors_set,
+            "output_tensors": output_tensors_set,
+            "patient_csv": [
+                "/media/ml4c3/cohorts_lists/rr-and-codes.csv",
+                "/media/ml4c3/cohorts_lists/rr-and-codes-non-icu.csv",
+            ],
+        },
+    )
+
+    generate_hyperoptimize_json(parameters=parameters, path_json=path_json)
+
+
+def generate_model_dict(model_type: str):
+    if model_type == "deep_nn":
+        parameters = generate_nn_dict()
+    elif model_type == "keras_logreg":
+        parameters = generate_keras_logreg_dict()
+    elif model_type == "slearn_logreg":
+        parameters = generate_sklearn_logreg_dict()
+    elif model_type == "svm":
+        parameters = generate_svm_dict()
+    elif model_type == "randomforest":
+        parameters = generate_randomforest_dict()
+    elif model_type == "xgboost":
+        parameters = generate_xgboost_dict()
+    else:
+        raise ValueError(f"Wrong model type: {model_type}")
+    return parameters
+
+
+def generate_sklearn_logreg_dict():
     parameters: Dict[str, List[Any]] = {
+        "mode": ["train_sklearn_logreg"],
+        # Model Architecture Parameters
+        "l1": [0.0, 0.01, 0.02],
+        "l2": [0.0, 0.01, 0.02],
+        # Training Parameters
+        "valid_ratio": [0.2],
+        "test_ratio": [0.1],
+    }
+    return parameters
+
+
+def generate_svm_dict():
+    parameters: Dict[str, List[Any]] = {
+        "mode": ["train_sklearn_svm"],
+        # Model Architecture Parameters
+        "c": [0.0, 0.01, 0.04, 0.08, 0.10],
+        # Training Parameters
+        "valid_ratio": [0.2],
+        "test_ratio": [0.1],
+    }
+    return parameters
+
+
+def generate_randomforest_dict():
+    parameters: Dict[str, List[Any]] = {
+        "mode": ["train_sklearn_randomforest"],
+        # Model Architecture Parameters
+        "n_estimators": [40, 60, 80, 100, 120, 140],
+        "max_depth": [3, 5, 7, 9, 12],
+        "min_samples_split": [5],
+        "min_samples_leaf": [8],
+        # Training Parameters
+        "valid_ratio": [0.2],
+        "test_ratio": [0.1],
+    }
+    return parameters
+
+
+def generate_xgboost_dict():
+    parameters: Dict[str, List[Any]] = {
+        "mode": ["train_sklearn_xgboost"],
+        # Model Architecture Parameters
+        "gamma": [0.0, 0.02, 0.06, 0.1, 0.2],
+        "l1": [0.0, 0.01, 0.02],
+        "l2": [0.0, 0.01, 0.02],
+        "n_estimators": [40, 60, 80, 100, 120, 140],
+        "max_depth": [3, 5, 7, 9, 12],
+        # Training Parameters
+        "valid_ratio": [0.2],
+        "test_ratio": [0.1],
+    }
+    return parameters
+
+
+def generate_nn_dict():
+    parameters: Dict[str, List[Any]] = {
+        "mode": ["train"],
         # Model Architecture Parameters
         "activation": ["relu"],
         "block_size": [3],
@@ -147,137 +237,14 @@ def generate_hyperoptimize_json_arrest(path_json: str):
         "anneal_rate": [0.0],
         "anneal_shift": [0.0],
         "anneal_max": [2.0],
-        # Other parameters
-        "input_tensors": input_tensors_set,
-        "output_tensors": output_tensors_set,
-        "patient_csv": [
-            "/media/ml4c3/cohorts_lists/rr-and-codes.csv",
-            "/media/ml4c3/cohorts_lists/rr-and-codes-non-icu.csv",
-        ],
     }
+    return parameters
 
-    generate_hyperoptimize_json(parameters=parameters, path_json=path_json)
 
-
-def generate_hyperoptimize_json_arrest(path_json: str):
-    """
-    Generates and saves a dictionary with parameter values to hyperoptimize as a
-    .json file. This file is used by the hyperoptimize recipe.
-
-    :param path_json: <str> Full path where the .json file will be saved.
-    """
-    tmaps: Dict[str, TensorMap] = {}
-
-    output_tensors_set: List[List[str]] = [["arrest_double"]]
-    for tmap_list in output_tensors_set:
-        for tmap_name in tmap_list:
-            tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
-
-    windows = [
-        (1, 73, 24),
-        (1, 73, 48),
-        (1, 73, 72),
-        (1, 97, 24),
-        (1, 97, 48),
-        (1, 97, 72),
-    ]
-    signals = [
-        "blood_pressure_systolic",
-        "blood_pressure_diastolic",
-        "respirations",
-        "pulse",
-        "temperature",
-        "urine_output",
-        "calcium",
-        "sodium",
-        "potassium",
-        "chloride",
-        "bun",
-        "creatinine",
-        "wbc",
-        "hgb",
-    ]
-    features = [
-        "min",
-        "max",
-        "mean",
-        "std",
-        "first",
-        "last",
-        "count",
-        # "mean_slope",
-        # "mean_crossing_rate",
-    ]
-    input_tensors_set: List[List[str]] = []
-    for T1, T2, T3 in windows:
-        input_tmaps = []
-        for signal in signals:
-            for feature in features:
-                input_tmaps.append(
-                    f"{signal}_value_{T1}_and_{T2}_hrs_pre_arrest_start_date"
-                    f"_{T3}_hrs_window_{feature}",
-                )
-        input_tensors_set.append(input_tmaps)
-    for T1, T2, T3 in [windows[0], windows[3]]:
-        input_tmaps = []
-        for signal in signals:
-            input_tmaps.append(
-                f"{signal}_value_{T1}_and_{T2}_hrs_pre_arrest_start_date"
-                f"_{T3}_hrs_window_last",
-            )
-        input_tensors_set.append(input_tmaps)
-    for tmap_list in input_tensors_set:
-        for tmap_name in tmap_list:
-            tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
-
-    parameters: Dict[str, List[Any]] = {
-        # Model Architecture Parameters
-        "activation": ["relu"],
-        "block_size": [3],
-        "conv_layers": [[32]],
-        "conv_x": [[3]],
-        "conv_y": [[3]],
-        "conv_z": [[2]],
-        "conv_dilate": [False],
-        "conv_dropout": [0.0],
-        "conv_regularize": ["dropout"],  # dropout, spatial_dropout
-        "conv_type": ["conv"],  # conv, separable, depth
-        "dense_blocks": [[32, 24, 16]],
-        "dense_layers": [[16, 64]],
-        "directly_embed_and_repeat": [None],  # None or int
-        "dropout": [0.0, 0.05],
-        "layer_normalization": [None],
-        "layer_order": [["normalization", "activation", "regularization"]],
-        "pool_after_final_dense_bloack": [True],
-        "pool_type": ["max"],  # max, average
-        "pool_x": [2],
-        "pool_y": [2],
-        "pool_z": [1],
-        # Training Parameters
-        "epochs": [200],
-        "batch_size": [64],
-        "valid_ratio": [0.2],
-        "test_ratio": [0.1],
-        "learning_rate": [0.0002],
-        "learning_rate_patience": [8],
-        "learning_rate_reduction": [0.5],
-        "mixup_alpha": [0],
-        "patience": [24],
-        "optimizer": ["adam"],
-        "learning_rate_schedule": [None],  # None, triangular, triangular2
-        "anneal_rate": [0.0],
-        "anneal_shift": [0.0],
-        "anneal_max": [2.0],
-        # Other parameters
-        "input_tensors": input_tensors_set,
-        "output_tensors": output_tensors_set,
-        "patient_csv": [
-            "/media/ml4c3/cohorts_lists/rr-and-codes.csv",
-            "/media/ml4c3/cohorts_lists/rr-and-codes-non-icu.csv",
-        ],
-    }
-
-    generate_hyperoptimize_json(parameters=parameters, path_json=path_json)
+def generate_keras_logreg_dict():
+    # TODO
+    parameters = {}
+    return parameters
 
 
 def _ensure_even_number(num: int) -> int:
@@ -437,10 +404,23 @@ def parse_arguments():
         choices=["arrest"],
         help="Cohort of patients that you want to create the json file for.",
     )
+    parser.add_argument(
+        "--model",
+        type=str,
+        choices=[
+            "deep_nn",
+            "keras_logreg",
+            "sklrean_logreg",
+            "svm",
+            "randomforest",
+            "xgboost",
+        ],
+        help="Model type.",
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_arguments()
     if args.cohort == "arrest":
-        generate_hyperoptimize_json_arrest(args.hyperoptimize_config_file)
+        generate_hyperoptimize_json_arrest(args.hyperoptimize_config_file, args.model)

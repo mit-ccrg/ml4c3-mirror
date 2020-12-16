@@ -564,13 +564,6 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
         tmaps[tmap_name] = tm
         return tmaps
 
-    # ICU Around event explore tmaps
-    from ml4c3.tensormap.icu_around_event_explore import get_tmap as tmaps_icu_around_explore # isort: skip
-    tm = tmaps_icu_around_explore(tmap_name)
-    if tm:
-        tmaps[tmap_name] = tm
-        return tmaps
-
     # ICU ECG features tmaps
     from ml4c3.tensormap.icu_ecg_features import get_tmap as tmaps_icu_ecg_features # isort: skip
     tm = tmaps_icu_ecg_features(tmap_name)
@@ -595,13 +588,6 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
     # ICU Standardized tmaps
     from ml4c3.tensormap.icu_normalized import get_tmap as tmaps_icu_normalized # isort: skip
     tm = tmaps_icu_normalized(tmap_name)
-    if tm:
-        tmaps[tmap_name] = tm
-        return tmaps
-
-    # ICU Static around event tmaps
-    from ml4c3.tensormap.icu_static_around_event import get_tmap as tmaps_icu_static_around_event # isort: skip
-    tm = tmaps_icu_static_around_event(tmap_name)
     if tm:
         tmaps[tmap_name] = tm
         return tmaps

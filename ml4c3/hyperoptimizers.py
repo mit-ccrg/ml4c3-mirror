@@ -122,12 +122,13 @@ def hyperparameter_optimizer(
                 train_csv=args.train_csv,
                 valid_csv=args.valid_csv,
                 test_csv=args.test_csv,
-                output_folder=trial_path,
+                output_folder=args.output_folder,
                 cache=args.cache,
                 mixup_alpha=args.mixup_alpha,
                 debug=args.debug,
             )
             train_dataset, valid_dataset, test_dataset = datasets
+
             train_results = train_model_from_datasets(
                 model=model,
                 tensor_maps_in=args.tensor_maps_in,

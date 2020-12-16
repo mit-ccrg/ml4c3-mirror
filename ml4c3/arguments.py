@@ -236,7 +236,8 @@ def parse_args() -> argparse.Namespace:
     )
     icu_parser.add_argument(
         "--path_xref",
-        help="Path to CSV file cross referencing MRN and CSNs with Bedmaster .mat files.",
+        help="Path to CSV file cross referencing MRN and CSNs with Bedmaster .mat"
+        " files.",
     )
     icu_parser.add_argument(
         "--departments",
@@ -245,13 +246,14 @@ def parse_args() -> argparse.Namespace:
     )
     icu_parser.add_argument(
         "--staging_dir",
-        help="Directory to store temporary files created during tensorization pipeline.",
+        help="Directory to store temporary files created during tensorization.",
     )
     icu_parser.add_argument(
         "--staging_batch_size",
         type=int,
         default=1,
-        help="Number of patients to process locally before being moved to final location.",
+        help="Number of patients to process locally before being moved to final "
+        "location.",
     )
     icu_parser.add_argument(
         "--adt_start_index",
@@ -276,7 +278,7 @@ def parse_args() -> argparse.Namespace:
     icu_parser.add_argument(
         "--overwrite",
         action="store_true",
-        help="Bool indicating whether existing EDW and hd5 files should be overwritten.",
+        help="Overwrite existing EDW and hd5 files during tensorization.",
     )
     icu_parser.add_argument(
         "--allow_one_source",
@@ -427,18 +429,6 @@ def parse_args() -> argparse.Namespace:
         help="If set, directly embed input tensors (without passing to a dense layer)"
         " into concatenation layer, and repeat each input N times, where N is this"
         " argument's value. To directly embed a feature without repetition, set to 1.",
-    )
-    model_parser.add_argument(
-        "--l1",
-        default=0.0,
-        type=float,
-        help="L1 value for regularizing the kernel and bias of each layer.",
-    )
-    model_parser.add_argument(
-        "--l2",
-        default=0.0,
-        type=float,
-        help="L2 value for regularizing the kernel and bias of each layer.",
     )
     model_parser.add_argument(
         "--layer_normalization",
@@ -628,15 +618,21 @@ def parse_args() -> argparse.Namespace:
         type=float,
         help="Annealing maximum value",
     )
+    training_parser.add_argument(
+        "--l1",
+        default=0.0,
+        type=float,
+        help="L1 value for regularizing the kernel and bias of each layer.",
+    )
+    training_parser.add_argument(
+        "--l2",
+        default=0.0,
+        type=float,
+        help="L2 value for regularizing the kernel and bias of each layer.",
+    )
 
     # Train Shallow arguments
     train_shallow_parser = argparse.ArgumentParser(add_help=False)
-    train_shallow_parser.add_argument(
-        "--c",
-        type=float,
-        default=0.01,
-        help="Regularization strength",
-    )
     train_shallow_parser.add_argument(
         "--n_estimators",
         type=int,
@@ -648,6 +644,13 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=5,
         help="Maximum depth of tree-based classifier",
+    )
+    train_shallow_parser.add_argument(
+        "--c",
+        type=float,
+        default=1e9,
+        help="Inverse of regularization strength; must be a positive float. "
+        "Smaller values specify stronger regularization",
     )
     train_shallow_parser.add_argument(
         "--min_samples_split",
@@ -685,7 +688,6 @@ def parse_args() -> argparse.Namespace:
         name="train_keras_logreg",
         description="TODO",
         parents=[
-            model_parser,
             training_parser,
             train_shallow_parser,
             io_parser,
@@ -697,7 +699,6 @@ def parse_args() -> argparse.Namespace:
         name="train_sklearn_logreg",
         description="TODO",
         parents=[
-            model_parser,
             training_parser,
             train_shallow_parser,
             io_parser,
@@ -709,7 +710,6 @@ def parse_args() -> argparse.Namespace:
         name="train_sklearn_svm",
         description="TODO",
         parents=[
-            model_parser,
             training_parser,
             train_shallow_parser,
             io_parser,
@@ -721,7 +721,6 @@ def parse_args() -> argparse.Namespace:
         name="train_sklearn_randomforest",
         description="TODO",
         parents=[
-            model_parser,
             training_parser,
             train_shallow_parser,
             io_parser,
@@ -733,7 +732,6 @@ def parse_args() -> argparse.Namespace:
         name="train_sklearn_xgboost",
         description="TODO",
         parents=[
-            model_parser,
             training_parser,
             train_shallow_parser,
             io_parser,

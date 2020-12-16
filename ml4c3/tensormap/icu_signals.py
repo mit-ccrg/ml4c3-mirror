@@ -703,7 +703,7 @@ def make_measurement_array_tensor_from_file():
     return _tensor_from_file
 
 
-def make_bp_array_tensor_from_file(position):
+def make_bp_array_tensor_from_file(position: int = None):
     def _tensor_from_file(tm, hd5, **kwargs):
         visits = get_visits(tm, hd5, **kwargs)
 
@@ -724,8 +724,14 @@ def make_bp_array_tensor_from_file(position):
                 for index, value in enumerate(values):
                     if value == "nan":
                         tensor[i][0][index] = value
+                    elif position is not None:
+                        pressures = [float(pressure) for pressure in value.split("/")]
+                        tensor[i][0][index] = pressures[position]
                     else:
-                        tensor[i][0][index] = float(value.split("/")[position])
+                        pressures = [float(pressure) for pressure in value.split("/")]
+                        tensor[i][0][index] = (
+                            pressures[0] - pressures[-1]
+                        ) / pressures[0]
                 unix_array = hd5[f"{path}/time"][()]
                 if flag_dates:
                     tensor[i][1][: unix_array.shape[0]] = get_local_timestamps(
@@ -744,10 +750,14 @@ def make_bp_array_tensor_from_file(position):
                 path = tm.path_prefix.replace("*", visit)
                 values = hd5[path][()].astype(str)
                 for index, value in enumerate(values):
-                    if value == "nan":
+                    if value == "nan" or tm.interpretation == Interpretation.EVENT:
                         tensor[i][index] = value
+                    elif position is not None:
+                        pressures = [float(pressure) for pressure in value.split("/")]
+                        tensor[i][index] = pressures[position]
                     else:
-                        tensor[i][index] = int(value.split("/")[position])
+                        pressures = [float(pressure) for pressure in value.split("/")]
+                        tensor[i][index] = (pressures[0] - pressures[-1]) / pressures[0]
         else:
             raise ValueError(
                 f"Incorrect interpretation '{tm.interpretation}' for measurement tmap.",
@@ -824,6 +834,31 @@ def create_measurement_tmap(tm_name: str, measurement_name: str, measurement_typ
                 interpretation=Interpretation.LANGUAGE,
                 tensor_from_file=make_measurement_attribute_tensor_from_file("units"),
                 path_prefix=f"edw/*/{measurement_type}/{measurement_name}",
+            )
+    elif "ppi" in measurement_name:
+        if tm_name == f"{measurement_name}_timeseries":
+            tm = TensorMap(
+                name=tm_name,
+                shape=(None, 2, None),
+                interpretation=Interpretation.TIMESERIES,
+                tensor_from_file=make_bp_array_tensor_from_file(),
+                path_prefix=f"edw/*/{measurement_type}/blood_pressure",
+            )
+        elif tm_name == f"{measurement_name}_value":
+            tm = TensorMap(
+                name=tm_name,
+                shape=(None, None),
+                interpretation=Interpretation.CONTINUOUS,
+                tensor_from_file=make_bp_array_tensor_from_file(),
+                path_prefix=f"edw/*/{measurement_type}/blood_pressure/value",
+            )
+        elif tm_name == f"{measurement_name}_time":
+            tm = TensorMap(
+                name=tm_name,
+                shape=(None, None),
+                interpretation=Interpretation.EVENT,
+                tensor_from_file=make_bp_array_tensor_from_file(),
+                path_prefix=f"edw/*/{measurement_type}/blood_pressure/time",
             )
     else:
         if tm_name == f"{measurement_name}_timeseries":
@@ -1038,8 +1073,17 @@ def create_length_of_stay_tmap():
     return tmap
 
 
-def admin_age_tensor_from_file(tm: TensorMap, data: PatientData) -> np.ndarray:
-    visits = tm.time_series_filter(data)
+def admin_age_tensor_from_file(
+    tm: TensorMap, data: PatientData, **kwargs
+) -> np.ndarray:
+
+    if "visits" in kwargs:
+        visits = kwargs["visits"]
+        if isinstance(visits, str):
+            visits = [visits]
+    else:
+        visits = tm.time_series_filter(data)
+
     shape = (len(visits),) + tm.shape
     tensor = np.zeros(shape)
 
@@ -1095,8 +1139,15 @@ def create_sex_double_tmap():
 
 
 def make_static_tensor_from_file(key: str) -> Callable:
-    def _tensor_from_file(tm: TensorMap, data: PatientData) -> np.ndarray:
-        visits = tm.time_series_filter(data)
+    def _tensor_from_file(tm: TensorMap, data: PatientData, **kwargs) -> np.ndarray:
+        unix_dates = kwargs.get("unix_dates")
+        if "visits" in kwargs:
+            visits = kwargs["visits"]
+            if isinstance(visits, str):
+                visits = [visits]
+        else:
+            visits = tm.time_series_filter(data)
+
         temp = None
         finalize = False
         if tm.is_timeseries:
@@ -1106,9 +1157,9 @@ def make_static_tensor_from_file(key: str) -> Callable:
         else:
             shape = (len(visits),) + tm.shape
 
-        if tm.is_categorical or tm.is_continuous:
+        if tm.is_categorical or tm.is_continuous or (tm.is_event and unix_dates):
             tensor = np.zeros(shape)
-        elif tm.is_language or tm.is_event:
+        elif tm.is_language or (tm.is_event and not unix_dates):
             tensor = np.full(shape, "", object)
             finalize = True
         elif tm.is_timeseries and temp is not None:
@@ -1126,6 +1177,8 @@ def make_static_tensor_from_file(key: str) -> Callable:
                 value = data[path].attrs[key] if temp is None else temp[i]
                 if tm.channel_map:
                     tensor[i, tm.channel_map[value.lower()]] = 1
+                elif tm.is_event and unix_dates:
+                    tensor[i] = get_unix_timestamps(value)
                 else:
                     tensor[i] = value
             except (ValueError, KeyError) as e:
