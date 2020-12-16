@@ -15,6 +15,8 @@ from data import (
     augmentation_dict,
     get_pretraining_tasks,
     get_pretraining_datasets,
+    get_downstream_datasets,
+    downstream_tmap_from_name,
 )
 from regnet import ML4C3Regnet
 from tensorflow import config as tf_config
@@ -105,6 +107,50 @@ def build_pretraining_model(
     )  # following RegNet's setup
     model({input_name: Input(shape=(ecg_length, 12))})  # initialize model
     model.compile(loss=[tm.loss for tm in tmaps_out], optimizer=optimizer)
+    return model
+
+
+def build_downstream_model(
+    downstream_tmap_name: str,
+    ecg_length: int,
+    kernel_size: int,
+    group_size: int,
+    depth: int,
+    initial_width: int,
+    width_growth_rate: int,
+    width_quantization: float,
+    decay_steps: int,  # optimizer settings
+    learning_rate: float,
+    model_file: str = None,
+    **kwargs,
+):
+    tmap = downstream_tmap_from_name(downstream_tmap_name)
+    input_name = get_ecg_tmap(0, []).input_name
+    output_name_to_shape = {tmap.output_name: tmap.shape[0]}
+    model = ML4C3Regnet(
+        kernel_size,
+        group_size,
+        depth,
+        initial_width,
+        width_growth_rate,
+        width_quantization,
+        input_name,
+        output_name_to_shape,
+    )
+    lr_schedule = CosineDecay(
+        initial_learning_rate=learning_rate,
+        decay_steps=decay_steps,
+    )
+    optimizer = SGDW(
+        learning_rate=lr_schedule,
+        momentum=0.9,
+        weight_decay=5 * 5e-5,
+    )  # following RegNet's setup
+    model({input_name: Input(shape=(ecg_length, 12))})  # initialize model
+    model.compile(loss=[tmap.loss], optimizer=optimizer)
+    if model_file is not None:
+        print(f"Loading model weights from {model_file}")
+        model.load_weights(model_file, skip_mismatch=True)  # load all weights besides new last layer
     return model
 
 
@@ -216,7 +262,72 @@ def _test_build_pretraining_model_bad_group_size():
     assert "val_loss" in history.history
 
 
-class PretrainingTrainable(tune.Trainable):
+def _test_build_downstream_model():
+    m = build_downstream_model(
+        downstream_tmap_name="age",
+        decay_steps=10,
+        ecg_length=100,
+        kernel_size=3,
+        group_size=2,
+        depth=10,
+        initial_width=8,
+        width_growth_rate=2,
+        width_quantization=1.5,
+        learning_rate=1e-5,
+    )
+    m.summary()
+    dummy_in = {m.input_name: np.zeros((10, 100, 12))}
+    dummy_out = {"output_age_continuous": (10, 1)}
+    history = m.fit(
+        dummy_in,
+        dummy_out,
+        batch_size=2,
+        validation_data=(dummy_in, dummy_out),
+    )
+    assert "val_loss" in history.history
+
+
+def _test_build_downstream_model_pretrained():
+    m = _build_test_model()
+    m.summary()
+    dummy_in = {m.input_name: np.zeros((10, 100, 12))}
+    dummy_out = {
+        tm.output_name: np.zeros((10,) + tm.shape) for tm in get_pretraining_tasks()
+    }
+    history = m.fit(
+        dummy_in,
+        dummy_out,
+        batch_size=2,
+        validation_data=(dummy_in, dummy_out),
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = save_model(tmpdir, m)
+        downstream = build_downstream_model(
+            downstream_tmap_name="age",
+            model_file=path,
+            decay_steps=10,
+            ecg_length=100,
+            kernel_size=3,
+            group_size=2,
+            depth=10,
+            initial_width=8,
+            width_growth_rate=2,
+            width_quantization=1.5,
+            learning_rate=1e-5,
+        )
+    downstream.summary()
+    dummy_in = {m.input_name: np.zeros((10, 100, 12))}
+    dummy_out = {"output_age_continuous": (10, 1)}
+    history = downstream.fit(
+        dummy_in,
+        dummy_out,
+        batch_size=2,
+        validation_data=(dummy_in, dummy_out),
+    )
+    assert "val_loss" in history.history
+
+
+class RegNetTrainable(tune.Trainable):
     def setup(self, config):
         # Imports: third party
         import tensorflow as tf  # necessary for ray tune
@@ -234,21 +345,36 @@ class PretrainingTrainable(tune.Trainable):
             if "strength" in name
         }
 
-        datasets, stats, cleanups = get_pretraining_datasets(
-            ecg_length=config["ecg_length"],
-            augmentation_strengths=augmentation_strengths,
-            num_augmentations=config["num_augmentations"],
-            hd5_folder=config["hd5_folder"],
-            num_workers=config["num_workers"],
-            batch_size=BATCH_SIZE,
-            train_csv=config["train_csv"],
-            valid_csv=config["valid_csv"],
-            test_csv=config["test_csv"],
-        )
+        downstream_tmap_name = config.get("downstream_tmap_name", False)
+        if downstream_tmap_name:  # downstream training
+            size = config.get("downstream_size", False)
+            assert size
+            datasets, stats, cleanups = get_downstream_datasets(
+                downstream_tmap_name=downstream_tmap_name,
+                downstream_size=size,
+                ecg_length=config["ecg_length"],
+                augmentation_strengths=augmentation_strengths,
+                num_augmentations=config["num_augmentations"],
+                hd5_folder=config["hd5_folder"],
+                num_workers=config["num_workers"],
+                batch_size=BATCH_SIZE,
+                csv_folder=config["csv_folder"],
+            )
+            self.model = build_downstream_model(**config)
+        else:  # pretraining
+            datasets, stats, cleanups = get_pretraining_datasets(
+                ecg_length=config["ecg_length"],
+                augmentation_strengths=augmentation_strengths,
+                num_augmentations=config["num_augmentations"],
+                hd5_folder=config["hd5_folder"],
+                num_workers=config["num_workers"],
+                batch_size=BATCH_SIZE,
+                csv_folder=config["csv_folder"],
+            )
+            self.model = build_pretraining_model(**config)
         self.cleanups = cleanups
         self.train_dataset, self.valid_dataset, _ = datasets
 
-        self.model = build_pretraining_model(**config)
         print(
             f"Model has {count_params(self.model.trainable_weights)} trainable parameters",
         )
@@ -300,7 +426,7 @@ def run(
         for aug_name in augmentation_dict()
         if "roll" not in aug_name
     }
-    augmentation_params["roll_strength"] = 1.0
+    augmentation_params["roll_strength"] = tune.randint(0, 2)  # either 0 or 1
     augmentation_params["num_augmentations"] = tune.randint(0, len(augmentation_dict()))
 
     model_params = {
@@ -350,7 +476,7 @@ def run(
 
     stopper = EarlyStopping(patience=patience, max_epochs=epochs)
     analysis = tune.run(
-        PretrainingTrainable,
+        RegNetTrainable,
         verbose=1,
         num_samples=num_trials,  # how many hyperparameter trials
         search_alg=bohb_search,
@@ -369,18 +495,8 @@ def run(
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--train_csv",
-        help="Path to CSV with Sample IDs to reserve for training.",
-        required=True,
-    )
-    parser.add_argument(
-        "--valid_csv",
-        help=("Path to CSV with Sample IDs to reserve for validation"),
-        required=True,
-    )
-    parser.add_argument(
-        "--test_csv",
-        help=("Path to CSV with Sample IDs to reserve for testing."),
+        "--csv_folder",
+        help="Path to folder containing sample CSVs",
         required=True,
     )
     parser.add_argument(

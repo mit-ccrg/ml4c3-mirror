@@ -9,7 +9,6 @@ import h5py
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
-from sklearn.model_selection import train_test_split
 
 # Imports: first party
 from ml4c3.datasets import train_valid_test_datasets
@@ -27,7 +26,9 @@ from ml4c3.tensormap.ecg_labels import tmaps as ecg_label_tmaps
 from ml4c3.tensormap.TensorMap import TensorMap
 
 
+PRETRAIN_NAMES = "pretrain_train", "pretrain_valid", "pretrain_test"
 DOWNSTREAM_SIZES = 500, 1000, 10000
+DOWNSTREAM_NAMES = "downstream_train", "downstream_valid", "downstream_test"
 
 
 def most_recent_ecg_date(hd5: h5py.File) -> List[str]:
@@ -69,6 +70,8 @@ def gaussian_noise(ecg, strength):
 
 
 def roll(ecg, strength):
+    if strength == 0:
+        return ecg
     amount = np.random.randint(ecg.shape[0])
     return np.roll(ecg, amount, axis=0)
 
@@ -212,53 +215,60 @@ def get_pretraining_datasets(
     hd5_folder: str,
     num_workers: int,
     batch_size: int,
-    train_csv: str,
-    valid_csv: str,
-    test_csv: str,
+    csv_folder: str,
 ):
     augmentations = apply_augmentation_strengths(
         augmentation_strengths,
         num_augmentations,
     )
     ecg_tmap = get_ecg_tmap(ecg_length, augmentations)
+    csvs = get_pretrain_csv_paths(csv_folder)
     return train_valid_test_datasets(
         [ecg_tmap],
         get_pretraining_tasks(),
         tensors=hd5_folder,
         batch_size=batch_size,
         num_workers=num_workers,
-        train_csv=train_csv,
-        valid_csv=valid_csv,
-        test_csv=test_csv,
+        train_csv=csvs[0],
+        valid_csv=csvs[1],
+        test_csv=csvs[2],
+    )
+
+
+def downstream_tmap_from_name(name: str) -> TensorMap:
+    return next(
+        tmap for tmap in get_downstream_tmaps()
+        if tmap.name == name
     )
 
 
 def get_downstream_datasets(
-    downstream_tmap: TensorMap,
+    downstream_tmap_name: str,
+    downstream_size: int,
     ecg_length: int,
     augmentation_strengths: Dict[str, float],
     num_augmentations: int,
     hd5_folder: str,
     num_workers: int,
     batch_size: int,
-    train_csv: str,
-    valid_csv: str,
-    test_csv: str,
+    csv_folder: str,
 ):
     augmentations = apply_augmentation_strengths(
         augmentation_strengths,
         num_augmentations,
     )
     ecg_tmap = get_ecg_tmap(ecg_length, augmentations)
+    downstream_tmap = downstream_tmap_from_name(downstream_tmap_name)
+    csvs = get_downstream_csv_paths(csv_folder, downstream_tmap, downstream_size)
     return train_valid_test_datasets(
         [ecg_tmap],
         [downstream_tmap],
         tensors=hd5_folder,
         batch_size=batch_size,
         num_workers=num_workers,
-        train_csv=train_csv,
-        valid_csv=valid_csv,
-        test_csv=test_csv,
+        train_csv=csvs[0],
+        valid_csv=csvs[1],
+        test_csv=csvs[2],
     )
 
 
@@ -275,9 +285,7 @@ def demo_augmentation(
 
 def demo_augmentations(
     hd5_folder: str,
-    train_csv: str,
-    valid_csv: str,
-    test_csv: str,
+    csv_folder: str,
     output_folder: str,
     **kwargs,
 ):
@@ -291,9 +299,7 @@ def demo_augmentations(
         hd5_folder=hd5_folder,
         num_workers=1,
         batch_size=ecgs_per_augmentation,
-        train_csv=train_csv,
-        valid_csv=valid_csv,
-        test_csv=test_csv,
+        csv_folder=csv_folder,
     )
     ecgs = next(train_dataset.take(1).as_numpy_iterator())[0]["input_ecg_continuous"]
     for name, augmentation in augmentations.items():
@@ -311,8 +317,20 @@ def demo_augmentations(
         cleanup()
 
 
-def get_downstream_csv_name(folder: str, name: str, tmap: TensorMap, size: int) -> str:
+def _get_pretrain_csv_path(folder: str, name: str) -> str:
+    return os.path.join(folder, f"{name}.csv")
+
+
+def get_pretrain_csv_paths(folder: str) -> List[str]:
+    return [_get_pretrain_csv_path(folder, name) for name in PRETRAIN_NAMES]
+
+
+def _get_downstream_csv_path(folder: str, name: str, tmap: TensorMap, size: int) -> str:
     return os.path.join(folder, f"{name}_{tmap.name}_{size}.csv")
+
+
+def get_downstream_csv_paths(folder: str, tmap: TensorMap, size: int) -> List[str]:
+    return [_get_downstream_csv_path(folder, name, tmap, size) for name in DOWNSTREAM_NAMES]
 
 
 def _get_null_check_col(tmap: TensorMap) -> str:
@@ -327,6 +345,7 @@ def explore_all_data(
     sample_csv: str,
     **kwargs,
 ):
+    """Builds all of the sample CSVs for pretraining and downstream tasks"""
     run_id = "pretraining_explore"
     os.makedirs(os.path.join(args.output_folder, run_id), exist_ok=True)
     sample_freq_tmap = tmaps["ecg_sampling_frequency_pc_continuous"]
@@ -372,20 +391,20 @@ def explore_all_data(
     # pretraining data
     pretraining_cols = list(map(_get_null_check_col, pretraining_tmaps))  # exclude errors in these cols
     for name, split_df in zip(
-            ["pretrain_train", "pretrain_valid", "pretrain_test"],
+            PRETRAIN_NAMES,
             [split_dfs[0], split_dfs[1], split_dfs[-1]]
     ):
-        path = os.path.join(output_folder, f"{name}_ids.csv"),
+        path = _get_pretrain_csv_path(output_folder, name)
         print(f"Writing {len(split_df)} {name} ids to {path}.")
         split_df["sample_id"].dropna(subset=[pretraining_cols]).to_csv(
             path, index=False,
         )
     # finetuning data
-    for name, split_df in zip(["downstream_train", "downstream_valid", "downstream_test"], split_dfs[2:]):
+    for name, split_df in zip(DOWNSTREAM_NAMES, split_dfs[2:]):
         for tmap in downstream_tmaps:
             not_null_df = split_df.dropna([_get_null_check_col(tmap)])
             for size in DOWNSTREAM_SIZES:
-                path = get_downstream_csv_name(name=name, size=size, folder=output_folder, tmap=tmap)
+                path = _get_downstream_csv_path(name=name, size=size, folder=output_folder, tmap=tmap)
                 print(f"Writing {size} {name} ids to {path}.")
                 not_null_df["sample_id"].iloc[:size].to_csv()
 
@@ -408,16 +427,8 @@ def parse_args():
         help=("Path to CSV with all Sample IDs to use."),
     )
     parser.add_argument(
-        "--train_csv",
-        help="Path to CSV with Sample IDs to reserve for training.",
-    )
-    parser.add_argument(
-        "--valid_csv",
-        help=("Path to CSV with Sample IDs to reserve for validation"),
-    )
-    parser.add_argument(
-        "--test_csv",
-        help=("Path to CSV with Sample IDs to reserve for testing."),
+        "--csv_folder",
+        help="Folder where sample CSVs are.",
     )
     parser.add_argument(
         "--hd5_folder",

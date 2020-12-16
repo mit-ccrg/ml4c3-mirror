@@ -8,7 +8,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 from ray.tune import Analysis, run, stopper
-from hyperoptimize import EarlyStopping, PretrainingTrainable, build_pretraining_model
+from hyperoptimize import EarlyStopping, RegNetTrainable, build_pretraining_model
 from ray.tune.experiment import Experiment
 
 
@@ -64,10 +64,10 @@ def _run_experiments(
     experiments = [
         Experiment(
             name,
-            run=PretrainingTrainable,
+            run=RegNetTrainable,
             config=config,
             keep_checkpoints_num=1,
-            checkpoint_score_attr="val_loss",
+            checkpoint_score_attr="min-val_loss",
             checkpoint_freq=1,
             stop=stopper,
             resources_per_trial={
@@ -78,17 +78,4 @@ def _run_experiments(
         )
         for name, config in zip(names, configs)
     ]
-    result = run(
-        experiments,
-    )
-    os.makedirs(output_folder, exist_ok=True)
-    for trial in result.trials:
-        checkpoint = trial.checkpoint
-        path = checkpoint.value
-        name = next(n for n in path.split("/") if "best_val_loss" in n)
-        with open(os.path.join(output_folder, f"{name}.json"), "w") as f:
-            json.dump(checkpoint.result, f, default=str)
-        shutil.copy(
-            os.path.join(path, "pretraining_model.h5"),
-            os.path.join(output_folder, f"{name}.h5"),
-        )
+    run(experiments)
