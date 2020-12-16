@@ -13,8 +13,6 @@ from tensorflow.keras.utils import model_to_dot
 from tensorflow.keras.models import Model
 
 # Imports: first party
-from ingest.ecg import tensorize as tensorize_ecg
-from ingest.icu import tensorize_batched as tensorize_icu_batched
 from ml4c3.plots import plot_ecg, plot_architecture_diagram
 from ml4c3.models import make_model, train_model_from_datasets
 from ml4c3.metrics import simclr_loss, simclr_accuracy
@@ -25,6 +23,8 @@ from ml4c3.evaluations import predict_and_evaluate
 from ml4c3.explorations import explore
 from definitions.globals import MODEL_EXT
 from ingest.edw.pipeline import pull_edw_data
+from ingest.ecg.tensorizer import tensorize as tensorize_ecg
+from ingest.icu.tensorizer import tensorize as tensorize_icu
 from ml4c3.hyperoptimizers import hyperoptimize
 from ml4c3.tensormap.TensorMap import TensorMap
 from ingest.icu.assess_coverage import assess_coverage
@@ -39,7 +39,7 @@ from ingest.icu.pre_tensorize_explorations import pre_tensorize_explore
 def run(args: argparse.Namespace):
     start_time = timer()  # Keep track of elapsed execution time
     try:
-        if args.mode in [
+        if args.recipe in [
             "train",
             "train_keras_logreg",
             "train_sklearn_logreg",
@@ -48,43 +48,43 @@ def run(args: argparse.Namespace):
             "train_sklearn_xbost",
         ]:
             train_model(args)
-        elif args.mode == "train_simclr":
+        elif args.recipe == "train_simclr":
             train_simclr_model(args)
-        elif args.mode == "infer":
+        elif args.recipe == "infer":
             infer_multimodal_multitask(args)
-        elif args.mode == "hyperoptimize":
+        elif args.recipe == "hyperoptimize":
             hyperoptimize(args)
-        elif args.mode == "tensorize_ecg":
+        elif args.recipe == "tensorize_ecg":
             tensorize_ecg(args)
-        elif args.mode == "pull_adt":
+        elif args.recipe == "pull_adt":
             pull_edw_data(args, only_adt=True)
-        elif args.mode == "pull_edw":
+        elif args.recipe == "pull_edw":
             pull_edw_data(args)
-        elif args.mode == "tensorize_icu_no_edw_pull":
-            tensorize_icu_batched(args)
-        elif args.mode == "tensorize_icu":
+        elif args.recipe == "tensorize_icu_no_edw_pull":
+            tensorize_icu(args)
+        elif args.recipe == "tensorize_icu":
             pull_edw_data(args)
-            tensorize_icu_batched(args)
-        elif args.mode == "explore":
+            tensorize_icu(args)
+        elif args.recipe == "explore":
             explore(args=args, disable_saving_output=args.explore_disable_saving_output)
-        elif args.mode == "plot_ecg":
+        elif args.recipe == "plot_ecg":
             plot_ecg(args)
-        elif args.mode == "build":
+        elif args.recipe == "build":
             build_multimodal_multitask(args)
-        elif args.mode == "assess_coverage":
+        elif args.recipe == "assess_coverage":
             assess_coverage(args)
-        elif args.mode == "check_icu_structure":
+        elif args.recipe == "check_icu_structure":
             check_icu_structure(args)
-        elif args.mode == "pre_tensorize_explore":
+        elif args.recipe == "pre_tensorize_explore":
             pre_tensorize_explore(args)
-        elif args.mode == "match_patient_bedmaster":
+        elif args.recipe == "match_patient_bedmaster":
             match_data(args)
-        elif args.mode == "visualize":
+        elif args.recipe == "visualize":
             run_server(args)
-        elif args.mode == "extract_ecg_features":
+        elif args.recipe == "extract_ecg_features":
             extract_ecg_features(args)
         else:
-            raise ValueError("Unknown mode:", args.mode)
+            raise ValueError("Unknown recipe:", args.recipe)
 
     except Exception as error:
         logging.exception(error)
@@ -93,9 +93,7 @@ def run(args: argparse.Namespace):
 
     end_time = timer()
     elapsed_time = end_time - start_time
-    logging.info(
-        "Executed the '{}' operation in {:.2f} seconds".format(args.mode, elapsed_time),
-    )
+    logging.info(f"Executed {args.recipe} operation in {elapsed_time:.2f} sec")
 
 
 def build_multimodal_multitask(args: argparse.Namespace) -> Model:
@@ -104,17 +102,14 @@ def build_multimodal_multitask(args: argparse.Namespace) -> Model:
     model.save(model_file)
     plot_architecture_diagram(
         model_to_dot(model, show_shapes=True, expand_nested=True),
-        os.path.join(
-            args.output_folder,
-            "architecture_graph" + args.image_ext,
-        ),
+        os.path.join(args.output_folder, "architecture_graph" + args.image_ext),
     )
     logging.info(f"Model saved to {model_file}")
     return model
 
 
 def train_model(args: argparse.Namespace) -> Dict[str, float]:
-    if args.mode != "train":
+    if args.recipe != "train":
         args.mixup_alpha = 0
 
     # Create datasets
@@ -189,7 +184,7 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
     for cleanup in cleanups:
         cleanup()
 
-    if args.mode == "train":
+    if args.recipe == "train":
         logging.info(f"Model trained for {len(history.history['loss'])} epochs")
     logging.info(
         get_verbose_stats_string(

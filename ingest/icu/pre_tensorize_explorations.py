@@ -156,11 +156,11 @@ class PreTensorizeExplorer:
         xref_file = xref_file.dropna(subset=["MRN"])
         bedmaster_mrns = set(xref_file["MRN"].unique())
         bedmaster_csns = set(xref_file["PatientEncounterID"].unique())
-        cross_ref_bedmaster_files = set(xref_file["fileID"].unique())
+        cross_ref_bedmaster_files = set(xref_file["path"].unique())
 
         bedmaster_files, _ = get_files_in_directory(
             directory=self.path_bedmaster,
-            extension=BEDMASTER_EXT,
+            file_extension=BEDMASTER_EXT,
         )
 
         self.summary["edw_mrns"] = len(self.edw_mrns)
@@ -201,7 +201,7 @@ class PreTensorizeExplorer:
             k = 0
             bedmaster_files_paths, _ = get_files_in_directory(
                 directory=self.path_bedmaster,
-                extension=BEDMASTER_EXT,
+                file_extension=BEDMASTER_EXT,
             )
             for bedmaster_file_path in bedmaster_files_paths:
                 k += 1
@@ -216,10 +216,11 @@ class PreTensorizeExplorer:
                 file = os.path.split(bedmaster_file_path)[-1]
                 # pylint: disable=cell-var-from-loop
                 csns = set(
-                    xref_file[list(map(lambda x: x in file, xref_file["fileID"]))][
+                    xref_file[list(map(lambda x: x in file, xref_file["path"]))][
                         "PatientEncounterID"
                     ].unique(),
                 )
+
                 self._update_list_signals(bedmaster_signals, csns)
                 logging.info(
                     "Obtained statistics from Bedmaster file number "
@@ -401,7 +402,7 @@ class PreTensorizeExplorer:
         bedmaster_files_dict = {}
         bedmaster_files, _ = get_files_in_directory(
             directory=self.path_bedmaster,
-            extension=BEDMASTER_EXT,
+            file_extension=BEDMASTER_EXT,
         )
         for bedmaster_file in bedmaster_files:
             file_id = "_".join(os.path.split(bedmaster_file)[-1].split("_")[:2])
@@ -419,7 +420,7 @@ class PreTensorizeExplorer:
         total_bedmaster_files_ids = len(bedmaster_files)
 
         for idx, file_id in enumerate(bedmaster_files):
-            logging.info(f"Analyzing fileID {idx} of {total_bedmaster_files_ids}...")
+            logging.info(f"Analyzing path {idx} of {total_bedmaster_files_ids}...")
             total_files = len(bedmaster_files[file_id])
 
             previous_max = None

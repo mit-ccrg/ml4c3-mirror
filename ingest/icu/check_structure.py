@@ -170,7 +170,7 @@ class BedmasterChecker:
         """
         bedmaster_files_paths, unexpected_files = get_files_in_directory(
             directory=self.bedmaster_dir,
-            extension=BEDMASTER_EXT,
+            file_extension=BEDMASTER_EXT,
         )
 
         if patient_csv and path_xref:

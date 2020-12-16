@@ -1181,6 +1181,7 @@ def plot_ecg(args):
     tensor_maps_in = [tmaps[it] for it in needed_tensors]
 
     if args.plot_mode == "clinical":
+
         plot_signal_function = _plot_ecg_clinical
     elif args.plot_mode == "full":
         plot_signal_function = _plot_ecg_full

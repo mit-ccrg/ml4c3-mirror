@@ -109,9 +109,9 @@ def make_model(args):
     """
     Create a model to train according the input arguments.
     """
-    if args.mode in ["train", "train_simclr", "infer", "build"]:
+    if args.recipe in ["train", "train_simclr", "infer", "build"]:
         model = make_multimodal_multitask_model(**args.__dict__)
-    elif args.mode == "train_keras_logreg":
+    elif args.recipe == "train_keras_logreg":
         model = make_shallow_model(
             tensor_maps_in=args.tensor_maps_in,
             tensor_maps_out=args.tensor_maps_out,
@@ -125,7 +125,7 @@ def make_model(args):
         )
     else:
         hyperparameters = {}
-        if args.mode == "train_sklearn_logreg":
+        if args.recipe == "train_sklearn_logreg":
             if args.l1 == 0 and args.l2 == 0:
                 c = 1e7
             else:
@@ -134,21 +134,21 @@ def make_model(args):
             hyperparameters["l1_ratio"] = c * args.l1
         elif args.mode == "train_sklearn_svm":
             hyperparameters["c"] = args.c
-        elif args.mode == "train_sklearn_randomforest":
+        elif args.recipe == "train_sklearn_randomforest":
             hyperparameters["n_estimators"] = args.n_estimators
             hyperparameters["max_depth"] = args.max_depth
             hyperparameters["min_samples_split"] = args.min_samples_split
             hyperparameters["min_samples_leaf"] = args.min_samples_leaf
-        elif args.mode == "train_sklearn_xgboost":
+        elif args.recipe == "train_sklearn_xgboost":
             hyperparameters["n_estimators"] = args.n_estimators
             hyperparameters["max_depth"] = args.max_depth
             hyperparameters["gamma"] = args.gamma
             hyperparameters["l1_ratio"] = args.l1
             hyperparameters["l2_ratio"] = args.l2
         else:
-            raise ValueError("Unknown train mode: ", args.mode)
+            raise ValueError("Unknown train mode: ", args.recipe)
         assert len(args.tensor_maps_out) == 1
-        model_type = args.mode.split("_")[-1]
+        model_type = args.recipe.split("_")[-1]
         model = make_sklearn_model(
             model_type=model_type,
             hyperparameters=hyperparameters,

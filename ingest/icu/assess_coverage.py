@@ -270,11 +270,11 @@ class ICUCoverageAssesser:
         :param path_hd5: <str> Directory with .hd5 files.
         :param desired_departments: <List[str]> List of department names.
         :param event_column: <str> Name of the event column (if exists) in
-                             --cohort_query/--cohort_csv.
+               --cohort_query/--cohort_csv.
         :param time_column: <str> Name of the event time column (if exists) in
-                             --cohort_query/--cohort_csv.
+               --cohort_query/--cohort_csv.
         :param count: <bool> Count the number of unique rows (events) in
-                             --cohort_query/--cohort_csv.
+               --cohort_query/--cohort_csv.
         """
 
         departments: Dict[Any, str] = {
@@ -306,12 +306,16 @@ class ICUCoverageAssesser:
         for key in departments:
             if key:
                 matching_depts.append(key)
+
         bedmaster_matcher = PatientBedmasterMatcher(
             path_bedmaster=path_bedmaster,
             path_adt=os.path.join(self.output_dir, "adt.csv"),
             desired_departments=matching_depts,
         )
-        bedmaster_matcher.match_files(os.path.join(self.output_dir, "xref.csv"))
+        path_xref = os.path.join(self.output_dir, "xref.csv")
+        bedmaster_matcher.match_files(
+            path_xref=path_xref,
+        )
 
         # Initialize empty table
         data: Dict[str, Any] = {}

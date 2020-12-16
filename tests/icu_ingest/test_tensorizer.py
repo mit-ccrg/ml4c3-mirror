@@ -9,9 +9,9 @@ import numpy as np
 import pytest
 
 # Imports: first party
-from ingest.icu import tensorize
 from ml4c3.recipes import run
 from ml4c3.arguments import parse_args
+from ingest.icu.tensorizer import Tensorizer
 
 # pylint: disable=no-member
 
@@ -46,13 +46,25 @@ def test_tensorizer(
     args = parse_args()
     output_file = os.path.join(args.tensors, f"{pytest.example_mrn}.hd5")
 
-    # make sure the file doesn't exist
+    # Make sure the file doesn't exist
     with pytest.raises(OSError):
         with h5py.File(output_file, "r") as tens_file:
             pass
 
-    # tensorize and check hd5 structure
-    tensorize(args)
+    # Tensorize and check hd5 structure
+    tensorizer = Tensorizer(
+        args.path_bedmaster,
+        args.path_alarms,
+        args.path_edw,
+        args.path_xref,
+    )
+    tensorizer.tensorize(
+        tensors=args.tensors,
+        overwrite_hd5=args.overwrite,
+        num_workers=args.num_workers,
+        allow_one_source=args.allow_one_source,
+    )
+
     with h5py.File(output_file, "r") as tens_file:
         assert sorted(list(tens_file.keys())) == ["bedmaster", "edw"]
 

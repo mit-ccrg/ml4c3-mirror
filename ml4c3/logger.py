@@ -9,13 +9,11 @@ import logging.config
 
 def load_config(log_level, log_dir, log_file_basename):
     os.makedirs(log_dir, exist_ok=True)
-
-    logger = logging.getLogger(__name__)
-
     log_file = f"{log_dir}/{log_file_basename}.log"
-
+    logger = logging.getLogger(__name__)
     try:
-        logging.config.dictConfig(_create_config(log_level, log_file))
+        logger_config = _create_logger_config(log_level=log_level, log_file=log_file)
+        logging.config.dictConfig(logger_config)
         success_msg = (
             "Logging configuration was loaded. "
             f"Log messages can be found at {log_file}."
@@ -26,18 +24,16 @@ def load_config(log_level, log_dir, log_file_basename):
         raise error
 
 
-def _create_config(log_level, log_file):
+def _create_logger_config(log_level: str, log_file: str):
     return {
         "version": 1,
         "disable_existing_loggers": False,
         "formatters": {
             "simple": {
+                "datefmt": "%Y-%m-%d %H:%M:%S",
                 "format": (
-                    "%(asctime)s - %(module)s:%(lineno)d - %(levelname)s - %(message)s"
+                    "%(asctime)s - %(levelname)s - %(module)s:%(lineno)d - %(message)s"
                 ),
-            },
-            "detailed": {
-                "format": "%(name)s:%(levelname)s %(module)s:%(lineno)d:  %(message)s",
             },
         },
         "handlers": {

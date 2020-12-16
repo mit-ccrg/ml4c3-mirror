@@ -1,3 +1,3 @@
-StartTime,EndTime,stpIn,tStart,tEnd,tDischarge,tAdmit,fileID,unixFileStartTime,unixFileEndTime,fileStartTime,MRN,PatientEncounterID,grp,Department
-Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,bedmaster_file-123_5_v4,100,200,Wrong,123,345,Wrong,Wrong
-Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,bedmaster_file-123_6_v4,100,200,Wrong,123,345,Wrong,Wrong
+StartTime,EndTime,stpIn,TransferInDTS,TransferOutDTS,tDischarge,tAdmit,path,unixFileStartTime,unixFileEndTime,fileStartTime,MRN,PatientEncounterID,grp,Department
+Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,bedmaster_file-123_5_v4.mat,100,200,Wrong,123,345,Wrong,Wrong
+Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,bedmaster_file-123_6_v4.mat,100,200,Wrong,123,345,Wrong,Wrong

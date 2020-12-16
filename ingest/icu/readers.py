@@ -1525,7 +1525,7 @@ class CrossReferencer:
         overwrite_hd5: bool = True,
         n_patients: int = None,
         tensors: str = None,
-        flag_one_source: bool = False,
+        allow_one_source: bool = False,
     ) -> Dict[str, Dict[str, List[str]]]:
         """
         Get the cross-referenced Bedmaster files and EDW files.
@@ -1550,7 +1550,7 @@ class CrossReferencer:
                               hd5 files are excluded from the output dict.
         :param n_patients: <int> max number of patients to tensorize.
         :param tensors: <str> directory to check for existing hd5 files.
-        :param flag_one_source: <bool> bool indicating whether a patient with
+        :param allow_one_source: <bool> bool indicating whether a patient with
                                 just one type of data will be tensorized or not.
         :return: <dict> a dictionary with the MRNs, visit ID and Bedmaster files.
         """
@@ -1560,14 +1560,16 @@ class CrossReferencer:
                 path_bedmaster=self.bedmaster_dir,
                 path_adt=self.adt_file,
             )
-            bedmaster_matcher.match_files(self.xref_file)
+            bedmaster_matcher.match_files(
+                self.xref_file,
+            )
 
         adt = pd.read_csv(self.adt_file)
         adt_columns = EDW_FILES["adt_file"]["columns"]
         adt = adt[adt_columns].drop_duplicates()
 
         xref = pd.read_csv(self.xref_file)
-        xref = xref.drop_duplicates(subset=["MRN", "PatientEncounterID", "fileID"])
+        xref = xref.drop_duplicates(subset=["MRN", "PatientEncounterID", "path"])
         edw_mrns = [
             folder
             for folder in os.listdir(self.edw_dir)
@@ -1578,17 +1580,18 @@ class CrossReferencer:
             xref = xref[xref["MRN"].isin(mrns)]
             edw_mrns = [ele for ele in edw_mrns if ele in mrns]
         if starting_time:
-            xref = xref[xref["unixFileEndTime"] > starting_time]
+            xref = xref[xref["TransferInDTS"] > starting_time]
             adt = adt[adt[adt_columns[0]].isin(edw_mrns)]
             adt[adt_columns[4]] = get_unix_timestamps(adt[adt_columns[4]].values)
             adt = adt[adt[adt_columns[4]] > starting_time]
             edw_mrns = list(adt[adt_columns[0]].drop_duplicates().astype(str))
         if ending_time:
-            xref = xref[xref["unixFileStartTime"] < ending_time]
+            xref = xref[xref["TransferOutDTS"] < ending_time]
             adt = adt[adt[adt_columns[0]].isin(edw_mrns)]
             adt[adt_columns[3]] = get_unix_timestamps(adt[adt_columns[3]].values)
             adt = adt[adt[adt_columns[3]] < ending_time]
             edw_mrns = list(adt[adt_columns[0]].drop_duplicates().astype(str))
+
         if not overwrite_hd5 and tensors and os.path.isdir(tensors):
             existing_mrns = [
                 hd5file[:-4]
@@ -1597,7 +1600,6 @@ class CrossReferencer:
             ]
             xref = xref[~xref["MRN"].isin(existing_mrns)]
             edw_mrns = [ele for ele in edw_mrns if ele not in existing_mrns]
-
         elif not overwrite_hd5 and not tensors:
             logging.warning(
                 "overwrite_hd5 is set to False, but output_dir option is "
@@ -1605,8 +1607,12 @@ class CrossReferencer:
                 "going to be overwritten.",
             )
 
-        self.add_bedmaster_elements(xref, edw_mrns, flag_one_source)
-        if flag_one_source:
+        self.add_bedmaster_elements(
+            xref=xref,
+            edw_mrns=edw_mrns,
+            allow_one_source=allow_one_source,
+        )
+        if allow_one_source:
             self.add_edw_elements(edw_mrns)
         self.assess_coverage()
         self.stats()
@@ -1620,51 +1626,27 @@ class CrossReferencer:
                 f"{len(self.crossref)}.",
             )
             return self.crossref
-
         return dict(list(self.crossref.items())[:n_patients])
 
-    def add_bedmaster_elements(self, xref, edw_mrns, flag_one_source):
-        # Add elements from cross referencer .csv
+    def add_bedmaster_elements(self, xref, edw_mrns, allow_one_source):
+        # Add elements from xref.csv
         for _, row in xref.iterrows():
-            mrn = str(row.MRN)
-            if flag_one_source and mrn not in edw_mrns:
+            mrn = str(row["MRN"])
+            if allow_one_source and mrn not in edw_mrns:
                 continue
             try:
-                csn = str(int(row.PatientEncounterID))
+                csn = str(int(row["PatientEncounterID"]))
             except ValueError:
-                csn = str(row.PatientEncounterID)
-            bedmaster_file_id = str(row.fileID)
-            bedmaster_path = os.path.join(
-                self.bedmaster_dir,
-                f"{bedmaster_file_id}.mat",
-            )
-            if (
-                not os.path.exists(bedmaster_path)
-                and str(row.Department) in MAPPING_DEPARTMENTS
-            ):
-                departments_folders = MAPPING_DEPARTMENTS[str(row.Department)]
-                for department_folder in departments_folders:
-                    bedmaster_path = os.path.join(
-                        self.bedmaster_dir,
-                        department_folder,
-                        f"{bedmaster_file_id}.mat",
-                    )
-                    if os.path.exists(bedmaster_path):
-                        break
-            if not os.path.exists(bedmaster_path):
-                bedmaster_path = os.path.join(
-                    self.bedmaster_dir,
-                    str(row.Department),
-                    f"{bedmaster_file_id}.mat",
-                )
-                if not os.path.exists(bedmaster_path):
-                    raise ValueError(f"Bedmaster file {bedmaster_file_id} not found.")
+                csn = str(row["PatientEncounterID"])
+            fname = os.path.split(row["path"])[1]
+            bedmaster_path = os.path.join(self.bedmaster_dir, fname)
             if mrn not in self.crossref:
                 self.crossref[mrn] = {csn: [bedmaster_path]}
             elif csn not in self.crossref[mrn]:
                 self.crossref[mrn][csn] = [bedmaster_path]
             else:
                 self.crossref[mrn][csn].append(bedmaster_path)
+
         for _mrn, visits in self.crossref.items():
             for _csn, bedmaster_files in visits.items():
                 bedmaster_files.sort(
@@ -1729,7 +1711,7 @@ class CrossReferencer:
             xref_csns_set = set(_xref_csns_set.astype(int).astype(str))
         except ValueError:
             xref_csns_set = set(xref["PatientEncounterID"].unique())
-        xref_bedmaster_files_set = set(xref["fileID"].unique())
+        xref_bedmaster_files_set = set(xref["path"].unique())
 
         crossref_mrns_set = set(self.crossref.keys())
         crossref_csns_set = set()

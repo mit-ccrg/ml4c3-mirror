@@ -212,7 +212,7 @@ def _obtain_data(
     query_directory: str,
     adt: pd.DataFrame,
 ):
-    if args.staging_dir is None:
+    if args.path_staging_dir is None:
         raise ValueError("Must provide staging directory.")
     batch_size = args.staging_batch_size or 1
 
@@ -276,7 +276,7 @@ def _obtain_data(
             and (len(list_mrn) == batch_size or (index + 1) == len(patients.index))
         ):
             if batch_size > 1:
-                folder_idx = args.staging_dir
+                folder_idx = args.path_staging_dir
             else:
                 folder_idx = os.path.join(str(list_mrn[0]), str(list_csn[0]))
 
@@ -293,7 +293,7 @@ def _obtain_data(
             list_mrn = []
             list_csn = []
             if args.staging_batch_size > 1:
-                _reorder_folders(args.path_edw, args.staging_dir)
+                _reorder_folders(args.path_edw, args.path_staging_dir)
 
 
 def _mrns_csns_from_df(df: pd.DataFrame) -> Tuple[Set[str], Optional[Set[str]]]:

@@ -56,6 +56,7 @@ def test_pre_tensorize_explorations(temp_dir):
         for file_name in os.listdir(args.output_folder)
         if file_name.endswith(".csv")
     ]
+
     assert sorted(expected_files) == sorted(output_files)
 
     edw_df = pd.read_csv(os.path.join(args.output_folder, expected_files[0]))

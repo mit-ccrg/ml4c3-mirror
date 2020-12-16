@@ -29,8 +29,8 @@ BOTTLENECK_STR_TO_ENUM = {
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     subparser = parser.add_subparsers(
-        title="ml4c3 modes",  # TODO add descriptions
-        description="Select one of the following modes: \n"
+        title="ml4c3 recipes",
+        description="Select one of the following recipes: \n"
         "\t * train: ADD DESCRIPTION. \n"
         "\t * train_keras_logreg: ADD DESCRIPTION. \n"
         "\t * train_sklearn_logreg: ADD DESCRIPTION. \n"
@@ -54,7 +54,7 @@ def parse_args() -> argparse.Namespace:
         "\t * pre_tensorize_explore: ADD DESCRIPTION. \n"
         "\t * match_patient_bedmaster: ADD DESCRIPTION. \n"
         "\t * extract_ecg_features: ADD DESCRIPTION. \n",
-        dest="mode",
+        dest="recipe",
     )
 
     # Tensor Map arguments
@@ -245,8 +245,8 @@ def parse_args() -> argparse.Namespace:
         help="List of department names for which to process patient data.",
     )
     icu_parser.add_argument(
-        "--staging_dir",
-        help="Directory to store temporary files created during tensorization.",
+        "--path_staging_dir",
+        help="Directory to store temporary files created during tensorization pipeline.",
     )
     icu_parser.add_argument(
         "--staging_batch_size",
@@ -1158,7 +1158,7 @@ def _process_args(args: argparse.Namespace):
         args.tensors = tensors if len(tensors) > 1 else tensors[0]
 
     # Create list of names of all needed TMaps
-    if "input_tensors" in args and args.mode != "explore_icu":
+    if "input_tensors" in args and args.recipe != "explore_icu":
         needed_tmaps_names = args.input_tensors + args.output_tensors
 
         # Update dict of tmaps to include all needed tmaps
@@ -1187,7 +1187,7 @@ def _process_args(args: argparse.Namespace):
         args.bad_hd5_dir = os.path.expanduser(args.bad_hd5_dir)
 
     logging.info(f"Command Line was: {command_line}")
-    if "input_tensors" in args and args.mode != "explore_icu":
+    if "input_tensors" in args and args.recipe != "explore_icu":
         logging.info(f"Total TensorMaps: {len(tmaps)} Arguments are {args}")
 
     if "layer_order" in args and len(set(args.layer_order)) != 3:
