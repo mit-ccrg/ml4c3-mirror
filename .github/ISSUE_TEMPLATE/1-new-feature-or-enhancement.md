@@ -7,9 +7,9 @@ assignees: ''
 
 ---
 
-## Why it matters
+## What and why
 
-## Possible solution
+## Solution(s)
 
 ## Acceptance criteria
 

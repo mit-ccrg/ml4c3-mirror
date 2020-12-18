@@ -1,12 +1,15 @@
 <!-- Each bullet point should link to the issue it closes --> 
+## Closes issues
+# 
 
 ## Changelog
+- [x] 
 - [x]
-- [x]
+- [ ] todo: 
 
 ## Checklist
-- [ ] Added docstrings to important functions.
-- [ ] Added or revised tests as appropriate.
+- [ ] Added or revised tests if appropriate.
 - [ ] If new packages are installed, `requirements.txt` is updated.
+- [ ] If documentation should be updated, a new issue was made in `ml4c3-wiki`.
 - [ ] The PR name describes its content and does not contain "Ref #".
-- [ ] The code being added to the repo does not contain any PHI.
+- [ ] The PR does not add PHI.
