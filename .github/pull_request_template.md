@@ -1,4 +1,3 @@
-<!-- Each bullet point should link to the issue it closes --> 
 ## Closes issues
 # 
 
