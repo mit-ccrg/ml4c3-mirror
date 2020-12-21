@@ -1,5 +1,5 @@
-## Closes issues
-# 
+## Issues closed
+Closes #
 
 ## Changelog
 - [x] 
