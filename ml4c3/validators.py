@@ -48,8 +48,8 @@ def validator_voltage_no_zero_padding(
     data: PatientData,
 ):
     for cm, idx in tm.channel_map.items():
-        lead_length = tm.shape[-1]
-        lead = tensor[..., tm.channel_map[cm]]
+        lead_length = tm.shape[0]
+        lead = tensor[:, tm.channel_map[cm]]
         num_zero = lead_length - np.count_nonzero(lead)
         if num_zero > ECG_ZERO_PADDING_THRESHOLD * lead_length:
             error_message = f"Lead {cm} is zero-padded"

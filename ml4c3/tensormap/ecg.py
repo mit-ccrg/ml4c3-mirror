@@ -55,7 +55,7 @@ def _resample_voltage(voltage: np.array, desired_samples: int, fs: float) -> np.
     return np.interp(x_interp, x, voltage)
 
 
-def make_voltage_tff(exact_length=False, no_pacemaker=False):
+def make_voltage_tff(exact_length=False, no_pacemaker=False, conv_2d=False):
     if no_pacemaker:
         from ml4c3.tensormap.ecg_labels import tmaps as label_tmaps  # isort: skip
 
@@ -67,6 +67,8 @@ def make_voltage_tff(exact_length=False, no_pacemaker=False):
             pacemaker_tm.time_series_filter = tm.time_series_filter
             pacemaker_tensor = pacemaker_tm.tensor_from_file(pacemaker_tm, data)
         dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
+        if conv_2d:
+            shape = shape[:-1]
         voltage_length = shape[1] if dynamic else shape[0]
         tensor = np.zeros(shape, dtype=np.float32)
         for i, ecg_date in enumerate(ecg_dates):
@@ -103,6 +105,8 @@ def make_voltage_tff(exact_length=False, no_pacemaker=False):
                         f"Could not get voltage for lead {cm} with {voltage_length}"
                         f" samples in {data.id}",
                     )
+        if conv_2d:
+            tensor = tensor[..., None]
         return tensor
 
     return tensor_from_file
@@ -153,7 +157,7 @@ def update_tmaps_ecg_voltage(
 ) -> Dict[str, TensorMap]:
     """
     Generates ECG voltage TMaps that are given by the name format:
-        [12_lead_]ecg_{length}[_exact][_std][_augmentations]
+        [12_lead_]ecg_{length}[_exact][_std][_no_pacemaker][_2d][_augmentations]
 
     Required:
         length: the number of samples present in each lead.
@@ -163,10 +167,13 @@ def update_tmaps_ecg_voltage(
         exact: only return voltages when raw data has exactly {length} samples in each lead.
         std: standardize voltages using mean = 0, std = 2000.
         augmentations: apply crop, noise, and warp transformations to voltages.
+        no_pacemaker: excludes waveforms with a pacemaker
+        2d: return tensor shaped for 2D convolutions
 
     Examples:
         valid: ecg_2500_exact_std
-        valid: 12_lead_ecg_625_crop_warp
+        valid: 8_lead_ecg_625_crop_warp
+        valid: ecg_2500_std_no_pacemaker_2d
         invalid: ecg_2500_noise_std
 
     Note: if additional modifiers are present after the name format, e.g.
@@ -176,7 +183,7 @@ def update_tmaps_ecg_voltage(
         tmap appropriately.
     """
     voltage_tm_pattern = re.compile(
-        r"^(8_lead_)?ecg_\d+(_exact)?(_std)?(_no_pacemaker)?(_warp|_crop|_noise)*",
+        r"^(8_lead_)?ecg_\d+(_exact)?(_std)?(_no_pacemaker)?(_2d)?(_warp|_crop|_noise)*",
     )
     match = voltage_tm_pattern.match(tmap_name)
     if match is None:
@@ -188,19 +195,24 @@ def update_tmaps_ecg_voltage(
     length = int(tmap_name.split("ecg_")[1].split("_")[0])
     exact = "exact" in tmap_name
     no_pacemaker = "no_pacemaker" in tmap_name
+    conv_2d = "_2d" in tmap_name
     normalizer = Standardize(mean=0, std=2000) if "std" in tmap_name else None
     augmenters = [
         augment_function
         for augment_option, augment_function in name2augmenters.items()
         if augment_option in tmap_name
     ]
+    shape = (length, len(leads))
+    if conv_2d:
+        shape += (1,)
     tmap = TensorMap(
         name=match_tmap_name,
-        shape=(length, len(leads)),
+        shape=shape,
         path_prefix=ECG_PREFIX,
         tensor_from_file=make_voltage_tff(
             exact_length=exact,
             no_pacemaker=no_pacemaker,
+            conv_2d=conv_2d,
         ),
         normalizers=normalizer,
         channel_map=leads,
