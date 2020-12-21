@@ -293,7 +293,7 @@ def make_data_generator_factory(
     for csv_source, csv_name in csv_sources:
         df = pd.read_csv(csv_source, low_memory=False)
         mrn_col = infer_mrn_column(df, csv_source)
-        df[mrn_col] = df[mrn_col].astype(int)
+        df[mrn_col] = df[mrn_col].dropna().astype(int)
         csv_data.append((csv_name, df, mrn_col))
         logging.info(f"Loaded dataframe with shape {df.shape} from {csv_source}")
 
@@ -927,7 +927,7 @@ def patient_csv_to_set(
         mrn_column_name = infer_mrn_column(df, patient_csv)
 
     # Isolate MRN column from dataframe, cast to int
-    patient_ids = df[mrn_column_name].astype(int)
+    patient_ids = df[mrn_column_name].dropna().astype(int)
 
     return set(patient_ids)
 

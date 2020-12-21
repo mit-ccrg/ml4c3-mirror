@@ -57,8 +57,7 @@ def _resample_voltage(voltage: np.array, desired_samples: int, fs: float) -> np.
 
 def make_voltage_tff(exact_length=False, no_pacemaker=False):
     if no_pacemaker:
-        # Imports: first party
-        from ml4c3.tensormap.ecg_labels import tmaps as label_tmaps
+        from ml4c3.tensormap.ecg_labels import tmaps as label_tmaps  # isort: skip
 
         pacemaker_tm = label_tmaps["pacemaker"]
 

@@ -141,7 +141,7 @@ def parse_args() -> argparse.Namespace:
         help="Enable caching of tf.data.Dataset, on by default.",
     )
     cache_parser.add_argument(
-        "--no-cache",
+        "--no_cache",
         dest="cache",
         action="store_false",
         help="Disable caching of tf.data.Dataset.",

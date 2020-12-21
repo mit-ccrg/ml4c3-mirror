@@ -585,12 +585,14 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
         tmaps[tmap_name] = tm
         return tmaps
 
+    """
     # ICU Standardized tmaps
     from ml4c3.tensormap.icu_normalized import get_tmap as tmaps_icu_normalized # isort: skip
     tm = tmaps_icu_normalized(tmap_name)
     if tm:
         tmaps[tmap_name] = tm
         return tmaps
+    """
 
     # Base tmaps: ECG
     from ml4c3.tensormap.ecg import tmaps as tmaps_ecg # isort:skip
@@ -607,6 +609,12 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
     # Base tmaps: Echo
     from ml4c3.tensormap.echo import tmaps as tmaps_echo  # isort:skip
     tmaps.update(tmaps_echo)
+    if tmap_name in tmaps:
+        return tmaps
+
+    # Base tmap: c3po
+    from ml4c3.tensormap.c3po import make_c3po_death_tmap # isort: skip
+    tmaps = make_c3po_death_tmap(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps
 
@@ -639,7 +647,6 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
     tmaps = update_tmaps_time_series(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps
-
     # fmt: on
 
     raise ValueError(
@@ -649,33 +656,28 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
 
 def create_tmap(signal, source, field) -> Optional[TensorMap]:
     tm_name = f"{signal}_{field}"
-    if source in ["vital", "waveform"]:
-        # Imports: first party
-        from ml4c3.tensormap.icu_signals import get_bedmaster_signal_tmap
 
+    # fmt: off
+    if source in ["vital", "waveform"]:
+        from ml4c3.tensormap.icu_signals import get_bedmaster_signal_tmap # isort: skip
         return get_bedmaster_signal_tmap(tm_name, signal, source)
 
     if source == "alarm":
-        # Imports: first party
-        from ml4c3.tensormap.icu_signals import create_alarm_tmap
-
+        from ml4c3.tensormap.icu_signals import create_alarm_tmap # isort: skip
         return create_alarm_tmap(tm_name, signal)
 
     if source in ["flowsheet", "labs"]:
-        # Imports: first party
-        from ml4c3.tensormap.icu_signals import create_measurement_tmap
-
+        from ml4c3.tensormap.icu_signals import create_measurement_tmap # isort: skip
         return create_measurement_tmap(tm_name, signal, source)
+
     if source == "med":
-        # Imports: first party
-        from ml4c3.tensormap.icu_signals import create_med_tmap
-
+        from ml4c3.tensormap.icu_signals import create_med_tmap # isort: skip
         return create_med_tmap(tm_name, signal)
-    if source in ["events", "surgery", "transfusions", "procedures"]:
-        # Imports: first party
-        from ml4c3.tensormap.icu_signals import create_event_tmap
 
+    if source in ["events", "surgery", "transfusions", "procedures"]:
+        from ml4c3.tensormap.icu_signals import create_event_tmap # isort: skip
         return create_event_tmap(tm_name, signal, source)
+    # fmt: on
 
     raise ValueError(
         f"Could not create tmap for field {field} of signal {signal} and source {source}",
