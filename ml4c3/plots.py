@@ -5,16 +5,17 @@ import re
 import math
 import hashlib
 import logging
+import argparse
 from typing import Dict, List, Tuple, Union, Callable, Optional
 from datetime import datetime
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict
 
 # Imports: third party
-import h5py
 import numpy as np
 import pydot
 import pandas as pd
 import seaborn as sns
+import pygraphviz as pgv
 from scipy import stats
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
@@ -38,7 +39,7 @@ from ml4c3.datasets import (
     get_train_valid_test_ids,
 )
 from definitions.ecg import ECG_DATE_FORMAT, ECG_DATETIME_FORMAT
-from definitions.globals import PDF_EXT, TENSOR_EXT
+from definitions.models import BottleneckType
 from ml4c3.tensormap.TensorMap import (
     TensorMap,
     update_tmaps,
@@ -1569,6 +1570,350 @@ def plot_architecture_diagram(dot: pydot.Dot, image_path: str):
         )
 
     logging.info(f"Saved architecture diagram to: {image_path}")
+
+
+def _conv_layer(dimension: int, conv_type: str) -> str:
+    if dimension == 4 and conv_type == "conv":
+        conv_layer = "Conv3D"
+    elif dimension == 3 and conv_type == "conv":
+        conv_layer = "Conv2D"
+    elif dimension == 2 and conv_type == "conv":
+        conv_layer = "Conv1D"
+    elif dimension == 3 and conv_type == "separable":
+        conv_layer = "SeparableConv2D"
+    elif dimension == 2 and conv_type == "separable":
+        conv_layer = "SeparableConv1D"
+    elif dimension == 3 and conv_type == "depth":
+        conv_layer = "DepthwiseConv2D"
+    else:
+        raise ValueError(f"Unknown conv_type/dimension: {conv_type}/{dimension}")
+    return conv_layer
+
+
+def _activation_layer(activation_layer: str) -> str:
+    if activation_layer.lower() == "relu":
+        return "ReLU"
+    return activation_layer
+
+
+def _normalization_layer(normalization_layer: str) -> str:
+    if normalization_layer.lower() == "batch_norm":
+        return "BN"
+    return normalization_layer
+
+
+def _pool_layer(pool_type: str) -> str:
+    if pool_type == "max":
+        return "MaxPool"
+    elif pool_type == "average":
+        return "AveragePool"
+    elif pool_type == "upsample":
+        return "Upsample"
+    return pool_type
+
+
+def _conv_label(
+    args: argparse.Namespace,
+    layer_order: List[str],
+    conv_layer: str,
+) -> str:
+    conv_label = (
+        "<<table border='0' cellborder='1' cellspacing='0' cellpadding='10'><tr>"
+    )
+    for layer in layer_order:
+        if layer == "convolution":
+            conv_label += f"<td port='{layer}' bgcolor='cyan'>{conv_layer}</td>"
+        elif layer == "activation":
+            if args.activation_layer:
+                conv_label += f"<td port='{layer}' bgcolor='yellow'>{_activation_layer(args.activation_layer)}</td>"
+        elif layer == "normalization":
+            if args.normalization_layer:
+                conv_label += f"<td port='{layer}' bgcolor='orange'>{_normalization_layer(args.normalization_layer)}</td>"
+        elif layer == "dropout":
+            if args.spatial_dropout > 0:
+                conv_label += f"<td port='{layer}' bgcolor='grey'>Spatial Dropout</td>"
+    conv_label += "</tr></table>>"
+    return conv_label
+
+
+INVISIBLE_ARGS = {
+    "label": "",
+    "style": "invisible",
+    "fixedsize": True,
+    "width": 0,
+    "height": 0,
+}
+
+
+def _conv_block(
+    args: argparse.Namespace,
+    input_idx: int,
+    conv_label: str,
+    g: pgv.AGraph,
+    last_node: str,
+) -> str:
+    conv_block = []
+
+    for i in range(args.conv_block_size):
+        node = f"{input_idx}_conv_layer_{i}"
+        g.add_node(node, label=conv_label, shape="none", margin=0)
+        g.add_edge(last_node, node)
+        last_node = node
+        conv_block.append(node)
+
+    if args.pool_type:
+        node = f"{input_idx}_conv_pool"
+        g.add_node(
+            node,
+            label=_pool_layer(args.pool_type),
+            style="filled",
+            fillcolor="aquamarine",
+        )
+        g.add_edge(last_node, node)
+        last_node = node
+        conv_block.append(node)
+
+    g.add_subgraph(
+        conv_block,
+        name=f"cluster_{input_idx}_conv_block",
+        style="dotted",
+        label=f"Convolutional Block x{len(args.conv_blocks)}",
+        labeljust="r",
+        labelloc="b",
+    )
+    return last_node
+
+
+def _res_block(
+    args: argparse.Namespace,
+    input_idx: int,
+    conv_label: str,
+    g: pgv.AGraph,
+    last_node: str,
+) -> str:
+    res_block = []
+
+    node = f"{input_idx}_res_start"
+    start_node = node
+    g.add_node(node, **INVISIBLE_ARGS)
+    g.add_edge(last_node, node, arrowhead="none")
+    last_node = node
+    res_block.append(node)
+
+    for i in range(args.residual_block_size):
+        node = f"{input_idx}_res_layer_{i}"
+        g.add_node(node, label=conv_label, shape="none", margin=0)
+        g.add_edge(last_node, node)
+        last_node = node
+        res_block.append(node)
+
+    node = f"{input_idx}_res_end"
+    end_node = node
+    g.add_node(node, label="Add", style="filled", fillcolor="aquamarine")
+    g.add_edge(last_node, node)
+    last_node = node
+    res_block.append(node)
+
+    g.add_edge(
+        start_node,
+        end_node,
+        constraint=False,
+        xlabel="match dimensions via point conv",
+    )
+
+    if args.pool_type:
+        node = f"{input_idx}_res_pool"
+        g.add_node(
+            node,
+            label=_pool_layer(args.pool_type),
+            style="filled",
+            fillcolor="aquamarine",
+        )
+        g.add_edge(last_node, node)
+        last_node = node
+        res_block.append(node)
+
+    g.add_subgraph(
+        res_block,
+        name=f"cluster_{input_idx}_res_block",
+        style="dotted",
+        label=f"Residual Block x{len(args.residual_blocks)}",
+        labeljust="r",
+        labelloc="b",
+    )
+    return last_node
+
+
+def _dense_block(
+    args: argparse.Namespace,
+    input_idx: int,
+    conv_label: str,
+    g: pgv.AGraph,
+    last_node: str,
+) -> str:
+    dense_block = []
+
+    node = f"{input_idx}_dense_start"
+    g.add_node(node, **INVISIBLE_ARGS)
+    g.add_edge(last_node, node, arrowhead="none")
+    last_node = node
+    last_concat = node
+    dense_block.append(node)
+
+    for i in range(args.dense_block_size):
+        node = f"{input_idx}_dense_layer_{i}"
+        g.add_node(node, label=conv_label, shape="none", margin=0)
+        g.add_edge(last_node, node)
+        last_node = node
+        dense_block.append(node)
+
+        if i < args.dense_block_size - 1:
+            node = f"{input_idx}_dense_connect_{i}"
+            g.add_node(node, label="Concat", style="filled", fillcolor="aquamarine")
+            g.add_edge(last_node, node)
+            last_node = node
+            dense_block.append(node)
+            g.add_edge(last_concat, node, constraint=False)
+            last_concat = node
+
+    if args.pool_type:
+        node = f"{input_idx}_dense_pool"
+        g.add_node(
+            node,
+            label=_pool_layer(args.pool_type),
+            style="filled",
+            fillcolor="aquamarine",
+        )
+        g.add_edge(last_node, node)
+        last_node = node
+        dense_block.append(node)
+
+    g.add_subgraph(
+        dense_block,
+        name=f"cluster_{input_idx}_dense_block",
+        style="dotted",
+        label=f"Dense Block x{len(args.dense_blocks)}",
+        labeljust="r",
+        labelloc="b",
+    )
+    return last_node
+
+
+def _fully_connected_label(args: argparse.Namespace, units: int) -> str:
+    label = "<<table border='0' cellborder='1' cellspacing='0' cellpadding='10'><tr>"
+    for layer in args.dense_layer_order:
+        if layer == "dense":
+            label += f"<td port='{layer}' bgcolor='deepskyblue'>Dense ({units})</td>"
+        elif layer == "activation":
+            if args.activation_layer:
+                label += f"<td port='{layer}' bgcolor='yellow'>{_activation_layer(args.activation_layer)}</td>"
+        elif layer == "normalization":
+            if args.normalization_layer:
+                label += f"<td port='{layer}' bgcolor='orange'>{_normalization_layer(args.normalization_layer)}</td>"
+        elif layer == "dropout":
+            if args.dense_dropout > 0:
+                label += f"<td port='{layer}' bgcolor='grey'>Dropout</td>"
+    label += "</tr></table>>"
+
+    return label
+
+
+def plot_condensed_architecture_diagram(args: argparse.Namespace) -> pgv.AGraph:
+    g = pgv.AGraph(directed=True)
+    g.graph_attr.update(rankdir="LR", splines="ortho", fontname="arial")
+    g.node_attr.update(shape="box", fontname="arial")
+    g.edge_attr.update(fontname="arial")
+
+    # Inputs/Encoders
+    encoders = []
+    for input_idx, tm in enumerate(args.tensor_maps_in):
+        node = f"{input_idx}_{tm.name}"
+        g.add_node(node, label=tm.name, style="filled", fillcolor="green")
+        last_node = node
+        dimension = tm.axes
+        if dimension > 1:
+            # Input conv blocks
+            conv_layer = _conv_layer(dimension, args.conv_type)
+
+            if args.conv_blocks:
+                conv_label = _conv_label(args, args.conv_block_layer_order, conv_layer)
+                last_node = _conv_block(args, input_idx, conv_label, g, last_node)
+            if args.residual_blocks:
+                conv_label = _conv_label(
+                    args,
+                    args.residual_block_layer_order,
+                    conv_layer,
+                )
+                last_node = _res_block(args, input_idx, conv_label, g, last_node)
+            if args.dense_blocks:
+                conv_label = _conv_label(args, args.dense_block_layer_order, conv_layer)
+                last_node = _dense_block(args, input_idx, conv_label, g, last_node)
+
+            node = f"{input_idx}_flatten"
+            g.add_node(node, label="Flatten", style="filled", fillcolor="aquamarine")
+            g.add_edge(last_node, node)
+            last_node = node
+        elif tm.annotation_units > 0:
+            # Input fully connected block
+            label = _fully_connected_label(args, tm.annotation_units)
+
+            node = f"{input_idx}_fully_connected_input"
+            g.add_node(node, label=label, shape="none", margin=0)
+            g.add_edge(last_node, node)
+            last_node = node
+        else:
+            # Direct input
+            pass
+        encoders.append(last_node)
+
+    # Bottleneck
+    if args.bottleneck_type != BottleneckType.FlattenRestructure:
+        raise NotImplementedError(
+            f"Simple model architecture diagram for bottleneck type "
+            f"({args.bottleneck_type}) is not yet supported.",
+        )
+
+    if len(encoders) > 1:
+        node = "bottleneck"
+        g.add_node(node, label="Concat", style="filled", fillcolor="aquamarine")
+        for encoder in encoders:
+            g.add_edge(encoder, node)
+        last_node = node
+
+    # Fully connected layers
+    for i, layer in enumerate(args.dense_layers):
+        label = _fully_connected_label(args, layer)
+        node = f"{i}_fully_connected"
+        g.add_node(node, label=label, shape="none", margin=0)
+        g.add_edge(last_node, node)
+        last_node = node
+
+    node = f"predecoder"
+    g.add_node(node, **INVISIBLE_ARGS)
+    g.add_edge(last_node, node, arrowhead="none")
+    last_node = node
+
+    # Outputs/Decoders
+    for output_idx, tm in enumerate(args.tensor_maps_out):
+        dimension = tm.axes
+        if dimension > 1:
+            raise NotImplementedError(
+                f"Simple model architecture diagram for multidimensional outputs "
+                f"({tm}) is not yet supported.",
+            )
+        else:
+            node = f"{output_idx}_{tm.name}"
+            g.add_node(node, label=tm.name, style="filled", fillcolor="green")
+            g.add_edge(last_node, node)
+
+    image_path = os.path.join(
+        args.output_folder,
+        f"condensed-architecture{args.image_ext}",
+    )
+    g.draw(image_path, prog="dot")
+    logging.info(f"Saved architecture diagram to: {image_path}")
+
+    return g
 
 
 def plot_feature_coefficients(

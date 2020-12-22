@@ -9,11 +9,10 @@ from typing import Dict
 
 # Imports: third party
 import numpy as np
-from tensorflow.keras.utils import model_to_dot
 from tensorflow.keras.models import Model
 
 # Imports: first party
-from ml4c3.plots import plot_ecg, plot_architecture_diagram
+from ml4c3.plots import plot_ecg
 from ml4c3.models import make_model, train_model_from_datasets
 from ml4c3.metrics import simclr_loss, simclr_accuracy
 from ml4c3.datasets import get_verbose_stats_string, train_valid_test_datasets
@@ -100,10 +99,6 @@ def build_multimodal_multitask(args: argparse.Namespace) -> Model:
     model = make_model(args)
     model_file = os.path.join(args.output_folder, "model_weights" + MODEL_EXT)
     model.save(model_file)
-    plot_architecture_diagram(
-        model_to_dot(model, show_shapes=True, expand_nested=True),
-        os.path.join(args.output_folder, "architecture_graph" + args.image_ext),
-    )
     logging.info(f"Model saved to {model_file}")
     return model
 

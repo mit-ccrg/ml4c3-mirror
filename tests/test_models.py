@@ -12,34 +12,47 @@ import tensorflow as tf
 from ml4c3.models import (
     MODEL_EXT,
     ACTIVATION_FUNCTIONS,
-    BottleneckType,
     make_multimodal_multitask_model,
 )
+from definitions.models import BottleneckType
 from ml4c3.tensormap.TensorMap import TensorMap
 
 MEAN_PRECISION_EPS = 0.02  # how much mean precision degradation is acceptable
 DEFAULT_PARAMS = {
-    "activation": "relu",
-    "block_size": 3,
-    "bottleneck_type": BottleneckType.FlattenRestructure,
-    "conv_layers": [6, 5, 3],
     "conv_type": "conv",
-    "conv_width": 3,
+    "conv_blocks": [6],
+    "conv_block_size": 1,
+    "conv_block_layer_order": ["convolution", "activation", "dropout", "normalization"],
+    "residual_blocks": [5, 3],
+    "residual_block_size": 3,
+    "residual_block_layer_order": [
+        "convolution",
+        "activation",
+        "dropout",
+        "normalization",
+    ],
+    "dense_blocks": [5, 3],
+    "dense_block_size": 3,
+    "dense_block_layer_order": [
+        "normalization",
+        "activation",
+        "convolution",
+        "dropout",
+    ],
     "conv_x": [3],
     "conv_y": [3],
     "conv_z": [2],
-    "dense_blocks": [5, 3],
-    "dense_dropout": 0,
-    "dense_layers": [4, 2],
-    "layer_order": ["activation", "regularization", "normalization"],
-    "learning_rate": 1e-3,
-    "max_pools": [],
-    "optimizer": "adam",
-    "padding": "same",
+    "conv_padding": "same",
     "pool_type": "max",
     "pool_x": 1,
     "pool_y": 1,
     "pool_z": 1,
+    "bottleneck_type": BottleneckType.FlattenRestructure,
+    "dense_layers": [4, 2],
+    "activation_layer": "relu",
+    "dense_layer_order": ["dense", "normalization", "activation", "dropout"],
+    "optimizer": "adam",
+    "learning_rate": 1e-3,
 }
 
 TrainType = Dict[str, np.ndarray]
@@ -76,9 +89,7 @@ def assert_model_trains(
         )
     for tmap, tensor in zip(input_tmaps, m.inputs):
         assert tensor.shape[1:] == tmap.shape
-        assert tensor.shape[1:] == tmap.shape
     for tmap, tensor in zip(output_tmaps, m.outputs):
-        assert tensor.shape[1:] == tmap.shape
         assert tensor.shape[1:] == tmap.shape
     data = make_training_data(input_tmaps, output_tmaps)
     history = m.fit(

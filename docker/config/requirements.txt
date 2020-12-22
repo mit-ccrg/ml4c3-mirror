@@ -11,6 +11,7 @@ jupyterlab
 lxml
 neurokit2
 pydot>=1.2.4
+pygraphviz
 pylint
 pyodbc
 pytz

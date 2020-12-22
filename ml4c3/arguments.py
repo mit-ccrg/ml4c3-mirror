@@ -13,7 +13,7 @@ import numpy as np
 
 # Imports: first party
 from ml4c3.logger import load_config
-from ml4c3.models import BottleneckType
+from definitions.models import BottleneckType
 from ml4c3.tensormap.TensorMap import TensorMap, update_tmaps
 
 BOTTLENECK_STR_TO_ENUM = {
@@ -318,39 +318,77 @@ def parse_args() -> argparse.Namespace:
     # Model Architecture Parameters
     model_parser = argparse.ArgumentParser(add_help=False)
     model_parser.add_argument(
-        "--activation",
-        default="relu",
-        help="Activation function for hidden units in neural nets dense layers.",
+        "--conv_type",
+        default="conv",
+        choices=["conv", "separable", "depth"],
+        help="Type of convolutional layer used in conv, residual, and dense blocks",
     )
     model_parser.add_argument(
-        "--block_size",
+        "--conv_blocks",
+        nargs="*",
+        type=int,
+        help=(
+            "Number of filters to use in all convolutional layers for each "
+            "convolutional block."
+        ),
+    )
+    model_parser.add_argument(
+        "--conv_block_size",
+        default=1,
+        type=int,
+        help="Number of convolutional layers within a convolutional block.",
+    )
+    model_parser.add_argument(
+        "--conv_block_layer_order",
+        nargs=4,
+        default=["convolution", "normalization", "activation", "dropout"],
+        choices=["convolution", "normalization", "activation", "dropout"],
+        help="TODO",
+    )
+    model_parser.add_argument(
+        "--residual_blocks",
+        nargs="*",
+        type=int,
+        help=(
+            "Number of filters to use in all convolutional layers for each residual "
+            "block. Original residual block paper: https://arxiv.org/abs/1512.03385"
+        ),
+    )
+    model_parser.add_argument(
+        "--residual_block_size",
+        default=2,
+        type=int,
+        help="Number of convolutional layers within a residual block.",
+    )
+    model_parser.add_argument(
+        "--residual_block_layer_order",
+        nargs=4,
+        default=["convolution", "normalization", "activation", "dropout"],
+        choices=["convolution", "normalization", "activation", "dropout"],
+        help="TODO",
+    )
+    model_parser.add_argument(
+        "--dense_blocks",
+        nargs="*",
+        default=[32, 24, 16],
+        type=int,
+        help=(
+            "Number of filters to use in all convolutional layers for each dense block."
+            " Original dense block paper: https://arxiv.org/abs/1608.06993"
+        ),
+    )
+    model_parser.add_argument(
+        "--dense_block_size",
         default=3,
         type=int,
-        help="Number of convolutional layers within a block.",
+        help="Number of convolutional layers within a dense block.",
     )
     model_parser.add_argument(
-        "--bottleneck_type",
-        type=str,
-        default=list(BOTTLENECK_STR_TO_ENUM)[0],
-        choices=list(BOTTLENECK_STR_TO_ENUM),
-    )
-    model_parser.add_argument(
-        "--save_coefficients",
-        action="store_true",
-        help="Save model coefficients to CSV file",
-    )
-    model_parser.add_argument(
-        "--top_features_to_plot",
-        default=None,
-        type=int,
-        help="Number of features to plot in features coefficients plot.",
-    )
-    model_parser.add_argument(
-        "--conv_layers",
-        nargs="*",
-        default=[32],
-        type=int,
-        help="List of number of kernels in convolutional layers.",
+        "--dense_block_layer_order",
+        nargs=4,
+        default=["normalization", "activation", "convolution", "dropout"],
+        choices=["convolution", "normalization", "activation", "dropout"],
+        help="TODO",
     )
     model_parser.add_argument(
         "--conv_x",
@@ -358,9 +396,10 @@ def parse_args() -> argparse.Namespace:
         nargs="*",
         type=int,
         help=(
-            "X dimension of convolutional kernel. Filter sizes are specified per layer"
-            " given by conv_layers and per block given by dense_blocks. Filter sizes"
-            " are repeated if there are less than the number of layers/blocks."
+            "X dimension of convolutional kernel. Kernel dimensions are specified per "
+            "conv_block, residual_block, and dense_block. Kernel dimensions are "
+            "repeated if the number of kernels specified is less than the number of "
+            "blocks."
         ),
     )
     model_parser.add_argument(
@@ -368,107 +407,29 @@ def parse_args() -> argparse.Namespace:
         default=[3],
         nargs="*",
         type=int,
-        help=(
-            "Y dimension of convolutional kernel. Filter sizes are specified per layer"
-            " given by conv_layers and per block given by dense_blocks. Filter sizes"
-            " are repeated if there are less than the number of layers/blocks."
-        ),
+        help="Y dimension of convolutional kernel. See --conv_x.",
     )
     model_parser.add_argument(
         "--conv_z",
         default=[2],
         nargs="*",
         type=int,
-        help=(
-            "Z dimension of convolutional kernel. Filter sizes are specified per layer"
-            " given by conv_layers and per block given by dense_blocks. Filter sizes"
-            " are repeated if there are less than the number of layers/blocks."
-        ),
+        help="Z dimension of convolutional kernel. See --conv_x.",
     )
     model_parser.add_argument(
-        "--conv_dilate",
-        default=False,
-        action="store_true",
-        help="Dilate the convolutional layers.",
-    )
-    model_parser.add_argument(
-        "--spatial_dropout",
-        default=0.0,
-        type=float,
-        help="Dropout rate of convolutional kernels; must be in [0, 1].",
-    )
-    model_parser.add_argument(
-        "--conv_type",
-        default="conv",
-        choices=["conv", "separable", "depth"],
-        help="Type of convolutional layer",
-    )
-    model_parser.add_argument(
-        "--dense_blocks",
-        nargs="*",
-        default=[32, 24, 16],
-        type=int,
-        help="List of number of kernels in convolutional layers.",
-    )
-    model_parser.add_argument(
-        "--dense_layers",
-        nargs="*",
-        default=[32, 16],
-        type=int,
-        help="List of number of hidden units in neural nets dense layers.",
-    )
-    model_parser.add_argument(
-        "--dense_dropout",
-        default=0.0,
-        type=float,
-        help="Dropout rate of dense (fully connected) layers; must be in [0, 1].",
-    )
-    model_parser.add_argument(
-        "--directly_embed_and_repeat",
-        type=int,
-        help="If set, directly embed input tensors (without passing to a dense layer)"
-        " into concatenation layer, and repeat each input N times, where N is this"
-        " argument's value. To directly embed a feature without repetition, set to 1.",
-    )
-    model_parser.add_argument(
-        "--layer_normalization",
-        choices=["", "batch_norm", "layer_norm", "instance_norm", "poincare_norm"],
-        help="Type of normalization layer after dense or convolutional layer.",
-    )
-    model_parser.add_argument(
-        "--layer_order",
-        nargs=3,
-        default=["normalization", "activation", "dropout"],
-        choices=["normalization", "activation", "dropout"],
-        help=(
-            "Order of normalization, activation, and dropout after "
-            "dense or convolutional layers."
-        ),
-    )
-    model_parser.add_argument(
-        "--nest_model",
-        nargs=2,
-        action="append",
-        help="Embed a nested model ending at the specified layer before the bottleneck"
-        " layer of the current model. Repeat this argument to embed multiple models."
-        " For example --nest_model /path/to/model_weights.h5 embed_layer",
-    )
-    model_parser.add_argument(
-        "--padding",
+        "--conv_padding",
         default="same",
         help="Valid or same border padding on the convolutional layers.",
     )
     model_parser.add_argument(
-        "--pool_after_final_dense_block",
-        default=True,
-        action="store_false",
-        help="Pool the last layer of all dense blocks.",
-    )
-    model_parser.add_argument(
         "--pool_type",
+        nargs="?",
         default="max",
         choices=["max", "average"],
-        help="Type of pooling layers.",
+        help=(
+            "Type of pooling layers inserted between conv_layers, residual_blocks, and "
+            "dense_blocks."
+        ),
     )
     model_parser.add_argument(
         "--pool_x",
@@ -487,6 +448,77 @@ def parse_args() -> argparse.Namespace:
         default=1,
         type=int,
         help="Pooling size in the z-axis, if 1 no pooling will be performed.",
+    )
+    model_parser.add_argument(
+        "--bottleneck_type",
+        type=str,
+        default=list(BOTTLENECK_STR_TO_ENUM)[0],
+        choices=list(BOTTLENECK_STR_TO_ENUM),
+    )
+    model_parser.add_argument(
+        "--dense_layers",
+        nargs="*",
+        default=[32, 16],
+        type=int,
+        help="List of number of hidden units in dense (fully connected) layers.",
+    )
+    model_parser.add_argument(
+        "--activation_layer",
+        default="relu",
+        nargs="?",
+        help=(
+            "Type of activation layer after dense (fully connected) or convolutional "
+            "layers."
+        ),
+    )
+    model_parser.add_argument(
+        "--normalization_layer",
+        nargs="?",
+        choices=["batch_norm", "layer_norm", "instance_norm", "poincare_norm"],
+        help=(
+            "Type of normalization layer after dense (fully connected) or convolutional"
+            " layers."
+        ),
+    )
+    model_parser.add_argument(
+        "--spatial_dropout",
+        default=0.0,
+        type=float,
+        help="Dropout rate of convolutional kernels; must be in [0, 1].",
+    )
+    model_parser.add_argument(
+        "--dense_dropout",
+        default=0.0,
+        type=float,
+        help="Dropout rate of dense (fully connected) layers; must be in [0, 1].",
+    )
+    model_parser.add_argument(
+        "--dense_layer_order",
+        nargs=4,
+        default=["dense", "normalization", "activation", "dropout"],
+        choices=["dense", "normalization", "activation", "dropout"],
+        help=(
+            "Order of dense (fully connected), normalization, activation, and dropout "
+            "layers."
+        ),
+    )
+    model_parser.add_argument(
+        "--nest_model",
+        nargs=2,
+        action="append",
+        help="Embed a nested model ending at the specified layer before the bottleneck"
+        " layer of the current model. Repeat this argument to embed multiple models."
+        " For example --nest_model /path/to/model_weights.h5 embed_layer",
+    )
+    model_parser.add_argument(
+        "--save_coefficients",
+        action="store_true",
+        help="Save model coefficients to CSV file",
+    )
+    model_parser.add_argument(
+        "--top_features_to_plot",
+        type=int,
+        help="Number of features to plot in features coefficients plot.",
     )
 
     # Training Parameters
@@ -1189,12 +1221,6 @@ def _process_args(args: argparse.Namespace):
     logging.info(f"Command Line was: {command_line}")
     if "input_tensors" in args and args.recipe != "explore_icu":
         logging.info(f"Total TensorMaps: {len(tmaps)} Arguments are {args}")
-
-    if "layer_order" in args and len(set(args.layer_order)) != 3:
-        raise ValueError(
-            "Activation, normalization, and dropout layers must each be listed"
-            f" exactly once for valid ordering. Got : {args.layer_order}",
-        )
 
     if args.num_workers <= 0:
         raise ValueError(
