@@ -486,9 +486,22 @@ def make_multimodal_multitask_model(
     num_residual = len(residual_blocks)
     num_dense = len(dense_blocks)
     num_filters_needed = num_conv + num_residual + num_dense
-    conv_x = _repeat_dimension(conv_x, "x", num_filters_needed)
-    conv_y = _repeat_dimension(conv_y, "y", num_filters_needed)
-    conv_z = _repeat_dimension(conv_z, "z", num_filters_needed)
+
+    conv_x = _repeat_dimension(
+        dim=conv_x,
+        name="x",
+        num_filters_needed=num_filters_needed,
+    )
+    conv_y = _repeat_dimension(
+        dim=conv_y,
+        name="y",
+        num_filters_needed=num_filters_needed,
+    )
+    conv_z = _repeat_dimension(
+        dim=conv_z,
+        name="z",
+        num_filters_needed=num_filters_needed,
+    )
 
     nest_model = nest_model or []
     nested_models = [
@@ -1422,6 +1435,8 @@ def _calc_start_shape(
 
 
 def _repeat_dimension(dim: List[int], name: str, num_filters_needed: int) -> List[int]:
+    if dim is None:
+        dim = [-1]
     if len(dim) != num_filters_needed:
         logging.warning(
             f"Number of {name} dimensions for convolutional kernel sizes ({len(dim)})"
