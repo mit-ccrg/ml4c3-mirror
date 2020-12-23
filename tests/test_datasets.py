@@ -195,7 +195,7 @@ class TestDataset:
         for _ in range(repeat_test):
             dataset, stats, cleanup = make_dataset(
                 data_split="train",
-                hd5_sources=[default_arguments.tensors],
+                hd5_sources=[[default_arguments.tensors]],
                 csv_sources=[],
                 patient_ids=train_ids,
                 input_tmaps=default_arguments.tensor_maps_in,

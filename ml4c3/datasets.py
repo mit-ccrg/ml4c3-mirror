@@ -99,7 +99,7 @@ def _get_sample(
 
 def _tensor_worker(
     worker_name: str,
-    hd5_sources: List[str],
+    hd5_sources: List[List[str]],
     csv_data: List[Tuple[str, pd.DataFrame, str]],
     patient_ids: List[int],
     start_signal: Event,
@@ -133,16 +133,21 @@ def _tensor_worker(
                 tensors = []
                 data = PatientData(patient_id=patient_id)
 
-                # Add top level groups in hd5s to patient dictionary
+                # Add top level groups in hd5s to patient dictionary;
+                # iterate over all subdirectories in the hd5 source directory
+                # and check if the file exists at that full path; if it does,
+                # append open hd5 file object to PatientData and move to next
+                # hd5_source
                 for hd5_source in hd5_sources:
-                    hd5_path = os.path.join(hd5_source, f"{patient_id}.hd5")
-                    if not os.path.isfile(hd5_path):
-                        continue
-                    hd5 = h5py.File(hd5_path, "r")
-                    for key in hd5:
-                        data[key] = hd5[key]
-                    open_hd5s.append(hd5)
-
+                    for subdir in hd5_source:
+                        hd5_path = os.path.join(subdir, f"{patient_id}.hd5")
+                        if not os.path.isfile(hd5_path):
+                            continue
+                        hd5 = h5py.File(hd5_path, "r")
+                        for key in hd5:
+                            data[key] = hd5[key]
+                        open_hd5s.append(hd5)
+                        break
                 # Add rows in csv with patient data accessible in patient dictionary
                 for csv_name, df, mrn_col in csv_data:
                     mask = df[mrn_col] == patient_id
@@ -272,7 +277,7 @@ def _csv_data_source_name_among_tmap_path_prefixes(
 def make_data_generator_factory(
     data_split: str,
     num_workers: int,
-    hd5_sources: List[str],
+    hd5_sources: List[List[str]],
     csv_sources: List[Tuple[str, str]],
     patient_ids: Set[int],
     input_tmaps: List[TensorMap],
@@ -402,7 +407,7 @@ def make_data_generator_factory(
 
 def make_dataset(
     data_split: str,
-    hd5_sources: List[str],
+    hd5_sources: List[List[str]],
     csv_sources: List[Tuple[str, str]],
     patient_ids: Set[int],
     input_tmaps: List[TensorMap],
@@ -518,7 +523,8 @@ def tensors_to_sources(
             csv_name = os.path.splitext(os.path.basename(source))[0]
             csv_sources.append((source, csv_name))
         else:
-            hd5_sources.append(source)
+            hd5_subdirs = [root_dir[0] for root_dir in os.walk(source)]
+            hd5_sources.append(hd5_subdirs)
     _csv_data_source_name_among_tmap_path_prefixes(
         tmaps=tmaps,
         csv_sources=csv_sources,
