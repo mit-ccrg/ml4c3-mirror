@@ -9,7 +9,6 @@ import numpy as np
 import pytest
 
 # Imports: first party
-from ml4c3.recipes import run
 from ml4c3.arguments import parse_args
 from ingest.icu.tensorizer import Tensorizer
 
@@ -36,6 +35,7 @@ def test_tensorizer(
     .
     tensorize_icu_no_edw_pull
     --path_xref {test_dir}/data/xref_file_tensorize.csv
+    --path_adt {test_dir}/data/edw/adt
     --path_bedmaster {test_dir}/data/bedmaster
     --path_edw {test_dir}/data/edw
     --path_alarms {test_dir}/data/bedmaster_alarms
@@ -57,6 +57,7 @@ def test_tensorizer(
         args.path_alarms,
         args.path_edw,
         args.path_xref,
+        args.path_adt,
     )
     tensorizer.tensorize(
         tensors=args.tensors,

@@ -158,9 +158,9 @@ def stage_bedmaster_files(
             try:
                 shutil.copy(path_source_file, path_destination_dir)
             except FileNotFoundError as e:
-                logging.warning(f"{path} not found. Error given: {e}")
+                logging.warning(f"{path_source_file} not found. Error given: {e}")
         else:
-            logging.warning(f"{path} not found.")
+            logging.warning(f"{path_source_file} not found.")
 
 
 def get_files_in_directory(

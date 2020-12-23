@@ -40,6 +40,7 @@ class Tensorizer:
         alarms_dir: str,
         edw_dir: str,
         xref_path: str,
+        adt_path: str,
     ):
         """
         Initialize Tensorizer object.
@@ -49,11 +50,14 @@ class Tensorizer:
         :param edw_dir: <str> Directory containing all the EDW data.
         :param xref_path: <str> Full path of the file containing
                cross reference between EDW and Bedmaster.
+        :param adt_path: <str> Full path of the file containing
+               the adt patients' info to be tensorized.
         """
         self.bedmaster_dir = bedmaster_dir
         self.alarms_dir = alarms_dir
         self.edw_dir = edw_dir
         self.xref_path = xref_path
+        self.adt_path = adt_path
         self.untensorized_files: Dict[str, List[str]] = {"file": [], "error": []}
 
     def tensorize(
@@ -117,15 +121,6 @@ class Tensorizer:
         )
         os.makedirs(tensors, exist_ok=True)
 
-        for mrn, visits in files_per_mrn.items():
-            self._main_write(
-                tensors=tensors,
-                mrn=mrn,
-                visits=visits,
-                scaling_and_units=ICU_SCALE_UNITS,
-            )
-
-        """
         with multiprocessing.Pool(processes=num_workers) as pool:
             pool.starmap(
                 self._main_write,
@@ -134,7 +129,6 @@ class Tensorizer:
                     for mrn, visits in files_per_mrn.items()
                 ],
             )
-        """
 
         df = pd.DataFrame.from_dict(self.untensorized_files)
         df.to_csv(
@@ -172,6 +166,7 @@ class Tensorizer:
                     self._write_bedmaster_alarms_data(
                         self.alarms_dir,
                         self.edw_dir,
+                        self.adt_path,
                         mrn,
                         visit_id,
                         writer=writer,
@@ -230,12 +225,13 @@ class Tensorizer:
     def _write_bedmaster_alarms_data(
         alarms_path: str,
         edw_path: str,
+        adt_path: str,
         mrn: str,
         visit_id: str,
         writer: Writer,
     ):
 
-        reader = BedmasterAlarmsReader(alarms_path, edw_path, mrn, visit_id)
+        reader = BedmasterAlarmsReader(alarms_path, edw_path, mrn, visit_id, adt_path)
         alarms = reader.list_alarms()
         for alarm in alarms:
             alarm_instance = reader.get_alarm(alarm)
@@ -333,7 +329,7 @@ def copy_hd5(path_staging_dir: str, destination_tensors: str, num_workers: int):
     init_time = time.time()
     list_files = os.listdir(path_staging_dir)
 
-    with multiprocessing.Pool(processes=workers) as pool:
+    with multiprocessing.Pool(processes=num_workers) as pool:
         pool.starmap(
             _copy_hd5,
             [(path_staging_dir, destination_tensors, file) for file in list_files],
@@ -341,7 +337,8 @@ def copy_hd5(path_staging_dir: str, destination_tensors: str, num_workers: int):
 
     elapsed_time = time.time() - init_time
     logging.info(
-        f"HD5 files copied to {destination_tensors}. Process took {elapsed_time:.2f} sec",
+        f"HD5 files copied to {destination_tensors}. "
+        f"Process took {elapsed_time:.2f} sec",
     )
 
 
@@ -434,7 +431,8 @@ def tensorize(args):
         )
         elapsed_time = time.time() - init
         logging.info(
-            f"Bedmaster files copied to {args.path_bedmaster} in {elapsed_time:.2f} sec",
+            f"Bedmaster files copied to {args.path_bedmaster} "
+            f"in {elapsed_time:.2f} sec",
         )
 
         # Get paths to staging directories
@@ -443,6 +441,7 @@ def tensorize(args):
         path_edw_staging = get_path_to_staging_dir("edw_temp")
         path_alarms_staging = get_path_to_staging_dir("bedmaster_alarms_temp")
         path_xref_staging = get_path_to_staging_dir("edw_temp/xref.csv")
+        path_adt_staging = get_path_to_staging_dir("edw_temp/adt.csv")
         path_tensors_staging = get_path_to_staging_dir("results_temp")
 
         # Run tensorization
@@ -451,6 +450,7 @@ def tensorize(args):
             alarms_dir=path_alarms_staging,
             edw_dir=path_edw_staging,
             xref_path=path_xref_staging,
+            adt_path=path_adt_staging,
         )
         tensorizer.tensorize(
             tensors=path_tensors_staging,
@@ -475,7 +475,7 @@ def tensorize(args):
         if not os.path.isdir(args.tensors):
             os.makedirs(args.tensors)
         copy_hd5(
-            path_staging_dir=local_tensors,
+            path_staging_dir=path_tensors_staging,
             destination_tensors=args.tensors,
             num_workers=args.num_workers,
         )
@@ -486,11 +486,12 @@ def tensorize(args):
         elapsed_time = end_batch_time - start_batch_time
         logging.info(
             f"Processed batch {idx_batch + 1}/{total_batch} of "
-            f"{last_mrn_index - first_mrn_index} patients in {elapsed_time:.2f} seconds.",
+            f"{last_mrn_index - first_mrn_index} patients in "
+            f"{elapsed_time:.2f} seconds.",
         )
         if missed_files:
             logging.info(
-                f"From {last_mrn_index - first_mrn_index} patients, {len(missed_files)} "
+                f"From {last_mrn_index - first_mrn_index} patients, {len(missed_files)}"
                 f"HD5 files are not tensorized. MRN of those patients: {missed_files}.",
             )
         else:

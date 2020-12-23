@@ -110,6 +110,7 @@ def pytest_configure():
         pytest.example_mrn,
         pytest.example_visit_id,
     )
+    pytest.adt_path = os.path.join(pytest.edw_dir, "adt.csv")
 
     # Alarms
     pytest.alarms_dir = os.path.join(pytest.datadir, "bedmaster_alarms")

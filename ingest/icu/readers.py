@@ -1358,6 +1358,7 @@ class BedmasterAlarmsReader(Reader):
         edw_path: str,
         mrn: str,
         csn: str,
+        adt_file: str,
         move_file: str = EDW_FILES["move_file"]["name"],
     ):
         """
@@ -1367,6 +1368,7 @@ class BedmasterAlarmsReader(Reader):
         :param edw_path: Absolute path of edw directory.
         :param mrn: MRN of the patient.
         :param csn: CSN of the patient visit.
+        :param adt_file: Path to adt table.
         :param move_file: File containing the movements of the patient
                           (admission, transfer and discharge) from the patient.
                           Can be inferred if None.
@@ -1378,6 +1380,7 @@ class BedmasterAlarmsReader(Reader):
         if not move_file.endswith(".csv"):
             move_file += ".csv"
         self.move_file = os.path.join(self.edw_path, self.mrn, self.csn, move_file)
+        self.adt_file = adt_file
         self.alarms_dfs = self._get_alarms_dfs()
 
     def list_alarms(self) -> List[str]:
@@ -1429,7 +1432,13 @@ class BedmasterAlarmsReader(Reader):
         :return: <List[pd.core.frame.DataFrame]> List with all the Bedmaster alarms
                  data frames containing data for the given patient.
         """
-        movement_df = pd.read_csv(self.move_file)
+        if os.path.isfile(self.move_file):
+            movement_df = pd.read_csv(self.move_file)
+        else:
+            adt_df = pd.read_csv(self.adt_file)
+            movement_df = adt_df[adt_df["MRN"] == self.mrn]
+            movement_df = movement_df[movement_df["PatientEncounterID"] == self.csn]
+
         department_nm = np.array(movement_df["DepartmentDSC"], dtype=str)
         room_bed = np.array(movement_df["BedLabelNM"], dtype=str)
         transfer_in = np.array(movement_df["TransferInDTS"], dtype=str)
@@ -1575,7 +1584,6 @@ class CrossReferencer:
             for folder in os.listdir(self.edw_dir)
             if os.path.isdir(os.path.join(self.edw_dir, folder))
         ]
-
         if mrns:
             xref = xref[xref["MRN"].isin(mrns)]
             edw_mrns = [ele for ele in edw_mrns if ele in mrns]
@@ -1606,7 +1614,6 @@ class CrossReferencer:
                 "not set, ignoring overwrite_hd5 option. HD5 files are "
                 "going to be overwritten.",
             )
-
         self.add_bedmaster_elements(
             xref=xref,
             edw_mrns=edw_mrns,
@@ -1632,7 +1639,7 @@ class CrossReferencer:
         # Add elements from xref.csv
         for _, row in xref.iterrows():
             mrn = str(row["MRN"])
-            if allow_one_source and mrn not in edw_mrns:
+            if not allow_one_source and mrn not in edw_mrns:
                 continue
             try:
                 csn = str(int(row["PatientEncounterID"]))

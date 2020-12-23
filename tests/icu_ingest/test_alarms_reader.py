@@ -14,6 +14,7 @@ def alarms_reader() -> BedmasterAlarmsReader:
         pytest.edw_dir,
         pytest.example_mrn,
         pytest.example_visit_id,
+        pytest.adt_path,
     )
     return reader
 

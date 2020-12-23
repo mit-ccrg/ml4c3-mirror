@@ -49,10 +49,7 @@ def test_get_xref_files(cross_referencer: CrossReferencer):
     }
     assert cross_referencer.get_xref_files() == expected_dict
     assert cross_referencer.get_xref_files(mrns=["456"]) == expected_dict2
-    assert (
-        cross_referencer.get_xref_files(starting_time=240, ending_time=420)
-        == expected_dict2
-    )
+    assert cross_referencer.get_xref_files(starting_time=240, ending_time=420) == {}
     assert (
         cross_referencer.get_xref_files(
             overwrite_hd5=False,
