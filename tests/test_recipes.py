@@ -52,7 +52,7 @@ class TestRecipes:
                 tensor_from_file=pytest.TFF,
             ),
         )
-        explore_expected = utils.build_hdf5s(temp_dir, tmaps, n=pytest.N_TENSORS)
+        explore_expected = utils.build_hd5s(temp_dir, tmaps, n=pytest.N_TENSORS)
         default_arguments_explore.num_workers = 3
         default_arguments_explore.tensor_maps_in = tmaps
         default_arguments_explore.explore_export_fpath = True

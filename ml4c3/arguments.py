@@ -141,7 +141,7 @@ def parse_args() -> argparse.Namespace:
         help="Enable caching of tf.data.Dataset, on by default.",
     )
     cache_parser.add_argument(
-        "--no_cache",
+        "--cache_off",
         dest="cache",
         action="store_false",
         help="Disable caching of tf.data.Dataset.",
@@ -149,7 +149,7 @@ def parse_args() -> argparse.Namespace:
     cache_parser.set_defaults(cache=True)
     run_parser.add_argument(
         "--random_seed",
-        default=12878,
+        default=2021,
         type=int,
         help="Random seed to use throughout run.  Always use np.random.",
     )
@@ -334,7 +334,6 @@ def parse_args() -> argparse.Namespace:
     )
     model_parser.add_argument(
         "--conv_block_size",
-        default=1,
         type=int,
         help="Number of convolutional layers within a convolutional block.",
     )
@@ -356,7 +355,6 @@ def parse_args() -> argparse.Namespace:
     )
     model_parser.add_argument(
         "--residual_block_size",
-        default=2,
         type=int,
         help="Number of convolutional layers within a residual block.",
     )
@@ -370,7 +368,6 @@ def parse_args() -> argparse.Namespace:
     model_parser.add_argument(
         "--dense_blocks",
         nargs="*",
-        default=[32, 24, 16],
         type=int,
         help=(
             "Number of filters to use in all convolutional layers for each dense block."
@@ -379,20 +376,18 @@ def parse_args() -> argparse.Namespace:
     )
     model_parser.add_argument(
         "--dense_block_size",
-        default=3,
         type=int,
         help="Number of convolutional layers within a dense block.",
     )
     model_parser.add_argument(
         "--dense_block_layer_order",
         nargs=4,
-        default=["normalization", "activation", "convolution", "dropout"],
+        default=["convolution", "normalization", "activation", "dropout"],
         choices=["convolution", "normalization", "activation", "dropout"],
         help="TODO",
     )
     model_parser.add_argument(
         "--conv_x",
-        default=[3],
         nargs="*",
         type=int,
         help=(
@@ -404,14 +399,12 @@ def parse_args() -> argparse.Namespace:
     )
     model_parser.add_argument(
         "--conv_y",
-        default=[3],
         nargs="*",
         type=int,
         help="Y dimension of convolutional kernel. See --conv_x.",
     )
     model_parser.add_argument(
         "--conv_z",
-        default=[2],
         nargs="*",
         type=int,
         help="Z dimension of convolutional kernel. See --conv_x.",
@@ -424,7 +417,6 @@ def parse_args() -> argparse.Namespace:
     model_parser.add_argument(
         "--pool_type",
         nargs="?",
-        default="max",
         choices=["max", "average"],
         help=(
             "Type of pooling layers inserted between conv_layers, residual_blocks, and "
@@ -433,19 +425,16 @@ def parse_args() -> argparse.Namespace:
     )
     model_parser.add_argument(
         "--pool_x",
-        default=2,
         type=int,
         help="Pooling size in the x-axis, if 1 no pooling will be performed.",
     )
     model_parser.add_argument(
         "--pool_y",
-        default=2,
         type=int,
         help="Pooling size in the y-axis, if 1 no pooling will be performed.",
     )
     model_parser.add_argument(
         "--pool_z",
-        default=1,
         type=int,
         help="Pooling size in the z-axis, if 1 no pooling will be performed.",
     )
@@ -458,13 +447,11 @@ def parse_args() -> argparse.Namespace:
     model_parser.add_argument(
         "--dense_layers",
         nargs="*",
-        default=[32, 16],
         type=int,
         help="List of number of hidden units in dense (fully connected) layers.",
     )
     model_parser.add_argument(
         "--activation_layer",
-        default="relu",
         nargs="?",
         help=(
             "Type of activation layer after dense (fully connected) or convolutional "
@@ -525,13 +512,11 @@ def parse_args() -> argparse.Namespace:
     training_parser = argparse.ArgumentParser(add_help=False)
     training_parser.add_argument(
         "--epochs",
-        default=12,
         type=int,
         help="Number of training epochs.",
     )
     training_parser.add_argument(
         "--batch_size",
-        default=16,
         type=int,
         help="Mini batch size for stochastic gradient descent algorithms.",
     )
@@ -579,7 +564,6 @@ def parse_args() -> argparse.Namespace:
     )
     training_parser.add_argument(
         "--learning_rate",
-        default=0.0002,
         type=float,
         help="Learning rate during training.",
     )
@@ -613,42 +597,13 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     training_parser.add_argument(
-        "--balance_csvs",
-        default=[],
-        nargs="*",
-        help=(
-            "Balances batches with representation from sample IDs in this list of CSVs"
-        ),
-    )
-    training_parser.add_argument(
         "--optimizer",
-        default="adam",
-        type=str,
         help="Optimizer for model training",
     )
     training_parser.add_argument(
         "--learning_rate_schedule",
-        type=str,
         choices=["triangular", "triangular2"],
         help="Adjusts learning rate during training.",
-    )
-    training_parser.add_argument(
-        "--anneal_rate",
-        default=0.0,
-        type=float,
-        help="Annealing rate in epochs of loss terms during training",
-    )
-    training_parser.add_argument(
-        "--anneal_shift",
-        default=0.0,
-        type=float,
-        help="Annealing offset in epochs of loss terms during training",
-    )
-    training_parser.add_argument(
-        "--anneal_max",
-        default=2.0,
-        type=float,
-        help="Annealing maximum value",
     )
     training_parser.add_argument(
         "--l1",

@@ -121,13 +121,13 @@ pytest_configure()
 
 class Utils:
     @staticmethod
-    def build_hdf5s(
+    def build_hd5s(
         path: str,
         tensor_maps: List[TensorMap],
         n=5,
     ) -> Dict[Tuple[str, TensorMap], np.ndarray]:
         """
-        Builds hdf5s at path given TensorMaps. Only works for Continuous and
+        Builds hd5s at path given TensorMaps. Only works for Continuous and
         Categorical TensorMaps.
         """
         out = {}
@@ -142,7 +142,7 @@ class Utils:
                         value[..., i % tm.shape[-1]] = 1
                     else:
                         raise NotImplementedError(
-                            "Cannot automatically build hdf5 from interpretation"
+                            "Cannot automatically build hd5 from interpretation"
                             f' "{tm.interpretation}"',
                         )
                     hd5.create_dataset(f"/{tm.name}", data=value)
@@ -177,37 +177,58 @@ def use_testing_tmaps(monkeypatch):
     monkeypatch.setattr("ml4c3.hyperoptimizers.update_tmaps", mock_update_tmaps)
 
 
+baseline_default_arguments = [
+    "--input_tensors",
+    "3d_cont",
+    "--output_tensors",
+    "1d_cat",
+    "--conv_x",
+    "3",
+    "--conv_y",
+    "3",
+    "--conv_z",
+    "3",
+    "--pool_x",
+    "1",
+    "--pool_y",
+    "1",
+    "--pool_z",
+    "1",
+    "--num_workers",
+    "1",
+    "--epochs",
+    "2",
+    "--batch_size",
+    "2",
+    "--dense_layers",
+    "4",
+    "--conv_blocks",
+    "4",
+    "--conv_block_size",
+    "3",
+    "--optimizer",
+    "adam",
+    "--activation_layer",
+    "relu",
+    "--learning_rate",
+    "0.001",
+]
+
+
 @pytest.fixture(scope="function")
 def default_arguments(tmpdir_factory, utils: Utils) -> argparse.Namespace:
     temp_dir = tmpdir_factory.mktemp("data")
-    utils.build_hdf5s(temp_dir, pytest.MOCK_TMAPS.values(), n=pytest.N_TENSORS)
-    hdf5_dir = str(temp_dir)
-    inp_key = "3d_cont"
-    out_key = "1d_cat"
+    utils.build_hd5s(temp_dir, pytest.MOCK_TMAPS.values(), n=pytest.N_TENSORS)
+    hd5_dir = str(temp_dir)
     sys.argv = [
         ".",
         "train",
-        "--output_folder",
-        hdf5_dir,
-        "--input_tensors",
-        inp_key,
-        "--output_tensors",
-        out_key,
         "--tensors",
-        hdf5_dir,
-        "--pool_x",
-        "1",
-        "--pool_y",
-        "1",
-        "--pool_z",
-        "1",
-        "--epochs",
-        "2",
-        "--num_workers",
-        "1",
-        "--batch_size",
-        "2",
+        hd5_dir,
+        "--output_folder",
+        hd5_dir,
     ]
+    sys.argv.extend(baseline_default_arguments)
     args = parse_args()
     return args
 
@@ -215,34 +236,17 @@ def default_arguments(tmpdir_factory, utils: Utils) -> argparse.Namespace:
 @pytest.fixture(scope="function")
 def default_arguments_infer(tmpdir_factory, utils: Utils) -> argparse.Namespace:
     temp_dir = tmpdir_factory.mktemp("data")
-    utils.build_hdf5s(temp_dir, pytest.MOCK_TMAPS.values(), n=pytest.N_TENSORS)
-    hdf5_dir = str(temp_dir)
-    inp_key = "3d_cont"
-    out_key = "1d_cat"
+    utils.build_hd5s(temp_dir, pytest.MOCK_TMAPS.values(), n=pytest.N_TENSORS)
+    hd5_dir = str(temp_dir)
     sys.argv = [
         ".",
         "infer",
-        "--output_folder",
-        hdf5_dir,
-        "--input_tensors",
-        inp_key,
-        "--output_tensors",
-        out_key,
         "--tensors",
-        hdf5_dir,
-        "--pool_x",
-        "1",
-        "--pool_y",
-        "1",
-        "--pool_z",
-        "1",
-        "--epochs",
-        "2",
-        "--num_workers",
-        "1",
-        "--batch_size",
-        "2",
+        hd5_dir,
+        "--output_folder",
+        hd5_dir,
     ]
+    sys.argv.extend(baseline_default_arguments)
     args = parse_args()
     return args
 
@@ -250,23 +254,15 @@ def default_arguments_infer(tmpdir_factory, utils: Utils) -> argparse.Namespace:
 @pytest.fixture(scope="function")
 def default_arguments_explore(tmpdir_factory, utils: Utils) -> argparse.Namespace:
     temp_dir = tmpdir_factory.mktemp("data")
-    utils.build_hdf5s(temp_dir, pytest.MOCK_TMAPS.values(), n=pytest.N_TENSORS)
-    hdf5_dir = str(temp_dir)
-    inp_key = "3d_cont"
-    out_key = "1d_cat"
+    utils.build_hd5s(temp_dir, pytest.MOCK_TMAPS.values(), n=pytest.N_TENSORS)
+    hd5_dir = str(temp_dir)
     sys.argv = [
         ".",
         "explore",
-        "--output_folder",
-        hdf5_dir,
-        "--input_tensors",
-        inp_key,
-        "--output_tensors",
-        out_key,
         "--tensors",
-        hdf5_dir,
-        "--num_workers",
-        "1",
+        hd5_dir,
+        "--output_folder",
+        hd5_dir,
     ]
     args = parse_args()
     return args
