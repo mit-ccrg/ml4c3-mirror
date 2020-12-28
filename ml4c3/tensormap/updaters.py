@@ -215,7 +215,6 @@ def update_tmaps_window(
     # Copy the base_tmap to modify, either a real tmap or the fake one setup to get
     # the days between events
     new_tmap = copy.deepcopy(base_tmap)
-    new_tmap.name = new_name
 
     reference_prefix, reference_dt_col = _get_dataset_metadata(
         dataset_name=reference_name,
@@ -293,5 +292,6 @@ def update_tmaps_window(
             return dates
 
     new_tmap.time_series_filter = get_cross_referenced_dates
-    tmaps[tmap_name] = new_tmap
+    new_tmap.name = new_name
+    tmaps[new_name] = new_tmap
     return tmaps
