@@ -6,7 +6,7 @@ import numpy as np
 
 # Imports: first party
 from definitions.echo import ECHO_PREFIX, ECHO_DATETIME_COLUMN
-from ml4c3.normalizer import RobustScaler
+from ml4c3.normalizer import RobustScalePopulation
 from ml4c3.validators import RangeValidator, validator_no_nans, validator_not_all_zero
 from ml4c3.tensormap.TensorMap import (
     Dates,
@@ -56,7 +56,7 @@ for tmap_name, tmap_key in continuous_tmap_names_and_keys.items():
     for standardize in ["", "_scaled"]:
         normalizer = None
         if standardize == "_scaled":
-            normalizer = RobustScaler(
+            normalizer = RobustScalePopulation(
                 median=echo_measures_continuous[tmap_name]["median"],
                 iqr=echo_measures_continuous[tmap_name]["iqr"],
             )

@@ -26,7 +26,7 @@ class Normalizer(ABC):
         return tensor
 
 
-class Standardize(Normalizer):
+class ZScorePopulation(Normalizer):
     """
     Normalize a tensor by subtracting a constant mean and dividing by a
     constant standard deviation.
@@ -42,7 +42,7 @@ class Standardize(Normalizer):
         return tensor * (self.std + EPS) + self.mean
 
 
-class RobustScaler(Normalizer):
+class RobustScalePopulation(Normalizer):
     """
     Normalize a tensor by subtracting a constant median and dividing by a
     constant interquartile range.
@@ -58,7 +58,7 @@ class RobustScaler(Normalizer):
         return tensor * (self.iqr + EPS) + self.median
 
 
-class ZeroMeanStd1(Normalizer):
+class ZScore(Normalizer):
     """
     Normalize a tensor by subtracting the mean of the tensor and dividing by
     the standard deviation of the tensor.
@@ -68,6 +68,19 @@ class ZeroMeanStd1(Normalizer):
         tensor -= np.mean(tensor)
         tensor /= np.std(tensor) + EPS
         return tensor
+
+
+class RobustScale(Normalizer):
+    """
+    Normalize a tensor by subtracting the median of the tensor and dividing by the
+    interquartile range of the tensor.
+    """
+
+    def normalize(self, tensor: np.ndarray) -> np.ndarray:
+        q25, q75 = np.percentile(tensor, [25, 75])
+        iqr = q75 - q25
+        median = np.median(tensor)
+        return (tensor - median) / (iqr + EPS)
 
 
 class MinMax(Normalizer):

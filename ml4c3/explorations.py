@@ -1206,10 +1206,17 @@ def _modify_tmap_to_return_mean(tmap: TensorMap) -> TensorMap:
 
     def tff(_: TensorMap, data: PatientData):
         _tensor = tmap.tensor_from_file(tmap, data)
-        _tensor = tmap.postprocess_tensor(_tensor, data, augment=False)
         if tmap.time_series_limit is None:
-            return np.array([_tensor.mean()])
-        return _tensor.mean(axis=tuple(range(len(_tensor.shape)))[1:])[:, None]
+            _tensor = np.array([_tensor])
+        for i in range(len(_tensor)):
+            try:
+                _tensor[i] = tmap.postprocess_tensor(_tensor[i], data, augment=False)
+            except:
+                _tensor[i] = np.nan
+        tensor = _tensor.mean(axis=tuple(range(len(_tensor.shape)))[1:])[:, None]
+        if tmap.time_series_limit is None:
+            tensor = tensor[0]
+        return tensor
 
     new_tm.tensor_from_file = tff
     return new_tm

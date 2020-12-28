@@ -4,7 +4,7 @@ from typing import Optional
 
 # Imports: first party
 from definitions.icu import ICU_TMAPS_METADATA
-from ml4c3.normalizer import MinMax, Standardize, RobustScaler, ZeroMeanStd1
+from ml4c3.normalizer import MinMax, ZScore, ZScorePopulation, RobustScalePopulation
 from ml4c3.tensormap.TensorMap import TensorMap
 from ml4c3.tensormap.icu_around_event import get_tmap as get_around_tmap
 from ml4c3.tensormap.icu_static_around_event import get_tmap as get_static_around_tmap
@@ -29,7 +29,7 @@ def get_tmap(tmap_name: str) -> Optional[TensorMap]:
         if tm:
             feature_name = tm.name.replace("_mean_imputation", "")
             tm.name = tm.name + "_standardized"
-            normalizer = Standardize(
+            normalizer = ZScorePopulation(
                 mean=ICU_TMAPS_METADATA[feature_name]["mean"],
                 std=ICU_TMAPS_METADATA[feature_name]["std"],
             )
@@ -39,7 +39,7 @@ def get_tmap(tmap_name: str) -> Optional[TensorMap]:
         if tm:
             feature_name = tm.name.replace("_mean_imputation", "")
             tm.name = tm.name + "_robustscaler"
-            normalizer = RobustScaler(
+            normalizer = RobustScalePopulation(
                 median=ICU_TMAPS_METADATA[feature_name]["median"],
                 iqr=ICU_TMAPS_METADATA[feature_name]["iqr"],
             )
@@ -49,7 +49,7 @@ def get_tmap(tmap_name: str) -> Optional[TensorMap]:
         if tm:
             feature_name = tm.name.replace("_mean_imputation", "")
             tm.name = tm.name + "_zeromean"
-            normalizer = ZeroMeanStd1()
+            normalizer = ZScore()
             tm.normalizers = [normalizer]
     elif tmap_name.endswith("_minmax"):
         tm = _get_tmap(tmap_name.replace("_minmax", ""))

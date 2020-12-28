@@ -10,7 +10,7 @@ import pandas as pd
 # Imports: first party
 from definitions.ecg import ECG_PREFIX
 from definitions.c3po import C3PO_PREFIX, C3PO_DEATH_DATE_COLUMN
-from ml4c3.normalizer import RobustScaler
+from ml4c3.normalizer import RobustScalePopulation
 from ml4c3.validators import RangeValidator, validator_no_nans, validator_not_all_zero
 from ml4c3.tensormap.TensorMap import TensorMap, PatientData, Interpretation
 

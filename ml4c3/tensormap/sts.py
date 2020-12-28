@@ -8,7 +8,7 @@ import numpy as np
 
 # Imports: first party
 from definitions.sts import STS_PREFIX, STS_SURGERY_DATE_COLUMN
-from ml4c3.normalizer import MinMax, RobustScaler
+from ml4c3.normalizer import MinMax, RobustScalePopulation
 from ml4c3.validators import validator_no_nans, validator_not_all_zero
 from ml4c3.tensormap.TensorMap import (
     Dates,
@@ -260,7 +260,7 @@ for tmap_name in sts_features_continuous:
     for standardize in ["", "_scaled", "_minmaxed"]:
         normalizer = None
         if standardize == "_scaled":
-            normalizer = RobustScaler(
+            normalizer = RobustScalePopulation(
                 median=sts_features_continuous[tmap_name]["median"],
                 iqr=sts_features_continuous[tmap_name]["iqr"],
             )

@@ -14,7 +14,7 @@ from definitions.ecg import (
     ECG_REST_LEADS_ALL,
     ECG_REST_LEADS_INDEPENDENT,
 )
-from ml4c3.normalizer import Standardize
+from ml4c3.normalizer import ZScore, RobustScale, ZScorePopulation
 from ml4c3.validators import (
     RangeValidator,
     validator_no_empty,
@@ -157,46 +157,65 @@ def update_tmaps_ecg_voltage(
 ) -> Dict[str, TensorMap]:
     """
     Generates ECG voltage TMaps that are given by the name format:
-        [12_lead_]ecg_{length}[_exact][_std][_no_pacemaker][_2d][_augmentations]
+        [8_lead_]ecg_{length}[_exact][_scaling][_no_pacemaker][_2d][_augmentations]
 
     Required:
-        length: the number of samples present in each lead.
+        length: The number of samples present in each lead.
 
     Optional:
-        12_lead: use the 12 clinical leads.
-        exact: only return voltages when raw data has exactly {length} samples in each lead.
-        std: standardize voltages using mean = 0, std = 2000.
-        augmentations: apply crop, noise, and warp transformations to voltages.
-        no_pacemaker: excludes waveforms with a pacemaker
-        2d: return tensor shaped for 2D convolutions
+        8_lead:        Use the 8 independent leads.
+        exact:         Only return voltages when raw data has exactly {length} samples
+                       in each lead. If not given, voltages are resampled to {length}.
+        scaling:       Scaling can be one of zscore, robustscale, zscore_pop, or
+                       robustscale_pop, where zscore and robustscale scale each voltage
+                       independently and zscore_pop and robustscale_pop scale each
+                       voltage using population level distributions.
+        augmentations: Apply crop, noise, and warp transformations to voltages.
+        no_pacemaker:  Excludes waveforms with a pacemaker
+        2d:            Return tensor shaped for 2D convolutions
 
     Examples:
-        valid: ecg_2500_exact_std
+        valid: ecg_2500_zscore
         valid: 8_lead_ecg_625_crop_warp
-        valid: ecg_2500_std_no_pacemaker_2d
-        invalid: ecg_2500_noise_std
-
-    Note: if additional modifiers are present after the name format, e.g.
-        ecg_2500_std_newest_sts, the matched part of the tmap name, e.g.
-        ecg_2500_std, will be used to construct a tmap and save it to the dict.
-        Later, a function will find the tmap name ending in _newest, and modify the
-        tmap appropriately.
+        valid: ecg_2500_robustscale_pop_no_pacemaker_2d
+        invalid: ecg_2500_noise_exact
     """
     voltage_tm_pattern = re.compile(
-        r"^(8_lead_)?ecg_\d+(_exact)?(_std)?(_no_pacemaker)?(_2d)?(_warp|_crop|_noise)*",
+        r"^(8_lead_)?ecg_(\d+)(_exact)?"
+        r"(_zscore_pop|_robustscale_pop|_zscore|_robustscale)?"
+        r"(_no_pacemaker)?(_2d)?(_warp|_crop|_noise)*",
     )
     match = voltage_tm_pattern.match(tmap_name)
     if match is None:
         return tmaps
 
     # Isolate matching components of tmap name and build it
-    match_tmap_name = match[0]
-    leads = ECG_REST_LEADS_INDEPENDENT if "8_lead" in tmap_name else ECG_REST_LEADS_ALL
-    length = int(tmap_name.split("ecg_")[1].split("_")[0])
-    exact = "exact" in tmap_name
-    no_pacemaker = "no_pacemaker" in tmap_name
-    conv_2d = "_2d" in tmap_name
-    normalizer = Standardize(mean=0, std=2000) if "std" in tmap_name else None
+
+    # fmt: off
+    # 8_lead_ecg_2500_exact_zscore_no_pacemaker_2d
+    new_tmap_name = match[0]       # 8_lead_ecg_2500_exact_zscore_no_pacemaker_2d
+    use_8_lead = bool(match[1])    # 8_lead
+    length = int(match[2])         # 2500
+    exact = bool(match[3])         # exact
+    scaling = match[4]             # zscore
+    no_pacemaker = bool(match[5])  # no_pacemaker
+    conv_2d = bool(match[6])       # 2d
+    # fmt: on
+
+    leads = ECG_REST_LEADS_INDEPENDENT if use_8_lead else ECG_REST_LEADS_ALL
+    if scaling == "_zscore":
+        normalizer = ZScore()
+    elif scaling == "_robustscale":
+        normalizer = RobustScale()
+    elif scaling == "_zscore_pop":
+        normalizer = ZScorePopulation(mean=0, std=2000)
+    elif scaling == "_robustscale_pop":
+        raise ValueError(
+            f"Cannot create {new_tmap_name}, population median and IQR undefined for "
+            f"ECG voltage.",
+        )
+    else:
+        normalizer = None
     augmenters = [
         augment_function
         for augment_option, augment_function in name2augmenters.items()
@@ -206,7 +225,7 @@ def update_tmaps_ecg_voltage(
     if conv_2d:
         shape += (1,)
     tmap = TensorMap(
-        name=match_tmap_name,
+        name=new_tmap_name,
         shape=shape,
         path_prefix=ECG_PREFIX,
         tensor_from_file=make_voltage_tff(
@@ -220,7 +239,7 @@ def update_tmaps_ecg_voltage(
         validators=validator_voltage_no_zero_padding,
         augmenters=augmenters,
     )
-    tmaps[match_tmap_name] = tmap
+    tmaps[new_tmap_name] = tmap
     return tmaps
 
 
@@ -897,23 +916,23 @@ tmaps[tmap_name] = TensorMap(
 # TMap name      ->      (hd5 key,          fill, validator,                 normalizer)
 interval_key_map = {
     "ecg_rate":          ("ventricularrate", 0,   RangeValidator(10, 200),   None),
-    "ecg_rate_std":      ("ventricularrate", 0,   RangeValidator(10, 200),   Standardize(mean=70, std=16)),
+    "ecg_rate_std":      ("ventricularrate", 0,   RangeValidator(10, 200),   ZScorePopulation(mean=70, std=16)),
     "ecg_pr":            ("printerval",      0,   RangeValidator(50, 500),   None),
-    "ecg_pr_std":        ("printerval",      0,   RangeValidator(50, 500),   Standardize(mean=175, std=36)),
+    "ecg_pr_std":        ("printerval",      0,   RangeValidator(50, 500),   ZScorePopulation(mean=175, std=36)),
     "ecg_qrs":           ("qrsduration",     0,   RangeValidator(20, 400),   None),
-    "ecg_qrs_std":       ("qrsduration",     0,   RangeValidator(20, 400),   Standardize(mean=104, std=26)),
+    "ecg_qrs_std":       ("qrsduration",     0,   RangeValidator(20, 400),   ZScorePopulation(mean=104, std=26)),
     "ecg_qt":            ("qtinterval",      0,   RangeValidator(100, 800),  None),
-    "ecg_qt_std":        ("qtinterval",      0,   RangeValidator(100, 800),  Standardize(mean=411, std=45)),
+    "ecg_qt_std":        ("qtinterval",      0,   RangeValidator(100, 800),  ZScorePopulation(mean=411, std=45)),
     "ecg_qtc":           ("qtcorrected",     0,   RangeValidator(100, 800),  None),
-    "ecg_qtc_std":       ("qtcorrected",     0,   RangeValidator(100, 800),  Standardize(mean=440, std=39)),
+    "ecg_qtc_std":       ("qtcorrected",     0,   RangeValidator(100, 800),  ZScorePopulation(mean=440, std=39)),
     "ecg_paxis":         ("paxis",           999, RangeValidator(-90, 360),  None),
-    "ecg_paxis_std":     ("paxis",           999, RangeValidator(-90, 360),  Standardize(mean=47, std=30)),
+    "ecg_paxis_std":     ("paxis",           999, RangeValidator(-90, 360),  ZScorePopulation(mean=47, std=30)),
     "ecg_raxis":         ("raxis",           999, RangeValidator(-90, 360),  None),
-    "ecg_raxis_std":     ("raxis",           999, RangeValidator(-90, 360),  Standardize(mean=18, std=53)),
+    "ecg_raxis_std":     ("raxis",           999, RangeValidator(-90, 360),  ZScorePopulation(mean=18, std=53)),
     "ecg_taxis":         ("taxis",           999, RangeValidator(-90, 360),  None),
-    "ecg_taxis_std":     ("taxis",           999, RangeValidator(-90, 360),  Standardize(mean=58, std=63)),
+    "ecg_taxis_std":     ("taxis",           999, RangeValidator(-90, 360),  ZScorePopulation(mean=58, std=63)),
     "ecg_qrs_count":     ("qrscount",        -1,  RangeValidator(0, 100),    None),
-    "ecg_qrs_count_std": ("qrscount",        -1,  RangeValidator(0, 100),    Standardize(mean=12, std=3)),
+    "ecg_qrs_count_std": ("qrscount",        -1,  RangeValidator(0, 100),    ZScorePopulation(mean=12, std=3)),
 }
 # fmt: on
 
@@ -979,7 +998,7 @@ tmaps[tmap_name] = TensorMap(
     shape=(1,),
     time_series_limit=0,
     validators=RangeValidator(0, 120),
-    normalizers=Standardize(mean=65, std=16),
+    normalizers=ZScorePopulation(mean=65, std=16),
 )
 
 
@@ -1055,7 +1074,7 @@ tmaps["ecg_bmi_std"] = TensorMap(
     shape=(1,),
     time_series_limit=0,
     tensor_from_file=ecg_bmi,
-    normalizers=Standardize(mean=29, std=6),
+    normalizers=ZScorePopulation(mean=29, std=6),
     validators=validator_not_all_zero,
 )
 
@@ -1081,7 +1100,7 @@ tmaps[tmap_name] = TensorMap(
     shape=(1,),
     time_series_limit=0,
     validators=RangeValidator(MIN_WEIGHT_LBS, MAX_WEIGHT_LBS),
-    normalizers=Standardize(mean=182, std=45),
+    normalizers=ZScorePopulation(mean=182, std=45),
 )
 
 
@@ -1106,7 +1125,7 @@ tmaps[tmap_name] = TensorMap(
     shape=(1,),
     time_series_limit=0,
     validators=RangeValidator(MIN_HEIGHT_IN, MAX_HEIGHT_IN),
-    normalizers=Standardize(mean=66, std=4),
+    normalizers=ZScorePopulation(mean=66, std=4),
 )
 
 

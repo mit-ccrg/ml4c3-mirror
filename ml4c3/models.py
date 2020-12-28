@@ -270,7 +270,7 @@ def make_model(args):
                 c = 1 / (args.l1 + args.l2)
             hyperparameters["c"] = c
             hyperparameters["l1_ratio"] = c * args.l1
-        elif args.mode == "train_sklearn_svm":
+        elif args.recipe == "train_sklearn_svm":
             hyperparameters["c"] = args.c
         elif args.recipe == "train_sklearn_randomforest":
             hyperparameters["n_estimators"] = args.n_estimators
