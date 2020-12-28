@@ -175,7 +175,7 @@ def _swap_path_prefix(path, prefix, new_prefix):
     return new_path
 
 
-def _deidentify_hd5(old_new_path):
+def _deidentify_hd5(old_new_path: str):
     """
     Given a path to an existing HD5, copy it to a new path and delete all identifiable
     information. Currently only set up for ECG data.
@@ -197,19 +197,24 @@ def _deidentify_hd5(old_new_path):
             hd5.create_dataset("deidentified", data=True, dtype=bool)
 
 
-def _deidentify_hd5s(args, mrn_map):
+def _deidentify_hd5s(
+    path_to_hd5_deidentified: str,
+    path_to_hd5: str,
+    mrn_map: Dict[int, int],
+    num_workers: int,
+):
     """
     Create de-identified HD5 files in parallel.
     """
-    if args.path_to_hd5_deidentified is None:
+    if path_to_hd5_deidentified is None:
         return
 
     old_new_paths = []
-    for root, dirs, files in os.walk(args.path_to_hd5):
+    for root, dirs, files in os.walk(path_to_hd5):
         new_root = _swap_path_prefix(
             root,
-            args.path_to_hd5,
-            args.path_to_hd5_deidentified,
+            path_to_hd5,
+            path_to_hd5_deidentified,
         )
         for file in files:
             split = os.path.splitext(file)
@@ -225,13 +230,13 @@ def _deidentify_hd5s(args, mrn_map):
             new_path = os.path.join(new_root, f"{new_id}{TENSOR_EXT}")
             old_new_paths.append((old_path, new_path))
 
-    with Pool(processes=args.num_workers) as pool:
+    with Pool(processes=num_workers) as pool:
         pool.map(_deidentify_hd5, old_new_paths)
 
-    print(f"De-identified {len(old_new_paths)} ECGs at {args.path_to_hd5_deidentified}")
+    print(f"De-identified {len(old_new_paths)} ECGs at {path_to_hd5_deidentified}")
 
 
-def _deidentify_csv(path, mrn_map):
+def _deidentify_csv(path: str, mrn_map: str):
     """
     Given a path to a CSV, delete all identifiable information.
     """
@@ -264,19 +269,19 @@ def _deidentify_csv(path, mrn_map):
     df.to_csv(path, index=False)
 
 
-def _deidentify_csvs(args, mrn_map):
+def _deidentify_csvs(path_to_csv_deidentified: str, path_to_csv: str, mrn_map: str):
     """
     Create de-identified STS data.
     """
-    if args.path_to_csv_deidentified is None:
+    if path_to_csv_deidentified is None:
         return
 
     count = 0
-    for root, dirs, files in os.walk(args.path_to_csv):
+    for root, dirs, files in os.walk(path_to_csv):
         new_root = _swap_path_prefix(
             root,
-            args.path_to_csv,
-            args.path_to_csv_deidentified,
+            path_to_csv,
+            path_to_csv_deidentified,
         )
         for file in files:
             split = os.path.splitext(file)
@@ -300,8 +305,17 @@ def _deidentify_csvs(args, mrn_map):
 def run(args):
     start_time = timer()
     mrn_map = _remap_mrns(args)
-    _deidentify_hd5s(args, mrn_map)
-    _deidentify_csvs(args, mrn_map)
+    _deidentify_hd5s(
+        path_to_hd5_deidentified=args.path_to_hd5_deidentified,
+        path_to_hd5=args.path_to_hd5,
+        mrn_map=args.mrn_map,
+        num_workers=args.num_workers,
+    )
+    _deidentify_csvs(
+        path_to_csv_deidentified=args.path_to_csv_deidentified,
+        path_to_csv=args.path_to_csv,
+        mrn_map=args.mrn_map,
+    )
     end_time = timer()
     elapsed_time = end_time - start_time
     print(f"De-identification took {elapsed_time:.2f} seconds.")
