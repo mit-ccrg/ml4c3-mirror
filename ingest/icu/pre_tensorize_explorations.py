@@ -29,14 +29,14 @@ class PreTensorizeExplorer:
 
     def __init__(
         self,
-        path_bedmaster: str,
-        path_edw: str,
-        path_xref: str,
+        bedmaster: str,
+        edw: str,
+        xref: str,
         patient_csv: str,
     ):
-        self.path_bedmaster = path_bedmaster
-        self.path_edw = path_edw
-        self.path_xref = path_xref
+        self.bedmaster = bedmaster
+        self.edw = edw
+        self.xref = xref
         self.reset()
         self.xref_fields = [
             "edw_mrns",
@@ -106,7 +106,7 @@ class PreTensorizeExplorer:
             for _, row in df.iterrows():
                 mrn = str(int(row["MRN"]))
                 csn = str(int(row["PatientEncounterID"]))
-                fpath = os.path.join(self.path_edw, mrn, csn)
+                fpath = os.path.join(self.edw, mrn, csn)
                 if not os.path.isdir(fpath):
                     continue
                 csv_files = [
@@ -125,11 +125,11 @@ class PreTensorizeExplorer:
             mrns = list(df["MRN"].unique())
             for mrn in mrns:
                 mrn = str(int(mrn))
-                if not os.path.isdir(os.path.join(self.path_edw, mrn)):
+                if not os.path.isdir(os.path.join(self.edw, mrn)):
                     continue
-                csns = os.listdir(os.path.join(self.path_edw, mrn))
+                csns = os.listdir(os.path.join(self.edw, mrn))
                 for csn in csns:
-                    fpath = os.path.join(self.path_edw, mrn, csn)
+                    fpath = os.path.join(self.edw, mrn, csn)
                     if not os.path.isdir(fpath):
                         continue
                     csv_files = [
@@ -152,14 +152,14 @@ class PreTensorizeExplorer:
         """
         Assess coverage between EDW and Bedmaster datasets.
         """
-        xref_file = pd.read_csv(self.path_xref)
+        xref_file = pd.read_csv(self.xref)
         xref_file = xref_file.dropna(subset=["MRN"])
         bedmaster_mrns = set(xref_file["MRN"].unique())
         bedmaster_csns = set(xref_file["PatientEncounterID"].unique())
         cross_ref_bedmaster_files = set(xref_file["path"].unique())
 
         bedmaster_files, _ = get_files_in_directory(
-            directory=self.path_bedmaster,
+            directory=self.bedmaster,
             file_extension=BEDMASTER_EXT,
         )
 
@@ -192,15 +192,15 @@ class PreTensorizeExplorer:
 
     def _get_signals_stats(self):
         """
-        Obtain list of signals for every file in path_edw and path_bedmaster and update
+        Obtain list of signals for every file in edw and bedmaster and update
         the corresponding counter using _update_list_signals.
         """
         if self.signals:
-            xref_file = pd.read_csv(self.path_xref)
+            xref_file = pd.read_csv(self.xref)
             xref_file = xref_file.dropna(subset=["MRN"])
             k = 0
             bedmaster_files_paths, _ = get_files_in_directory(
-                directory=self.path_bedmaster,
+                directory=self.bedmaster,
                 file_extension=BEDMASTER_EXT,
             )
             for bedmaster_file_path in bedmaster_files_paths:
@@ -230,7 +230,7 @@ class PreTensorizeExplorer:
         k = 0
         for mrn, csn in self.edw_mrns_csns:
             k += 1
-            reader = EDWReader(self.path_edw, mrn, csn)
+            reader = EDWReader(self.edw, mrn, csn)
             edw_signals = {
                 "med": reader.list_medications(),
                 "flowsheet": reader.list_vitals(),
@@ -251,7 +251,7 @@ class PreTensorizeExplorer:
         """
         count = 0
         for mrn, csn in self.edw_mrns_csns:
-            reader = EDWReader(self.path_edw, mrn, csn)
+            reader = EDWReader(self.edw, mrn, csn)
             static_data = reader.get_static_data()
             sex = static_data.sex
             end_stay_type = static_data.end_stay_type
@@ -401,7 +401,7 @@ class PreTensorizeExplorer:
     def _get_bedmaster_files(self):
         bedmaster_files_dict = {}
         bedmaster_files, _ = get_files_in_directory(
-            directory=self.path_bedmaster,
+            directory=self.bedmaster,
             file_extension=BEDMASTER_EXT,
         )
         for bedmaster_file in bedmaster_files:
@@ -464,7 +464,7 @@ class PreTensorizeExplorer:
         :param detailed_bedmaster: <Bool> Generate detailed Bedmaster statistics.
         :param no_xref: <Bool> Don't use crossreference data. Enable along with
                                detailed_bedmaster to create  bedmaster_statistics
-                               without using path_edw or  xref_file.
+                               without using edw or  xref_file.
         """
         self.reset(signals)
 
@@ -512,9 +512,9 @@ class PreTensorizeExplorer:
 
 def pre_tensorize_explore(args):
     explorer = PreTensorizeExplorer(
-        path_bedmaster=args.path_bedmaster,
-        path_edw=args.path_edw,
-        path_xref=args.path_xref,
+        bedmaster=args.bedmaster,
+        edw=args.edw,
+        xref=args.xref,
         patient_csv=args.patient_csv,
     )
     explorer.write_pre_tensorize_summary(

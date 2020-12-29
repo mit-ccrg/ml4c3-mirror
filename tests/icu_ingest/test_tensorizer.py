@@ -34,11 +34,11 @@ def test_tensorizer(
     sys.argv = f"""
     .
     tensorize_icu_no_edw_pull
-    --path_xref {test_dir}/data/xref_file_tensorize.csv
-    --path_adt {test_dir}/data/edw/adt
-    --path_bedmaster {test_dir}/data/bedmaster
-    --path_edw {test_dir}/data/edw
-    --path_alarms {test_dir}/data/bedmaster_alarms
+    --xref {test_dir}/data/xref_file_tensorize.csv
+    --adt {test_dir}/data/edw/adt
+    --bedmaster {test_dir}/data/bedmaster
+    --edw {test_dir}/data/edw
+    --alarms {test_dir}/data/bedmaster_alarms
     --output_folder {temp_dir}/{pytest.run_id}
     --tensors {os.path.join(temp_dir, pytest.run_id)}
     """.split()
@@ -53,11 +53,11 @@ def test_tensorizer(
 
     # Tensorize and check hd5 structure
     tensorizer = Tensorizer(
-        args.path_bedmaster,
-        args.path_alarms,
-        args.path_edw,
-        args.path_xref,
-        args.path_adt,
+        args.bedmaster,
+        args.alarms,
+        args.edw,
+        args.xref,
+        args.adt,
     )
     tensorizer.tensorize(
         tensors=args.tensors,

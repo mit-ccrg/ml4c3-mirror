@@ -211,17 +211,17 @@ def parse_args() -> argparse.Namespace:
     # ICU modes common arguments
     icu_parser = argparse.ArgumentParser(add_help=False)
     icu_parser.add_argument(
-        "--path_edw",
+        "--edw",
         default="/media/ml4c3/edw/",
         help="Directory to save or load EDW CSV files.",
     )
     icu_parser.add_argument(
-        "--path_bedmaster",
+        "--bedmaster",
         default="/media/lm4-bedmaster/",
         help="Directory containing Bedmaster .mat files.",
     )
     icu_parser.add_argument(
-        "--path_alarms",
+        "--alarms",
         default="/media/ml4c3/bedmaster_alarms/",
         help="Directory containing Bedmaster alarms CSV files.",
     )
@@ -231,13 +231,16 @@ def parse_args() -> argparse.Namespace:
         "optionally CSNs.",
     )
     icu_parser.add_argument(
-        "--path_adt",
+        "--adt",
         help="Path to save or load ADT table CSV file.",
     )
     icu_parser.add_argument(
-        "--path_xref",
-        help="Path to CSV file cross referencing MRN and CSNs with Bedmaster .mat"
-        " files.",
+        "--xref",
+        default=os.path.expanduser("~/xref.csv"),
+        help="Path to CSV file that links MRN, CSN, and Bedmaster file paths. "
+        "If this file does not exist, it is created in Step 2. If this "
+        "file exists, it is loaded and used in Step 2 and a new xref.csv "
+        "is not created and saved.",
     )
     icu_parser.add_argument(
         "--departments",
@@ -245,7 +248,7 @@ def parse_args() -> argparse.Namespace:
         help="List of department names for which to process patient data.",
     )
     icu_parser.add_argument(
-        "--path_staging_dir",
+        "--staging_dir",
         help="Directory to store temporary files created during tensorization pipeline.",
     )
     icu_parser.add_argument(

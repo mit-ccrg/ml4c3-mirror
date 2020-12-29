@@ -199,7 +199,7 @@ class NameEncrypter:
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Encrypt folders and files.")
     parser.add_argument(
-        "--path_edw",
+        "--edw",
         type=str,
         default="/media/ml4c3/edw/",
         help="Directory with EDW .csv files.",
@@ -211,7 +211,7 @@ def parse_arguments():
         help="Directory with tensorized .hd5 tensors.",
     )
     parser.add_argument(
-        "--path_xref",
+        "--xref",
         type=str,
         default="/media/ml4c3/xref.csv",
         help="Full path of the file where EDW and Bedmaster "
@@ -252,17 +252,17 @@ def run(args: argparse.Namespace):
 
     if args.encryption_type == "folder":
         init_time = time.time()
-        encrypter.encrypt_folders(args.path_edw, decrypt=args.decrypt_flag)
+        encrypter.encrypt_folders(args.edw, decrypt=args.decrypt_flag)
         elapsed_time = time.time() - init_time
         print(f"Folders encryption time: {round(elapsed_time, 4)} seconds.")
     elif args.encryption_type == "csv_file":
         init_time = time.time()
-        encrypter.encrypt_csv_file(args.path_xref, decrypt=args.decrypt_flag)
+        encrypter.encrypt_csv_file(args.xref, decrypt=args.decrypt_flag)
         elapsed_time = time.time() - init_time
         print(f"CSV file encryption time: {round(elapsed_time, 4)} seconds.")
     elif args.encryption_type == "hd5_file":
         init_time = time.time()
-        encrypter.encrypt_hd5(args.path_hd5, decrypt=args.decrypt_flag)
+        encrypter.encrypt_hd5(args.hd5, decrypt=args.decrypt_flag)
         elapsed_time = time.time() - init_time
         print(f"HD5 encryption time: {round(elapsed_time, 4)} seconds.")
     else:

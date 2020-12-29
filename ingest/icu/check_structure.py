@@ -159,23 +159,23 @@ class BedmasterChecker:
         self.bedmaster_dir = bedmaster_dir
         self.alarms_dir = alarms_dir
 
-    def check_mat_files_structure(self, patient_csv: str = None, path_xref: str = None):
+    def check_mat_files_structure(self, patient_csv: str = None, xref: str = None):
         """
         Checks if bedmaster_dir is structured properly.
 
         Checks that the .mat files in bedmaster_dir are in the right format and
         it doesn't have any unexpected file.
         :param patient_csv: <str> Path to CSV with Sample IDs to restrict MRNs.
-        :param path_xref: <str> Path to CSV with Sample IDs to restrict Bedmaster files.
+        :param xref: <str> Path to CSV with Sample IDs to restrict Bedmaster files.
         """
         bedmaster_files_paths, unexpected_files = get_files_in_directory(
             directory=self.bedmaster_dir,
             file_extension=BEDMASTER_EXT,
         )
 
-        if patient_csv and path_xref:
+        if patient_csv and xref:
             mrns = list(pd.read_csv(patient_csv)["MRN"].unique())
-            xref_df = pd.read_csv(path_xref)
+            xref_df = pd.read_csv(xref)
             bedmaster_files_names = list(
                 xref_df[xref_df["MRN"].isin(mrns)]["fileID"].unique(),
             )
@@ -191,7 +191,7 @@ class BedmasterChecker:
             bedmaster_file_name = os.path.split(bedmaster_file_path)[-1].split(".")[0]
             if (
                 patient_csv
-                and path_xref
+                and xref
                 and bedmaster_file_name not in bedmaster_files_names
             ):
                 continue
@@ -271,9 +271,9 @@ class BedmasterChecker:
 
 def check_icu_structure(args):
     if args.check_edw:
-        edw_checker = EDWChecker(args.path_edw)
+        edw_checker = EDWChecker(args.edw)
         edw_checker.check_structure(args.patient_csv)
     if args.check_bedmaster:
-        bedmaster_checker = BedmasterChecker(args.path_bedmaster, args.path_alarms)
-        bedmaster_checker.check_mat_files_structure(args.patient_csv, args.path_xref)
+        bedmaster_checker = BedmasterChecker(args.bedmaster, args.alarms)
+        bedmaster_checker.check_mat_files_structure(args.patient_csv, args.xref)
         bedmaster_checker.check_alarms_files_structure()

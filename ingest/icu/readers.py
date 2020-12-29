@@ -1358,7 +1358,7 @@ class BedmasterAlarmsReader(Reader):
         edw_path: str,
         mrn: str,
         csn: str,
-        adt_file: str,
+        adt: str,
         move_file: str = EDW_FILES["move_file"]["name"],
     ):
         """
@@ -1368,7 +1368,7 @@ class BedmasterAlarmsReader(Reader):
         :param edw_path: Absolute path of edw directory.
         :param mrn: MRN of the patient.
         :param csn: CSN of the patient visit.
-        :param adt_file: Path to adt table.
+        :param adt: Path to adt table.
         :param move_file: File containing the movements of the patient
                           (admission, transfer and discharge) from the patient.
                           Can be inferred if None.
@@ -1380,7 +1380,7 @@ class BedmasterAlarmsReader(Reader):
         if not move_file.endswith(".csv"):
             move_file += ".csv"
         self.move_file = os.path.join(self.edw_path, self.mrn, self.csn, move_file)
-        self.adt_file = adt_file
+        self.adt = adt
         self.alarms_dfs = self._get_alarms_dfs()
 
     def list_alarms(self) -> List[str]:
@@ -1435,7 +1435,7 @@ class BedmasterAlarmsReader(Reader):
         if os.path.isfile(self.move_file):
             movement_df = pd.read_csv(self.move_file)
         else:
-            adt_df = pd.read_csv(self.adt_file)
+            adt_df = pd.read_csv(self.adt)
             movement_df = adt_df[adt_df["MRN"] == self.mrn]
             movement_df = movement_df[movement_df["PatientEncounterID"] == self.csn]
 
@@ -1516,14 +1516,14 @@ class CrossReferencer:
         bedmaster_dir: str,
         edw_dir: str,
         xref_file: str,
-        adt_file: str = EDW_FILES["adt_file"]["name"],
+        adt: str = EDW_FILES["adt_file"]["name"],
     ):
         self.bedmaster_dir = bedmaster_dir
         self.edw_dir = edw_dir
         self.xref_file = xref_file
-        if not adt_file.endswith(".csv"):
-            adt_file += ".csv"
-        self.adt_file = os.path.join(self.edw_dir, adt_file)
+        if not adt.endswith(".csv"):
+            adt += ".csv"
+        self.adt = os.path.join(self.edw_dir, adt)
         self.crossref: Dict[str, Dict[str, List[str]]] = {}
 
     def get_xref_files(
@@ -1566,16 +1566,16 @@ class CrossReferencer:
         self.crossref = {}
         if not os.path.exists(self.xref_file):
             bedmaster_matcher = PatientBedmasterMatcher(
-                path_bedmaster=self.bedmaster_dir,
-                path_adt=self.adt_file,
+                bedmaster=self.bedmaster_dir,
+                adt=self.adt,
             )
             bedmaster_matcher.match_files(
                 self.xref_file,
             )
 
-        adt = pd.read_csv(self.adt_file)
+        adt_df = pd.read_csv(self.adt)
         adt_columns = EDW_FILES["adt_file"]["columns"]
-        adt = adt[adt_columns].drop_duplicates()
+        adt_df = adt_df[adt_columns].drop_duplicates()
 
         xref = pd.read_csv(self.xref_file)
         xref = xref.drop_duplicates(subset=["MRN", "PatientEncounterID", "path"])
@@ -1589,16 +1589,16 @@ class CrossReferencer:
             edw_mrns = [ele for ele in edw_mrns if ele in mrns]
         if starting_time:
             xref = xref[xref["TransferInDTS"] > starting_time]
-            adt = adt[adt[adt_columns[0]].isin(edw_mrns)]
-            adt[adt_columns[4]] = get_unix_timestamps(adt[adt_columns[4]].values)
-            adt = adt[adt[adt_columns[4]] > starting_time]
-            edw_mrns = list(adt[adt_columns[0]].drop_duplicates().astype(str))
+            adt_df = adt_df[adt_df[adt_columns[0]].isin(edw_mrns)]
+            adt_df[adt_columns[4]] = get_unix_timestamps(adt_df[adt_columns[4]].values)
+            adt_df = adt_df[adt_df[adt_columns[4]] > starting_time]
+            edw_mrns = list(adt_df[adt_columns[0]].drop_duplicates().astype(str))
         if ending_time:
             xref = xref[xref["TransferOutDTS"] < ending_time]
-            adt = adt[adt[adt_columns[0]].isin(edw_mrns)]
-            adt[adt_columns[3]] = get_unix_timestamps(adt[adt_columns[3]].values)
-            adt = adt[adt[adt_columns[3]] < ending_time]
-            edw_mrns = list(adt[adt_columns[0]].drop_duplicates().astype(str))
+            adt_df = adt_df[adt_df[adt_columns[0]].isin(edw_mrns)]
+            adt_df[adt_columns[3]] = get_unix_timestamps(adt_df[adt_columns[3]].values)
+            adt_df = adt_df[adt_df[adt_columns[3]] < ending_time]
+            edw_mrns = list(adt_df[adt_columns[0]].drop_duplicates().astype(str))
 
         if not overwrite_hd5 and tensors and os.path.isdir(tensors):
             existing_mrns = [

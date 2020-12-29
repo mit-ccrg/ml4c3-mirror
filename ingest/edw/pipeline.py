@@ -210,9 +210,9 @@ def _obtain_data(
     args: argparse.Namespace,
     edw: pyodbc.Connection,
     query_directory: str,
-    adt: pd.DataFrame,
+    adt_df: pd.DataFrame,
 ):
-    if args.path_staging_dir is None:
+    if args.staging_dir is None:
         raise ValueError("Must provide staging directory.")
     batch_size = args.staging_batch_size or 1
 
@@ -226,7 +226,7 @@ def _obtain_data(
     ]
 
     # Get unique patients and encounters, sort, and select data
-    patients = adt[["MRN", "PatientEncounterID"]].drop_duplicates()
+    patients = adt_df[["MRN", "PatientEncounterID"]].drop_duplicates()
     patients = patients.sort_values(by=["MRN", "PatientEncounterID"], ascending=True)
     num_patients = len(patients)
     logging.info(
@@ -245,7 +245,7 @@ def _obtain_data(
     csns = set()
     if not args.overwrite:
         _, csns = _get_mrns_csns_at_destination(
-            edw_dir=args.path_edw,
+            edw_dir=args.edw,
             query_paths=query_paths,
             patients=patients,
         )
@@ -276,7 +276,7 @@ def _obtain_data(
             and (len(list_mrn) == batch_size or (index + 1) == len(patients.index))
         ):
             if batch_size > 1:
-                folder_idx = args.path_staging_dir
+                folder_idx = args.staging_dir
             else:
                 folder_idx = os.path.join(str(list_mrn[0]), str(list_csn[0]))
 
@@ -287,13 +287,13 @@ def _obtain_data(
                 list_csn=list_csn,
                 batch_size=batch_size,
                 folder_idx=folder_idx,
-                save_dir=args.path_edw,
+                save_dir=args.edw,
             )
 
             list_mrn = []
             list_csn = []
             if args.staging_batch_size > 1:
-                _reorder_folders(args.path_edw, args.path_staging_dir)
+                _reorder_folders(args.edw, args.staging_dir)
 
 
 def _mrns_csns_from_df(df: pd.DataFrame) -> Tuple[Set[str], Optional[Set[str]]]:
@@ -306,23 +306,23 @@ def _mrns_csns_from_df(df: pd.DataFrame) -> Tuple[Set[str], Optional[Set[str]]]:
     return mrns, csns
 
 
-def _format_adt_table(adt: pd.DataFrame) -> pd.DataFrame:
+def _format_adt_table(adt_df: pd.DataFrame) -> pd.DataFrame:
     """
     Given ADT dataframe, returns the ADT table where the MRN and PatientEncounterID
     columns are strings and the HospitalAdmitDTS column is datetime.
     """
     if (
-        "MRN" not in adt
-        or "PatientEncounterID" not in adt
-        or "HospitalAdmitDTS" not in adt
+        "MRN" not in adt_df
+        or "PatientEncounterID" not in adt_df
+        or "HospitalAdmitDTS" not in adt_df
     ):
         raise ValueError(
             "ADT table must contain MRN, PatientEncounterID, and HospitalAdmitDTS columns.",
         )
-    adt["MRN"] = adt["MRN"].astype(int).astype(str)
-    adt["PatientEncounterID"] = adt["PatientEncounterID"].astype(int).astype(str)
-    adt["HospitalAdmitDTS"] = pd.to_datetime(adt["HospitalAdmitDTS"])
-    return adt
+    adt_df["MRN"] = adt_df["MRN"].astype(int).astype(str)
+    adt_df["PatientEncounterID"] = adt_df["PatientEncounterID"].astype(int).astype(str)
+    adt_df["HospitalAdmitDTS"] = pd.to_datetime(adt_df["HospitalAdmitDTS"])
+    return adt_df
 
 
 def get_adt_table(
@@ -351,25 +351,25 @@ def get_adt_table(
             a. By encounter (CSN)
             b. By hospital admission time (between a start and end date)
     """
-    if args.path_adt is None:
+    if args.adt is None:
         raise ValueError("Must provide path to save or load ADT table.")
 
     csns = None
 
     # Load initial ADT table
     # 1. by using the path to an existing ADT table
-    if os.path.isfile(args.path_adt):
-        adt = pd.read_csv(args.path_adt, low_memory=False)
-        adt = _format_adt_table(adt)
+    if os.path.isfile(args.adt):
+        adt_df = pd.read_csv(args.adt, low_memory=False)
+        adt_df = _format_adt_table(adt_df)
 
         # Restrict ADT table to MRNs found in patient_csv
         if args.patient_csv is not None:
             patient_df = pd.read_csv(args.patient_csv, low_memory=False)
             mrns, csns = _mrns_csns_from_df(df=patient_df)
-            adt = adt[adt["MRN"].isin(mrns)]
+            adt_df = adt_df[adt_df["MRN"].isin(mrns)]
             logging.info(f"Filtered existing ADT table to MRNs in {args.patient_csv}")
 
-        logging.info(f"Loaded existing ADT table: {args.path_adt}")
+        logging.info(f"Loaded existing ADT table: {args.adt}")
 
     # 2. by department
     elif args.departments is not None:
@@ -410,13 +410,13 @@ def get_adt_table(
 
         # Run query for ADT table
         adt_query = os.path.join(query_directory, "adt.sql")
-        adt = query_to_dataframe(
+        adt_df = query_to_dataframe(
             edw=edw,
             query_path=adt_query,
             strings_to_insert=[mrns_string],
         )
-        adt = _format_adt_table(adt)
-        adt = adt[adt["PatientEncounterID"].isin(dept_csns)]
+        adt_df = _format_adt_table(adt_df)
+        adt_df = adt_df[adt_df["PatientEncounterID"].isin(dept_csns)]
         logging.info(f"Pulled ADT table by departments: {', '.join(args.departments)}")
 
     # 3. by using patient_csv containing MRNs and optionally CSNs
@@ -428,12 +428,12 @@ def get_adt_table(
 
         # Run query for ADT table
         adt_query = os.path.join(query_directory, "adt.sql")
-        adt = query_to_dataframe(
+        adt_df = query_to_dataframe(
             edw=edw,
             query_path=adt_query,
             strings_to_insert=[mrns_string],
         )
-        adt = _format_adt_table(adt)
+        adt_df = _format_adt_table(adt_df)
         logging.info(f"Pulled ADT table by patient_csv: {args.patient_csv}")
 
     # 4. by using a query that gets MRNs and optionally CSNs
@@ -454,12 +454,12 @@ def get_adt_table(
 
         # Run query for ADT table
         adt_query = os.path.join(query_directory, "adt.sql")
-        adt = query_to_dataframe(
+        adt_df = query_to_dataframe(
             edw=edw,
             query_path=adt_query,
             strings_to_insert=[mrns_string],
         )
-        adt = _format_adt_table(adt)
+        adt_df = _format_adt_table(adt_df)
         logging.info(f"Pulled ADT table by cohort_query: {args.cohort_query}")
 
     else:
@@ -471,7 +471,7 @@ def get_adt_table(
     # Time filter in order of priority:
     # 1. filter by CSN
     if csns is not None:
-        adt = adt[adt["PatientEncounterID"].isin(csns)]
+        adt_df = adt_df[adt_df["PatientEncounterID"].isin(csns)]
         logging.info(f"Filtered ADT table by CSNs.")
     # 2. filter by time
     elif args.start_time is not None or args.end_time is not None:
@@ -481,29 +481,29 @@ def get_adt_table(
             args.end_time = "2200-01-01"
         start = pd.to_datetime(args.start_time, format="%Y-%m-%d")
         end = pd.to_datetime(args.end_time, format="%Y-%m-%d")
-        after_start = adt["HospitalAdmitDTS"] > start
-        before_end = adt["HospitalAdmitDTS"] < end
-        adt = adt[after_start & before_end]
+        after_start = adt_df["HospitalAdmitDTS"] > start
+        before_end = adt_df["HospitalAdmitDTS"] < end
+        adt_df = adt_df[after_start & before_end]
         logging.info(f"Filtered ADT table by hospital admission time.")
     # 3. do not filter
 
     # Check that ADT table is not empty
-    if len(adt) == 0:
+    if len(adt_df) == 0:
         raise ValueError("ADT table is empty.")
 
     # Save ADT table
-    if not os.path.isfile(args.path_adt):
-        os.makedirs(os.path.dirname(args.path_adt), exist_ok=True)
-        adt.to_csv(args.path_adt, index=False)
-        logging.info(f"Saved ADT table to {args.path_adt}")
+    if not os.path.isfile(args.adt):
+        os.makedirs(os.path.dirname(args.adt), exist_ok=True)
+        adt_df.to_csv(args.adt, index=False)
+        logging.info(f"Saved ADT table to {args.adt}")
 
-    return adt
+    return adt_df
 
 
 def pull_edw_data(args: argparse.Namespace, only_adt: bool = False):
     edw = connect_edw()
     query_directory = os.path.join(os.path.dirname(__file__), "queries-pipeline")
-    adt = get_adt_table(
+    adt_df = get_adt_table(
         args=args,
         edw=edw,
         query_directory=query_directory,
@@ -514,6 +514,6 @@ def pull_edw_data(args: argparse.Namespace, only_adt: bool = False):
         args=args,
         edw=edw,
         query_directory=query_directory,
-        adt=adt,
+        adt_df=adt_df,
     )
-    logging.info(f"Saved EDW data to {args.path_edw}")
+    logging.info(f"Saved EDW data to {args.edw}")

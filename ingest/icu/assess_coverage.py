@@ -194,7 +194,7 @@ class ICUCoverageAssesser:
     @staticmethod
     def _hd5_coverage(
         csv: pd.DataFrame,
-        path_hd5: str,
+        hd5: str,
         data: Dict[str, Any],
         count: bool = False,
     ):
@@ -203,18 +203,18 @@ class ICUCoverageAssesser:
         dictionary with the coverage assessment results.
 
         :param csv: <pd.DataFrame> Pandas data frame to analyze the coverage.
-        :param path_hd5: <str> Directory with .hd5 files.
+        :param hd5: <str> Directory with .hd5 files.
         :param data: <Dict[str, Any]> Dictionary with the coverage assessment.
         :param count: <bool> Bool indicating whether or not the number of events
                       is calculated.
         """
         hd5_files = [
-            hd5_file for hd5_file in os.listdir(path_hd5) if hd5_file.endswith(".hd5")
+            hd5_file for hd5_file in os.listdir(hd5) if hd5_file.endswith(".hd5")
         ]
         new_csv = pd.DataFrame()
         for _, row in csv.iterrows():
             if f"{int(row['MRN'])}.hd5" in hd5_files:
-                hd5_file = h5py.File(os.path.join(path_hd5, f"{row['MRN']}.hd5"), "r")
+                hd5_file = h5py.File(os.path.join(hd5, f"{row['MRN']}.hd5"), "r")
                 csns = GET_SIGNAL_TMAP("visits").tensor_from_file(
                     GET_SIGNAL_TMAP("visits"),
                     hd5_file,
@@ -252,9 +252,9 @@ class ICUCoverageAssesser:
 
     def assess_coverage(
         self,
-        path_bedmaster: str,
-        path_edw: str,
-        path_hd5: str,
+        bedmaster: str,
+        edw: str,
+        hd5: str,
         desired_departments: List[str] = None,
         event_column: str = None,
         time_column: str = None,
@@ -265,9 +265,9 @@ class ICUCoverageAssesser:
         and CSNs available in EDW, Bedmaster and HD5 and a second .csv file
         listing the MRNs and CSNs from EDW that haven't been downloaded yet.
 
-        :param path_bedmaster: <str> Directory with Bedmaster .mat files.
-        :param path_edw: <str> Directory with EDW .csv files.
-        :param path_hd5: <str> Directory with .hd5 files.
+        :param bedmaster: <str> Directory with Bedmaster .mat files.
+        :param edw: <str> Directory with EDW .csv files.
+        :param hd5: <str> Directory with .hd5 files.
         :param desired_departments: <List[str]> List of department names.
         :param event_column: <str> Name of the event column (if exists) in
                --cohort_query/--cohort_csv.
@@ -308,13 +308,13 @@ class ICUCoverageAssesser:
                 matching_depts.append(key)
 
         bedmaster_matcher = PatientBedmasterMatcher(
-            path_bedmaster=path_bedmaster,
-            path_adt=os.path.join(self.output_dir, "adt.csv"),
+            bedmaster=bedmaster,
+            adt=os.path.join(self.output_dir, "adt.csv"),
             desired_departments=matching_depts,
         )
-        path_xref = os.path.join(self.output_dir, "xref.csv")
+        xref = os.path.join(self.output_dir, "xref.csv")
         bedmaster_matcher.match_files(
-            path_xref=path_xref,
+            xref=xref,
         )
 
         # Initialize empty table
@@ -364,7 +364,7 @@ class ICUCoverageAssesser:
             else:
                 data = self._coverage(cohort, data)
                 data = self._coverage(xref, data)
-            data = self._hd5_coverage(cohort, path_hd5, data, count)
+            data = self._hd5_coverage(cohort, hd5, data, count)
         data_frame = pd.DataFrame.from_dict(
             data,
             orient="index",
@@ -373,7 +373,7 @@ class ICUCoverageAssesser:
         csv_path = os.path.join(self.output_dir, "coverage.csv")
         data_frame.to_csv(csv_path)
 
-        remaining_patients = self._compare(self.adt_path, path_edw, False)
+        remaining_patients = self._compare(self.adt_path, edw, False)
         remaining_patients.to_csv(
             os.path.join(self.output_dir, "remaining_patients.csv"),
             index=False,
@@ -385,12 +385,12 @@ def assess_coverage(args):
         output_dir=args.output_folder,
         cohort_query=args.cohort_query,
         cohort_csv=args.cohort_csv,
-        adt_csv=args.path_adt,
+        adt_csv=args.adt,
     )
     assesser.assess_coverage(
-        path_bedmaster=args.path_bedmaster,
-        path_edw=args.path_edw,
-        path_hd5=args.tensors,
+        bedmaster=args.bedmaster,
+        edw=args.edw,
+        hd5=args.tensors,
         desired_departments=args.departments,
         event_column=args.event_column,
         time_column=args.time_column,

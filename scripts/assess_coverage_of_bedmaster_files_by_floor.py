@@ -32,25 +32,25 @@ class AssessBedmasterCoverage:
     @staticmethod
     def count_department_coverage(
         tensors: str,
-        path_bedmaster: str,
-        path_adt: str,
-        path_xref: str,
-        path_coverage_statistics: str,
+        bedmaster: str,
+        adt: str,
+        xref: str,
+        coverage_stats: str,
         desired_department: str,
     ):
         """
         Counts MRNs in ADT table with 1+ associated Bedmaster file.
 
         :param tensors: <str> Directory with .hd5 files.
-        :param path_bedmaster: <str> Directory with Bedmaster .mat files.
-        :param path_adt: <str> Path to ADT table.
-        :param path_xref: <str> Path to xref table.
-        :param path_coverage_statistics: <str> Path to save the resulting
+        :param bedmaster: <str> Directory with Bedmaster .mat files.
+        :param adt: <str> Path to ADT table.
+        :param xref: <str> Path to xref table.
+        :param coverage_stats: <str> Path to save the resulting
                coverage-$department.csv file.
         :param desired_department: <str> Desired department to assess coverage.
         """
 
-        bedmaster = pd.read_csv(path_xref)
+        bedmaster = pd.read_csv(xref)
         bedmaster = bedmaster[bedmaster["Department"] == desired_department]
 
         data: Dict[str, Dict[str, Any]] = {
@@ -82,13 +82,13 @@ class AssessBedmasterCoverage:
         ).strftime("%Y-%m-%d %H:%M:%S")
 
         # Read adt and filter
-        adt = pd.read_csv(path_adt)
-        adt = adt[adt["DepartmentDSC"] == desired_department]
-        adt_first = adt["TransferInDTS"].min()[:-8]
-        adt_last = adt["TransferInDTS"].max()[:-8]
-        adt_before = adt[adt["TransferInDTS"] < bedmaster_first]
-        adt_after = adt[adt["TransferInDTS"] > bedmaster_last]
-        adt_filt = adt[adt["TransferInDTS"] >= bedmaster_first]
+        adt_df = pd.read_csv(adt)
+        adt_df = adt_df[adt_df["DepartmentDSC"] == desired_department]
+        adt_first = adt_df["TransferInDTS"].min()[:-8]
+        adt_last = adt_df["TransferInDTS"].max()[:-8]
+        adt_before = adt_df[adt_df["TransferInDTS"] < bedmaster_first]
+        adt_after = adt_df[adt_df["TransferInDTS"] > bedmaster_last]
+        adt_filt = adt_df[adt_df["TransferInDTS"] >= bedmaster_first]
         adt_filt = adt_filt[adt_filt["TransferInDTS"] <= bedmaster_last]
 
         csns_out = set(adt_before["PatientEncounterID"]).union(
@@ -195,7 +195,7 @@ class AssessBedmasterCoverage:
                 for department in MAPPING_DEPARTMENTS[desired_department]:
                     try:
                         size += os.path.getsize(
-                            os.path.join(path_bedmaster, department, f"{path}.mat"),
+                            os.path.join(bedmaster, department, f"{path}.mat"),
                         )
                     except FileNotFoundError:
                         continue
@@ -238,8 +238,8 @@ class AssessBedmasterCoverage:
         df = pd.DataFrame.from_dict(results, orient="index", columns=columns)
         new_index = pd.Index(rows, name=desired_department)
         df.index = new_index
-        df.to_csv(path_coverage_statistics)
-        print(f"Saved {path_coverage_statistics}.")
+        df.to_csv(coverage_stats)
+        print(f"Saved {coverage_stats}.")
 
 
 def parse_arguments():
@@ -251,7 +251,7 @@ def parse_arguments():
         help="Directory where the results are saved.",
     )
     parser.add_argument(
-        "--path_bedmaster",
+        "--bedmaster",
         type=str,
         default="/media/lm4-bedmaster/",
         help="Directory containing Bedmaster .mat files.",
@@ -277,37 +277,37 @@ def run(args: argparse.Namespace):
     for department in args.departments:
         departments[department] = POSSIBLE_DEPARTMENTS[department]
 
-    path_adt = os.path.join(args.output_folder, "adt.csv")
+    adt = os.path.join(args.output_folder, "adt.csv")
     # If ADT and xref .csv files exist, use them
-    if os.path.exists(path_adt):
-        print(f"{path_adt} exists.")
+    if os.path.exists(adt):
+        print(f"{adt} exists.")
     # If these files do not exist, create them by pulling from EDW
     else:
-        print(f"{path_adt} does not exist; pulling from EDW...")
+        print(f"{adt} does not exist; pulling from EDW...")
         os.system(
             f"./scripts/run.sh $PWD/ml4c3/recipes.py pull_adt \
                 --departments {' '.join(departments.keys())} \
                 --output_folder {args.output_folder} \
-                --path_adt {path_adt}",
+                --adt {adt}",
         )
 
-    path_xref = os.path.join(args.output_folder, "xref.csv")
+    xref = os.path.join(args.output_folder, "xref.csv")
     # Match the bedmaster files in bedmaster_dir with adt_file
-    if os.path.exists(path_xref):
-        print(f"{path_xref} exists.")
+    if os.path.exists(xref):
+        print(f"{xref} exists.")
     else:
-        print(f"{path_xref} does not exist; generating...")
+        print(f"{xref} does not exist; generating...")
         matcher = PatientBedmasterMatcher(
-            path_bedmaster=args.path_bedmaster,
-            path_adt=path_adt,
+            bedmaster=args.bedmaster,
+            adt=adt,
             desired_departments=list(departments.values()),
         )
-        matcher.match_files(path_xref, True)
+        matcher.match_files(xref, True)
 
     # Assess coverage for each department
     for department in departments:
         edw_department_name = departments[department]
-        path_coverage_statistics = os.path.join(
+        coverage_stats = os.path.join(
             args.output_folder,
             f"coverage-{department}.csv",
         )
@@ -316,10 +316,10 @@ def run(args: argparse.Namespace):
         assessor = AssessBedmasterCoverage()
         assessor.count_department_coverage(
             tensors=args.tensors,
-            path_bedmaster=args.path_bedmaster,
-            path_adt=path_adt,
-            path_xref=path_xref,
-            path_coverage_statistics=path_coverage_statistics,
+            bedmaster=args.bedmaster,
+            adt=adt,
+            xref=xref,
+            coverage_stats=coverage_stats,
             desired_department=edw_department_name,
         )
         elapsed_time = time.time() - start_time

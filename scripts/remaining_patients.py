@@ -17,7 +17,7 @@ def parse_arguments():
         help="File with a list of MRNs and CSNs to check their existance.",
     )
     parser.add_argument(
-        "--path_edw",
+        "--edw",
         type=str,
         default="/media/ml4c3/edw/",
         help="Directory where the analysis is performed.",
@@ -41,7 +41,7 @@ def run(args: argparse.Namespace):
     remaining_patients = ICUCoverageAssesser._compare(
         ICUCoverageAssesser,
         args.patient_csv,
-        args.path_edw,
+        args.edw,
         args.remove,
     )
     if not os.path.isdir(args.output_folder):

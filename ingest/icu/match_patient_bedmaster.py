@@ -19,19 +19,19 @@ from ingest.icu.utils import get_files_in_directory
 class PatientBedmasterMatcher:
     def __init__(
         self,
-        path_bedmaster: str,
-        path_adt: str,
+        bedmaster: str,
+        adt: str,
         desired_departments: List[str] = None,
     ):
         """
         Init Patient Bedmaster matcher.
 
-        :param path_bedmaster: <str> Directory containing all the Bedmaster files.
-        :param path_adt: <str> Path to ADT table.
+        :param bedmaster: <str> Directory containing all the Bedmaster files.
+        :param adt: <str> Path to ADT table.
         :param desired_departments: <List[str]> List of all desired departments.
         """
-        self.path_bedmaster = path_bedmaster
-        self.path_adt = path_adt
+        self.bedmaster = bedmaster
+        self.adt = adt
         self.desired_departments = desired_departments
         self.folder_to_dept: Dict[str, List[str]] = {}
         for key, values in MAPPING_DEPARTMENTS.items():
@@ -54,7 +54,7 @@ class PatientBedmasterMatcher:
 
     @staticmethod
     def parse_bedmaster_file_paths(
-        path_bedmaster: str,
+        bedmaster: str,
         departments_short_names: set = None,
     ):
         """
@@ -62,7 +62,7 @@ class PatientBedmasterMatcher:
         and retrieve metadata from the paths, inlcuding department, room,
         and start time. Optionally, focus the search on subset of department folders.
 
-        :param path_bedmaster: <str> path to directory with subdirectories organized
+        :param bedmaster: <str> path to directory with subdirectories organized
                by department; subdirectories contain Bedmaster .mat files.
         :param departments_short_names: <set> Names of departments in short format;
                these are hard to remember and are thus saved in a dictionary keyed
@@ -70,13 +70,13 @@ class PatientBedmasterMatcher:
         :return: <pd.DataFrame> Table of full paths to Bedmaster files, departments,
                  room_beds, and start time of each file.
         """
-        logging.info(f"Getting paths to Bedmaster files at {path_bedmaster}")
+        logging.info(f"Getting paths to Bedmaster files at {bedmaster}")
         if departments_short_names is not None:
             logging.info(
                 f"Restricting search to the following departments: {departments_short_names}",
             )
         bedmaster_files, _ = get_files_in_directory(
-            directory=path_bedmaster,
+            directory=bedmaster,
             file_extension=BEDMASTER_EXT,
             departments_short_names=departments_short_names,
         )
@@ -146,29 +146,29 @@ class PatientBedmasterMatcher:
 
     def match_files(
         self,
-        path_xref: str = None,
+        xref: str = None,
     ):
         """
         Match Bedmaster files with patient's MRN and EncounterID.
 
-        :param path_xref: <str> Path to the CSV file containing the xref table.
+        :param xref: <str> Path to the CSV file containing the xref table.
         """
         logging.info("Matching Bedmaster files with MRNs and CSNs.")
 
         # Read ADT table and take desired columns, remove duplicates, and sort
-        adt = pd.read_csv(self.path_adt)
-        adt = (
-            adt[EDW_FILES["adt_file"]["columns"]]
+        adt_df = pd.read_csv(self.adt)
+        adt_df = (
+            adt_df[EDW_FILES["adt_file"]["columns"]]
             .drop_duplicates()
             .sort_values("TransferInDTS")
         )
 
         # Convert dates to Unix Time Stamps
-        adt["TransferInDTS"] = get_unix_timestamps(adt["TransferInDTS"].values)
-        adt["TransferOutDTS"] = get_unix_timestamps(adt["TransferOutDTS"].values)
+        adt_df["TransferInDTS"] = get_unix_timestamps(adt_df["TransferInDTS"].values)
+        adt_df["TransferOutDTS"] = get_unix_timestamps(adt_df["TransferOutDTS"].values)
 
         # Get departments from ADT:
-        departments = set(adt["DepartmentDSC"])
+        departments = set(adt_df["DepartmentDSC"])
         departments_short_names = self.get_department_short_names(
             departments=departments,
         )
@@ -179,7 +179,7 @@ class PatientBedmasterMatcher:
 
         # Parse Bedmaster file paths into metadata
         metadata = self.parse_bedmaster_file_paths(
-            path_bedmaster=self.path_bedmaster,
+            bedmaster=self.bedmaster,
             departments_short_names=departments_short_names,
         )
 
@@ -189,23 +189,23 @@ class PatientBedmasterMatcher:
         logging.info(f"Cross referencing metadata and ADT DataFrames")
 
         # Merge adt and metadata on the room_bed
-        xref = adt.merge(metadata, left_on="BedLabelNM", right_on="room_bed")
+        xref_df = adt_df.merge(metadata, left_on="BedLabelNM", right_on="room_bed")
 
         # Keep rows with ADT start time within Bedmaster file transfer times
-        xref = xref[
-            (xref["TransferInDTS"] - 3600 <= xref["start_time"].astype(float))
-            & (xref["start_time"].astype(float) < xref["TransferOutDTS"])
+        xref_df = xref_df[
+            (xref_df["TransferInDTS"] - 3600 <= xref_df["start_time"].astype(float))
+            & (xref_df["start_time"].astype(float) < xref_df["TransferOutDTS"])
         ]
 
         # Save xref table to CSV
-        xref.to_csv(path_xref, index=False)
-        logging.info(f"Saved {path_xref}")
+        xref_df.to_csv(path_or_buf=xref, index=False)
+        logging.info(f"Saved {xref}")
 
 
 def match_data(args):
     bedmaster_matcher = PatientBedmasterMatcher(
-        path_bedmaster=args.path_bedmaster,
-        path_adt=args.path_adt,
+        bedmaster=args.bedmaster,
+        adt=args.adt,
         desired_departments=args.departments,
     )
-    bedmaster_matcher.match_files(path_xref=args.path_xref)
+    bedmaster_matcher.match_files(xref=args.xref)
