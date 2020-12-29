@@ -10,7 +10,7 @@ import numpy as np
 from definitions.sts import STS_PREFIX, STS_SURGERY_DATE_COLUMN
 from ml4c3.normalizer import MinMax, RobustScalePopulation
 from ml4c3.validators import validator_no_nans, validator_not_all_zero
-from ml4c3.tensormap.TensorMap import (
+from tensormap.TensorMap import (
     Dates,
     TensorMap,
     ChannelMap,

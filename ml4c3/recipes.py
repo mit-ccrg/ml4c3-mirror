@@ -22,10 +22,10 @@ from ml4c3.evaluations import predict_and_evaluate
 from ml4c3.explorations import explore
 from definitions.globals import MODEL_EXT
 from ingest.edw.pipeline import pull_edw_data
+from tensormap.TensorMap import TensorMap
 from ingest.ecg.tensorizer import tensorize as tensorize_ecg
 from ingest.icu.tensorizer import tensorize as tensorize_icu
 from ml4c3.hyperoptimizers import hyperoptimize
-from ml4c3.tensormap.TensorMap import TensorMap
 from ingest.icu.assess_coverage import assess_coverage
 from ingest.icu.check_structure import check_icu_structure
 from ingest.icu.ecg_features_extraction import extract_ecg_features

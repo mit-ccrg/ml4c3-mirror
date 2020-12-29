@@ -7,7 +7,7 @@ import numpy as np
 
 # Imports: first party
 from definitions.icu import ICU_TMAPS_METADATA
-from ml4c3.tensormap.TensorMap import TensorMap
+from tensormap.TensorMap import TensorMap
 
 
 def compute_feature(

@@ -15,7 +15,7 @@ from ml4c3.models import (
     make_multimodal_multitask_model,
 )
 from definitions.models import BottleneckType
-from ml4c3.tensormap.TensorMap import TensorMap
+from tensormap.TensorMap import TensorMap
 
 MEAN_PRECISION_EPS = 0.02  # how much mean precision degradation is acceptable
 DEFAULT_PARAMS = {

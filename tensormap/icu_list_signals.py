@@ -5,8 +5,8 @@ from typing import Optional
 import numpy as np
 
 # Imports: first party
+from tensormap.TensorMap import TensorMap, Interpretation, get_visits
 from definitions.icu_tmap_list import DEFINED_TMAPS
-from ml4c3.tensormap.TensorMap import TensorMap, Interpretation, get_visits
 
 
 def make_list_signal_tensor_from_file(sig_type: str):

@@ -3,7 +3,7 @@ import pytest
 from tensorflow.keras.losses import logcosh
 
 # Imports: first party
-from ml4c3.tensormap.TensorMap import TensorMap
+from tensormap.TensorMap import TensorMap
 
 # pylint: disable=no-member
 

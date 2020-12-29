@@ -5,9 +5,9 @@ from typing import Optional
 # Imports: first party
 from definitions.icu import ICU_TMAPS_METADATA
 from ml4c3.normalizer import MinMax, ZScore, ZScorePopulation, RobustScalePopulation
-from ml4c3.tensormap.TensorMap import TensorMap
-from ml4c3.tensormap.icu_around_event import get_tmap as get_around_tmap
-from ml4c3.tensormap.icu_static_around_event import get_tmap as get_static_around_tmap
+from tensormap.TensorMap import TensorMap
+from tensormap.icu_around_event import get_tmap as get_around_tmap
+from tensormap.icu_static_around_event import get_tmap as get_static_around_tmap
 
 
 def get_tmap(tmap_name: str) -> Optional[TensorMap]:

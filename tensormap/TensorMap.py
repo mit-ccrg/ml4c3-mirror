@@ -544,42 +544,42 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
     # fmt: off
 
     # ICU Signal tmaps
-    from ml4c3.tensormap.icu_signals import get_tmap as tmaps_icu_signals # isort: skip
+    from tensormap.icu_signals import get_tmap as tmaps_icu_signals # isort: skip
     tm = tmaps_icu_signals(tmap_name)
     if tm:
         tmaps[tmap_name] = tm
         return tmaps
 
     # ICU Event department tmaps
-    from ml4c3.tensormap.icu_event_department import get_tmap as tmaps_icu_event_department # isort: skip
+    from tensormap.icu_event_department import get_tmap as tmaps_icu_event_department # isort: skip
     tm = tmaps_icu_event_department(tmap_name)
     if tm:
         tmaps[tmap_name] = tm
         return tmaps
 
     # ICU Around event tmaps
-    from ml4c3.tensormap.icu_around_event import get_tmap as tmaps_icu_around_event # isort: skip
+    from tensormap.icu_around_event import get_tmap as tmaps_icu_around_event # isort: skip
     tm = tmaps_icu_around_event(tmap_name)
     if tm:
         tmaps[tmap_name] = tm
         return tmaps
 
     # ICU ECG features tmaps
-    from ml4c3.tensormap.icu_ecg_features import get_tmap as tmaps_icu_ecg_features # isort: skip
+    from tensormap.icu_ecg_features import get_tmap as tmaps_icu_ecg_features # isort: skip
     tm = tmaps_icu_ecg_features(tmap_name)
     if tm:
         tmaps[tmap_name] = tm
         return tmaps
 
     # ICU first visit tmaps
-    from ml4c3.tensormap.icu_first_visit_with_signal import get_tmap as tmaps_icu_first_visit # isort: skip
+    from tensormap.icu_first_visit_with_signal import get_tmap as tmaps_icu_first_visit # isort: skip
     tm = tmaps_icu_first_visit(tmap_name)
     if tm:
         tmaps[tmap_name] = tm
         return tmaps
 
     # ICU List signals tmaps
-    from ml4c3.tensormap.icu_list_signals import get_tmap as tmaps_icu_list_signals # isort: skip
+    from tensormap.icu_list_signals import get_tmap as tmaps_icu_list_signals # isort: skip
     tm = tmaps_icu_list_signals(tmap_name)
     if tm:
         tmaps[tmap_name] = tm
@@ -587,7 +587,7 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
 
     """
     # ICU Standardized tmaps
-    from ml4c3.tensormap.icu_normalized import get_tmap as tmaps_icu_normalized # isort: skip
+    from tensormap.icu_normalized import get_tmap as tmaps_icu_normalized # isort: skip
     tm = tmaps_icu_normalized(tmap_name)
     if tm:
         tmaps[tmap_name] = tm
@@ -595,55 +595,55 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
     """
 
     # Base tmaps: ECG
-    from ml4c3.tensormap.ecg import tmaps as tmaps_ecg # isort:skip
+    from tensormap.ecg import tmaps as tmaps_ecg # isort:skip
     tmaps.update(tmaps_ecg)
     if tmap_name in tmaps:
         return tmaps
 
     # Base tmaps: STS
-    from ml4c3.tensormap.sts import tmaps as tmaps_sts # isort:skip
+    from tensormap.sts import tmaps as tmaps_sts # isort:skip
     tmaps.update(tmaps_sts)
     if tmap_name in tmaps:
         return tmaps
 
     # Base tmaps: Echo
-    from ml4c3.tensormap.echo import tmaps as tmaps_echo  # isort:skip
+    from tensormap.echo import tmaps as tmaps_echo  # isort:skip
     tmaps.update(tmaps_echo)
     if tmap_name in tmaps:
         return tmaps
 
     # Base tmap: c3po
-    from ml4c3.tensormap.c3po import make_c3po_death_tmap # isort: skip
+    from tensormap.c3po import make_c3po_death_tmap # isort: skip
     tmaps = make_c3po_death_tmap(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps
 
     # Base tmaps: ECG labels
-    from ml4c3.tensormap.ecg_labels import tmaps as tmaps_ecg_labels # isort:skip
+    from tensormap.ecg_labels import tmaps as tmaps_ecg_labels # isort:skip
     tmaps.update(tmaps_ecg_labels)
     if tmap_name in tmaps:
         return tmaps
 
     # Base tmaps: ECG voltage
-    from ml4c3.tensormap.ecg import update_tmaps_ecg_voltage # isort:skip
+    from tensormap.ecg import update_tmaps_ecg_voltage # isort:skip
     tmaps = update_tmaps_ecg_voltage(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps
 
     # Modify: Weighted loss
-    from ml4c3.tensormap.updaters import update_tmaps_weighted_loss # isort:skip
+    from tensormap.updaters import update_tmaps_weighted_loss # isort:skip
     tmaps = update_tmaps_weighted_loss(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps
 
     # Modify: Window (e.g. "pre_echo" or "pre_sts")
-    from ml4c3.tensormap.updaters import update_tmaps_window # isort:skip
+    from tensormap.updaters import update_tmaps_window # isort:skip
     tmaps = update_tmaps_window(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps
 
     # Modify: Time series
-    from ml4c3.tensormap.updaters import update_tmaps_time_series # isort:skip
+    from tensormap.updaters import update_tmaps_time_series # isort:skip
     tmaps = update_tmaps_time_series(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps
@@ -659,23 +659,23 @@ def create_tmap(signal, source, field) -> Optional[TensorMap]:
 
     # fmt: off
     if source in ["vital", "waveform"]:
-        from ml4c3.tensormap.icu_signals import get_bedmaster_signal_tmap # isort: skip
+        from tensormap.icu_signals import get_bedmaster_signal_tmap # isort: skip
         return get_bedmaster_signal_tmap(tm_name, signal, source)
 
     if source == "alarm":
-        from ml4c3.tensormap.icu_signals import create_alarm_tmap # isort: skip
+        from tensormap.icu_signals import create_alarm_tmap # isort: skip
         return create_alarm_tmap(tm_name, signal)
 
     if source in ["flowsheet", "labs"]:
-        from ml4c3.tensormap.icu_signals import create_measurement_tmap # isort: skip
+        from tensormap.icu_signals import create_measurement_tmap # isort: skip
         return create_measurement_tmap(tm_name, signal, source)
 
     if source == "med":
-        from ml4c3.tensormap.icu_signals import create_med_tmap # isort: skip
+        from tensormap.icu_signals import create_med_tmap # isort: skip
         return create_med_tmap(tm_name, signal)
 
     if source in ["events", "surgery", "transfusions", "procedures"]:
-        from ml4c3.tensormap.icu_signals import create_event_tmap # isort: skip
+        from tensormap.icu_signals import create_event_tmap # isort: skip
         return create_event_tmap(tm_name, signal, source)
     # fmt: on
 

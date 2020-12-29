@@ -14,15 +14,15 @@ from ml4c3.validators import (
     validator_no_negative,
     validator_not_all_zero,
 )
-from definitions.icu_tmap_list import DEFINED_TMAPS
-from ml4c3.tensormap.TensorMap import (
+from tensormap.TensorMap import (
     TensorMap,
     PatientData,
     Interpretation,
     get_visits,
     get_local_timestamps,
 )
-from ml4c3.tensormap.icu_first_visit_with_signal import get_tmap as get_visit_tmap
+from definitions.icu_tmap_list import DEFINED_TMAPS
+from tensormap.icu_first_visit_with_signal import get_tmap as get_visit_tmap
 
 
 def make_alarm_array_tensor_from_file():

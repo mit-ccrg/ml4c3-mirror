@@ -6,13 +6,13 @@ import numpy as np
 import pandas as pd
 
 # Imports: first party
-from definitions.icu_tmap_list import DEFINED_TMAPS
-from ml4c3.tensormap.TensorMap import (
+from tensormap.TensorMap import (
     TensorMap,
     Interpretation,
     get_visits,
     get_local_timestamps,
 )
+from definitions.icu_tmap_list import DEFINED_TMAPS
 
 
 def has_data(hd5, visit, data):

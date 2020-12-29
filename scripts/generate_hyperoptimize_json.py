@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 import numpy as np
 
 # Imports: first party
-from ml4c3.tensormap.TensorMap import TensorMap, update_tmaps
+from tensormap.TensorMap import TensorMap, update_tmaps
 
 # pylint: disable=dangerous-default-value
 

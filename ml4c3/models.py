@@ -76,7 +76,7 @@ from ml4c3.datasets import (
 from ml4c3.optimizers import NON_KERAS_OPTIMIZERS, get_optimizer
 from definitions.models import BottleneckType
 from definitions.globals import MODEL_EXT
-from ml4c3.tensormap.TensorMap import TensorMap
+from tensormap.TensorMap import TensorMap
 
 #######################################
 ##                                   ##

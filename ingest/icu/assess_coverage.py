@@ -12,7 +12,7 @@ import pandas as pd
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
 from definitions.icu import EDW_FILES, MAPPING_DEPARTMENTS
-from ml4c3.tensormap.icu_signals import get_tmap as GET_SIGNAL_TMAP
+from tensormap.icu_signals import get_tmap as GET_SIGNAL_TMAP
 from ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
 
 EXPECTED_FILES = []

@@ -14,7 +14,7 @@ import numpy as np
 # Imports: first party
 from ml4c3.logger import load_config
 from definitions.models import BottleneckType
-from ml4c3.tensormap.TensorMap import TensorMap, update_tmaps
+from tensormap.TensorMap import TensorMap, update_tmaps
 
 BOTTLENECK_STR_TO_ENUM = {
     "flatten_restructure": BottleneckType.FlattenRestructure,

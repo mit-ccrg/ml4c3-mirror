@@ -27,7 +27,7 @@ from ml4c3.models import (
 from ml4c3.datasets import train_valid_test_datasets
 from definitions.types import Arguments
 from ml4c3.evaluations import predict_and_evaluate, get_sklearn_model_coefficients
-from ml4c3.tensormap.TensorMap import TensorMap, update_tmaps
+from tensormap.TensorMap import TensorMap, update_tmaps
 
 # fmt: off
 # need matplotlib -> Agg -> pyplot

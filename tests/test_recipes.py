@@ -15,7 +15,7 @@ from ml4c3.explorations import (
     categorical_explore_header,
     _tmap_requires_modification_for_explore,
 )
-from ml4c3.tensormap.TensorMap import TensorMap, Interpretation
+from tensormap.TensorMap import TensorMap, Interpretation
 
 
 class TestRecipes:

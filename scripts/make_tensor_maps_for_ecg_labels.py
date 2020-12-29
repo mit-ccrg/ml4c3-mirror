@@ -154,7 +154,7 @@ if __name__ == "__main__":
         py_file.write(f"from ml4c3.TensorMap import TensorMap, Interpretation\n")
         py_file.write(f"from ml4c3.definitions import ECG_PREFIX\n")
         py_file.write(
-            f"from ml4c3.tensormap.ecg import {MAKE_TFF_FUNCTION_NAME}, {MAKE_ANY_TFF_FUNCTION_NAME}\n",
+            f"from tensormap.ecg import {MAKE_TFF_FUNCTION_NAME}, {MAKE_ANY_TFF_FUNCTION_NAME}\n",
         )
         py_file.write(f"from ml4c3.validators import validator_not_all_zero\n\n\n")
         py_file.write("tmaps: Dict[str, TensorMap] = {}\n")

@@ -14,7 +14,7 @@ from definitions.ecg import ECG_PREFIX
 from definitions.sts import STS_PREFIX, STS_SURGERY_DATE_COLUMN
 from definitions.echo import ECHO_PREFIX, ECHO_DATETIME_COLUMN
 from definitions.globals import SECONDS_IN_DAY
-from ml4c3.tensormap.TensorMap import (
+from tensormap.TensorMap import (
     Dates,
     TensorMap,
     PatientData,

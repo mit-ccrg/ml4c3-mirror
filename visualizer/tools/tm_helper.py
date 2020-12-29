@@ -8,10 +8,9 @@ import numpy as np
 import pandas as pd
 
 # Imports: first party
-from visualizer.properties import SIGNAL_INTERPRETATION
-
 # pylint: disable=unused-import, global-statement, too-many-function-args
-from ml4c3.tensormap.TensorMap import create_tmap, update_tmaps
+from tensormap.TensorMap import create_tmap, update_tmaps
+from visualizer.properties import SIGNAL_INTERPRETATION
 
 TMAPS: Dict = {}
 

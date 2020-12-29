@@ -24,7 +24,7 @@ from ml4c3.validators import (
     validator_voltage_no_zero_padding,
 )
 from definitions.globals import YEAR_DAYS
-from ml4c3.tensormap.TensorMap import (
+from tensormap.TensorMap import (
     TensorMap,
     Interpretation,
     make_hd5_path,
@@ -57,7 +57,7 @@ def _resample_voltage(voltage: np.array, desired_samples: int, fs: float) -> np.
 
 def make_voltage_tff(exact_length=False, no_pacemaker=False, conv_2d=False):
     if no_pacemaker:
-        from ml4c3.tensormap.ecg_labels import tmaps as label_tmaps  # isort: skip
+        from tensormap.ecg_labels import tmaps as label_tmaps  # isort: skip
 
         pacemaker_tm = label_tmaps["pacemaker"]
 

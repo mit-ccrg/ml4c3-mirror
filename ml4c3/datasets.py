@@ -16,11 +16,7 @@ from tensorflow_probability import distributions as tfd
 
 # Imports: first party
 from definitions.globals import CSV_EXT, TENSOR_EXT, MRN_COLUMNS
-from ml4c3.tensormap.TensorMap import (
-    TensorMap,
-    PatientData,
-    find_negative_label_and_channel,
-)
+from tensormap.TensorMap import TensorMap, PatientData, find_negative_label_and_channel
 
 SampleGenerator = Generator[
     Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]],

@@ -16,11 +16,13 @@ import pytest
 import neurokit2 as nk
 
 # Imports: first party
-import ml4c3
+import tensormap
 from definitions.icu import EDW_FILES
 from ml4c3.arguments import parse_args
 from ingest.icu.writers import Writer
 from definitions.globals import TENSOR_EXT
+from tensormap.TensorMap import TensorMap, Interpretation, get_local_timestamps
+from tensormap.icu_signals import get_tmap as GET_SIGNAL_TMAP
 from ingest.icu.data_objects import (
     Event,
     Procedure,
@@ -31,9 +33,7 @@ from ingest.icu.data_objects import (
     BedmasterAlarm,
     BedmasterSignal,
 )
-from ml4c3.tensormap.TensorMap import TensorMap, Interpretation, get_local_timestamps
-from ml4c3.tensormap.icu_signals import get_tmap as GET_SIGNAL_TMAP
-from ml4c3.tensormap.icu_list_signals import get_tmap as GET_LIST_TMAP
+from tensormap.icu_list_signals import get_tmap as GET_LIST_TMAP
 
 # pylint: disable=redefined-outer-name, unused-argument, missing-class-docstring
 
@@ -172,7 +172,7 @@ def use_testing_tmaps(monkeypatch):
     def mock_update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]):
         return pytest.MOCK_TMAPS
 
-    monkeypatch.setattr(ml4c3.tensormap.TensorMap, "update_tmaps", mock_update_tmaps)
+    monkeypatch.setattr(tensormap.TensorMap, "update_tmaps", mock_update_tmaps)
     monkeypatch.setattr("ml4c3.arguments.update_tmaps", mock_update_tmaps)
     monkeypatch.setattr("ml4c3.hyperoptimizers.update_tmaps", mock_update_tmaps)
 

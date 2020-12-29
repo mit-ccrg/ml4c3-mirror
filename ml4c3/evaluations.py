@@ -27,7 +27,7 @@ from ml4c3.datasets import (
 )
 from definitions.types import Path, Paths, Inputs, Outputs, Predictions
 from definitions.globals import CSV_EXT
-from ml4c3.tensormap.TensorMap import TensorMap, find_negative_label_and_channel
+from tensormap.TensorMap import TensorMap, find_negative_label_and_channel
 
 
 def predict_and_evaluate(

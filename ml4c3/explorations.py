@@ -25,7 +25,7 @@ from ml4c3.datasets import (
     get_train_valid_test_ids,
     get_dicts_of_arrays_from_dataset,
 )
-from ml4c3.tensormap.TensorMap import (
+from tensormap.TensorMap import (
     TensorMap,
     PatientData,
     Interpretation,

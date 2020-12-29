@@ -11,10 +11,10 @@ import numpy as np
 import neurokit2 as nk
 
 # Imports: first party
-from ml4c3.tensormap.TensorMap import TensorMap
-from ml4c3.tensormap.icu_signals import get_tmap as GET_SIGNAL_TMAP
-from ml4c3.tensormap.icu_list_signals import get_tmap as GET_LIST_TMAP
-from ml4c3.tensormap.icu_first_visit_with_signal import get_tmap as get_visit_tmap
+from tensormap.TensorMap import TensorMap
+from tensormap.icu_signals import get_tmap as GET_SIGNAL_TMAP
+from tensormap.icu_list_signals import get_tmap as GET_LIST_TMAP
+from tensormap.icu_first_visit_with_signal import get_tmap as get_visit_tmap
 
 LEADS = ["i", "ii", "iii", "v"]
 ECG_TMAPS = {

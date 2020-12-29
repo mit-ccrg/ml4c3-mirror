@@ -40,11 +40,7 @@ from ml4c3.datasets import (
 )
 from definitions.ecg import ECG_DATE_FORMAT, ECG_DATETIME_FORMAT
 from definitions.models import BottleneckType
-from ml4c3.tensormap.TensorMap import (
-    TensorMap,
-    update_tmaps,
-    find_negative_label_and_channel,
-)
+from tensormap.TensorMap import TensorMap, update_tmaps, find_negative_label_and_channel
 
 # fmt: off
 # need matplotlib -> Agg -> pyplot

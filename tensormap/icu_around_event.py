@@ -9,12 +9,12 @@ import numpy as np
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
 from ml4c3.validators import validator_no_nans
-from ml4c3.tensormap.TensorMap import Axis, TensorMap, Interpretation
-from ml4c3.tensormap.icu_signals import get_tmap as get_signal_tmap
-from ml4c3.tensormap.icu_signals import admin_age_tensor_from_file
-from ml4c3.tensormap.icu_ecg_features import get_tmap as get_ecg_tmap
-from ml4c3.tensormap.icu_signal_metrics import compute_feature
-from ml4c3.tensormap.icu_first_visit_with_signal import get_tmap as get_visit_tmap
+from tensormap.TensorMap import Axis, TensorMap, Interpretation
+from tensormap.icu_signals import get_tmap as get_signal_tmap
+from tensormap.icu_signals import admin_age_tensor_from_file
+from tensormap.icu_ecg_features import get_tmap as get_ecg_tmap
+from tensormap.icu_signal_metrics import compute_feature
+from tensormap.icu_first_visit_with_signal import get_tmap as get_visit_tmap
 
 # pylint: disable=unused-argument
 
