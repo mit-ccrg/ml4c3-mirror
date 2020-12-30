@@ -1,12 +1,13 @@
 ## What is `ml4c3`?
-Machine Learning for Cardiology and Critical Care (`ml4c3`) is a pipeline for
+Machine Learning for Cardiology and Critical Care (`ml4c3`) is a pipeline for  
 working with complex physiological data. It does several key things:
 
 - *Ingests* raw data into a pre-processed format.
 - *Tensorizes* ingested data into `hd5` or CSV format suitable for performant modeling.
 - *Visualizes* ECGs, ICU waveforms, labs, and modeling results.
 - *Explores* summary statistics and trends.
-- *Trains* supervised and reinforcement learning models built in TensorFlow using a powerful, simple, and expressive command line arguments.
+- *Trains* supervised and reinforcement learning models built in TensorFlow using a  
+    powerful, simple, and expressive command line arguments.
 - *Clusters* data to reveal patterns via unsupervised learning.
 
 ## How do I install `ml4c3`?
