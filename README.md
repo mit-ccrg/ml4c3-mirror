@@ -2,13 +2,14 @@
 Machine Learning for Cardiology and Critical Care (`ml4c3`) is a pipeline for  
 working with complex physiological data. It does several key things:
 
-- *Ingests* raw data into a pre-processed format.
-- *Tensorizes* ingested data into `hd5` or CSV format suitable for performant modeling.
-- *Visualizes* ECGs, ICU waveforms, labs, and modeling results.
-- *Explores* summary statistics and trends.
-- *Trains* supervised and reinforcement learning models built in TensorFlow using a  
-    powerful, simple, and expressive command line arguments.
-- *Clusters* data to reveal patterns via unsupervised learning.
+- *Ingest* raw data into a pre-processed format.
+- *Tensorize* ingested data into standard `hd5` or CSV formats compatible with the pipeline.
+- *Map* desired data from `hd5` or CSV files to code via the `TensorMap` abstraction.
+- *Visualize* ECGs, ICU waveforms, labs, and modeling results.
+- *Explore* summary statistics and trends.
+- *Train* supervised and reinforcement learning models that are constructed from  
+    powerful, simple, and expressive command line arguments and `TensorMaps`.
+- *Cluster* data to reveal patterns via unsupervised learning.
 
 ## How do I install `ml4c3`?
 1. Install [`docker`](https://docs.docker.com/get-docker/) and [`anaconda`](https://docs.conda.io/projects/conda/en/latest/user-guide/install/)
