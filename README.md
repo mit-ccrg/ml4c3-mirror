@@ -66,8 +66,8 @@ Read the documentation at the [`ml4c3` wiki](https://github.com/aguirre-lab/ml4c
 Join the [discussions](https://github.com/aguirre-lab/ml4c3/discussions).
 
 ## Can I contribute?
-Yes, we would love your help! See our lab [`CONTRIBUTING`](https://github.com/aguirre-lab/aguirre-lab/blob/master/CONTRIBUTING.md)
-to learn how to open an issue or submit a PR.
+Yes, we would love your help! See [`CONTRIBUTING`](/CONTRIBUTING.md)
+to learn how to open an issue, submit a PR, and more.
 
 ## Who built `ml4c3`?
 `ml4c3` was built by the [Aguirre Lab](https://csb.mgh.harvard.edu/aaron_aguirre) at the
