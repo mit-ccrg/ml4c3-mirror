@@ -1,8 +1,8 @@
 ---
 name: Bug report
-about: ''
+about: Something doesn't work.
 title: ''
-labels: "bug 🐛"
+labels: "bug \U0001F41B"
 assignees: ''
 
 ---
