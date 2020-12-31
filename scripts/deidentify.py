@@ -3,6 +3,7 @@ import os
 import shutil
 import argparse
 from timeit import default_timer as timer
+from typing import Dict
 from multiprocessing import Pool, cpu_count
 
 # Imports: third party
@@ -95,6 +96,7 @@ def _get_csv_mrns(args):
                         continue
                     fpath = os.path.join(root, fname)
                     fpaths.append(fpath)
+
         # If user gave path to single CSV, instead of a directory, use that path
         else:
             fpaths.append(args.path_to_csv)
@@ -134,7 +136,6 @@ def _remap_mrns(args):
     if os.path.isfile(args.mrn_map):
         # call to _get_csv_mrns to determine which files to skip for sts deidentification
         _get_csv_mrns(args)
-
         mrn_map = pd.read_csv(args.mrn_map, low_memory=False, usecols=["mrn", "new_id"])
         mrn_map = mrn_map.set_index("mrn")
         mrn_map = mrn_map["new_id"].to_dict()
@@ -145,7 +146,6 @@ def _remap_mrns(args):
     new_mrns = _get_mrns(args, skip_mrns=set(mrn_map.keys()))
     new_ids = list(range(starting_id, len(new_mrns) + starting_id))
     np.random.shuffle(new_ids)
-
     mrn_map.update(dict(zip(new_mrns, new_ids)))
     print(f"New MRNs remapped starting at ID {starting_id}")
 
@@ -162,15 +162,19 @@ def _remap_mrns(args):
 def _swap_path_prefix(path, prefix, new_prefix):
     """
     Given:
-        path = /foo/bar
-        prefix = /foo
+        path       = /foo/meow/bar.csv
+        prefix     = /foo
         new_prefix = /baz
+    Creates:
+                     /baz/meow
     Returns:
-        /baz/bar
+                     /baz/meow/bar.csv
     """
     path_relative_root = path.replace(prefix, "").lstrip("/")
     new_path = os.path.join(new_prefix, path_relative_root)
-    if not os.path.isdir(new_path):
+    if os.path.isfile(path):
+        os.makedirs(os.path.dirname(new_path), exist_ok=True)
+    else:
         os.makedirs(new_path, exist_ok=True)
     return new_path
 
@@ -236,7 +240,7 @@ def _deidentify_hd5s(
     print(f"De-identified {len(old_new_paths)} ECGs at {path_to_hd5_deidentified}")
 
 
-def _deidentify_csv(path: str, mrn_map: str):
+def _deidentify_csv(path: str, mrn_map: dict, columns_to_remove: list):
     """
     Given a path to a CSV, delete all identifiable information.
     """
@@ -261,43 +265,70 @@ def _deidentify_csv(path: str, mrn_map: str):
     else:
         mrn_cols = list(matches)
 
-    # Remap MRNs and drop PHI columns
+    # Remap MRNs and drop PHI columns and other user-specified columns
     df[mrn_cols] = df[mrn_cols].applymap(lambda mrn: mrn_map[int(float(mrn))])
-    phi_cols = set(df.columns) & phi_keys
-    df = df.drop(phi_cols, axis=1)
+    cols_to_drop = set(df.columns) & (phi_keys | set(columns_to_remove))
+    df = df.drop(cols_to_drop, axis=1)
 
     df.to_csv(path, index=False)
 
 
-def _deidentify_csvs(path_to_csv_deidentified: str, path_to_csv: str, mrn_map: str):
+def _deidentify_csvs(
+    path_to_csv_deidentified: str,
+    path_to_csv: str,
+    mrn_map: dict,
+    columns_to_remove: list,
+):
     """
-    Create de-identified STS data.
+    De-identify CSV data.
     """
     if path_to_csv_deidentified is None:
         return
 
     count = 0
-    for root, dirs, files in os.walk(path_to_csv):
-        new_root = _swap_path_prefix(
-            root,
-            path_to_csv,
-            path_to_csv_deidentified,
+    new_paths = []
+    old_paths = []
+
+    if os.path.isfile(path_to_csv):
+        dirname = os.path.dirname(path_to_csv)
+        new_path = _swap_path_prefix(
+            path=path_to_csv,
+            prefix=dirname,
+            new_prefix=path_to_csv_deidentified,
         )
-        for file in files:
-            split = os.path.splitext(file)
-            if split[-1] != CSV_EXT:
-                continue
-            old_path = os.path.join(root, file)
-            new_path = os.path.join(new_root, file)
-            if os.path.exists(new_path):
-                os.remove(new_path)
-            shutil.copyfile(old_path, new_path)
-            # if there was no PHI in the original file, copy it without trying to deidentify
-            global path_of_csv_to_skip
-            if old_path in path_of_csv_to_skip:
-                continue
-            _deidentify_csv(new_path, mrn_map)
-            count += 1
+        new_paths = [new_path]
+        old_paths = [path_to_csv]
+    else:
+        for root, dirs, files in os.walk(path_to_csv):
+            for file in files:
+                split = os.path.splitext(file)
+                if split[-1] != CSV_EXT:
+                    continue
+
+                old_path = os.path.join(root, file)
+                old_paths.append(old_path)
+
+                new_path = _swap_path_prefix(
+                    path=os.path.join(root, file),
+                    prefix=path_to_csv,
+                    new_prefix=path_to_csv_deidentified,
+                )
+                new_paths.append(new_path)
+
+    for old_path, new_path in zip(old_paths, new_paths):
+        if os.path.exists(new_path):
+            os.remove(new_path)
+        shutil.copyfile(old_path, new_path)
+        # if there was no PHI in the original file, copy it without trying to deidentify
+        global path_of_csv_to_skip
+        if old_path in path_of_csv_to_skip:
+            continue
+        _deidentify_csv(
+            path=new_path,
+            mrn_map=mrn_map,
+            columns_to_remove=columns_to_remove,
+        )
+        count += 1
 
     print(f"De-identified {count} CSV files at {args.path_to_csv_deidentified}")
 
@@ -308,13 +339,14 @@ def run(args):
     _deidentify_hd5s(
         path_to_hd5_deidentified=args.path_to_hd5_deidentified,
         path_to_hd5=args.path_to_hd5,
-        mrn_map=args.mrn_map,
+        mrn_map=mrn_map,
         num_workers=args.num_workers,
     )
     _deidentify_csvs(
         path_to_csv_deidentified=args.path_to_csv_deidentified,
         path_to_csv=args.path_to_csv,
-        mrn_map=args.mrn_map,
+        mrn_map=mrn_map,
+        columns_to_remove=args.columns_to_remove,
     )
     end_time = timer()
     elapsed_time = end_time - start_time
@@ -331,7 +363,6 @@ def parse_args():
     parser.add_argument(
         "--starting_id",
         type=int,
-        default=1,
         help="Starting value for new IDs.",
     )
     parser.add_argument(
@@ -350,8 +381,8 @@ def parse_args():
     )
     parser.add_argument(
         "--path_to_csv_deidentified",
-        help="Path to save de-identified CSVs to. "
-        "Skip this argument to skip de-identification of STS data.",
+        help="Directory in which de-identified CSVs will be created."
+        "Skip this argument to skip de-identification of CSV data.",
     )
     parser.add_argument(
         "--num_workers",
@@ -359,7 +390,19 @@ def parse_args():
         type=int,
         help="Number of worker processes to use if processing in parallel.",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--columns_to_remove",
+        nargs="*",
+        help="List of strings defining columns to remove from the final dataframe "
+        "prior to saving to CSV",
+    )
+
+    args = parser.parse_args()
+    if args.path_to_csv is not None and args.path_to_csv_deidentified is None:
+        raise ValueError(
+            f"--path_to_csv is given, but no --path_to_csv_deidentified is given.",
+        )
+    return args
 
 
 if __name__ == "__main__":
