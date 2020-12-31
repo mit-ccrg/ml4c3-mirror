@@ -1,8 +1,8 @@
 ---
 name: Infrastructure
-about: ''
+about: New functionality or enhancements.
 title: ''
-labels: "infrastructure 🚇"
+labels: "infrastructure \U0001F687"
 assignees: ''
 
 ---
