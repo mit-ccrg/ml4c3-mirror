@@ -41,22 +41,23 @@ working with complex physiological data. It does several key things:
     ```
 
 ## Why does `ml4c3` exist?
-When a researcher joins an academic data science group, they get access to a
-workstation or server and some data. Perhaps a more senior researcher shares some code
-via email or Dropbox. It usually consists of a long `main.py` script with outdated
-depdencies. Nothing is documented. The manuscript does not link to an open-source GitHub
+When a researcher joins an academic research group, they get access to a workstation or
+server and some data. Sometimes a more senior researcher shares some code via email or
+Dropbox -- usually a long `main.py` script with now-outdated dependencies. Nothing is
+documented. A manuscript published using the code does not link to an open-source GitHub
 repo, nor does it sufficiently document the steps and settings needed to reproduce the
-results.
+results. The paper merely includes the familar phrase "code is available upon request".
 
-The new researcher spends their first week trying to set up their environment so they
-can simply run their predecessor's pipeline. The next two weeks are spent understanding
-the code. Eventually, the new researcher refactor the entire pipeline. A month later,
-they start training models.
+The researcher spends their first week trying to set up their compute environment so they
+can simply run their predecessor's pipeline. The packages need updating, and a library was
+compiled in a special way, but nobody knows exactly how. The next two weeks are spent
+understanding the code. Eventually, the researcher refactors the entire pipeline. A month
+later, they start training models.
 
-This is too common in academia. We think there is a better way, so we built `ml4c3` to:
+This story is too common in academia. We think there is a better way, so we built `ml4c3` to:
 - address limitations of Jupyter notebooks, one-off scripts, and glue-code.
 - enhance collaborative workflow between researchers, following best practices.
-- increase efficiency via excellent documentation and modular code; several group members work with the same data and/or have similar computational needs.
+- increase efficiency via excellent documentation and modular code.
 
 ## How do I use `ml4c3`?
 See the [`ml4c3` wiki](https://github.com/aguirre-lab/ml4c3/wiki).
@@ -69,4 +70,13 @@ We prefer PRs that solve issues, but a well-written issue that describes a probl
 its root cause is also helpful.
 
 ## Who built `ml4c3`?
-`ml4c3` was built by the [Aguirre Lab](https://csb.mgh.harvard.edu/aaron_aguirre) at the Center for Systems Biology, Wellman Center for Photomedicine, and Cardiovascular Research Center at the Massachusetts General Hospital.
+`ml4c3` was built by the [Aguirre Lab](https://csb.mgh.harvard.edu/aaron_aguirre) at the
+Center for Systems Biology, Wellman Center for Photomedicine, and Cardiovascular Research
+Center at the Massachusetts General Hospital.
+
+We are a team of students, postdoctoral researchers, and engineers who work on overlapping
+research projects at the intersection of machine learning, computer science, cardiology,
+and critical care.
+
+Since we share research needs, computational tooling, and data, the benefits of closely
+collaborating around a shared infrastructure were obvious.
