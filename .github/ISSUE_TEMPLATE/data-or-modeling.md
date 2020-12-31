@@ -1,5 +1,5 @@
 ---
-name: 2 - Data or modeling
+name: Data or modeling
 about: Data or modeling
 title: ''
 labels: "data 📈 or modeling 🧠"

@@ -1,6 +1,6 @@
 ---
-name: 4 - Bug report
-about: Bug report
+name: Bug report
+about: Bug report 🐛
 title: ''
 labels: "bug 🐛"
 assignees: ''

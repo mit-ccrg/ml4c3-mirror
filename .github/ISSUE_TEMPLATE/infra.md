@@ -1,6 +1,6 @@
 ---
-name: 1 - New feature or enhancement
-about: New feature or enhancement
+name: Infrastructure
+about: Infrastructure 🚇
 title: ''
 labels: "infrastructure 🚇"
 assignees: ''
