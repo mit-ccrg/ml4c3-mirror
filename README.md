@@ -1,5 +1,5 @@
 ## What is `ml4c3`?
-Machine Learning for Cardiology and Critical Care (`ml4c3`) is a pipeline for  
+Machine Learning for Cardiology and Critical Care (`ml4c3`) is a pipeline for
 working with complex physiological data. It does several key things:
 
 - *Ingest* raw data into a pre-processed format.
@@ -7,7 +7,7 @@ working with complex physiological data. It does several key things:
 - *Map* desired data from `hd5` or CSV files to code via the `TensorMap` abstraction.
 - *Visualize* ECGs, ICU waveforms, labs, and modeling results.
 - *Explore* summary statistics and trends.
-- *Train* supervised and reinforcement learning models that are constructed from  
+- *Train* supervised and reinforcement learning models that are constructed from
     powerful, simple, and expressive command line arguments and `TensorMaps`.
 - *Cluster* data to reveal patterns via unsupervised learning.
 
@@ -60,14 +60,14 @@ This story is too common in academia. We think there is a better way, so we buil
 - increase efficiency via excellent documentation and modular code.
 
 ## How do I use `ml4c3`?
-See the [`ml4c3` wiki](https://github.com/aguirre-lab/ml4c3/wiki).
+Read the documentation at the [`ml4c3` wiki](https://github.com/aguirre-lab/ml4c3/wiki).
+
+## Where do I ask questions?
+Join the [discussions](https://github.com/aguirre-lab/ml4c3/discussions).
 
 ## Can I contribute?
 Yes, we would love your help! See our lab [`CONTRIBUTING`](https://github.com/aguirre-lab/aguirre-lab/blob/master/CONTRIBUTING.md)
 to learn how to open an issue or submit a PR.
-
-We prefer PRs that solve issues, but a well-written issue that describes a problem and
-its root cause is also helpful.
 
 ## Who built `ml4c3`?
 `ml4c3` was built by the [Aguirre Lab](https://csb.mgh.harvard.edu/aaron_aguirre) at the
