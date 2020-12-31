@@ -1,5 +1,6 @@
 ---
 name: Infrastructure
+about:
 title: ''
 labels: "infrastructure 🚇"
 assignees: ''
