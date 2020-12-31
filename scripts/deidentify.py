@@ -393,6 +393,7 @@ def parse_args():
     parser.add_argument(
         "--columns_to_remove",
         nargs="*",
+        default=[],
         help="List of strings defining columns to remove from the final dataframe "
         "prior to saving to CSV",
     )
