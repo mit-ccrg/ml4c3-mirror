@@ -130,19 +130,36 @@ def _get_mrns(args, skip_mrns=set()):
 def _remap_mrns(args):
     """
     Remap and save the MRNs from the data sources that are being remapped to new random IDs.
+    Four scenarios for starting_id:
+    1. if existing map and no starting id given, use last id in existing map
+    2. if existing map and starting id given, use given starting id
+    3. if no existing map and no starting id given, use 1
+    4. if no existing map and starting id given, use given starting id
     """
     mrn_map = dict()
     starting_id = args.starting_id
+
     if os.path.isfile(args.mrn_map):
         # call to _get_csv_mrns to determine which files to skip for sts deidentification
         _get_csv_mrns(args)
         mrn_map = pd.read_csv(args.mrn_map, low_memory=False, usecols=["mrn", "new_id"])
         mrn_map = mrn_map.set_index("mrn")
         mrn_map = mrn_map["new_id"].to_dict()
+
+        # Scenario 1 for starting_id
         if starting_id is None:
             starting_id = max(mrn_map.values()) + 1
         print(f"Existing MRN map loaded from {args.mrn_map}")
+    # Scenario 2 for starting_id is to use the given value
 
+    # If no existing map
+    else:
+        # Scenario 3 for starting_id
+        if starting_id is None:
+            starting_id = 1
+
+        # else
+        # Scenario 4 for starting_id is to use the user-given starting_id
     new_mrns = _get_mrns(args, skip_mrns=set(mrn_map.keys()))
     new_ids = list(range(starting_id, len(new_mrns) + starting_id))
     np.random.shuffle(new_ids)
