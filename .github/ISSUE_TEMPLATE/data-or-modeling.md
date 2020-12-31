@@ -1,6 +1,6 @@
 ---
 name: Data or modeling
-about:
+about: ''
 title: ''
 labels: "data 📈 or modeling 🧠"
 assignees: ''
