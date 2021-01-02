@@ -249,7 +249,7 @@ def parse_args() -> argparse.Namespace:
     )
     icu_parser.add_argument(
         "--staging_dir",
-        help="Directory to store temporary files created during tensorization pipeline.",
+        help="Directory to store temp files created during tensorization pipeline.",
     )
     icu_parser.add_argument(
         "--staging_batch_size",
@@ -259,16 +259,26 @@ def parse_args() -> argparse.Namespace:
         "location.",
     )
     icu_parser.add_argument(
+        "--mrn_start_index",
+        type=int,
+        default=0,
+        help="Index of first MRN in ADT table to process, inclusive.",
+    )
+    icu_parser.add_argument(
+        "--mrn_end_index",
+        type=int,
+        help="Index of last MRN in ADT table to process, exclusive.",
+    )
+    icu_parser.add_argument(
         "--adt_start_index",
         type=int,
         default=0,
-        help="Index of first patient in ADT table to process, inclusive.",
+        help="Index of first MRN,CSN row in ADT table to process, inclusive.",
     )
     icu_parser.add_argument(
         "--adt_end_index",
         type=int,
-        default=None,
-        help="Index of last patient in ADT table to process, exclusive.",
+        help="Index of last MRN,CSN row in ADT table to process, exclusive.",
     )
     icu_parser.add_argument(
         "--start_time",
@@ -976,7 +986,6 @@ def parse_args() -> argparse.Namespace:
     pre_tensorize_explorer_parser.add_argument(
         "--signals",
         nargs="+",
-        default=None,
         help="List of Bedmaster signals to calculate their summary_statistics. To "
         "calculate statistics for all signals select 'all'. It always "
         "calculates statistics for all EDW signals.",
@@ -1019,7 +1028,6 @@ def parse_args() -> argparse.Namespace:
     visualizer_parser.add_argument(
         "--options_file",
         "-o",
-        default=None,
         help="YAML file with options for the visualizer. Default: None",
     )
 
@@ -1032,20 +1040,17 @@ def parse_args() -> argparse.Namespace:
     assess_coverage_parser.add_argument(
         "--event_column",
         type=str,
-        default=None,
         help="Name of the event column (if exists) in --cohort_query/--cohort_csv.",
     )
     assess_coverage_parser.add_argument(
         "--time_column",
         type=str,
-        default=None,
         help="Name of the event time column (if exists) in "
         "--cohort_query/--cohort_csv.",
     )
     assess_coverage_parser.add_argument(
         "--cohort_csv",
         type=str,
-        default=None,
         help="Full path of the .csv file containing a list of patients. "
         "If --cohort_query is set, this parameter will be ignored.",
     )

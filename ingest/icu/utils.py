@@ -2,9 +2,6 @@
 import os
 import shutil
 import logging
-import warnings
-import multiprocessing
-from typing import Dict, List
 
 # Imports: third party
 import pandas as pd
@@ -68,7 +65,6 @@ def stage_bedmaster_alarms(
     adt_filt = adt_df[adt_df["MRN"].isin(mrns)]
 
     departments = adt_filt["DepartmentDSC"].drop_duplicates()
-    dept_names = []
     for department in departments:
         try:
             short_names = MAPPING_DEPARTMENTS[department]
@@ -107,9 +103,6 @@ def stage_edw_files(
     mrns_and_csns = pd.read_csv(path_patients)
     mrns = mrns_and_csns["MRN"].drop_duplicates()
 
-    list_mrns = []
-    flag_found = []
-
     for mrn in mrns:
         source_path = os.path.join(edw, str(mrn))
         destination_path = os.path.join(staging_dir, "edw_temp", str(mrn))
@@ -122,9 +115,11 @@ def stage_edw_files(
     adt_new = os.path.join(staging_dir, "edw_temp", "adt.csv")
     shutil.copy(adt, adt_new)
 
-    # Copy xref table
+    # Create filtered xref table
+    df_xref_filt = pd.read_csv(xref)
+    df_xref_filt = df_xref_filt[df_xref_filt["MRN"].isin(mrns)]
     xref_new = os.path.join(staging_dir, "edw_temp", "xref.csv")
-    shutil.copy(xref, xref_new)
+    df_xref_filt.to_csv(xref_new, index=False)
 
 
 def stage_bedmaster_files(
@@ -146,10 +141,6 @@ def stage_bedmaster_files(
 
     xref = pd.read_csv(xref).sort_values(by=["MRN"], ascending=True)
     xref_subset = xref[xref["MRN"].isin(mrns)]
-
-    list_bedmaster_files = []
-    folder = []
-    flag_found = []
 
     # Iterate over all Bedmaster file paths to copy to staging directory
     path_destination_dir = os.path.join(staging_dir, "bedmaster_temp")

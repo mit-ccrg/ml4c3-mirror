@@ -359,34 +359,36 @@ def tensorize(args):
 
     # Iterate over batch of patients
     missed_patients = []
-    total_files_tensorized = []
-    if not args.adt_end_index:
+    num_mrns_tensorized = []
+
+    # If user does not set the end index,
+    if args.mrn_end_index is None:
         adt_df = pd.read_csv(args.adt)
         mrns = adt_df["MRN"].drop_duplicates()
-        args.adt_end_index = len(mrns)
-    patients = range(args.adt_start_index, args.adt_end_index, args.staging_batch_size)
-    total_files = args.adt_end_index - args.adt_start_index
-    total_batch = math.ceil(total_files / args.staging_batch_size)
+        args.mrn_end_index = len(mrns)
 
-    for idx_batch, num_batch in enumerate(patients):
+    mrn_indices_batched = range(
+        args.mrn_start_index,
+        args.mrn_end_index,
+        args.staging_batch_size,
+    )
+    num_mrns = args.mrn_end_index - args.mrn_start_index
+    num_batches = math.ceil(num_mrns / args.staging_batch_size)
+
+    # Iterate over batches of MRN indices
+    for idx_batch, first_mrn_index in enumerate(mrn_indices_batched):
         start_batch_time = time.time()
 
-        # Compute first and last patient
-        first_mrn_index = num_batch
-        if num_batch + args.staging_batch_size < args.adt_end_index:
-            last_mrn_index = num_batch + args.staging_batch_size
+        # For this batch, determine index of last MRN
+        if first_mrn_index + args.staging_batch_size < args.mrn_end_index:
+            last_mrn_index = first_mrn_index + args.staging_batch_size
         else:
-            last_mrn_index = args.adt_end_index
+            last_mrn_index = args.mrn_end_index
 
         # Create staging directory
         create_folders(args.staging_dir)
 
-        """
-        # Get desired number of patients
-        get_files = FileManager(args.xref, args.adt, args.staging_dir)
-        """
-
-        # Get unique MRNs and CSNs from ADT and save to patients.csv.
+        # Get unique MRNs and CSNs of this batch from ADT and save to patients.csv
         save_mrns_and_csns_csv(
             staging_dir=args.staging_dir,
             hd5_dir=args.tensors,
@@ -396,7 +398,7 @@ def tensorize(args):
             overwrite_hd5=args.overwrite,
         )
 
-        # Copy Bedmaster alarms from those patients
+        # Stage Bedmaster alarms from this batch of patients
         init = time.time()
         stage_bedmaster_alarms(
             staging_dir=args.staging_dir,
@@ -408,7 +410,7 @@ def tensorize(args):
             f"Alarms copied to {args.alarms} in {elapsed_time:.2f} sec",
         )
 
-        # Copy EDW files from those patients
+        # Copy EDW files from this batch of patients
         init = time.time()
         stage_edw_files(
             staging_dir=args.staging_dir,
@@ -422,7 +424,7 @@ def tensorize(args):
             f"{args.edw} in {elapsed_time:.2f} sec",
         )
 
-        # Copy Bedmaster files from those patients
+        # Copy Bedmaster files from this batch of patients
         init = time.time()
         stage_bedmaster_files(
             staging_dir=args.staging_dir,
@@ -466,7 +468,7 @@ def tensorize(args):
             for hd5_filename in os.listdir(path_tensors_staging)
             if hd5_filename.endswith(".hd5")
         ]
-        total_files_tensorized.extend(files_tensorized)
+        num_mrns_tensorized.extend(files_tensorized)
         missed_files = sorted(set(files_to_tensorize) - set(files_tensorized))
         missed_patients.extend(missed_files)
 
@@ -484,7 +486,7 @@ def tensorize(args):
         end_batch_time = time.time()
         elapsed_time = end_batch_time - start_batch_time
         logging.info(
-            f"Processed batch {idx_batch + 1}/{total_batch} of "
+            f"Processed batch {idx_batch + 1}/{num_batches} of "
             f"{last_mrn_index - first_mrn_index} patients in "
             f"{elapsed_time:.2f} seconds.",
         )
@@ -500,7 +502,7 @@ def tensorize(args):
 
     logging.info(f"HD5 Files tensorized and moved to {args.tensors}")
     logging.info(
-        f"{len(total_files_tensorized)} out of {total_files} " f"patients tensorized.",
+        f"{len(num_mrns_tensorized)} out of {num_mrns} " f"patients tensorized.",
     )
     if missed_patients:
         logging.warning(
