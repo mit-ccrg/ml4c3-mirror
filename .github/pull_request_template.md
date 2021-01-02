@@ -6,7 +6,7 @@ Closes #
 - [ ] todo: 
 
 ## Checklist
-- [x] The following are complete:
+- [ ] The following are complete:
     - Added or revised tests if appropriate.
     - If new packages are installed, `requirements.txt` is updated.
     - If documentation should be updated, a new issue was made in `ml4c3-wiki`.
