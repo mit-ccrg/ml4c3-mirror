@@ -419,6 +419,9 @@ def make_dataset(
     verbose: bool = True,
     return_nan: bool = False,
 ) -> Tuple[tf.data.Dataset, StatsWrapper, Cleanup]:
+    if batch_size is None:
+        raise ValueError("batch size cannot be None")
+
     output_types = (
         {
             tm.input_name: tf.string if tm.is_language else tf.float32

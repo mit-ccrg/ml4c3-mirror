@@ -618,6 +618,12 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
     if tmap_name in tmaps:
         return tmaps
 
+    # Base tmaps: ICI
+    from tensormap.ici import make_ici_tmap # isort: skip
+    tmaps = make_ici_tmap(tmap_name=tmap_name, tmaps=tmaps)
+    if tmap_name in tmaps:
+        return tmaps
+
     # Base tmaps: ECG labels
     from tensormap.ecg_labels import tmaps as tmaps_ecg_labels # isort:skip
     tmaps.update(tmaps_ecg_labels)

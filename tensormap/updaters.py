@@ -11,6 +11,7 @@ import pandas as pd
 # Imports: first party
 from ml4c3.metrics import weighted_crossentropy
 from definitions.ecg import ECG_PREFIX
+from definitions.ici import ICI_PREFIX, ICI_DATE_COLUMN
 from definitions.sts import STS_PREFIX, STS_SURGERY_DATE_COLUMN
 from definitions.echo import ECHO_PREFIX, ECHO_DATETIME_COLUMN
 from definitions.globals import SECONDS_IN_DAY
@@ -117,12 +118,15 @@ def _get_dataset_metadata(dataset_name: str) -> Tuple[str, str]:
     elif dataset_name == "ecg":
         prefix = ECG_PREFIX
         datetime_column = None
+    elif dataset_name == "ici":
+        prefix = ICI_PREFIX
+        datetime_column = ICI_DATE_COLUMN
     else:
         raise ValueError("{data_descriptor} is not a valid data descriptor")
     return prefix, datetime_column
 
 
-CROSS_REFERENCE_SOURCES = [ECG_PREFIX, STS_PREFIX, ECHO_PREFIX]
+CROSS_REFERENCE_SOURCES = [ECG_PREFIX, STS_PREFIX, ECHO_PREFIX, ICI_PREFIX]
 
 
 def _days_between_tensor_from_file(tm: TensorMap, data: PatientData) -> np.ndarray:
