@@ -1579,6 +1579,8 @@ class CrossReferencer:
 
         xref = pd.read_csv(self.xref_file)
         xref = xref.drop_duplicates(subset=["MRN", "PatientEncounterID", "path"])
+        xref["MRN"] = xref["MRN"].astype(str)
+
         edw_mrns = [
             folder
             for folder in os.listdir(self.edw_dir)
