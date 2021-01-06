@@ -11,7 +11,7 @@ import pytest
 from ingest.icu.readers import CrossReferencer
 
 
-@pytest.yield_fixture(scope="function")
+@pytest.fixture(scope="function")
 def cross_referencer() -> CrossReferencer:
     reader = CrossReferencer(
         pytest.bedmaster_dir,

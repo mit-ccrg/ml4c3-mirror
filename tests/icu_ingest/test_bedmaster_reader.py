@@ -14,7 +14,7 @@ from ingest.icu.data_objects import BedmasterSignal
 # pylint: disable=invalid-name
 
 
-@pytest.yield_fixture(scope="function")
+@pytest.fixture(scope="function")
 def bedmaster_reader(
     test_scale_units: Dict[str, Dict[str, Union[int, float, str]]],
 ) -> BedmasterReader:

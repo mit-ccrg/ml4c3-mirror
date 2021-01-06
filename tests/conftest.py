@@ -273,13 +273,13 @@ def pytest_exception_interact(node, call, report):
         child.terminate()
 
 
-@pytest.yield_fixture(scope="function")
+@pytest.fixture(scope="function")
 def matfile() -> h5py.File:
     with h5py.File(pytest.mat_file, "r") as mat_file:
         yield mat_file
 
 
-@pytest.yield_fixture(scope="function")
+@pytest.fixture(scope="function")
 def empty_matfile() -> h5py.File:
     with tempfile.NamedTemporaryFile(delete=False) as _file:
         with h5py.File(_file.name, "w") as mat_file:
@@ -292,13 +292,13 @@ def empty_matfile() -> h5py.File:
         pass
 
 
-@pytest.yield_fixture(scope="module")
+@pytest.fixture(scope="module")
 def temp_file():
     with tempfile.NamedTemporaryFile(delete=False) as _file:
         yield _file
 
 
-@pytest.yield_fixture(scope="function")
+@pytest.fixture(scope="function")
 def temp_dir():
     with tempfile.TemporaryDirectory() as _tmp_dir:
         yield _tmp_dir
