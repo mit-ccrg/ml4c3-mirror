@@ -16,7 +16,7 @@ from ml4c3.plots import plot_ecg
 from ml4c3.models import make_model, train_model_from_datasets
 from ml4c3.metrics import simclr_loss, simclr_accuracy
 from ml4c3.datasets import get_verbose_stats_string, train_valid_test_datasets
-from visualizer.run import run_server
+from visualizer.run import run_visualizer
 from ml4c3.arguments import parse_args
 from ml4c3.evaluations import predict_and_evaluate
 from ml4c3.explorations import explore
@@ -79,7 +79,7 @@ def run(args: argparse.Namespace):
         elif args.recipe == "match_patient_bedmaster":
             match_data(args)
         elif args.recipe == "visualize":
-            run_server(args)
+            run_visualizer(args)
         elif args.recipe == "extract_ecg_features":
             extract_ecg_features(args)
         else:

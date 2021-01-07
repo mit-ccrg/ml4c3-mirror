@@ -1,4 +1,8 @@
+# Imports: standard library
+from uuid import uuid4
+
 # Imports: third party
+import dash_auth
 from flask_caching import Cache
 
 # Imports: first party
@@ -10,6 +14,12 @@ from visualizer.static_callbacks import set_static_callbacks
 # pylint: disable=import-outside-toplevel
 def run(debug, port, address, files_dir, options):
     app.title = "HD5 visualizer"
+
+    random_token = str(uuid4())
+    dash_auth.BasicAuth(
+        app,
+        {"aguirrelab": random_token},
+    )
 
     cache = Cache(
         app.server,
@@ -28,12 +38,21 @@ def run(debug, port, address, files_dir, options):
     app.layout = create_layout(files_dir)
     set_static_callbacks(app)
     set_dynamic_callbacks(app, cache)
+
+    print(
+        f"""
+    ****************
+    To log in use:
+
+    \t Username: aguirrelab
+    \t Password: {random_token}
+
+    ****************"
+    """,
+    )
+
     app.run_server(debug=debug, host=address, port=port)
 
 
-def run_server(args):
+def run_visualizer(args):
     run(args.debug, args.port, args.address, args.tensors, args.options_file)
-
-
-if __name__ == "__main__":
-    run(debug=True, port=8050, address="0.0.0.0", files_dir=None, options=None)

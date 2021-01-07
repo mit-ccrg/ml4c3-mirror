@@ -1,6 +1,7 @@
 beautifulsoup4
 bokeh
 dash
+dash-auth
 datashader
 flask-caching
 h5py==2.10.0
