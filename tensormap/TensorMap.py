@@ -245,7 +245,7 @@ class TensorMap:
 
         # Infer embedded dimensionality from shape
         if annotation_units is None:
-            annotation_units = self.size
+            annotation_units = 0
         self.annotation_units = annotation_units
 
         # Wrap augmenter, validator, and normalizer in lists
@@ -639,6 +639,12 @@ def update_tmaps(tmap_name: str, tmaps: Dict[str, TensorMap]) -> Dict[str, Tenso
     # Modify: Weighted loss
     from tensormap.updaters import update_tmaps_weighted_loss # isort:skip
     tmaps = update_tmaps_weighted_loss(tmap_name=tmap_name, tmaps=tmaps)
+    if tmap_name in tmaps:
+        return tmaps
+
+    # Modify: Cross Reference STS/ECG
+    from tensormap.updaters import update_sts_ecg_cross_reference # isort:skip
+    tmaps = update_sts_ecg_cross_reference(tmap_name=tmap_name, tmaps=tmaps)
     if tmap_name in tmaps:
         return tmaps
 

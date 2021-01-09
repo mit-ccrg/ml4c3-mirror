@@ -299,3 +299,65 @@ def update_tmaps_window(
     new_tmap.name = new_name
     tmaps[new_name] = new_tmap
     return tmaps
+
+
+def update_sts_ecg_cross_reference(
+    tmap_name: str,
+    tmaps: Dict[str, TensorMap],
+) -> Dict[str, TensorMap]:
+    pattern = fr"(.*)_(\d+)_days_(before_sts|after_ecg)"
+    match = re.match(pattern, tmap_name)
+    if match is None:
+        return tmaps
+
+    # ecg_2500_zscore_pop_180_days_pre_sts
+    base_name = match[1]  # ecg_2500_zscore_pop
+    offset_days = int(match[2])  # 180
+    relative_event = match[3]  # pre_sts
+
+    new_name = f"{base_name}_{offset_days}_days_{relative_event}"
+
+    if base_name not in tmaps:
+        raise ValueError(
+            f"Base tmap {base_name} not in existing tmaps; cannot create {new_name}",
+        )
+
+    base_tmap = tmaps[base_name]
+    new_tmap = copy.deepcopy(base_tmap)
+
+    left_edge = pd.to_datetime(pd.Series(["1900-01-01"]))
+    left_edge.index = [-1]
+
+    def get_cross_referenced_dates(data: PatientData) -> Dates:
+        ecg_dates_str = pd.Series(list(data[ECG_PREFIX]))
+        surgery_dates = data[STS_PREFIX][STS_SURGERY_DATE_COLUMN]
+
+        ecg_dates = pd.to_datetime(ecg_dates_str).sort_values()
+        surgery_dates = pd.to_datetime(pd.Series(surgery_dates)).sort_values()
+        idx_map = {v: k for k, v in surgery_dates.to_dict().items()}
+
+        edges = pd.concat([left_edge, surgery_dates])
+        offset = datetime.timedelta(days=offset_days * -1)
+
+        surgery_dates = pd.to_datetime(pd.cut(ecg_dates, edges, labels=surgery_dates))
+        mask = ecg_dates.between(surgery_dates + offset, surgery_dates)
+
+        if relative_event == "before_sts":
+            ecg_dates_str = ecg_dates_str[mask]
+            dates = list(ecg_dates_str)
+        elif relative_event == "after_ecg":
+            surgery_dates = surgery_dates[mask]
+            surgery_dates.index = [idx_map[x] for x in surgery_dates]
+            dates = surgery_dates
+        else:
+            raise ValueError(f"Unknown relative event: {relative_event}")
+
+        if len(dates) == 0:
+            raise ValueError("No cross referenced dates")
+
+        return dates
+
+    new_tmap.time_series_filter = get_cross_referenced_dates
+    new_tmap.name = new_name
+    tmaps[new_name] = new_tmap
+    return tmaps
