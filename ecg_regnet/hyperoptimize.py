@@ -421,9 +421,7 @@ class RegNetTrainable(tune.Trainable):
 
 
 def run(
-    train_csv: str,
-    valid_csv: str,
-    test_csv: str,
+    csv_folder: str,
     epochs: int,
     hd5_folder: str,
     cpus: int,
@@ -451,9 +449,7 @@ def run(
         "width_quantization": tune.uniform(1.5, 3),
     }
     training_config = {
-        "train_csv": train_csv,
-        "valid_csv": valid_csv,
-        "test_csv": test_csv,
+        "csv_folder": csv_folder,
         "hd5_folder": hd5_folder,
         "num_workers": cpus_per_model,
     }
