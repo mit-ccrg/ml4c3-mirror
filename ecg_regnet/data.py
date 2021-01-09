@@ -22,9 +22,8 @@ from ml4c3.tensormap.ecg import (
     make_voltage_tff,
     get_ecg_age_from_hd5,
 )
-from ml4c3.tensormap.ecg_labels import tmaps as ecg_label_tmaps
 from ml4c3.tensormap.TensorMap import TensorMap
-
+from ml4c3.tensormap.ecg_labels import tmaps as ecg_label_tmaps
 
 PRETRAIN_NAMES = "pretrain_train", "pretrain_valid", "pretrain_test"
 DOWNSTREAM_SIZES = 500, 1000, 10000
@@ -236,10 +235,7 @@ def get_pretraining_datasets(
 
 
 def downstream_tmap_from_name(name: str) -> TensorMap:
-    return next(
-        tmap for tmap in get_downstream_tmaps()
-        if tmap.name == name
-    )
+    return next(tmap for tmap in get_downstream_tmaps() if tmap.name == name)
 
 
 def get_downstream_datasets(
@@ -330,7 +326,9 @@ def _get_downstream_csv_path(folder: str, name: str, tmap: TensorMap, size: int)
 
 
 def get_downstream_csv_paths(folder: str, tmap: TensorMap, size: int) -> List[str]:
-    return [_get_downstream_csv_path(folder, name, tmap, size) for name in DOWNSTREAM_NAMES]
+    return [
+        _get_downstream_csv_path(folder, name, tmap, size) for name in DOWNSTREAM_NAMES
+    ]
 
 
 def _get_null_check_col(tmap: TensorMap) -> str:
@@ -380,33 +378,47 @@ def explore_all_data(
     )
 
     shuffled_df = df.sample(frac=1, random_state=3005).dropna(
-        subset=list(map(_get_null_check_col, ecg_tmaps))  # make sure ECG is always present
+        subset=list(
+            map(_get_null_check_col, ecg_tmaps),
+        ),  # make sure ECG is always present
     )
     sizes = [
         # pretrain train, pretrain valid, downstream train, downstream valid, test
-        int(frac * len(shuffled_df)) for frac in np.cumsum([0.0, 0.7, 0.1, 0.1, 0.05, 0.05])
+        int(frac * len(shuffled_df))
+        for frac in np.cumsum([0.0, 0.7, 0.1, 0.1, 0.05, 0.05])
     ]
-    split_dfs = [shuffled_df.iloc[sizes[i]: sizes[i + 1]] for i in range(len(sizes) - 1)]
+    split_dfs = [
+        shuffled_df.iloc[sizes[i] : sizes[i + 1]] for i in range(len(sizes) - 1)
+    ]
 
     # pretraining data
-    pretraining_cols = list(map(_get_null_check_col, pretraining_tmaps))  # exclude errors in these cols
+    pretraining_cols = list(
+        map(_get_null_check_col, pretraining_tmaps),
+    )  # exclude errors in these cols
     for name, split_df in zip(
-            PRETRAIN_NAMES,
-            [split_dfs[0], split_dfs[1], split_dfs[-1]]
+        PRETRAIN_NAMES,
+        [split_dfs[0], split_dfs[1], split_dfs[-1]],
     ):
         path = _get_pretrain_csv_path(output_folder, name)
         print(f"Writing {len(split_df)} {name} ids to {path}.")
-        split_df["sample_id"].dropna(subset=[pretraining_cols]).to_csv(
-            path, index=False,
+        split_df.dropna(subset=pretraining_cols)["sample_id"].to_csv(
+            path,
+            index=False,
         )
     # finetuning data
     for name, split_df in zip(DOWNSTREAM_NAMES, split_dfs[2:]):
         for tmap in downstream_tmaps:
-            not_null_df = split_df.dropna([_get_null_check_col(tmap)])
+            not_null_df = split_df.dropna(subset=[_get_null_check_col(tmap)])
             for size in DOWNSTREAM_SIZES:
-                path = _get_downstream_csv_path(name=name, size=size, folder=output_folder, tmap=tmap)
-                print(f"Writing {size} {name} ids to {path}.")
-                not_null_df["sample_id"].iloc[:size].to_csv()
+                path = _get_downstream_csv_path(
+                    name=name,
+                    size=size,
+                    folder=output_folder,
+                    tmap=tmap,
+                )
+                save_df = not_null_df["sample_id"].iloc[:size]
+                print(f"Writing {len(save_df)} {name} ids to {path}")
+                save_df.to_csv(path, index=False)
 
 
 MODES: Dict[str, Callable] = {
