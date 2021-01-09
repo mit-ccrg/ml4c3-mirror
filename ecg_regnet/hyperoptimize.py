@@ -14,8 +14,8 @@ from data import (
     get_ecg_tmap,
     augmentation_dict,
     get_pretraining_tasks,
-    get_pretraining_datasets,
     get_downstream_datasets,
+    get_pretraining_datasets,
     downstream_tmap_from_name,
 )
 from regnet import ML4C3Regnet
@@ -23,6 +23,7 @@ from tensorflow import config as tf_config
 from ray.tune.schedulers import HyperBandForBOHB
 from ray.tune.suggest.bohb import TuneBOHB
 from tensorflow.keras.layers import Input
+from tensorflow.keras.backend import clear_session
 from tensorflow_addons.optimizers import SGDW
 from tensorflow.keras.experimental import CosineDecay
 from tensorflow.python.keras.utils.layer_utils import count_params
@@ -83,6 +84,7 @@ def build_pretraining_model(
     learning_rate: float,
     **kwargs,
 ):
+    clear_session()
     tmaps_out = get_pretraining_tasks()
     input_name = get_ecg_tmap(0, []).input_name
     output_name_to_shape = {tmap.output_name: tmap.shape[0] for tmap in tmaps_out}
@@ -127,6 +129,7 @@ def build_downstream_model(
     tmap = downstream_tmap_from_name(downstream_tmap_name)
     input_name = get_ecg_tmap(0, []).input_name
     output_name_to_shape = {tmap.output_name: tmap.shape[0]}
+    clear_session()
     model = ML4C3Regnet(
         kernel_size,
         group_size,
@@ -150,7 +153,11 @@ def build_downstream_model(
     model.compile(loss=[tmap.loss], optimizer=optimizer)
     if model_file is not None:
         print(f"Loading model weights from {model_file}")
-        model.load_weights(model_file, skip_mismatch=True)  # load all weights besides new last layer
+        model.load_weights(
+            model_file,
+            skip_mismatch=True,
+            by_name=True,
+        )  # load all weights besides new last layer
     return model
 
 
@@ -277,7 +284,7 @@ def _test_build_downstream_model():
     )
     m.summary()
     dummy_in = {m.input_name: np.zeros((10, 100, 12))}
-    dummy_out = {"output_age_continuous": (10, 1)}
+    dummy_out = {"output_age_continuous": np.random.randn(10, 1)}
     history = m.fit(
         dummy_in,
         dummy_out,
@@ -301,7 +308,7 @@ def _test_build_downstream_model_pretrained():
         validation_data=(dummy_in, dummy_out),
     )
     with tempfile.TemporaryDirectory() as tmpdir:
-        path = save_model(tmpdir, m)
+        path = os.path.join(save_model(tmpdir, m), "pretraining_model.h5")
         downstream = build_downstream_model(
             downstream_tmap_name="age",
             model_file=path,
@@ -315,9 +322,14 @@ def _test_build_downstream_model_pretrained():
             width_quantization=1.5,
             learning_rate=1e-5,
         )
+    rand_in = np.random.randn(1, 100, 12)
+    np.testing.assert_allclose(  # did the pretrained layers get loaded?
+        m.layers[0](rand_in),
+        downstream.layers[0](rand_in),
+    )
     downstream.summary()
     dummy_in = {m.input_name: np.zeros((10, 100, 12))}
-    dummy_out = {"output_age_continuous": (10, 1)}
+    dummy_out = {"output_age_continuous": np.zeros((10, 1))}
     history = downstream.fit(
         dummy_in,
         dummy_out,
