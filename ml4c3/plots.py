@@ -196,7 +196,8 @@ def evaluate_predictions(
             data_split=data_split,
         )
         rocs.append((y_predictions, y_truth, tm.channel_map))
-        # only plot confusion matrix for non-binary tasks
+
+        # For non-binary classification tasks, plot confusion matrix
         if len(tm.channel_map) > 2:
             plot_confusion_matrix(
                 prediction=y_predictions,
@@ -207,6 +208,7 @@ def evaluate_predictions(
                 prefix=folder,
                 data_split=data_split,
             )
+
     elif tm.is_categorical and tm.axes == 2:
         melt_shape = (
             y_predictions.shape[0] * y_predictions.shape[1],

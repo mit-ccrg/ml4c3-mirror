@@ -160,6 +160,7 @@ def predict_and_evaluate(
         pd.DataFrame(save_data).round(6).to_csv(path, index=False)
         logging.info(f"Saved predictions at: {path}")
 
+    # Iterate over each output tensor map and assess performance of predictions
     for y, tm in zip(y_predictions, tensor_maps_out):
         if isinstance(model, Model):
             if tm.output_name not in layer_names:
@@ -194,6 +195,7 @@ def predict_and_evaluate(
             image_ext=image_ext,
             plot_path=plot_path,
         )
+
     return performance_metrics
 
 

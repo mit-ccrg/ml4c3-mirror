@@ -27,7 +27,7 @@ from ml4c3.models import (
 from ml4c3.datasets import train_valid_test_datasets
 from definitions.types import Arguments
 from ml4c3.evaluations import predict_and_evaluate, get_sklearn_model_coefficients
-from tensormap.TensorMap import TensorMap, update_tmaps
+from tensormap.TensorMap import TensorMap, update_tmaps, find_negative_label_and_channel
 
 # fmt: off
 # need matplotlib -> Agg -> pyplot
@@ -67,6 +67,30 @@ def hyperoptimize(args: argparse.Namespace):
             continue
         space.update({key: hp.choice(key, param_lists[key])})
     hyperparameter_optimizer(args=args, space=space, param_lists=param_lists)
+
+
+def _create_aucs_for_bad_model(tensor_maps_out: List[TensorMap]) -> dict:
+    """
+    Given a list of output tensor maps, iterate over each tensor map and each channel
+    map, and create a dictionary to store placeholder values for AUC to encode if a bad
+    model is found.
+    """
+    aucs = {}
+    for split in ["train", "test"]:
+        aucs_per_split = {}
+        for tm in tensor_maps_out:
+            if tm.channel_map is not None:
+                negative_label_idx = -1
+                if len(tm.channel_map) == 2:
+                    _, negative_label_idx = find_negative_label_and_channel(
+                        tm.channel_map,
+                    )
+                for cm, idx in tm.channel_map.items():
+                    if idx == negative_label_idx:
+                        continue
+                    aucs_per_split[cm] = np.nan
+        aucs[split] = aucs_per_split
+    return aucs
 
 
 def hyperparameter_optimizer(
@@ -250,8 +274,14 @@ def hyperparameter_optimizer(
         finally:
             del model
             gc.collect()
+
+            # If model was bad, update aucs list with dictionary of empty values
+            # keyed by each tensormap
             if auc is None:
-                aucs.append({"train": {"BAD_MODEL": -1}, "test": {"BAD_MODEL": -1}})
+                aucs_for_bad_model = _create_aucs_for_bad_model(
+                    tensor_maps_out=args.tensor_maps_out,
+                )
+                aucs.append(aucs_for_bad_model)
             if history is None:
                 histories.append(
                     {
@@ -372,25 +402,26 @@ def _trial_metrics_and_params_to_df(
     param_lists: Dict,
     trial_aucs: List[Dict[str, Dict]],
 ) -> pd.DataFrame:
-    data: defaultdict = defaultdict(list)
-    trial_aucs_test = []
-    trial_aucs_train = []
+    """
+    Formats parameters and metrics from a list (one element per evaluation) of dicts
+    into a Pandas DataFrame.
+    """
+    data = defaultdict(list)
+
+    # Update data with a list of AUCs;
+    # each trial's AUC is an element in the list,
+    # and each list is keyed by the tensor map name
     for trial_auc in trial_aucs:
         for split, split_auc in trial_auc.items():
             no_idx = 0
-            for i, label in enumerate(split_auc):
-                if "no_" in label:
-                    no_idx = i
+            for label, auc in split_auc.items():
+                col_name = f"auc-{split}-{label}"
+                if col_name in data:
+                    data[col_name].append(auc)
+                else:
+                    data[col_name] = [auc]
 
-            for i, (label, auc) in enumerate(split_auc.items()):
-                if len(split_auc) == 2 and no_idx == i:
-                    continue
-
-                if split == "test":
-                    trial_aucs_test.append(auc)
-                elif split == "train":
-                    trial_aucs_train.append(auc)
-
+    # Update data dict with losses and parameter counts
     data.update(
         {
             "test_loss": all_losses,
@@ -399,11 +430,14 @@ def _trial_metrics_and_params_to_df(
             "parameter_count": [
                 history["parameter_count"][-1] for history in histories
             ],
-            "test_auc": trial_aucs_test,
-            "train_auc": trial_aucs_train,
         },
     )
-    data.update(_trial_parameters_to_dict(trials, param_lists))
+
+    # Update data dict with other parameters
+    param_dict = _trial_parameters_to_dict(trials, param_lists)
+    data.update(param_dict)
+
+    # Cast to dataframe
     df = pd.DataFrame(data)
     df.index.name = "Trial"
     return df
