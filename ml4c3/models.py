@@ -17,6 +17,7 @@ from sklearn.ensemble import RandomForestClassifier
 from tensorflow.keras import backend as K
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import LogisticRegression
+from tensorflow.keras.utils import model_to_dot
 from tensorflow.keras.layers import (
     ELU,
     Add,
@@ -65,7 +66,11 @@ from tensorflow.keras.callbacks import (
 from tensorflow.keras.regularizers import Regularizer, l1_l2
 
 # Imports: first party
-from ml4c3.plots import plot_metric_history, plot_condensed_architecture_diagram
+from ml4c3.plots import (
+    plot_metric_history,
+    plot_architecture_diagram,
+    plot_condensed_architecture_diagram,
+)
 from ml4c3.metrics import get_metric_dict
 from ml4c3.datasets import (
     BATCH_INPUT_INDEX,
@@ -246,9 +251,17 @@ def make_model(args):
     Create a model to train according the input arguments.
     """
     if args.recipe in ["train", "train_simclr", "infer", "build"]:
+        model = make_multimodal_multitask_model(**args.__dict__)
         if args.model_file is None:
             plot_condensed_architecture_diagram(args)
-        model = make_multimodal_multitask_model(**args.__dict__)
+            image_path = os.path.join(
+                args.output_folder,
+                f"architecture{args.image_ext}",
+            )
+            plot_architecture_diagram(
+                dot=model_to_dot(model, show_shapes=True, expand_nested=True),
+                image_path=image_path,
+            )
     elif args.recipe == "train_keras_logreg":
         model = make_shallow_model(
             tensor_maps_in=args.tensor_maps_in,
@@ -260,6 +273,11 @@ def make_model(args):
             donor_layers=args.donor_layers,
             l1=args.l1,
             l2=args.l2,
+        )
+        image_path = os.path.join(args.output_folder, f"architecture{args.image_ext}")
+        plot_architecture_diagram(
+            dot=model_to_dot(model, show_shapes=True, expand_nested=True),
+            image_path=image_path,
         )
     else:
         hyperparameters = {}

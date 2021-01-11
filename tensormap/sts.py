@@ -177,11 +177,8 @@ def _make_sts_tff_binary(
     def tensor_from_file(tm: TensorMap, data: PatientData) -> np.ndarray:
         surgery_dates = tm.time_series_filter(data)
         tensor = data[STS_PREFIX].loc[surgery_dates.index, key].to_numpy()
-        tensor = tensor[:, None]
-        tensor = np.apply_along_axis(
-            func1d=lambda x: binarize(key, x, negative_value, positive_value),
-            axis=1,
-            arr=tensor,
+        tensor = np.array(
+            [binarize(key, x, negative_value, positive_value) for x in tensor],
         )
         if not is_dynamic_shape(tm):
             tensor = tensor[0]
@@ -194,10 +191,9 @@ def _make_sts_tff_categorical(key: str) -> Callable:
     def tensor_from_file(tm: TensorMap, data: PatientData) -> np.ndarray:
         surgery_dates = tm.time_series_filter(data)
         tensor = data[STS_PREFIX].loc[surgery_dates.index, key].to_numpy()
-        tensor = tensor[:, None]
         if tm.channel_map is None:
             raise ValueError(f"{tm.name} channel map is None")
-        tensor = np.apply_along_axis(lambda x: one_hot(tm.channel_map, x), 1, tensor)
+        tensor = np.array([one_hot(tm.channel_map, x) for x in tensor])
         if not is_dynamic_shape(tm):
             tensor = tensor[0]
         return tensor
@@ -306,8 +302,7 @@ def tff_any(tm: TensorMap, data: PatientData) -> np.ndarray:
     surgery_dates = tm.time_series_filter(data)
     tensor = data[STS_PREFIX].loc[surgery_dates.index, sts_outcome_keys].to_numpy()
     tensor = tensor.any(axis=1).astype(int)
-    tensor = tensor[:, None]
-    tensor = np.apply_along_axis(lambda x: binarize("any", x), 1, tensor)
+    tensor = np.array([binarize("any", x) for x in tensor])
     if not is_dynamic_shape(tm):
         tensor = tensor[0]
     return tensor
