@@ -13,6 +13,10 @@ import itertools
 import subprocess
 from typing import List
 
+sys.path.append(os.path.expanduser("~/ml4c3"))
+# Imports: first party
+from ml4c3.logger import load_config
+
 env = os.environ.copy()
 
 
@@ -212,16 +216,7 @@ def parse_args() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
-
-    log_formatter = logging.Formatter(
-        "%(asctime)s - %(module)s:%(lineno)d - %(levelname)s - %(message)s",
-    )
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-
-    stdout_handler = logging.StreamHandler(sys.stdout)
-    stdout_handler.setFormatter(log_formatter)
-    logger.addHandler(stdout_handler)
+    load_config(log_level="INFO")
 
     interval = re.compile(r"^\d+-\d+$")
     if args.gpus is None or args.bootstraps is None or args.scripts is None:

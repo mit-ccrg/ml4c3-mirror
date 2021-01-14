@@ -7,9 +7,11 @@ import errno
 import logging.config
 
 
-def load_config(log_level, log_dir, log_file_basename):
-    os.makedirs(log_dir, exist_ok=True)
-    log_file = f"{log_dir}/{log_file_basename}.log"
+def load_config(log_level: str, log_dir: str = None, log_file_basename: str = None):
+    log_file = None
+    if log_dir is not None:
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = f"{log_dir}/{log_file_basename}.log"
     logger = logging.getLogger(__name__)
     try:
         logger_config = _create_logger_config(log_level=log_level, log_file=log_file)
@@ -24,8 +26,8 @@ def load_config(log_level, log_dir, log_file_basename):
         raise error
 
 
-def _create_logger_config(log_level: str, log_file: str):
-    return {
+def _create_logger_config(log_level: str, log_file: str = None):
+    config = {
         "version": 1,
         "disable_existing_loggers": False,
         "formatters": {
@@ -43,13 +45,16 @@ def _create_logger_config(log_level: str, log_file: str):
                 "formatter": "simple",
                 "stream": sys.stdout,
             },
-            "file": {
-                "level": log_level,
-                "class": "logging.FileHandler",
-                "formatter": "simple",
-                "filename": log_file,
-                "mode": "w",
-            },
         },
-        "loggers": {"": {"handlers": ["console", "file"], "level": log_level}},
+        "loggers": {"": {"handlers": ["console"], "level": log_level}},
     }
+    if log_file is not None:
+        config["handlers"]["file"] = {
+            "level": log_level,
+            "class": "logging.FileHandler",
+            "formatter": "simple",
+            "filename": log_file,
+            "mode": "w",
+        }
+        config["loggers"][""]["handlers"].append("file")
+    return config

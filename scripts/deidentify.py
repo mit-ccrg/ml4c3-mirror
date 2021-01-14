@@ -140,27 +140,29 @@ def _remap_mrns(args):
     starting_id = args.starting_id
 
     if os.path.isfile(args.mrn_map):
-        # call to _get_csv_mrns to determine which files to skip for sts deidentification
+        # call _get_csv_mrns to determine which CSVs to skip for deidentification
         _get_csv_mrns(args)
         mrn_map = pd.read_csv(args.mrn_map, low_memory=False, usecols=["mrn", "new_id"])
         mrn_map = mrn_map.set_index("mrn")
         mrn_map = mrn_map["new_id"].to_dict()
 
-        # Scenario 1 for starting_id
+        # Scenario 1: use last ID in map as starting_id
         if starting_id is None:
             starting_id = max(mrn_map.values()) + 1
         print(f"Existing MRN map loaded from {args.mrn_map}")
-    # Scenario 2 for starting_id is to use the given value
+
+        # Scenario 2:  user specifies starting_id
 
     # If no existing map
     else:
-        # Scenario 3 for starting_id
+        # Scenario 3: no existing map, so use 1 for starting_id
         if starting_id is None:
             starting_id = 1
+        # Scenario 4: user specifies starting_id
 
-        # else
-        # Scenario 4 for starting_id is to use the user-given starting_id
-    new_mrns = _get_mrns(args, skip_mrns=set(mrn_map.keys()))
+    # Get new MRNs from HD5 and CSV sources that are not already in mrn_map
+    existing_mrns = set(mrn_map.keys())
+    new_mrns = _get_mrns(args, skip_mrns=existing_mrns)
     new_ids = list(range(starting_id, len(new_mrns) + starting_id))
     np.random.shuffle(new_ids)
     mrn_map.update(dict(zip(new_mrns, new_ids)))
@@ -274,7 +276,10 @@ def _deidentify_csv(path: str, mrn_map: dict, columns_to_remove: list):
     # Cast each column name in df to string (in case column name is an int)
     # and check if defined MRN column names match the column names in the df
     matches = {
-        col for col in df.columns for mrn_col in MRN_COLUMNS if mrn_col in str(col)
+        col
+        for col in df.columns
+        for mrn_col in MRN_COLUMNS
+        if mrn_col == str(col).lower()
     }
     if len(matches) == 0:
         # If none of the known MRN columns are in the csv, assume it's the first column
@@ -282,8 +287,13 @@ def _deidentify_csv(path: str, mrn_map: dict, columns_to_remove: list):
     else:
         mrn_cols = list(matches)
 
-    # Remap MRNs and drop PHI columns and other user-specified columns
-    df[mrn_cols] = df[mrn_cols].applymap(lambda mrn: mrn_map[int(float(mrn))])
+    # Remap MRNs using the mrn_map dictionary value, where the key is each MRN from the
+    # DataFrame from the loaded CSV. Only apply the function to MRNs that are not NaN.
+    df[mrn_cols] = df[mrn_cols].applymap(
+        lambda mrn: mrn_map[int(float(mrn))] if pd.notnull(mrn) else np.nan,
+    )
+
+    # Drop PHI columns and other user-specified columns
     cols_to_drop = set(df.columns) & (phi_keys | set(columns_to_remove))
     df = df.drop(cols_to_drop, axis=1)
 
@@ -353,6 +363,7 @@ def _deidentify_csvs(
 def run(args):
     start_time = timer()
     mrn_map = _remap_mrns(args)
+
     _deidentify_hd5s(
         path_to_hd5_deidentified=args.path_to_hd5_deidentified,
         path_to_hd5=args.path_to_hd5,

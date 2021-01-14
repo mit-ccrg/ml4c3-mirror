@@ -1133,9 +1133,9 @@ def _process_args(args: argparse.Namespace):
         for k, v in sorted(args.__dict__.items(), key=operator.itemgetter(0)):
             f.write(k + " = " + str(v) + "\n")
     load_config(
-        args.logging_level,
-        args.output_folder,
-        "log_" + now_string,
+        log_level=args.logging_level,
+        log_dir=args.output_folder,
+        log_file_basename="log_" + now_string,
     )
 
     tensors = []
