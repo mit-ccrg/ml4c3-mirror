@@ -10,6 +10,7 @@ from typing import Dict
 
 # Imports: third party
 import numpy as np
+import tensorflow as tf
 
 # Imports: first party
 from ml4c3.logger import load_config
@@ -1138,6 +1139,10 @@ def _process_args(args: argparse.Namespace):
         log_file_basename="log_" + now_string,
     )
 
+    gpus = tf.config.experimental.list_physical_devices("GPU")
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
+
     tensors = []
     if "tensors" in args and args.tensors is not None:
         for tensor in args.tensors:
@@ -1198,10 +1203,3 @@ def _process_args(args: argparse.Namespace):
             pretrained_layer: new_layer
             for pretrained_layer, new_layer in args.remap_layer
         }
-
-    # Imports: third party
-    import tensorflow as tf
-
-    gpus = tf.config.experimental.list_physical_devices("GPU")
-    for gpu in gpus:
-        tf.config.experimental.set_memory_growth(gpu, True)
