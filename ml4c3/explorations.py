@@ -46,6 +46,8 @@ def explore(
     args: argparse.Namespace,
     disable_saving_output: bool = False,
 ) -> pd.DataFrame:
+    args.batch_size = 256
+
     cohort_counts: Dict[str, Any] = OrderedDict()
 
     src_path = args.tensors
@@ -432,12 +434,11 @@ def explore(
             [df_window, df_window.dropna()],
             ["union", "intersect"],
         ):
-            # Get list of unique labels from df
-            labels = ["all"]
-            if args.explore_stratify_label is not None:
-                labels.extend(
-                    [label for label in _df[args.explore_stratify_label].unique()],
-                )
+            # Get labels from dataframe of tensors
+            labels = _get_labels(
+                df=_df,
+                explore_stratify_label=args.explore_stratify_label,
+            )
 
             # Iterate through interpretations
             for interpretation in [
@@ -596,6 +597,22 @@ def _remove_redundant_cols(tmaps: List[TensorMap], df: pd.DataFrame) -> pd.DataF
                     inplace=True,
                 )
     return df
+
+
+def _get_labels(df: pd.DataFrame, explore_stratify_label: str) -> list:
+    """
+    Get list of unique non-NaN labels from dataframe
+    """
+    labels = ["all"]
+    if explore_stratify_label is not None:
+        labels.extend(
+            [
+                label
+                for label in df[explore_stratify_label].unique()
+                if not np.isnan(label)
+            ],
+        )
+    return labels
 
 
 def _plot_histogram_continuous_tensor(
