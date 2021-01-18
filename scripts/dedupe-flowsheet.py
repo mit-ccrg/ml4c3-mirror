@@ -2,6 +2,7 @@
 
 # Imports: standard library
 import os
+import shutil
 import argparse
 from timeit import default_timer as timer
 from multiprocessing import Pool, Value, cpu_count
@@ -9,19 +10,26 @@ from multiprocessing import Pool, Value, cpu_count
 # Imports: third party
 import pandas as pd
 
-mapping = {}
-failed = []
+csv = "flowsheet.csv"
 count = Value("i", 0)
 total = Value("i", 0)
 
 
-def check_patient_rows(mrn):
+def check_flowsheet_rows(depts):
     def good_row(row):
         try:
-            _mapping = mapping[mrn].loc[row["RecordedDTS"]]
-            x = row["DepartmentID"] == _mapping["DepartmentID"]
-            y = row["PatientEncounterID"] == _mapping["PatientEncounterID"]
-            return x & y
+            matched_dept = depts.loc[row["RecordedDTS"]]
+            if isinstance(matched_dept, pd.Series):
+                # some transfer in/out times overlap, okay if for the same department
+                matched_dept = matched_dept.drop_duplicates()[0]
+                if isinstance(matched_dept, pd.Series):
+                    print(
+                        f"Check measurement MRN/CSN/Recorded {row['MRN']}/{row['PatientEncounterID']}/{row['RecordedDTS']}",
+                    )
+                    raise KeyError(
+                        f"Measurement cannot be taken in more than 1 department",
+                    )
+            return row["DepartmentID"] == matched_dept
         except:
             # the measurement does not fall in a time window defined by the ADT table
             return False
@@ -29,54 +37,52 @@ def check_patient_rows(mrn):
     return good_row
 
 
-def dedupe_flowsheet(flowsheet_path_mrn):
+def dedupe_flowsheet(mrn_csn, df):
     with count.get_lock():
         count.value += 1
         if count.value % 10 == 0:
-            print(f"Finished {count.value} / {total.value}")
-    flowsheet_path, mrn = flowsheet_path_mrn
-    flowsheet = pd.read_csv(flowsheet_path)
+            print(f"Tried {count.value} / {total.value}")
+    mrn, csn = mrn_csn
+    flowsheet_path = os.path.join(args.edw_source, str(mrn), str(csn), csv)
+    cleaned_flowsheet_path = os.path.join(args.edw_cleaned, str(mrn), str(csn), csv)
+    if not os.path.isfile(flowsheet_path):
+        return 0
+
+    shutil.copytree(
+        src=os.path.dirname(flowsheet_path),
+        dst=os.path.dirname(cleaned_flowsheet_path),
+        dirs_exist_ok=True,
+    )
+
+    t_in = pd.to_datetime(df["TransferInDTS"])
+    t_out = pd.to_datetime(df["TransferOutDTS"])
+    depts = df["DepartmentID"].astype(int)
+    try:
+        depts.index = pd.IntervalIndex.from_arrays(t_in, t_out)
+        depts = depts.reset_index().drop_duplicates().set_index("index")["DepartmentID"]
+    except ValueError:
+        return 0
+
+    flowsheet = pd.read_csv(cleaned_flowsheet_path, low_memory=False)
     flowsheet["RecordedDTS"] = pd.to_datetime(flowsheet["RecordedDTS"])
-    mask = flowsheet.apply(check_patient_rows(mrn), axis=1)
-    flowsheet[mask].to_csv(flowsheet_path, index=False)
+    mask = flowsheet.apply(check_flowsheet_rows(depts), axis=1)
+    flowsheet[mask].to_csv(cleaned_flowsheet_path, index=False)
+    return 1
 
 
 def main(args):
     start_time = timer()
-    flowsheet_paths = []
-    for mrn in os.listdir(args.edw):
-        mrn_dir = os.path.join(args.edw, mrn)
-        for csn in os.listdir(mrn_dir):
-            flowsheet_path = os.path.join(mrn_dir, csn, "flowsheet.csv")
-            flowsheet_paths.append((flowsheet_path, int(mrn)))
 
-    print(f"Found {len(flowsheet_paths)} flowsheets at {args.edw}")
-
-    adt = pd.read_csv(args.adt)
-    for mrn, group in adt.groupby("MRN"):
-        t_in = pd.to_datetime(group["TransferInDTS"])
-        t_out = pd.to_datetime(group["TransferOutDTS"])
-        csn_dept = group[["PatientEncounterID", "DepartmentID"]]
-        try:
-            csn_dept.index = pd.IntervalIndex.from_arrays(t_in, t_out)
-            csn_dept = (
-                csn_dept.reset_index()
-                .drop_duplicates()
-                .set_index("index")[["PatientEncounterID", "DepartmentID"]]
-            )
-            mapping[mrn] = csn_dept
-        except ValueError as e:
-            failed.append(mrn)
-
-    print(f"ADT for the following patients are malformed, skipping: {failed}")
-
-    total.value = len(flowsheet_paths)
+    adt_grouped = pd.read_csv(args.adt, low_memory=False).groupby(
+        ["MRN", "PatientEncounterID"],
+    )
+    total.value = len(adt_grouped)
     with Pool(processes=args.num_workers) as pool:
-        pool.map(dedupe_flowsheet, flowsheet_paths)
+        cleaned = sum(pool.starmap(dedupe_flowsheet, adt_grouped))
 
     end_time = timer()
     elapsed_time = end_time - start_time
-    print(f"Cleaned {len(flowsheet_paths)} flowsheets in {elapsed_time:.2f} seconds")
+    print(f"Cleaned {cleaned} encounters in {elapsed_time:.2f} seconds")
 
 
 def parse_args():
@@ -86,8 +92,11 @@ def parse_args():
         help="Path to ADT table.",
     )
     parser.add_argument(
-        "--edw",
+        "--edw-source",
         help="Path to directory containing EDW flowsheet CSVs to deduplicate.",
+    )
+    parser.add_argument(
+        "--edw-cleaned",
     )
     parser.add_argument(
         "--num_workers",
