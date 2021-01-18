@@ -12,10 +12,10 @@ from collections import OrderedDict
 
 # Imports: third party
 import numpy as np
-import pydot
 import pandas as pd
 import seaborn as sns
 import pygraphviz as pgv
+from pydot import Node
 from scipy import stats
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
@@ -27,6 +27,8 @@ from sklearn.metrics import (
     average_precision_score,
 )
 from sklearn.calibration import calibration_curve
+from tensorflow.keras.utils import model_to_dot
+from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers.schedules import LearningRateSchedule
 
 # Imports: first party
@@ -179,7 +181,7 @@ def plot_metric_history(
                     break
 
     plt.tight_layout()
-    title = "metric_history"
+    title = "metric-history"
     figure_path = os.path.join(prefix, title + image_ext)
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
@@ -1073,7 +1075,7 @@ def plot_roc_per_class(
 
     figure_path = os.path.join(
         prefix,
-        "per_class_roc_" + title + "_" + data_split + image_ext,
+        "roc-per-class-" + title + "-" + data_split + image_ext,
     )
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
@@ -1222,14 +1224,14 @@ def _text_on_plot(axes, x, y, text, alpha=0.8, background="white"):
     t.set_bbox({"facecolor": background, "alpha": alpha, "edgecolor": background})
 
 
-def plot_architecture_diagram(dot: pydot.Dot, image_path: str):
+def plot_architecture_diagram(model: Model, output_folder: str, image_ext: str):
     """
     Given a graph representation of a model architecture,
     save the architecture diagram to an image file.
 
-    :param dot: pydot.Dot representation of model
-    :param image_path: path to save svg of architecture diagram to
+    :param model: Keras model class.
     """
+    dot = model_to_dot(model, show_shapes=True, expand_nested=True)
     legend = {}
     for n in dot.get_nodes():
         if n.get_label():
@@ -1275,13 +1277,18 @@ def plot_architecture_diagram(dot: pydot.Dot, image_path: str):
         n.set_style("filled")
 
     for label in legend:
-        legend_node = pydot.Node(
+        legend_node = Node(
             "legend" + label,
             label=label,
             shape="box",
             fillcolor=legend[label],
         )
         dot.add_node(legend_node)
+
+    image_path = os.path.join(
+        output_folder,
+        f"architecture{image_ext}",
+    )
 
     if image_path.endswith("svg"):
         # pydot svg applies a scale factor that clips the image so unscale it
@@ -1346,9 +1353,11 @@ def _pool_layer(pool_type: str) -> str:
 
 
 def _conv_label(
-    args: argparse.Namespace,
-    layer_order: List[str],
+    activation_layer: str,
     conv_layer: str,
+    layer_order: List[str],
+    normalization_layer: str,
+    spatial_dropout: float,
 ) -> str:
     conv_label = (
         "<<table border='0' cellborder='1' cellspacing='0' cellpadding='10'><tr>"
@@ -1357,13 +1366,13 @@ def _conv_label(
         if layer == "convolution":
             conv_label += f"<td port='{layer}' bgcolor='cyan'>{conv_layer}</td>"
         elif layer == "activation":
-            if args.activation_layer:
-                conv_label += f"<td port='{layer}' bgcolor='yellow'>{_activation_layer(args.activation_layer)}</td>"
+            if activation_layer:
+                conv_label += f"<td port='{layer}' bgcolor='yellow'>{_activation_layer(activation_layer)}</td>"
         elif layer == "normalization":
-            if args.normalization_layer:
-                conv_label += f"<td port='{layer}' bgcolor='orange'>{_normalization_layer(args.normalization_layer)}</td>"
+            if normalization_layer:
+                conv_label += f"<td port='{layer}' bgcolor='orange'>{_normalization_layer(normalization_layer)}</td>"
         elif layer == "dropout":
-            if args.spatial_dropout > 0:
+            if spatial_dropout > 0:
                 conv_label += f"<td port='{layer}' bgcolor='grey'>Spatial Dropout</td>"
     conv_label += "</tr></table>>"
     return conv_label
@@ -1379,26 +1388,28 @@ INVISIBLE_ARGS = {
 
 
 def _conv_block(
-    args: argparse.Namespace,
-    input_idx: int,
+    conv_block_size: int,
+    conv_blocks: int,
     conv_label: str,
     g: pgv.AGraph,
+    input_idx: int,
     last_node: str,
+    pool_type: str,
 ) -> str:
     conv_block = []
 
-    for i in range(args.conv_block_size):
+    for i in range(conv_block_size):
         node = f"{input_idx}_conv_layer_{i}"
         g.add_node(node, label=conv_label, shape="none", margin=0)
         g.add_edge(last_node, node)
         last_node = node
         conv_block.append(node)
 
-    if args.pool_type:
+    if pool_type:
         node = f"{input_idx}_conv_pool"
         g.add_node(
             node,
-            label=_pool_layer(args.pool_type),
+            label=_pool_layer(pool_type),
             style="filled",
             fillcolor="aquamarine",
         )
@@ -1410,7 +1421,7 @@ def _conv_block(
         conv_block,
         name=f"cluster_{input_idx}_conv_block",
         style="dotted",
-        label=f"Convolutional Block x{len(args.conv_blocks)}",
+        label=f"Convolutional Block x{len(conv_blocks)}",
         labeljust="r",
         labelloc="b",
     )
@@ -1418,11 +1429,13 @@ def _conv_block(
 
 
 def _res_block(
-    args: argparse.Namespace,
-    input_idx: int,
     conv_label: str,
     g: pgv.AGraph,
+    input_idx: int,
     last_node: str,
+    pool_type: str,
+    residual_block_size: int,
+    residual_blocks: int,
 ) -> str:
     res_block = []
 
@@ -1433,7 +1446,7 @@ def _res_block(
     last_node = node
     res_block.append(node)
 
-    for i in range(args.residual_block_size):
+    for i in range(residual_block_size):
         node = f"{input_idx}_res_layer_{i}"
         g.add_node(node, label=conv_label, shape="none", margin=0)
         g.add_edge(last_node, node)
@@ -1454,11 +1467,11 @@ def _res_block(
         xlabel="match dimensions via point conv",
     )
 
-    if args.pool_type:
+    if pool_type:
         node = f"{input_idx}_res_pool"
         g.add_node(
             node,
-            label=_pool_layer(args.pool_type),
+            label=_pool_layer(pool_type),
             style="filled",
             fillcolor="aquamarine",
         )
@@ -1470,7 +1483,7 @@ def _res_block(
         res_block,
         name=f"cluster_{input_idx}_res_block",
         style="dotted",
-        label=f"Residual Block x{len(args.residual_blocks)}",
+        label=f"Residual Block x{len(residual_blocks)}",
         labeljust="r",
         labelloc="b",
     )
@@ -1478,11 +1491,13 @@ def _res_block(
 
 
 def _dense_block(
-    args: argparse.Namespace,
-    input_idx: int,
     conv_label: str,
+    dense_block_size: int,
+    dense_blocks: int,
     g: pgv.AGraph,
+    input_idx: int,
     last_node: str,
+    pool_type: str,
 ) -> str:
     dense_block = []
 
@@ -1493,14 +1508,14 @@ def _dense_block(
     last_concat = node
     dense_block.append(node)
 
-    for i in range(args.dense_block_size):
+    for i in range(dense_block_size):
         node = f"{input_idx}_dense_layer_{i}"
         g.add_node(node, label=conv_label, shape="none", margin=0)
         g.add_edge(last_node, node)
         last_node = node
         dense_block.append(node)
 
-        if i < args.dense_block_size - 1:
+        if i < dense_block_size - 1:
             node = f"{input_idx}_dense_connect_{i}"
             g.add_node(node, label="Concat", style="filled", fillcolor="aquamarine")
             g.add_edge(last_node, node)
@@ -1509,11 +1524,11 @@ def _dense_block(
             g.add_edge(last_concat, node, constraint=False)
             last_concat = node
 
-    if args.pool_type:
+    if pool_type:
         node = f"{input_idx}_dense_pool"
         g.add_node(
             node,
-            label=_pool_layer(args.pool_type),
+            label=_pool_layer(pool_type),
             style="filled",
             fillcolor="aquamarine",
         )
@@ -1525,33 +1540,61 @@ def _dense_block(
         dense_block,
         name=f"cluster_{input_idx}_dense_block",
         style="dotted",
-        label=f"Dense Block x{len(args.dense_blocks)}",
+        label=f"Dense Block x{len(dense_blocks)}",
         labeljust="r",
         labelloc="b",
     )
     return last_node
 
 
-def _fully_connected_label(args: argparse.Namespace, units: int) -> str:
+def _fully_connected_label(
+    activation_layer,
+    dense_dropout: float,
+    dense_layer_order: List[str],
+    normalization_layer: str,
+    units: int,
+) -> str:
     label = "<<table border='0' cellborder='1' cellspacing='0' cellpadding='10'><tr>"
-    for layer in args.dense_layer_order:
+    for layer in dense_layer_order:
         if layer == "dense":
             label += f"<td port='{layer}' bgcolor='deepskyblue'>Dense ({units})</td>"
         elif layer == "activation":
-            if args.activation_layer:
-                label += f"<td port='{layer}' bgcolor='yellow'>{_activation_layer(args.activation_layer)}</td>"
+            if activation_layer:
+                label += f"<td port='{layer}' bgcolor='yellow'>{_activation_layer(activation_layer)}</td>"
         elif layer == "normalization":
-            if args.normalization_layer:
-                label += f"<td port='{layer}' bgcolor='orange'>{_normalization_layer(args.normalization_layer)}</td>"
+            if normalization_layer:
+                label += f"<td port='{layer}' bgcolor='orange'>{_normalization_layer(normalization_layer)}</td>"
         elif layer == "dropout":
-            if args.dense_dropout > 0:
+            if dense_dropout > 0:
                 label += f"<td port='{layer}' bgcolor='grey'>Dropout</td>"
     label += "</tr></table>>"
 
     return label
 
 
-def plot_condensed_architecture_diagram(args: argparse.Namespace) -> pgv.AGraph:
+def plot_condensed_architecture_diagram(
+    activation_layer: str,
+    bottleneck_type: str,
+    conv_block_layer_order: List[str],
+    conv_block_size: int,
+    conv_blocks: int,
+    conv_type: str,
+    dense_block_layer_order: List[str],
+    dense_block_size: int,
+    dense_blocks: int,
+    dense_dropout: float,
+    dense_layer_order: List[str],
+    dense_layers: int,
+    image_ext: str,
+    normalization_layer: str,
+    output_folder: str,
+    pool_type: str,
+    residual_block_layer_order: List[str],
+    residual_blocks: int,
+    spatial_dropout: float,
+    tensor_maps_in: List[TensorMap],
+    tensor_maps_out: List[TensorMap],
+) -> pgv.AGraph:
     g = pgv.AGraph(directed=True)
     g.graph_attr.update(rankdir="LR", splines="ortho", fontname="arial")
     g.node_attr.update(shape="box", fontname="arial")
@@ -1559,28 +1602,64 @@ def plot_condensed_architecture_diagram(args: argparse.Namespace) -> pgv.AGraph:
 
     # Inputs/Encoders
     encoders = []
-    for input_idx, tm in enumerate(args.tensor_maps_in):
+    for input_idx, tm in enumerate(tensor_maps_in):
         node = f"{input_idx}_{tm.name}"
         g.add_node(node, label=tm.name, style="filled", fillcolor="green")
         last_node = node
         dimension = tm.axes
         if dimension > 1:
-            # Input conv blocks
-            conv_layer = _conv_layer(dimension, args.conv_type)
-
-            if args.conv_blocks:
-                conv_label = _conv_label(args, args.conv_block_layer_order, conv_layer)
-                last_node = _conv_block(args, input_idx, conv_label, g, last_node)
-            if args.residual_blocks:
+            conv_layer = _conv_layer(dimension=dimension, conv_type=conv_type)
+            if conv_blocks:
                 conv_label = _conv_label(
-                    args,
-                    args.residual_block_layer_order,
-                    conv_layer,
+                    activation_layer=activation_layer,
+                    conv_layer=conv_layer,
+                    layer_order=conv_block_layer_order,
+                    normalization_layer=normalization_layer,
+                    spatial_dropout=spatial_dropout,
                 )
-                last_node = _res_block(args, input_idx, conv_label, g, last_node)
-            if args.dense_blocks:
-                conv_label = _conv_label(args, args.dense_block_layer_order, conv_layer)
-                last_node = _dense_block(args, input_idx, conv_label, g, last_node)
+                last_node = _conv_block(
+                    conv_block_size=conv_block_size,
+                    conv_blocks=conv_blocks,
+                    conv_label=conv_label,
+                    g=g,
+                    input_idx=input_idx,
+                    last_node=last_node,
+                    pool_type=pool_type,
+                )
+            if residual_blocks:
+                conv_label = _conv_label(
+                    activation_layer=activation_layer,
+                    conv_layer=conv_layer,
+                    layer_order=residual_block_layer_order,
+                    normalization_layer=normalization_layer,
+                    spatial_dropout=spatial_dropout,
+                )
+                last_node = _res_block(
+                    conv_label=conv_label,
+                    g=g,
+                    input_idx=input_idx,
+                    last_node=last_node,
+                    pool_type=pool_type,
+                    residual_block_size=residual_block_size,
+                    residual_blocks=residual_blocks,
+                )
+            if dense_blocks:
+                conv_label = _conv_label(
+                    activation_layer=activation_layer,
+                    conv_layer=conv_layer,
+                    layer_order=conv_block_layer_order,
+                    normalization_layer=normalization_layer,
+                    spatial_dropout=spatial_dropout,
+                )
+                last_node = _dense_block(
+                    conv_label=conv_label,
+                    dense_block_size=dense_block_size,
+                    dense_blocks=dense_blocks,
+                    g=g,
+                    input_idx=input_idx,
+                    last_node=last_node,
+                    pool_type=pool_type,
+                )
 
             node = f"{input_idx}_flatten"
             g.add_node(node, label="Flatten", style="filled", fillcolor="aquamarine")
@@ -1588,8 +1667,13 @@ def plot_condensed_architecture_diagram(args: argparse.Namespace) -> pgv.AGraph:
             last_node = node
         elif tm.annotation_units > 0:
             # Input fully connected block
-            label = _fully_connected_label(args, tm.annotation_units)
-
+            label = _fully_connected_label(
+                activation_layer=activation_layer,
+                dense_dropout=dense_dropout,
+                dense_layer_order=dense_layer_order,
+                normalization_layer=normalization_layer,
+                units=tm.annotation_units,
+            )
             node = f"{input_idx}_fully_connected_input"
             g.add_node(node, label=label, shape="none", margin=0)
             g.add_edge(last_node, node)
@@ -1600,10 +1684,10 @@ def plot_condensed_architecture_diagram(args: argparse.Namespace) -> pgv.AGraph:
         encoders.append(last_node)
 
     # Bottleneck
-    if args.bottleneck_type != BottleneckType.FlattenRestructure:
+    if bottleneck_type != BottleneckType.FlattenRestructure:
         raise NotImplementedError(
             f"Simple model architecture diagram for bottleneck type "
-            f"({args.bottleneck_type}) is not yet supported.",
+            f"({bottleneck_type}) is not yet supported.",
         )
 
     if len(encoders) > 1:
@@ -1614,8 +1698,14 @@ def plot_condensed_architecture_diagram(args: argparse.Namespace) -> pgv.AGraph:
         last_node = node
 
     # Fully connected layers
-    for i, layer in enumerate(args.dense_layers):
-        label = _fully_connected_label(args, layer)
+    for i, layer in enumerate(dense_layers):
+        label = _fully_connected_label(
+            activation_layer=activation_layer,
+            dense_dropout=dense_dropout,
+            dense_layer_order=dense_layer_order,
+            normalization_layer=normalization_layer,
+            units=layer,
+        )
         node = f"{i}_fully_connected"
         g.add_node(node, label=label, shape="none", margin=0)
         g.add_edge(last_node, node)
@@ -1627,7 +1717,7 @@ def plot_condensed_architecture_diagram(args: argparse.Namespace) -> pgv.AGraph:
     last_node = node
 
     # Outputs/Decoders
-    for output_idx, tm in enumerate(args.tensor_maps_out):
+    for output_idx, tm in enumerate(tensor_maps_out):
         dimension = tm.axes
         if dimension > 1:
             raise NotImplementedError(
@@ -1640,8 +1730,8 @@ def plot_condensed_architecture_diagram(args: argparse.Namespace) -> pgv.AGraph:
             g.add_edge(last_node, node)
 
     image_path = os.path.join(
-        args.output_folder,
-        f"condensed-architecture{args.image_ext}",
+        output_folder,
+        f"architecture-condensed{image_ext}",
     )
     g.draw(image_path, prog="dot")
     logging.info(f"Saved architecture diagram to: {image_path}")
@@ -1705,7 +1795,7 @@ def plot_feature_coefficients(
     # Auto-adjust layout and whitespace
     plt.tight_layout()
 
-    fpath = os.path.join(plot_path, f"feature_coefficients_{model_name}{image_ext}")
+    fpath = os.path.join(plot_path, f"feature-coefficients-{model_name}{image_ext}")
 
     plt.savefig(fpath, bbox_inches="tight", pad_inches=0.01)
     plt.close()

@@ -17,7 +17,6 @@ from sklearn.ensemble import RandomForestClassifier
 from tensorflow.keras import backend as K
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import LogisticRegression
-from tensorflow.keras.utils import model_to_dot
 from tensorflow.keras.layers import (
     ELU,
     Add,
@@ -248,19 +247,38 @@ def sklearn_model_loss_from_dataset(
 
 def make_model(args):
     """
-    Create a model to train according the input arguments.
+    Create a model to train, and plot architecture diagrams.
     """
     if args.recipe in ["train", "train_simclr", "infer", "build"]:
         model = make_multimodal_multitask_model(**args.__dict__)
         if args.model_file is None:
-            plot_condensed_architecture_diagram(args)
-            image_path = os.path.join(
-                args.output_folder,
-                f"architecture{args.image_ext}",
+            plot_condensed_architecture_diagram(
+                activation_layer=args.activation_layer,
+                bottleneck_type=args.bottleneck_type,
+                conv_block_layer_order=args.conv_block_layer_order,
+                conv_block_size=args.conv_block_size,
+                conv_blocks=args.conv_blocks,
+                conv_type=args.conv_type,
+                dense_block_layer_order=args.dense_block_layer_order,
+                dense_block_size=args.dense_block_size,
+                dense_blocks=args.dense_blocks,
+                dense_dropout=args.dense_dropout,
+                dense_layer_order=args.dense_layer_order,
+                dense_layers=args.dense_layers,
+                image_ext=args.image_ext,
+                normalization_layer=args.normalization_layer,
+                output_folder=args.output_folder,
+                pool_type=args.pool_type,
+                residual_block_layer_order=args.residual_block_layer_order,
+                residual_blocks=args.residual_blocks,
+                spatial_dropout=args.spatial_dropout,
+                tensor_maps_in=args.tensor_maps_in,
+                tensor_maps_out=args.tensor_maps_out,
             )
             plot_architecture_diagram(
-                dot=model_to_dot(model, show_shapes=True, expand_nested=True),
-                image_path=image_path,
+                model=model,
+                output_folder=args.output_folder,
+                image_ext=args.image_ext,
             )
     elif args.recipe == "train_keras_logreg":
         model = make_shallow_model(
@@ -276,8 +294,9 @@ def make_model(args):
         )
         image_path = os.path.join(args.output_folder, f"architecture{args.image_ext}")
         plot_architecture_diagram(
-            dot=model_to_dot(model, show_shapes=True, expand_nested=True),
-            image_path=image_path,
+            model=model,
+            output_folder=args.output_folder,
+            image_ext=args.image_ext,
         )
     else:
         hyperparameters = {}
