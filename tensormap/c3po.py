@@ -59,7 +59,7 @@ def make_c3po_death_tmap(
     tmap_name: str,
     tmaps: Dict[str, TensorMap],
 ) -> Dict[str, TensorMap]:
-    pattern = "c3po_death_(\d+)_years_pre_ecg"
+    pattern = "c3po_death_(\d+)_years_post_ecg"
     years = re.match(pattern, tmap_name)
     if years is None:
         return tmaps
