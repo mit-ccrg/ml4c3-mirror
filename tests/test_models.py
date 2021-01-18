@@ -1,3 +1,4 @@
+# pylint: disable=no-member
 # Imports: standard library
 import os
 from typing import Dict, List, Tuple, Iterator, Optional
@@ -9,11 +10,7 @@ import pytest
 import tensorflow as tf
 
 # Imports: first party
-from ml4c3.models import (
-    MODEL_EXT,
-    ACTIVATION_FUNCTIONS,
-    make_multimodal_multitask_model,
-)
+from ml4c3.models import MODEL_EXT, make_multimodal_multitask_model
 from definitions.models import BottleneckType
 from tensormap.TensorMap import TensorMap
 
@@ -101,7 +98,7 @@ def assert_model_trains(
     )
     for tmap in output_tmaps:
         for metric in tmap.metrics:
-            metric_name = metric if type(metric) == str else metric.__name__
+            metric_name = metric if isinstance(metric, str) else metric.__name__
             name = (
                 f"{tmap.output_name}_{metric_name}"
                 if len(output_tmaps) > 1
@@ -127,108 +124,6 @@ class TestMakeMultimodalMultitaskModel:
         Tests 1d->2d, 2d->1d, (1d,2d)->(1d,2d)
         """
         assert_model_trains(input_output_tmaps[0], input_output_tmaps[1])
-
-    @pytest.mark.slow
-    @pytest.mark.parametrize(
-        "input_tmaps",
-        pytest.MULTIMODAL_UP_TO_4D,
-    )
-    @pytest.mark.parametrize(
-        "output_tmaps",
-        pytest.MULTIMODAL_UP_TO_4D,
-    )
-    def test_multimodal(
-        self,
-        input_tmaps: List[TensorMap],
-        output_tmaps: List[TensorMap],
-    ):
-        assert_model_trains(input_tmaps, output_tmaps)
-
-    @pytest.mark.slow
-    @pytest.mark.parametrize(
-        "input_tmap",
-        pytest.CONTINUOUS_TMAPS[:-1],
-    )
-    @pytest.mark.parametrize(
-        "output_tmap",
-        pytest.TMAPS_UP_TO_4D,
-    )
-    def test_unimodal_md_to_nd(self, input_tmap: TensorMap, output_tmap: TensorMap):
-        assert_model_trains([input_tmap], [output_tmap])
-
-    @pytest.mark.slow
-    @pytest.mark.parametrize(
-        "input_tmap",
-        pytest.TMAPS_UP_TO_4D,
-    )
-    @pytest.mark.parametrize(
-        "output_tmap",
-        pytest.TMAPS_UP_TO_4D,
-    )
-    def test_load_unimodal(self, tmpdir, input_tmap: TensorMap, output_tmap: TensorMap):
-        m = make_multimodal_multitask_model(
-            tensor_maps_in=[input_tmap],
-            tensor_maps_out=[output_tmap],
-            **DEFAULT_PARAMS,
-        )
-        path = os.path.join(tmpdir, f"m{MODEL_EXT}")
-        m.save(path)
-        make_multimodal_multitask_model(
-            tensor_maps_in=[input_tmap],
-            tensor_maps_out=[output_tmap],
-            model_file=path,
-            **DEFAULT_PARAMS,
-        )
-
-    @pytest.mark.slow
-    @pytest.mark.parametrize(
-        "activation",
-        ACTIVATION_FUNCTIONS.keys(),
-    )
-    def test_load_custom_activations(self, tmpdir, activation: str):
-        inp, out = pytest.CONTINUOUS_TMAPS[:2], pytest.CATEGORICAL_TMAPS[:2]
-        params = DEFAULT_PARAMS.copy()
-        params["activation"] = activation
-        m = make_multimodal_multitask_model(
-            tensor_maps_in=inp, tensor_maps_out=out, **params
-        )
-        path = os.path.join(tmpdir, f"m{MODEL_EXT}")
-        m.save(path)
-        make_multimodal_multitask_model(
-            tensor_maps_in=inp,
-            tensor_maps_out=out,
-            model_file=path,
-            **params,
-        )
-
-    @pytest.mark.slow
-    @pytest.mark.parametrize(
-        "input_tmaps",
-        pytest.MULTIMODAL_UP_TO_4D,
-    )
-    @pytest.mark.parametrize(
-        "output_tmaps",
-        pytest.MULTIMODAL_UP_TO_4D,
-    )
-    def test_load_multimodal(
-        self,
-        tmpdir,
-        input_tmaps: List[TensorMap],
-        output_tmaps: List[TensorMap],
-    ):
-        m = make_multimodal_multitask_model(
-            tensor_maps_in=input_tmaps,
-            tensor_maps_out=output_tmaps,
-            **DEFAULT_PARAMS,
-        )
-        path = os.path.join(tmpdir, f"m{MODEL_EXT}")
-        m.save(path)
-        make_multimodal_multitask_model(
-            tensor_maps_in=input_tmaps,
-            tensor_maps_out=output_tmaps,
-            model_file=path,
-            **DEFAULT_PARAMS,
-        )
 
     @pytest.mark.parametrize(
         "input_output_tmaps",
