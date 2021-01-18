@@ -7,14 +7,24 @@ import errno
 import logging.config
 
 
-def load_config(log_level: str, log_dir: str = None, log_file_basename: str = None):
+def load_config(
+    log_level: str,
+    log_dir: str = None,
+    log_file_basename: str = None,
+    log_name: str = None,
+    log_console: bool = True,
+):
     log_file = None
     if log_dir is not None:
         os.makedirs(log_dir, exist_ok=True)
         log_file = f"{log_dir}/{log_file_basename}.log"
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger(log_name or __name__)
     try:
-        logger_config = _create_logger_config(log_level=log_level, log_file=log_file)
+        logger_config = _create_logger_config(
+            log_level=log_level,
+            log_file=log_file,
+            log_console=log_console,
+        )
         logging.config.dictConfig(logger_config)
         success_msg = (
             "Logging configuration was loaded. "
@@ -26,7 +36,11 @@ def load_config(log_level: str, log_dir: str = None, log_file_basename: str = No
         raise error
 
 
-def _create_logger_config(log_level: str, log_file: str = None):
+def _create_logger_config(
+    log_level: str,
+    log_file: str = None,
+    log_console: bool = True,
+):
     config = {
         "version": 1,
         "disable_existing_loggers": False,
@@ -38,16 +52,17 @@ def _create_logger_config(log_level: str, log_file: str = None):
                 ),
             },
         },
-        "handlers": {
-            "console": {
-                "level": log_level,
-                "class": "logging.StreamHandler",
-                "formatter": "simple",
-                "stream": sys.stdout,
-            },
-        },
-        "loggers": {"": {"handlers": ["console"], "level": log_level}},
+        "handlers": {},
+        "loggers": {"": {"handlers": [], "level": log_level}},
     }
+    if log_console:
+        config["handlers"]["console"] = {
+            "level": log_level,
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+            "stream": sys.stdout,
+        }
+        config["loggers"][""]["handlers"].append("console")
     if log_file is not None:
         config["handlers"]["file"] = {
             "level": log_level,

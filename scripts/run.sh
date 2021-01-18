@@ -99,7 +99,7 @@ while getopts ":i:d:m:p:jstvnrh" opt ; do
             ;;
         d)
             DOCKER_IMAGE=${DOCKER_IMAGE_GPU}
-            GPU_DEVICE="--gpus device=${OPTARG}"
+            GPU_DEVICE="--gpus \"device=${OPTARG}\""
             ;;
         m)
             MOUNTS="${MOUNTS} -v ${OPTARG}:${OPTARG}"

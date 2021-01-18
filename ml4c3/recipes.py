@@ -9,28 +9,10 @@ from typing import Dict
 
 # Imports: third party
 import numpy as np
-from tensorflow.keras.models import Model
 
 # Imports: first party
-from ml4c3.plots import plot_ecg
-from ml4c3.models import make_model, train_model_from_datasets
-from ml4c3.metrics import simclr_loss, simclr_accuracy
-from ml4c3.datasets import get_verbose_stats_string, train_valid_test_datasets
-from visualizer.run import run_visualizer
 from ml4c3.arguments import parse_args
-from ml4c3.evaluations import predict_and_evaluate
-from ml4c3.explorations import explore
 from definitions.globals import MODEL_EXT
-from ingest.edw.pipeline import pull_edw_data
-from tensormap.TensorMap import TensorMap
-from ingest.ecg.tensorizer import tensorize as tensorize_ecg
-from ingest.icu.tensorizer import tensorize as tensorize_icu
-from ml4c3.hyperoptimizers import hyperoptimize
-from ingest.icu.assess_coverage import assess_coverage
-from ingest.icu.check_structure import check_icu_structure
-from ingest.icu.ecg_features_extraction import extract_ecg_features
-from ingest.icu.match_patient_bedmaster import match_data
-from ingest.icu.pre_tensorize_explorations import pre_tensorize_explore
 
 # pylint: disable=redefined-outer-name, broad-except
 
@@ -38,6 +20,7 @@ from ingest.icu.pre_tensorize_explorations import pre_tensorize_explore
 def run(args: argparse.Namespace):
     start_time = timer()  # Keep track of elapsed execution time
     try:
+        # fmt: off
         if args.recipe in [
             "train",
             "train_keras_logreg",
@@ -52,41 +35,72 @@ def run(args: argparse.Namespace):
         elif args.recipe == "infer":
             infer_multimodal_multitask(args)
         elif args.recipe == "hyperoptimize":
+            from ml4c3.hyperoptimizers import hyperoptimize  # isort: skip
             hyperoptimize(args)
+
         elif args.recipe == "tensorize_ecg":
+            from ingest.ecg.tensorizer import tensorize as tensorize_ecg  # isort: skip
             tensorize_ecg(args)
+
         elif args.recipe == "pull_adt":
+            from ingest.edw.pipeline import pull_edw_data  # isort: skip
             pull_edw_data(args, only_adt=True)
+
         elif args.recipe == "pull_edw":
+            from ingest.edw.pipeline import pull_edw_data  # isort: skip
             pull_edw_data(args)
+
         elif args.recipe == "tensorize_icu_no_edw_pull":
+            from ingest.icu.tensorizer import tensorize as tensorize_icu  # isort: skip
             tensorize_icu(args)
+
         elif args.recipe == "tensorize_icu":
+            from ingest.edw.pipeline import pull_edw_data  # isort: skip
+            from ingest.icu.tensorizer import tensorize as tensorize_icu  # isort: skip
             pull_edw_data(args)
             tensorize_icu(args)
+
         elif args.recipe == "explore":
+            from ml4c3.explorations import explore  # isort: skip
             explore(args=args, disable_saving_output=args.explore_disable_saving_output)
+
         elif args.recipe == "plot_ecg":
+            from ml4c3.plots import plot_ecg  # isort: skip
             plot_ecg(args)
+
         elif args.recipe == "build":
             build_multimodal_multitask(args)
         elif args.recipe == "assess_coverage":
+            from ingest.icu.assess_coverage import assess_coverage  # isort: skip
             assess_coverage(args)
+
         elif args.recipe == "check_icu_structure":
+            from ingest.icu.check_structure import check_icu_structure  # isort: skip
             check_icu_structure(args)
+
         elif args.recipe == "pre_tensorize_explore":
+            from ingest.icu.pre_tensorize_explorations import pre_tensorize_explore  # isort: skip
             pre_tensorize_explore(args)
+
         elif args.recipe == "match_patient_bedmaster":
+            from ingest.icu.match_patient_bedmaster import match_data  # isort: skip
             match_data(args)
+
         elif args.recipe == "visualize":
+            from visualizer.run import run_visualizer  # isort: skip
             run_visualizer(args)
+
         elif args.recipe == "extract_ecg_features":
+            from ingest.icu.ecg_features_extraction import extract_ecg_features  # isort: skip
             extract_ecg_features(args)
+
         else:
             raise ValueError("Unknown recipe:", args.recipe)
+        # fmt: on
 
     except Exception as error:
         logging.exception(error)
+    finally:
         for child in mp.active_children():
             child.terminate()
 
@@ -95,7 +109,10 @@ def run(args: argparse.Namespace):
     logging.info(f"Executed {args.recipe} operation in {elapsed_time:.2f} sec")
 
 
-def build_multimodal_multitask(args: argparse.Namespace) -> Model:
+def build_multimodal_multitask(args: argparse.Namespace):
+    # Imports: first party
+    from ml4c3.models import make_model
+
     model = make_model(args)
     model_file = os.path.join(args.output_folder, "model_weights" + MODEL_EXT)
     model.save(model_file)
@@ -106,6 +123,9 @@ def build_multimodal_multitask(args: argparse.Namespace) -> Model:
 def train_model(args: argparse.Namespace) -> Dict[str, float]:
     if args.recipe != "train":
         args.mixup_alpha = 0
+
+    # Imports: first party
+    from ml4c3.datasets import get_verbose_stats_string, train_valid_test_datasets
 
     # Create datasets
     datasets, stats, cleanups = train_valid_test_datasets(
@@ -128,6 +148,9 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
     )
     train_dataset, valid_dataset, test_dataset = datasets
 
+    # Imports: first party
+    from ml4c3.models import make_model, train_model_from_datasets
+
     model = make_model(args)
 
     # Train model using datasets
@@ -146,15 +169,21 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
         return_history=True,
         plot=True,
     )
+    # Imports: third party
+    from tensorflow.keras.models import Model
+
     if isinstance(model, Model):
         model, history = train_results
     else:
         model = train_results
+    # Imports: first party
+    from ml4c3.evaluations import predict_and_evaluate
 
     # Evaluate trained model
     plot_path = args.output_folder
+    train_results = {}
     if args.mixup_alpha == 0:
-        predict_and_evaluate(
+        train_results = predict_and_evaluate(
             model=model,
             data=train_dataset,
             tensor_maps_in=args.tensor_maps_in,
@@ -164,7 +193,7 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
             image_ext=args.image_ext,
         )
 
-    performance_metrics = predict_and_evaluate(
+    test_results = predict_and_evaluate(
         model=model,
         data=test_dataset,
         tensor_maps_in=args.tensor_maps_in,
@@ -192,11 +221,21 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
             output_tmaps=args.tensor_maps_out,
         ),
     )
+    performance_metrics = {}
+    performance_metrics.update(
+        {f"train_{key}": value for key, value in train_results.items()},
+    )
+    performance_metrics.update(
+        {f"test_{key}": value for key, value in test_results.items()},
+    )
     return performance_metrics
 
 
 def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
     # Create datasets
+    # Imports: first party
+    from ml4c3.datasets import train_valid_test_datasets
+
     datasets, _, cleanups = train_valid_test_datasets(
         tensor_maps_in=args.tensor_maps_in,
         tensor_maps_out=args.tensor_maps_out,
@@ -215,6 +254,10 @@ def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
         debug=args.debug,
     )
     _, _, test_dataset = datasets
+
+    # Imports: first party
+    from ml4c3.models import make_model
+    from ml4c3.evaluations import predict_and_evaluate
 
     model = make_model(args)
 
@@ -266,6 +309,10 @@ def train_simclr_model(args: argparse.Namespace):
         raise ValueError("At least one SimCLR input should have augmentations.")
     args.tensor_maps_in = simclr_tensor_maps_in
 
+    # Imports: first party
+    from ml4c3.metrics import simclr_loss, simclr_accuracy
+    from tensormap.TensorMap import TensorMap
+
     projection_tm = TensorMap(
         name="projection",
         shape=shape,
@@ -275,6 +322,8 @@ def train_simclr_model(args: argparse.Namespace):
         time_series_limit=2,
     )
     args.tensor_maps_out = [projection_tm]
+    # Imports: first party
+    from ml4c3.datasets import train_valid_test_datasets
 
     datasets, _, cleanups = train_valid_test_datasets(
         tensor_maps_in=args.tensor_maps_in,
@@ -294,6 +343,10 @@ def train_simclr_model(args: argparse.Namespace):
         debug=args.debug,
     )
     train_dataset, valid_dataset, _ = datasets
+
+    # Imports: first party
+    from ml4c3.models import make_model, train_model_from_datasets
+
     model = make_model(args)
     model, history = train_model_from_datasets(
         model=model,

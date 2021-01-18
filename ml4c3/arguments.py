@@ -10,12 +10,10 @@ from typing import Dict
 
 # Imports: third party
 import numpy as np
-import tensorflow as tf
 
 # Imports: first party
 from ml4c3.logger import load_config
 from definitions.models import BottleneckType
-from tensormap.TensorMap import TensorMap, update_tmaps
 
 BOTTLENECK_STR_TO_ENUM = {
     "flatten_restructure": BottleneckType.FlattenRestructure,
@@ -793,6 +791,13 @@ def parse_args() -> argparse.Namespace:
         help="Full path to to .json file with the parameters to hyperoptimize. You can "
         "use the script generate_hyperoptimize_json.py to create it.",
     )
+    hyperoptimize_parser.add_argument(
+        "--hyperoptimize_workers",
+        type=int,
+        help="Number of concurrent workers to use for hyperoptimization. "
+        "If hyperoptimization requires GPUs, the number of workers should not "
+        "exceed the number of GPUs available through docker.",
+    )
 
     # Explore arguments
     explore_parser = subparser.add_parser(
@@ -1120,7 +1125,34 @@ def parse_args() -> argparse.Namespace:
     )
     args = parser.parse_args()
     _process_args(args)
+    if args.recipe != "hyperoptimize" and "input_tensors" in args:
+        _load_tensor_maps(args)
     return args
+
+
+def _load_tensor_maps(args: argparse.Namespace):
+    # Imports: third party
+    import tensorflow as tf
+
+    gpus = tf.config.experimental.list_physical_devices("GPU")
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
+
+    # Imports: first party
+    from tensormap.TensorMap import update_tmaps
+
+    needed_tmaps_names = args.input_tensors + args.output_tensors
+
+    # Update dict of tmaps to include all needed tmaps
+    tmaps = {}
+    for tmap_name in needed_tmaps_names:
+        tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
+
+    # Update args with TMaps
+    args.tensor_maps_in = [tmaps[tmap_name] for tmap_name in args.input_tensors]
+    args.tensor_maps_out = [tmaps[tmap_name] for tmap_name in args.output_tensors]
+
+    logging.info(f"Total TensorMaps: {len(tmaps)} Arguments are {args}")
 
 
 def _process_args(args: argparse.Namespace):
@@ -1139,10 +1171,6 @@ def _process_args(args: argparse.Namespace):
         log_file_basename="log_" + now_string,
     )
 
-    gpus = tf.config.experimental.list_physical_devices("GPU")
-    for gpu in gpus:
-        tf.config.experimental.set_memory_growth(gpu, True)
-
     tensors = []
     if "tensors" in args and args.tensors is not None:
         for tensor in args.tensors:
@@ -1157,18 +1185,6 @@ def _process_args(args: argparse.Namespace):
                 )
         args.tensors = tensors if len(tensors) > 1 else tensors[0]
 
-    # Create list of names of all needed TMaps
-    if "input_tensors" in args and args.recipe != "explore_icu":
-        needed_tmaps_names = args.input_tensors + args.output_tensors
-
-        # Update dict of tmaps to include all needed tmaps
-        tmaps: Dict[str, TensorMap] = {}
-        for tmap_name in needed_tmaps_names:
-            tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
-
-        # Update args with TMaps
-        args.tensor_maps_in = [tmaps[tmap_name] for tmap_name in args.input_tensors]
-        args.tensor_maps_out = [tmaps[tmap_name] for tmap_name in args.output_tensors]
     if "bottleneck_type" in args:
         args.bottleneck_type = BOTTLENECK_STR_TO_ENUM[args.bottleneck_type]
     if "learning_rate_schedule" in args:
@@ -1187,8 +1203,6 @@ def _process_args(args: argparse.Namespace):
         args.bad_hd5_dir = os.path.expanduser(args.bad_hd5_dir)
 
     logging.info(f"Command Line was: {command_line}")
-    if "input_tensors" in args and args.recipe != "explore_icu":
-        logging.info(f"Total TensorMaps: {len(tmaps)} Arguments are {args}")
 
     if args.num_workers <= 0:
         raise ValueError(

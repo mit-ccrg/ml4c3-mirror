@@ -173,8 +173,6 @@ def use_testing_tmaps(monkeypatch):
         return pytest.MOCK_TMAPS
 
     monkeypatch.setattr(tensormap.TensorMap, "update_tmaps", mock_update_tmaps)
-    monkeypatch.setattr("ml4c3.arguments.update_tmaps", mock_update_tmaps)
-    monkeypatch.setattr("ml4c3.hyperoptimizers.update_tmaps", mock_update_tmaps)
 
 
 baseline_default_arguments = [

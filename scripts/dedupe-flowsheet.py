@@ -42,7 +42,8 @@ def dedupe_flowsheet(mrn_csn, df):
         count.value += 1
         if count.value % 10 == 0:
             print(f"Tried {count.value} / {total.value}")
-    mrn, csn = mrn_csn
+    mrn = int(mrn_csn[0])
+    csn = int(mrn_csn[1])
     flowsheet_path = os.path.join(args.edw_source, str(mrn), str(csn), csv)
     cleaned_flowsheet_path = os.path.join(args.edw_cleaned, str(mrn), str(csn), csv)
     if not os.path.isfile(flowsheet_path):
