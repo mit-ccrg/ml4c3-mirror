@@ -19,7 +19,11 @@ def _get_training_dfs(analysis_df: pd.DataFrame) -> List[pd.DataFrame]:
     ]
 
 
-def _get_configs(folder: str, num_configs: int) -> Tuple[List[str], List[Dict]]:
+def _get_configs(
+    folder: str,
+    num_configs: int,
+    set_descriptions: bool = False,
+) -> Tuple[List[str], List[Dict]]:
     """
     gets num_configs config dictionaries from ray output folder
     The configs will be well distributed in terms of validation loss
@@ -47,6 +51,12 @@ def _get_configs(folder: str, num_configs: int) -> Tuple[List[str], List[Dict]]:
     )
     configs = config_df.iloc[indices].to_dict("records")
     names = [f"{i}_best_val_loss_{df[best_val_loss_col].iloc[i]}" for i in indices]
+    if set_descriptions:
+        for config, idx in zip(configs, indices):
+            config[
+                "description"
+            ] = f"pretrained val loss {df[best_val_loss_col].iloc[idx]:.3f}"
+            print(f"Set up config with description: {config['description']}")
     return names, configs
 
 
@@ -59,7 +69,7 @@ def _run_experiments(
     cpus_per_model: int,
     gpus_per_model: float,
 ):
-    names, configs = _get_configs(ray_output_folder, num_experiments)
+    names, configs = _get_configs(ray_output_folder, num_experiments, True)
     stopper = EarlyStopping(patience=patience, max_epochs=epochs)
     experiments = [
         Experiment(
