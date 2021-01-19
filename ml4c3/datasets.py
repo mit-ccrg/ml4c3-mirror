@@ -1173,3 +1173,16 @@ def get_array_from_dict_of_arrays(
     if array.shape[1] == 1:
         array = array.ravel()
     return array
+
+
+def get_split_stats(stats_all: tuple) -> Dict[str, Counter]:
+    """
+    Given a tuple of ml4c3.datasets.StatsWrapper objects, iterate through them
+    and return a dictionary of these objects, keyed by splits, and only non-empty splits
+    """
+    split_stats = {}
+    split_strings = ["train", "valid", "test"]
+    for split_string, stats in zip(split_strings, stats_all):
+        if len(stats.stats) > 0:
+            split_stats[split_string] = stats.stats
+    return split_stats

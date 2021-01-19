@@ -6,7 +6,7 @@ exclude: '^(.mypy_cache|.github)'
 repos:
 
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v3.1.0
+  rev: v3.4.0
   hooks:
   - id: check-executables-have-shebangs
     exclude: ".py"
@@ -28,18 +28,18 @@ repos:
     files: ".ipynb"
 
 - repo: https://github.com/Lucas-C/pre-commit-hooks
-  rev: v1.1.7
+  rev: v1.1.9
   hooks:
   - id: remove-tabs
     files: ".py"
 
 - repo: https://github.com/asottile/add-trailing-comma
-  rev: v2.0.1
+  rev: v2.0.2
   hooks:
   - id: add-trailing-comma
 
 - repo: https://github.com/timothycrosley/isort
-  rev: 5.0.5
+  rev: 5.7.0
   hooks:
   - id: isort
     additional_dependencies: [toml]
@@ -49,18 +49,18 @@ repos:
   hooks:
   - id: black
 
-- repo: local
-  hooks:
-  - id: pylint
-    name: pylint
-    entry: pylint
-    language: system
-    types: [python]
-
-- repo: git://github.com/luismayta/pre-commit-mypy
-  rev: master
-  hooks:
-  - id: mypy
-    args:
-    - --ignore-missing-imports
-    - --follow-imports=skip
+    #- repo: local
+    #  hooks:
+    #  - id: pylint
+    #    name: pylint
+    #    entry: pylint
+    #    language: system
+    #    types: [python]
+    #
+    #- repo: git://github.com/luismayta/pre-commit-mypy
+    #  rev: master
+    #  hooks:
+    #  - id: mypy
+    #    args:
+    #    - --ignore-missing-imports
+    #    - --follow-imports=skip

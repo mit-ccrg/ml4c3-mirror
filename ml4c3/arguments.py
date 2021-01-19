@@ -687,6 +687,7 @@ def parse_args() -> argparse.Namespace:
         name="train_keras_logreg",
         description="TODO",
         parents=[
+            model_parser,
             training_parser,
             train_shallow_parser,
             io_parser,
@@ -698,6 +699,7 @@ def parse_args() -> argparse.Namespace:
         name="train_sklearn_logreg",
         description="TODO",
         parents=[
+            model_parser,
             training_parser,
             train_shallow_parser,
             io_parser,
@@ -709,6 +711,7 @@ def parse_args() -> argparse.Namespace:
         name="train_sklearn_svm",
         description="TODO",
         parents=[
+            model_parser,
             training_parser,
             train_shallow_parser,
             io_parser,
@@ -720,6 +723,7 @@ def parse_args() -> argparse.Namespace:
         name="train_sklearn_randomforest",
         description="TODO",
         parents=[
+            model_parser,
             training_parser,
             train_shallow_parser,
             io_parser,
@@ -731,6 +735,7 @@ def parse_args() -> argparse.Namespace:
         name="train_sklearn_xgboost",
         description="TODO",
         parents=[
+            model_parser,
             training_parser,
             train_shallow_parser,
             io_parser,
@@ -1125,6 +1130,7 @@ def parse_args() -> argparse.Namespace:
         ],
     )
     args = parser.parse_args()
+    _setup_arg_file(args)
     _process_args(args)
     if args.recipe != "hyperoptimize" and "input_tensors" in args:
         _load_tensor_maps(args)
@@ -1132,15 +1138,13 @@ def parse_args() -> argparse.Namespace:
 
 
 def _load_tensor_maps(args: argparse.Namespace):
-    # Imports: third party
-    import tensorflow as tf
+    import tensorflow as tf  # isort: skip
 
     gpus = tf.config.experimental.list_physical_devices("GPU")
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
 
-    # Imports: first party
-    from tensormap.TensorMap import update_tmaps
+    from tensormap.TensorMap import update_tmaps  # isort: skip
 
     needed_tmaps_names = args.input_tensors + args.output_tensors
 
@@ -1156,22 +1160,29 @@ def _load_tensor_maps(args: argparse.Namespace):
     logging.info(f"Total TensorMaps: {len(tmaps)} Arguments are {args}")
 
 
-def _process_args(args: argparse.Namespace):
+def _setup_arg_file(args: argparse.Namespace):
     now_string = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
     args_file = os.path.join(args.output_folder, "arguments_" + now_string + ".txt")
     command_line = f"\n./scripts/run.sh {' '.join(sys.argv)}\n"
+
     if not os.path.exists(os.path.dirname(args_file)):
         os.makedirs(os.path.dirname(args_file))
+
     with open(args_file, "w") as f:
         f.write(command_line)
         for k, v in sorted(args.__dict__.items(), key=operator.itemgetter(0)):
             f.write(k + " = " + str(v) + "\n")
+
     load_config(
         log_level=args.logging_level,
         log_dir=args.output_folder,
         log_file_basename="log_" + now_string,
     )
+    logging.info(f"Command line was: {command_line}")
 
+
+def _process_args(args: argparse.Namespace):
+    np.random.seed(args.random_seed)
     tensors = []
     if "tensors" in args and args.tensors is not None:
         for tensor in args.tensors:
@@ -1188,6 +1199,7 @@ def _process_args(args: argparse.Namespace):
 
     if "bottleneck_type" in args:
         args.bottleneck_type = BOTTLENECK_STR_TO_ENUM[args.bottleneck_type]
+
     if "learning_rate_schedule" in args:
         if args.learning_rate_schedule is not None and args.patience < args.epochs:
             raise ValueError(
@@ -1195,15 +1207,12 @@ def _process_args(args: argparse.Namespace):
                 "Set patience > epochs.",
             )
 
-    np.random.seed(args.random_seed)
-
     # Replace tildes with full path to home dirs
     if "bad_xml_dir" in args and args.bad_xml_dir:
         args.bad_xml_dir = os.path.expanduser(args.bad_xml_dir)
+
     if "bad_hd5_dir" in args and args.bad_hd5_dir:
         args.bad_hd5_dir = os.path.expanduser(args.bad_hd5_dir)
-
-    logging.info(f"Command Line was: {command_line}")
 
     if args.num_workers <= 0:
         raise ValueError(
@@ -1218,3 +1227,8 @@ def _process_args(args: argparse.Namespace):
             pretrained_layer: new_layer
             for pretrained_layer, new_layer in args.remap_layer
         }
+
+    # Scikit-learn models do not utilize batch size, but tf.dataset requires it;
+    # set it here instead of forcing user to set --batch_size
+    if args.recipe.startswith("train_sklearn_"):
+        args.batch_size = 256

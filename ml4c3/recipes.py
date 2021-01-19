@@ -110,8 +110,7 @@ def run(args: argparse.Namespace):
 
 
 def build_multimodal_multitask(args: argparse.Namespace):
-    # Imports: first party
-    from ml4c3.models import make_model
+    from ml4c3.models import make_model  # isort: skip
 
     model = make_model(args)
     model_file = os.path.join(args.output_folder, "model_weights" + MODEL_EXT)
@@ -124,8 +123,11 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
     if args.recipe != "train":
         args.mixup_alpha = 0
 
-    # Imports: first party
-    from ml4c3.datasets import get_verbose_stats_string, train_valid_test_datasets
+    from ml4c3.datasets import (  # isort: skip
+        get_split_stats,
+        get_verbose_stats_string,
+        train_valid_test_datasets,
+    )
 
     # Create datasets
     datasets, stats, cleanups = train_valid_test_datasets(
@@ -148,8 +150,7 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
     )
     train_dataset, valid_dataset, test_dataset = datasets
 
-    # Imports: first party
-    from ml4c3.models import make_model, train_model_from_datasets
+    from ml4c3.models import make_model, train_model_from_datasets  # isort: skip
 
     model = make_model(args)
 
@@ -161,23 +162,22 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
         train_dataset=train_dataset,
         valid_dataset=valid_dataset,
         epochs=args.epochs,
-        patience=args.patience,
+        image_ext=args.image_ext,
         learning_rate_patience=args.learning_rate_patience,
         learning_rate_reduction=args.learning_rate_reduction,
+        num_workers=args.num_workers,
         output_folder=args.output_folder,
-        image_ext=args.image_ext,
-        return_history=True,
+        patience=args.patience,
         plot=True,
+        return_history=True,
     )
-    # Imports: third party
-    from tensorflow.keras.models import Model
+    from tensorflow.keras.models import Model  # isort: skip
 
     if isinstance(model, Model):
         model, history = train_results
     else:
         model = train_results
-    # Imports: first party
-    from ml4c3.evaluations import predict_and_evaluate
+    from ml4c3.evaluations import predict_and_evaluate  # isort: skip
 
     # Evaluate trained model
     plot_path = args.output_folder
@@ -210,17 +210,15 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
 
     if args.recipe == "train":
         logging.info(f"Model trained for {len(history.history['loss'])} epochs")
-    logging.info(
-        get_verbose_stats_string(
-            split_stats={
-                "train": stats[0].stats,
-                "valid": stats[1].stats,
-                "test": stats[2].stats,
-            },
-            input_tmaps=args.tensor_maps_in,
-            output_tmaps=args.tensor_maps_out,
-        ),
+
+    split_stats = get_split_stats(stats_all=stats)
+    verbose_stats_string = get_verbose_stats_string(
+        split_stats=split_stats,
+        input_tmaps=args.tensor_maps_in,
+        output_tmaps=args.tensor_maps_out,
     )
+    logging.info(verbose_stats_string)
+
     performance_metrics = {}
     performance_metrics.update(
         {f"auc_train_{key}": value for key, value in train_results.items()},
@@ -233,8 +231,7 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
 
 def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
     # Create datasets
-    # Imports: first party
-    from ml4c3.datasets import train_valid_test_datasets
+    from ml4c3.datasets import train_valid_test_datasets  # isort: skip
 
     datasets, _, cleanups = train_valid_test_datasets(
         tensor_maps_in=args.tensor_maps_in,
@@ -255,9 +252,8 @@ def infer_multimodal_multitask(args: argparse.Namespace) -> Dict[str, float]:
     )
     _, _, test_dataset = datasets
 
-    # Imports: first party
-    from ml4c3.models import make_model
-    from ml4c3.evaluations import predict_and_evaluate
+    from ml4c3.models import make_model  # isort: skip
+    from ml4c3.evaluations import predict_and_evaluate  # isort: skip
 
     model = make_model(args)
 
@@ -309,9 +305,8 @@ def train_simclr_model(args: argparse.Namespace):
         raise ValueError("At least one SimCLR input should have augmentations.")
     args.tensor_maps_in = simclr_tensor_maps_in
 
-    # Imports: first party
-    from ml4c3.metrics import simclr_loss, simclr_accuracy
-    from tensormap.TensorMap import TensorMap
+    from ml4c3.metrics import simclr_loss, simclr_accuracy  # isort: skip
+    from tensormap.TensorMap import TensorMap  # isort: skip
 
     projection_tm = TensorMap(
         name="projection",
@@ -322,8 +317,7 @@ def train_simclr_model(args: argparse.Namespace):
         time_series_limit=2,
     )
     args.tensor_maps_out = [projection_tm]
-    # Imports: first party
-    from ml4c3.datasets import train_valid_test_datasets
+    from ml4c3.datasets import train_valid_test_datasets  # isort: skip
 
     datasets, _, cleanups = train_valid_test_datasets(
         tensor_maps_in=args.tensor_maps_in,
@@ -344,8 +338,7 @@ def train_simclr_model(args: argparse.Namespace):
     )
     train_dataset, valid_dataset, _ = datasets
 
-    # Imports: first party
-    from ml4c3.models import make_model, train_model_from_datasets
+    from ml4c3.models import make_model, train_model_from_datasets  # isort: skip
 
     model = make_model(args)
     model, history = train_model_from_datasets(

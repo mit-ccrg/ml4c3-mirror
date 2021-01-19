@@ -112,13 +112,14 @@ def train_model_from_datasets(
     train_dataset: tf.data.Dataset,
     valid_dataset: Optional[tf.data.Dataset],
     epochs: int,
-    patience: int,
+    image_ext: str,
     learning_rate_patience: int,
     learning_rate_reduction: float,
+    num_workers: int,
     output_folder: str,
-    image_ext: str,
-    return_history: bool = False,
+    patience: int,
     plot: bool = True,
+    return_history: bool = False,
 ) -> Union[Model, Tuple[Model, History]]:
     """
     Train a model from tensorflow.data.Datasets for validation and training data.
@@ -127,21 +128,22 @@ def train_model_from_datasets(
     Plots the metric history after training. Creates a directory to save weights,
     if necessary.
 
+    :param epochs: Maximum number of epochs to run regardless of Early Stopping
+    :param image_ext: File format of saved image
+    :param learning_rate_patience: Number of epochs without validation loss improvement
+           to wait before reducing learning rate
+    :param learning_rate_reduction: Scale factor to reduce learning rate by
     :param model: The model to optimize
+    :param num_workers: Number of CPU workers to parallelize sklearn model.fit across
+    :param output_folder: Directory where output file will be stored
+    :param patience: Number of epochs to wait before reducing learning rate
+    :param plot: Whether or not to plot metrics from training
+    :param return_history: Whether or not to return history from training
     :param tensor_maps_in: List of input TensorMaps
     :param tensor_maps_out: List of output TensorMaps
     :param train_dataset: Dataset that yields batches of training data
     :param valid_dataset: Dataset that yields batches of validation data.
            Scikit-learn models do not utilize the validation split.
-    :param epochs: Maximum number of epochs to run regardless of Early Stopping
-    :param patience: Number of epochs to wait before reducing learning rate
-    :param learning_rate_patience: Number of epochs without validation loss improvement
-           to wait before reducing learning rate
-    :param learning_rate_reduction: Scale factor to reduce learning rate by
-    :param output_folder: Directory where output file will be stored
-    :param image_ext: File format of saved image
-    :param return_history: Whether or not to return history from training
-    :param plot: Whether or not to plot metrics from training
     :return: The optimized model which achieved the best validation loss or training
              loss if validation data was not provided
     """
@@ -327,6 +329,7 @@ def make_model(args):
         model = make_sklearn_model(
             model_type=model_type,
             hyperparameters=hyperparameters,
+            num_workers=args.num_workers,
         )
     return model
 
@@ -411,13 +414,13 @@ def make_shallow_model(
 def make_sklearn_model(
     model_type: str,
     hyperparameters: Dict[str, float],
+    num_workers: int,
 ) -> SKLEARN_MODELS:
     """
     Initialize and return a scikit-learn model.
 
     :param model_type: String defining type of scikit-learn model to initialize
     :param hyperparameters: Dict of hyperparameter names and values
-
     """
     if model_type == "logreg":
         model = LogisticRegression(
@@ -427,6 +430,7 @@ def make_sklearn_model(
             max_iter=5000,
             C=hyperparameters["c"],
             l1_ratio=hyperparameters["l1_ratio"],
+            n_jobs=num_workers,
         )
         model.loss_function = log_loss
         model.loss_name = "log"
@@ -441,6 +445,7 @@ def make_sklearn_model(
             max_depth=hyperparameters["max_depth"],
             min_samples_split=hyperparameters["min_samples_split"],
             min_samples_leaf=hyperparameters["min_samples_leaf"],
+            n_jobs=num_workers,
         )
         model.loss_function = _gini_loss
         model.loss_name = "gini"
@@ -451,6 +456,7 @@ def make_sklearn_model(
             gamma=hyperparameters["gamma"],
             reg_alpha=hyperparameters["l1_ratio"],
             reg_lambda=hyperparameters["l2_ratio"],
+            n_jobs=num_workers,
         )
         model.loss_function = log_loss
         model.loss_name = "log"
