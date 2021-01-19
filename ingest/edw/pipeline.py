@@ -212,7 +212,7 @@ def _obtain_data(
     query_directory: str,
     adt_df: pd.DataFrame,
 ):
-    if args.staging_dir is None:
+    if args.staging_batch_size > 1 and args.staging_dir is None:
         raise ValueError("Must provide staging directory.")
     batch_size = args.staging_batch_size or 1
 

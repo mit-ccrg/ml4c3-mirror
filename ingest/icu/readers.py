@@ -55,7 +55,7 @@ class Reader(ABC):
             try:
                 data = np.ascontiguousarray(data, dtype=dtype)
             except (UnicodeEncodeError, SystemError):
-                logging.info("Uknown character. Not ensuring contiguous array")
+                logging.info("Uknown character. Not ensuring contiguous array.")
                 new_data = []
                 for element in data:
                     new_data.append(unidecode.unidecode(str(element)))
@@ -192,18 +192,18 @@ class EDWReader(Reader):
         if str(end_date) != "nan":
             vitals_df = vitals_df[vitals_df[time_column] <= end_date]
 
-        return list(vitals_df[signal_column].str.upper().unique())
+        return list(vitals_df[signal_column].astype("str").str.upper().unique())
 
     def list_labs(self) -> List[str]:
         """
         List all the lab measurements taken from the patient.
 
         :return: <List[str]>  List with all the available lab measurements
-                from the patient
+                from the patient.
         """
         signal_column = EDW_FILES["lab_file"]["columns"][0]
         labs_df = pd.read_csv(self.lab_file)
-        return list(labs_df[signal_column].str.upper().unique())
+        return list(labs_df[signal_column].astype("str").str.upper().unique())
 
     def list_medications(self) -> List[str]:
         """
@@ -216,7 +216,7 @@ class EDWReader(Reader):
         status_column = EDW_FILES["med_file"]["columns"][1]
         med_df = pd.read_csv(self.med_file)
         med_df = med_df[med_df[status_column].isin(MED_ACTIONS)]
-        return list(med_df[signal_column].str.upper().unique())
+        return list(med_df[signal_column].astype("str").str.upper().unique())
 
     def list_surgery(self) -> List[str]:
         """
@@ -259,7 +259,7 @@ class EDWReader(Reader):
         data = pd.read_csv(file_name)
         data = data[data[status_column].isin(["Complete", "Completed"])]
         data = data.dropna(subset=[start_column, end_column])
-        return list(data[signal_column].str.upper().unique())
+        return list(data[signal_column].astype("str").str.upper().unique())
 
     def list_events(self) -> List[str]:
         """
@@ -269,7 +269,7 @@ class EDWReader(Reader):
         """
         signal_column, _ = EDW_FILES["events_file"]["columns"]
         data = pd.read_csv(self.events_file)
-        return list(data[signal_column].str.upper().unique())
+        return list(data[signal_column].astype("str").str.upper().unique())
 
     def get_static_data(self) -> StaticData:
         """
@@ -382,10 +382,10 @@ class EDWReader(Reader):
         med_df = med_df[med_df[status_column].isin(MED_ACTIONS)]
         med_df = med_df.sort_values(time_column)
 
-        if med_name not in med_df[signal_column].str.upper().unique():
+        if med_name not in med_df[signal_column].astype("str").str.upper().unique():
             raise ValueError(f"{med_name} was not found in {self.med_file}.")
 
-        idx = np.where(med_df[signal_column].str.upper() == med_name)[0]
+        idx = np.where(med_df[signal_column].astype("str").str.upper() == med_name)[0]
         route = np.array(med_df[route_column])[idx[0]]
         wt_base_dose = (
             bool(1) if np.array(med_df[weight_column])[idx[0]] == "Y" else bool(0)
@@ -524,10 +524,10 @@ class EDWReader(Reader):
         data = pd.read_csv(self.events_file)
         data = data.dropna(subset=[time_column])
         data = data.sort_values([time_column])
-        if event_type not in data[signal_column].str.upper().unique():
+        if event_type not in data[signal_column].astype("str").str.upper().unique():
             raise ValueError(f"{event_type} was not found in {self.events_file}.")
 
-        idx = np.where(data[signal_column].str.upper() == event_type)[0]
+        idx = np.where(data[signal_column].astype("str").str.upper() == event_type)[0]
         time = self._get_unix_timestamps(np.array(data[time_column])[idx])
         time = self._ensure_contiguous(time)
 
@@ -664,10 +664,10 @@ class EDWReader(Reader):
         ].drop_duplicates()
         data = data.sort_values(time_column)
 
-        if measure_name not in data[signal_column].str.upper().unique():
+        if measure_name not in data[signal_column].astype("str").str.upper().unique():
             raise ValueError(f"{measure_name} was not found in {file_name}.")
 
-        idx = np.where(data[signal_column].str.upper() == measure_name)[0]
+        idx = np.where(data[signal_column].astype("str").str.upper() == measure_name)[0]
         value = np.array(data[result_column])[idx]
         time = self._get_unix_timestamps(np.array(data[time_column])[idx])
         units = np.array(data[units_column])[idx[0]]
@@ -711,10 +711,12 @@ class EDWReader(Reader):
         data = data.dropna(subset=[start_column, end_column])
         data = data.sort_values([start_column, end_column])
 
-        if procedure_type not in data[signal_column].str.upper().unique():
+        if procedure_type not in data[signal_column].astype("str").str.upper().unique():
             raise ValueError(f"{procedure_type} was not found in {file_name}.")
 
-        idx = np.where(data[signal_column].str.upper() == procedure_type)[0]
+        idx = np.where(data[signal_column].astype("str").str.upper() == procedure_type)[
+            0
+        ]
         start_date = self._get_unix_timestamps(np.array(data[start_column])[idx])
         end_date = self._get_unix_timestamps(np.array(data[end_column])[idx])
         start_date = self._ensure_contiguous(start_date)
@@ -908,7 +910,7 @@ class BedmasterReader(h5py.File, Reader):
                 on the .mat file
         """
         if not self.contains_group("vs"):
-            logging.warning(f"No BM vitalsign found on file {self.filename}")
+            logging.warning(f"No BM vitalsign found on file {self.filename}.")
             if self.summary_stats:
                 self.summary_stats.add_file_stats("missing_vs")
             return []
@@ -928,7 +930,7 @@ class BedmasterReader(h5py.File, Reader):
         wv_signals: Dict[str, str] = {}
 
         if not self.contains_group("wv"):
-            logging.warning(f"No BM waveform found on file {self.filename}")
+            logging.warning(f"No BM waveform found on file {self.filename}.")
             if self.summary_stats:
                 self.summary_stats.add_file_stats("missing_wv")
             return wv_signals
@@ -1073,8 +1075,8 @@ class BedmasterReader(h5py.File, Reader):
 
         if signal.time.size == 0:
             logging.info(
-                f"Signal {signal} on .mat file {self.filename} doesn't contain new"
-                f"information (only contains overlapped values from previous bundles)."
+                f"Signal {signal} on .mat file {self.filename} doesn't contain new "
+                f"information (only contains overlapped values from previous bundles). "
                 f"It won't be written.",
             )
             if self.summary_stats:
@@ -1289,7 +1291,7 @@ class BedmasterReader(h5py.File, Reader):
         if signals.size == 0:
             logging.warning(
                 f"The signal on channel {channel} on file {self.filename} "
-                f"has no name. It is probably an empty signal or a badly"
+                f"has no name. It is probably an empty signal or a badly "
                 f"recorded one. It won't be written to the tensorized file.",
             )
             if self.summary_stats:
@@ -1304,8 +1306,8 @@ class BedmasterReader(h5py.File, Reader):
         if sf_arr.shape[0] <= 0:
             logging.info(
                 f"The signal on channel {channel} on file {self.filename} has an "
-                f"incorrect sample frequency format. Either it doesn't have sample"
-                f"frequency or it has an incongruent one. Sample frequency will be set"
+                f"incorrect sample frequency format. Either it doesn't have sample "
+                f"frequency or it has an incongruent one. Sample frequency will be set "
                 f"to Nan for this signal.",
             )
             return np.array([(np.nan, 0)], dtype="float,int")
@@ -1333,8 +1335,8 @@ class BedmasterReader(h5py.File, Reader):
             except (KeyError, ValueError):
                 logging.warning(
                     f"Scaling factor or units not found "
-                    f"for signal {signal_name} on file {self.filename}. They will"
-                    f"be set to units: UNKNOWN, scaling_factor: 0. ",
+                    f"for signal {signal_name} on file {self.filename}. They will "
+                    f"be set to units: UNKNOWN, scaling_factor: 0.",
                 )
                 scaling_factor = 0
                 units = "UNKNOWN"
@@ -1388,7 +1390,9 @@ class BedmasterAlarmsReader(Reader):
         alarms: Set[str] = set()
         alarm_name_column = ALARMS_FILES["columns"][3]
         for alarms_df in self.alarms_dfs:
-            alarms = alarms.union(set(alarms_df[alarm_name_column].str.upper()))
+            alarms = alarms.union(
+                set(alarms_df[alarm_name_column].astype("str").str.upper()),
+            )
         return list(alarms)
 
     def get_alarm(self, alarm_name: str) -> BedmasterAlarm:
@@ -1404,7 +1408,9 @@ class BedmasterAlarmsReader(Reader):
         ][1:5]
         first = True
         for alarm_df in self.alarms_dfs:
-            idx = np.where(alarm_df[alarm_name_column].str.upper() == alarm_name)[0]
+            idx = np.where(
+                alarm_df[alarm_name_column].astype("str").str.upper() == alarm_name,
+            )[0]
             dates = np.append(dates, np.array(alarm_df[date_column])[idx])
             durations = np.append(durations, np.array(alarm_df[duration_column])[idx])
             if len(idx) > 0 and first:
@@ -1447,10 +1453,9 @@ class BedmasterAlarmsReader(Reader):
             else:
                 logging.warning(
                     f"Department {dept} is not found in ALARMS_FILES['names'] "
-                    "(ml4c3/definitions.py). No alarms data will be searched for this "
-                    "department as it is not possible to know the corresponding "
-                    "alarms file. Please, add this information in "
-                    "ALARMS_FILES['names'] (ml4c3/definitions.py).",
+                    "in ml4c3/definitions.py. No alarms data will be searched for this "
+                    "department. Please, add this information to "
+                    "ALARMS_FILES['names'].",
                 )
                 continue
             bed = room_bed[i][-3:]
