@@ -3,9 +3,9 @@
 from typing import Optional
 
 # Imports: first party
-from definitions.icu import ICU_TMAPS_METADATA
 from ml4c3.normalizer import MinMax, ZScore, ZScorePopulation, RobustScalePopulation
 from tensormap.TensorMap import TensorMap
+from definitions.icu_tmaps import ICU_TMAPS_METADATA
 from tensormap.icu_around_event import get_tmap as get_around_tmap
 
 

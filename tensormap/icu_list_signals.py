@@ -6,7 +6,7 @@ import numpy as np
 
 # Imports: first party
 from tensormap.TensorMap import TensorMap, Interpretation, get_visits
-from definitions.icu_tmap_list import DEFINED_TMAPS
+from definitions.icu_tmaps import DEFINED_TMAPS
 
 
 def make_list_signal_tensor_from_file(sig_type: str):

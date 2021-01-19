@@ -12,7 +12,7 @@ from tensormap.TensorMap import (
     get_visits,
     get_local_timestamps,
 )
-from definitions.icu_tmap_list import DEFINED_TMAPS
+from definitions.icu_tmaps import DEFINED_TMAPS
 
 
 def has_data(hd5, visit, data):

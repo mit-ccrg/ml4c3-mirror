@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 # Imports: first party
-from definitions.icu import EDW_FILES
+from definitions.edw import EDW_FILES
 from ingest.icu.readers import EDWReader
 
 # pylint: disable=no-member, redefined-outer-name

@@ -9,12 +9,8 @@ import pandas as pd
 
 # Imports: first party
 from ml4c3.datasets import patient_csv_to_set
-from definitions.icu import (
-    EDW_FILES,
-    ALARMS_FILES,
-    BEDMASTER_EXT,
-    MATFILE_EXPECTED_GROUPS,
-)
+from definitions.edw import EDW_FILES
+from definitions.icu import ALARMS_FILES, BEDMASTER_EXT, MATFILE_EXPECTED_GROUPS
 from ingest.icu.utils import get_files_in_directory
 
 
@@ -72,7 +68,8 @@ class EDWChecker:
         """
         Checks if edw_dir is structured properly.
 
-        :param patient_csv: <str> Path to CSV with MRNs to parse; no other MRNs will be parsed.
+        :param patient_csv: <str> Path to CSV with MRNs to parse; no other MRNs
+               will be parsed.
         """
         self._check_adt()
 

@@ -208,3 +208,8 @@ DEFINED_TMAPS: Dict[str, Any] = {
         "static",
     ],
 }
+
+
+ICU_TMAPS_METADATA: Dict[str, Dict[str, Any]] = {
+    #    "TMAP_NAME": {"min": 0, "max": 0, "std": 0, "mean": 0, "median": 0, "iqr": 0}
+}

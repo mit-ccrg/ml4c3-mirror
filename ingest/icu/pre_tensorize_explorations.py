@@ -8,7 +8,8 @@ import numpy as np
 import pandas as pd
 
 # Imports: first party
-from definitions.icu import EDW_FILES, BEDMASTER_EXT
+from definitions.edw import EDW_FILES
+from definitions.icu import BEDMASTER_EXT
 from ingest.icu.utils import get_files_in_directory
 from ingest.icu.readers import EDWReader, BedmasterReader
 from ingest.icu.bedmaster_stats import BedmasterStats

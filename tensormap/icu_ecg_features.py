@@ -12,8 +12,8 @@ from tensormap.TensorMap import (
     get_visits,
     get_local_timestamps,
 )
+from definitions.icu_tmaps import DEFINED_TMAPS
 from tensormap.icu_signals import get_tmap as get_signal_tmap
-from definitions.icu_tmap_list import DEFINED_TMAPS
 
 
 def make_ecg_peak_tensor_from_file(lead):

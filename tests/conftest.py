@@ -17,7 +17,7 @@ import neurokit2 as nk
 
 # Imports: first party
 import tensormap
-from definitions.icu import EDW_FILES
+from definitions.edw import EDW_FILES
 from ml4c3.arguments import parse_args
 from ingest.icu.writers import Writer
 from definitions.globals import TENSOR_EXT

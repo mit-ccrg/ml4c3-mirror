@@ -14,13 +14,8 @@ import unidecode
 
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
-from definitions.icu import (
-    EDW_FILES,
-    MED_ACTIONS,
-    ALARMS_FILES,
-    ICU_SCALE_UNITS,
-    MAPPING_DEPARTMENTS,
-)
+from definitions.edw import EDW_FILES, MED_ACTIONS
+from definitions.icu import ALARMS_FILES, ICU_SCALE_UNITS
 from definitions.globals import TIMEZONE
 from ingest.icu.data_objects import (
     Event,

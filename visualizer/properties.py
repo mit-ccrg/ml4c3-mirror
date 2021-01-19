@@ -4,10 +4,8 @@ import os
 # Imports: third party
 import yaml
 
-# Imports: first party
-from definitions.icu import VISUALIZER_PATH
-
 LAYOUT = {}
+VISUALIZER_PATH = os.path.abspath(__file__ + "/..")
 
 # pylint: disable=global-statement
 

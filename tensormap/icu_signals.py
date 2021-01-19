@@ -8,7 +8,8 @@ import numpy as np
 
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
-from definitions.icu import EDW_PREFIX, ICU_SCALE_UNITS
+from definitions.edw import EDW_PREFIX
+from definitions.icu import ICU_SCALE_UNITS
 from ml4c3.validators import (
     validator_no_empty,
     validator_no_negative,
@@ -21,7 +22,7 @@ from tensormap.TensorMap import (
     get_visits,
     get_local_timestamps,
 )
-from definitions.icu_tmap_list import DEFINED_TMAPS
+from definitions.icu_tmaps import DEFINED_TMAPS
 from tensormap.icu_first_visit_with_signal import get_tmap as get_visit_tmap
 
 

@@ -2,15 +2,15 @@
 import os
 import re
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List
 
 # Imports: third party
-import numpy as np
 import pandas as pd
 
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
-from definitions.icu import EDW_FILES, BEDMASTER_EXT, MAPPING_DEPARTMENTS
+from definitions.edw import EDW_FILES
+from definitions.icu import BEDMASTER_EXT, MAPPING_DEPARTMENTS
 from ingest.icu.utils import get_files_in_directory
 
 # pylint: disable=too-many-branches, line-too-long
@@ -186,7 +186,7 @@ class PatientBedmasterMatcher:
         # Now, we have:
         # adt: patient MRNs, CSNs, and stay information
         # metadata: Bedmaster file info
-        logging.info(f"Cross referencing metadata and ADT DataFrames")
+        logging.info("Cross referencing metadata and ADT DataFrames")
 
         # Merge adt and metadata on the room_bed
         xref_df = adt_df.merge(metadata, left_on="BedLabelNM", right_on="room_bed")

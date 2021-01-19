@@ -10,7 +10,8 @@ import dash_html_components as html
 from dash.dependencies import Input, State, Output
 
 # Imports: first party
-from definitions.icu import STATIC_UNITS, VISUALIZER_PATH
+from definitions.edw import STATIC_UNITS
+from visualizer.properties import VISUALIZER_PATH
 from visualizer.tools.tm_helper import TMapHelper
 
 # pylint: disable=unused-variable, too-many-statements
