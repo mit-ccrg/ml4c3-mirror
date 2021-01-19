@@ -124,6 +124,7 @@ def build_downstream_model(
     decay_steps: int,  # optimizer settings
     learning_rate: float,
     model_file: str = None,
+    freeze_weights: bool = False,
     **kwargs,
 ):
     tmap = downstream_tmap_from_name(downstream_tmap_name)
@@ -150,7 +151,6 @@ def build_downstream_model(
         weight_decay=5 * 5e-5,
     )  # following RegNet's setup
     model({input_name: Input(shape=(ecg_length, 12))})  # initialize model
-    model.compile(loss=[tmap.loss], optimizer=optimizer)
     if model_file is not None:
         print(f"Loading model weights from {model_file}")
         model.load_weights(
@@ -158,6 +158,8 @@ def build_downstream_model(
             skip_mismatch=True,
             by_name=True,
         )  # load all weights besides new last layer
+        model.layers[0].trainable = not freeze_weights
+    model.compile(loss=[tmap.loss], optimizer=optimizer)
     return model
 
 
@@ -339,6 +341,56 @@ def _test_build_downstream_model_pretrained():
     assert "val_loss" in history.history
 
 
+def _test_build_downstream_model_pretrained_freeze_weights():
+    m = _build_test_model()
+    m.summary()
+    dummy_in = {m.input_name: np.zeros((10, 100, 12))}
+    dummy_out = {
+        tm.output_name: np.zeros((10,) + tm.shape) for tm in get_pretraining_tasks()
+    }
+    history = m.fit(
+        dummy_in,
+        dummy_out,
+        batch_size=2,
+        validation_data=(dummy_in, dummy_out),
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = os.path.join(save_model(tmpdir, m), "pretraining_model.h5")
+        downstream = build_downstream_model(
+            downstream_tmap_name="age",
+            model_file=path,
+            decay_steps=10,
+            ecg_length=100,
+            kernel_size=3,
+            group_size=2,
+            depth=10,
+            initial_width=8,
+            width_growth_rate=2,
+            width_quantization=1.5,
+            learning_rate=1e-5,
+            freeze_weights=True,
+        )
+    rand_in = np.random.randn(1, 100, 12)
+    np.testing.assert_allclose(  # did the pretrained layers get loaded?
+        m.layers[0](rand_in),
+        downstream.layers[0](rand_in),
+    )
+    downstream.summary()
+    dummy_in = {m.input_name: np.zeros((10, 100, 12))}
+    dummy_out = {"output_age_continuous": np.zeros((10, 1))}
+    history = downstream.fit(
+        dummy_in,
+        dummy_out,
+        batch_size=2,
+        validation_data=(dummy_in, dummy_out),
+    )
+    np.testing.assert_allclose(  # did the pretrained layers stay the same?
+        m.layers[0](rand_in),
+        downstream.layers[0](rand_in),
+    )
+    assert "val_loss" in history.history
+
+
 class RegNetTrainable(tune.Trainable):
     def setup(self, config):
         # Imports: third party
@@ -430,14 +482,24 @@ def run(
     output_folder: str,
     num_trials: int,
     patience: int,
+    augment: bool = False,
 ):
-    augmentation_params = {
-        f"{aug_name}_strength": tune.uniform(0, 1)
-        for aug_name in augmentation_dict()
-        if "roll" not in aug_name
-    }
-    augmentation_params["roll_strength"] = tune.randint(0, 2)  # either 0 or 1
-    augmentation_params["num_augmentations"] = tune.randint(0, len(augmentation_dict()))
+    if augment:
+        augmentation_params = {
+            f"{aug_name}_strength": tune.uniform(0, 1)
+            for aug_name in augmentation_dict()
+            if "roll" not in aug_name
+        }
+        augmentation_params["roll_strength"] = tune.randint(0, 2)  # either 0 or 1
+        augmentation_params["num_augmentations"] = tune.randint(
+            0,
+            len(augmentation_dict()),
+        )
+    else:
+        augmentation_params = {
+            f"{aug_name}_strength": 0 for aug_name in augmentation_dict()
+        }
+        augmentation_params["num_augmentations"] = 0
 
     model_params = {
         "ecg_length": tune.qrandint(1250, 5000, 250),
