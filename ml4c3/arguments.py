@@ -796,7 +796,8 @@ def parse_args() -> argparse.Namespace:
         type=int,
         help="Number of concurrent workers to use for hyperoptimization. "
         "If hyperoptimization requires GPUs, the number of workers should not "
-        "exceed the number of GPUs available through docker.",
+        "exceed the number of GPUs available through docker. By default, the number "
+        "of workers is set to the number of available GPUs.",
     )
 
     # Explore arguments

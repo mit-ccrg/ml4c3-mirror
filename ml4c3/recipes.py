@@ -223,10 +223,10 @@ def train_model(args: argparse.Namespace) -> Dict[str, float]:
     )
     performance_metrics = {}
     performance_metrics.update(
-        {f"train_{key}": value for key, value in train_results.items()},
+        {f"auc_train_{key}": value for key, value in train_results.items()},
     )
     performance_metrics.update(
-        {f"test_{key}": value for key, value in test_results.items()},
+        {f"auc_test_{key}": value for key, value in test_results.items()},
     )
     return performance_metrics
 
