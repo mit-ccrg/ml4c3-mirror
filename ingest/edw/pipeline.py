@@ -141,7 +141,8 @@ def _get_mrns_csns_at_destination(
             else:
                 # Remove the parent_dir prefix to just get '/mrn/csn'
                 csn_dir = csn_dir.replace(edw_dir, "")
-                _, mrn, csn = csn_dir.split("/")
+                mrn, csn = csn_dir.split("/")[-2:]
+
                 mrns.append(mrn)
                 csns.append(csn)
         except FileNotFoundError:

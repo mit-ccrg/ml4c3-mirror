@@ -2,11 +2,11 @@
 SELECT DISTINCT
     t4.PatientIdentityID as MRN
     ,t6.LinkCSNID as PatientEncounterID
+    ,t4.PatientID
     ,t7.DepartmentDSC
-    --,t1.ProcedureNM
-    --,t3.BeginDTS
-    --,t3.EndDTS
-    --,t3.ProgressDSC
+    ,t1.ProcedureNM as NameNM
+    ,t3.BeginDTS as DateDTS
+    ,t3.CaseNM as CommentTXT
 FROM
     [Epic].[Surgery].[Procedure_MGH] t1
     inner join [Epic].[Surgery].[CaseAllProcedure_MGH] t2 on (t1.ProcedureID = t2.ProcedureID)
@@ -28,14 +28,16 @@ UNION
 (SELECT DISTINCT
     t3.PatientIdentityID as MRN
     ,t2.PatientEncounterID
+    ,t2.PatientID
     ,t1.DepartmentDSC
-    --,t1.EventNM
-    --,t1.EventDTS
+    ,t1.EventNM as NameNM
+    ,t1.EventDTS as DateDTS
+    ,t1.EventCommentTXT as CommentTXT
 FROM
     [Epic].[Clinical].[EDEvent_MGH] t1
     join [Epic].[Clinical].[EDPatient_MGH] t2 on (t1.EventID = t2.EventID)
     join [Epic].[Patient].[Identity_MGH] t3   on (t2.PatientID = t3.PatientID)
-    --join [Epic].[Reference].[Department] t4   on (t1.DepartmentID = t4.DepartmentID)
+    join [Epic].[Reference].[Department] t4   on (t1.DepartmentID = t4.DepartmentID)
 WHERE
     t1.EventDTS > '2016-04-02 00:00:00.0000000'
     and t1.EventTypeCD in
@@ -43,26 +45,6 @@ WHERE
         '34380'  -- Code Start
         ,'34370' -- Rapid Response Start
         )
-    and t1.DepartmentID in
-        (
-        10020010634  -- MGH ELLISON 8 CARDSURG
-        ,10020010624 -- MGH ELLISON 10 STP DWN
-        ,10020010625 -- MGH ELLISON 11 CARD\INT
-        ,10020010635 -- MGH ELLISON 9 MED\CCU
-        ,10020010623 -- MGH BLAKE 8 CARD SICU
-        )
     and t3.IdentityTypeID = 67
-    --and t4.RevenueLocationID = '1002001' -- MGH Main Campus
-)
-UNION
-(SELECT DISTINCT
-    t2.PatientIdentityID as MRN
-    ,t1.PatientEncounterID
-    ,t1.DepartmentDSC
-FROM
-    Epic.Encounter.ADT_MGH t1
-    left join Epic.Patient.Identity_MGH t2 on (t1.PatientID=t2.PatientID)
-WHERE
-    t2.IdentityTypeID = 67
-    and t1.DepartmentID = '10020010623' -- MGH BLAKE 8 CARD SICU
+    and t4.RevenueLocationID = '1002001' -- MGH Main Campus
 )
