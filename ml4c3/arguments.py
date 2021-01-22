@@ -1026,29 +1026,103 @@ def parse_args() -> argparse.Namespace:
     )
 
     # Visualizer parser
-    visualizer_parser = subparser.add_parser(
-        name="visualize",
-        description="Start a web server to visualize the generated "
-        "HD5 files on the given directory.",
-        parents=[io_parser, run_parser],
-    )
-    visualizer_parser.add_argument(
+    ui_parser = argparse.ArgumentParser(add_help=False)
+    ui_parser.add_argument(
         "--port",
         "-p",
-        default="8050",
+        default="8888",
         help="Specify the port where the server will run. Default: 8050",
     )
-    visualizer_parser.add_argument(
+    ui_parser.add_argument(
         "--address",
         "-a",
         default="0.0.0.0",
         help="Specify the address where the server will run. "
         "Default: 0.0.0.0 (localhost)",
     )
+
+    visualizer_parser = subparser.add_parser(
+        name="visualize",
+        description="Start a web server to visualize the generated "
+        "HD5 files on the given directory.",
+        parents=[io_parser, run_parser, ui_parser],
+    )
     visualizer_parser.add_argument(
         "--options_file",
         "-o",
         help="YAML file with options for the visualizer. Default: None",
+    )
+
+    # Clustering parser
+    clustering_parser = subparser.add_parser(
+        name="cluster",
+        description="Start a web server to execute and visualize clusters",
+    )
+    clustering_subparsers = clustering_parser.add_subparsers(dest="cluster_mode")
+    cluster_ui_parser = clustering_subparsers.add_parser(
+        name="ui",
+        description="Start a web server to execute and visualize clusters",
+        parents=[io_parser, run_parser, ui_parser],
+    )
+
+    find_parser = clustering_subparsers.add_parser(
+        name="finder",
+        description="Generate a csv with the signals",
+        parents=[io_parser, run_parser],
+    )
+    find_parser.add_argument(
+        "--max_stay_length",
+        "-l",
+        type=int,
+        default=12,
+        help="Maximum stay length",
+    )
+    find_parser.add_argument(
+        "--csv_name",
+        "-o",
+        default="files",
+        help="Name of the output csv file with the signals",
+    )
+    find_parser.add_argument(
+        "--signals",
+        "-s",
+        nargs="+",
+        default=[],
+        help="Signals to be used",
+    )
+    find_parser.add_argument(
+        "--cell_value",
+        "-c",
+        default="overlap_length",
+        choices=[
+            "existence",
+            "overlap_length",
+            "overlap_percent",
+            "start_time",
+            "end_time",
+            "max_unfilled",
+            "non_monotonicities",
+            "max_non_monotonicity",
+        ],
+        help="Detailed statistic for each signal.",
+    )
+
+    extract_parser = clustering_subparsers.add_parser(
+        name="extract",
+        description="Generate a csv with the signals",
+        parents=[io_parser, run_parser],
+    )
+    extract_parser.add_argument(
+        "--output_file",
+        "-o",
+        default=None,
+        help="Name of the output 'Bundle' object with the data",
+    )
+    extract_parser.add_argument(
+        "--report_path",
+        "-f",
+        help="Path to a csv listing the files and signals to extract. Generated"
+        "by the 'find' command.",
     )
 
     # Assess coverage parser

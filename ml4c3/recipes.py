@@ -42,6 +42,20 @@ def run(args: argparse.Namespace):
             from ingest.ecg.tensorizer import tensorize as tensorize_ecg  # isort: skip
             tensorize_ecg(args)
 
+        elif args.recipe == "cluster":
+            if args.cluster_mode == "ui":
+                # Imports: first party
+                from clustering.entry import cluster_ui
+                cluster_ui(args)
+            elif args.cluster_mode == "finder":
+                # Imports: first party
+                from clustering.entry import find
+                find(args)
+            elif args.cluster_mode == "extract":
+                # Imports: first party
+                from clustering.entry import extract
+                extract(args)
+
         elif args.recipe == "pull_adt":
             from ingest.edw.pipeline import pull_edw_data  # isort: skip
             pull_edw_data(args, only_adt=True)

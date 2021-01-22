@@ -10,6 +10,7 @@ setup(
     install_requires=[],
     packages=find_packages(),
     package_data={
+        "clustering": ["ui/assets/*"],
         "visualizer": ["*", "assets/*"],
         "ingest": ["edw/queries-pipeline/*"],
     },
