@@ -516,6 +516,34 @@ def make_multimodal_multitask_model(
     if model_file is not None:
         logging.info(f"Attempting to load model file from: {model_file}")
         m = load_model(model_file, custom_objects=custom_dict, compile=False)
+        if remap_layer:
+            for old_layer_name, new_layer_name in remap_layer.items():
+                try:
+                    # rename layer
+                    layer = m.get_layer(old_layer_name)
+                    layer._name = new_layer_name
+
+                    # rename if input
+                    for i in m.inputs:
+                        if old_layer_name in i.name:
+                            i._name = i.name.replace(old_layer_name, new_layer_name)
+                            m.input_names = [
+                                new_layer_name if i_name == old_layer_name else i_name
+                                for i_name in m.input_names
+                            ]
+
+                    # rename if output
+                    for o in m.outputs:
+                        if old_layer_name in o.name:
+                            o._name = o.name.replace(old_layer_name, new_layer_name)
+                            m.output_names = [
+                                new_layer_name if o_name == old_layer_name else o_name
+                                for o_name in m.output_names
+                            ]
+                except ValueError:
+                    logging.warning(
+                        f"Could not remap layer {old_layer_name}, layer not found",
+                    )
         m.compile(optimizer=opt, loss=custom_dict["loss"])
         m.summary()
         logging.info(f"Loaded model file from: {model_file}")
