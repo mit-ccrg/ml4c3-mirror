@@ -57,6 +57,11 @@ def compute_feature(
             values = tm.tensor_from_file(tm, hd5, visits=visit, **kwargs)[0][indices]
 
         values = values[~np.isnan(values)]
+        if feature.endswith("_last_values"):
+            number_of_samples = int(feature.split("_")[0])
+            values = values[-number_of_samples:]
+            while feature != "count" and values.size < number_of_samples:
+                values = np.append(np.nan, values)
         if feature == "count":
             tensor = values.size
         elif values.size == 0:

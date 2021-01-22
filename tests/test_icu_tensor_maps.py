@@ -599,17 +599,18 @@ def test_around_event_tmaps(hd5_data: TEST_DATA):
     time_array = measurements[0]["blood_pressure"].time
 
     tm1 = get_around_tmap(
-        "blood_pressure_systolic_value_3_to_6_hrs_pre_arrest_start_date",
+        "blood_pressure_systolic_value_3_hrs_pre_arrest_start_date_3_hrs_window",
     )
     tm2 = get_around_tmap(
-        "blood_pressure_systolic_value_3_and_6_hrs_pre_arrest_start_date_2_hrs_window",
+        "blood_pressure_systolic_value_3_hrs_pre_arrest_start_date_6_hrs_pre_"
+        "arrest_start_date_2_hrs_window",
     )
     tm3 = get_around_tmap(
-        "blood_pressure_systolic_timeseries_3_to_6_hrs_pre_arrest_start_date",
+        "blood_pressure_systolic_timeseries_3_hrs_pre_arrest_start_date_3_hrs_window",
     )
     tm4 = get_around_tmap(
-        "blood_pressure_systolic_timeseries_3_and_6_hrs_pre_arrest_start_date_"
-        "2_hrs_window",
+        "blood_pressure_systolic_timeseries_3_hrs_pre_arrest_start_date_6_hrs_pre_"
+        "arrest_start_date_2_hrs_window",
     )
 
     tensor1 = tm1.tensor_from_file(tm1, hd5)
@@ -673,7 +674,7 @@ def test_sliding_window_tmaps(hd5_data: TEST_DATA):
     )
     tm2 = get_around_tmap(
         f"{window}_hrs_sliding_window_admin_date_to_arrest_start_date"
-        f"_{step}_hrs_step_12_hrs_prediction",
+        f"_{step}_hrs_step_12_hrs_prediction_2_hrs_gap",
     )
     tensor1 = tm1.tensor_from_file(tm1, hd5)
     tensor2 = tm2.tensor_from_file(tm2, hd5)
@@ -698,18 +699,19 @@ def test_signal_metrics_tmaps(hd5_data: TEST_DATA):
     time_array = measurements[0]["blood_pressure"].time
 
     tm1 = get_around_tmap(
-        "blood_pressure_systolic_value_3_to_6_hrs_pre_arrest_start_date_max",
+        "blood_pressure_systolic_value_3_hrs_pre_arrest_start_date_3_hrs_window_max",
     )
     tm2 = get_around_tmap(
-        "blood_pressure_systolic_value_3_and_6_hrs_pre_arrest_start_date_2_hrs"
-        "_window_mean",
+        "blood_pressure_systolic_value_3_hrs_pre_arrest_start_date_6_hrs_pre_"
+        "arrest_start_date_2_hrs_window_mean",
     )
     tm3 = get_around_tmap(
-        "blood_pressure_systolic_timeseries_3_to_6_hrs_pre_arrest_start_date_median",
+        "blood_pressure_systolic_timeseries_3_hrs_pre_arrest_start_date_3_hrs_"
+        "window_median",
     )
     tm4 = get_around_tmap(
-        "blood_pressure_systolic_timeseries_3_and_6_hrs_pre_arrest_start_date_"
-        "2_hrs_window_last",
+        "blood_pressure_systolic_timeseries_3_hrs_pre_arrest_start_date_6_hrs_pre_"
+        "arrest_start_date_2_hrs_window_last",
     )
 
     tensor1 = tm1.tensor_from_file(tm1, hd5)
