@@ -125,22 +125,19 @@ def stage_edw_files(
 def stage_bedmaster_files(
     staging_dir: str,
     xref: str,
-    bedmaster: str,
 ):
     """
     Find Bedmaster files and copy them to local folder.
 
     :param staging_dir: <str> Path to temporary staging directory.
     :param xref: <str> Path to xref.csv with Bedmaster metadata.
-    :param bedmaster: <str> Path to directory with department subdirectories
-           that contain Bedmaster .mat files.
     """
     path_patients = os.path.join(staging_dir, "patients.csv")
     mrns_and_csns = pd.read_csv(path_patients)
     mrns = mrns_and_csns["MRN"].drop_duplicates()
 
-    xref = pd.read_csv(xref).sort_values(by=["MRN"], ascending=True)
-    xref_subset = xref[xref["MRN"].isin(mrns)]
+    xref_df = pd.read_csv(xref).sort_values(by=["MRN"], ascending=True)
+    xref_subset = xref_df[xref_df["MRN"].isin(mrns)]
 
     # Iterate over all Bedmaster file paths to copy to staging directory
     path_destination_dir = os.path.join(staging_dir, "bedmaster_temp")

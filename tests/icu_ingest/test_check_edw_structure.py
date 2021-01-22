@@ -7,7 +7,7 @@ import unittest.mock
 import pytest
 
 # Imports: first party
-from ingest.icu.check_structure import EDWChecker
+from tensorize.edw.check_structure import EDWChecker
 
 
 def get_edw_checker(directory: str) -> EDWChecker:

@@ -499,7 +499,7 @@ class FakeSignal:
         starting_time = int(time())
         meds_list = [
             "aspirin_325_mg_tablet",
-            "cefazolin_2_gram|50_ml_in_dextrose_(iso-osmotic)_intravenous_piggyback",
+            "cefazolin_2_gram|50_ml_in_dextrose_iso-osmotic_intravenous_piggyback",
             "lactated_ringers_iv_bolus",
             "norepinephrine_infusion_syringe_in_swfi_80_mcg|ml_cmpd_central_mgh",
             "sodium_chloride_0.9_%_intravenous_solution",
@@ -733,7 +733,7 @@ def testing_tmaps() -> Dict[str, Dict[str, TensorMap]]:
     }
     meds_tmap_test_names = [
         "aspirin_325_mg_tablet",
-        "cefazolin_2_gram|50_ml_in_dextrose_(iso-osmotic)_intravenous_piggyback",
+        "cefazolin_2_gram|50_ml_in_dextrose_iso-osmotic_intravenous_piggyback",
         "lactated_ringers_iv_bolus",
         "norepinephrine_infusion_syringe_in_swfi_80_mcg|ml_cmpd_central_mgh",
         "sodium_chloride_0.9_%_intravenous_solution",

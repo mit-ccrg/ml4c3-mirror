@@ -1,12 +1,17 @@
 # Imports: standard library
 import logging
+from typing import Union
 
 # Imports: third party
 import h5py
 import numpy as np
 
 # Imports: first party
-from ingest.icu.data_objects import EDWType, StaticData, BedmasterType, ICUDataObject
+from tensorize.bedmaster.data_objects import (
+    BedmasterType,
+    ICUDiscreteData,
+    ICUContinuousData,
+)
 
 # pylint: disable=too-many-branches
 
@@ -14,12 +19,15 @@ from ingest.icu.data_objects import EDWType, StaticData, BedmasterType, ICUDataO
 class Writer(h5py.File):
     """
     Class used to write the signals into the final HD5 file.
+
     This class is a Wrapper around h5py.File. Thanks to that,
     it can be used with python's 'with' as in the example.
+
     >>> with Writer('output_file.hd5') as writer:
         do something
 
     The structure of the output file will be:
+
     <bedmaster>
         <visitID>/
             <signal name>/
@@ -36,20 +44,22 @@ class Writer(h5py.File):
     """
 
     bedmaster_dir = "bedmaster"
-    edw_dir = "edw"
 
-    def __init__(self, output_file: str, visit_id: str = None):
+    def __init__(
+        self,
+        output_file: str,
+        visit_id: str = None,
+    ):
         """
         Inherits from h5py.File to profit its features.
 
         :param output_file: <str> name of the output file.
         :param visit_id: <str> the visit ID of te data that will be logged.
-               If None, it has to be set using set_visit_id(visit_id)
-               before writing on the HD5
+                        If None, it has to be set using set_visit_id(visit_id)
+                        before writing on the HD5
         """
         super().__init__(output_file, "w")
         self.create_group(self.bedmaster_dir)
-        self.create_group(self.edw_dir)
         self.visit_id = visit_id
         if visit_id:
             self.set_visit_id(visit_id)
@@ -65,40 +75,18 @@ class Writer(h5py.File):
         """
         self.visit_id = visit_id
         self[self.bedmaster_dir].create_group(visit_id)
-        self[self.edw_dir].create_group(visit_id)
 
-    def write_completed_flag(self, source: str, flag: bool):
+    def write_completed_flag(self, flag: bool):
         """
         Write a flag indicating if all the data from the specified source had
         been tensorized.
 
-        :param source: <str> Data source: "bedmaster" or "edw".
         :param flag: <bool> Bool indicating if the tensorization for the specified
-               data source is finished.
+                     data source is finished.
         """
-        if source == "bedmaster":
-            source = self.bedmaster_dir
-        elif source == "edw":
-            source = self.edw_dir
-        self[source].attrs["completed"] = flag
+        self[self.bedmaster_dir].attrs["completed"] = flag
 
-    def write_static_data(self, static_data: StaticData):
-        """
-        Write the static information on the correct spot on the HD5.
-
-        :param static_data: <StaticData> the static data to be written.
-        """
-        # Check that the visitID has been set
-        if not self.visit_id:
-            raise ValueError("Visit ID not found. Please, check that you have set one.")
-
-        static_group = self[self.edw_dir][self.visit_id]
-
-        for field in dir(static_data):
-            if not field.startswith("_"):
-                static_group.attrs[field] = getattr(static_data, field)
-
-    def write_signal(self, signal: ICUDataObject):
+    def write_signal(self, signal: Union[ICUContinuousData, ICUDiscreteData]):
         """
         Writer for generic fields that all the data share.
         """
@@ -113,16 +101,12 @@ class Writer(h5py.File):
         signal_name = signal_name.replace("(", "").replace(")", "")
 
         if isinstance(signal, BedmasterType):
-            if "alarms" in signal.source:
-                pass
-            elif signal.value.size == 0 or signal.time.size == 0:
+            if signal.value.size == 0 or signal.time.size == 0:
                 logging.info(
                     f"Signal {signal.name} not written: time or value is empty",
                 )
                 return
             source = self.bedmaster_dir
-        elif isinstance(signal, EDWType):
-            source = self.edw_dir
         else:
             raise ValueError(f"Source {signal} not recognized")
 
@@ -146,9 +130,6 @@ class Writer(h5py.File):
                 for field, value in metadata.items():
                     self.write_new_data(meta_dir, field, value)
         else:  # Concatenate data into existing signal (just for Bedmaster)
-            if source == self.edw_dir:
-                raise ValueError(f"EDW signal {signal} already exists")
-
             signal_dir = base_dir[signal_name]
             current_length = signal_dir["value"].size
             for field, value in signal.__dict__.items():

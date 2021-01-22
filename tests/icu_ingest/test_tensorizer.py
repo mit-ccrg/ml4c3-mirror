@@ -88,7 +88,7 @@ def test_tensorizer(
             "med": [
                 "aspirin_325_mg_tablet",
                 (
-                    "cefazolin_2_gram|50_ml_in_dextrose_(iso-osmotic)_"
+                    "cefazolin_2_gram|50_ml_in_dextrose_iso-osmotic_"
                     "intravenous_piggyback"
                 ),
                 "lactated_ringers_iv_bolus",

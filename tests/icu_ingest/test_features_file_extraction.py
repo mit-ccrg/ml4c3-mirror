@@ -5,8 +5,8 @@ from typing import Dict, List, Tuple, Union
 import h5py
 
 # Imports: first party
-from ingest.icu.data_objects import ICUDataObject
-from ingest.icu.ecg_features_extraction import ECGFeatureFileExtractor
+from tensorize.bedmaster.data_objects import ICUDataObject
+from tensorize.bedmaster.ecg_features_extraction import ECGFeatureFileExtractor
 
 # pylint: disable=unused-argument
 # hd5_data fixture is needed to write the data file this test inspects

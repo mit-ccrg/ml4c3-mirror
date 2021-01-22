@@ -327,6 +327,20 @@ def parse_args() -> argparse.Namespace:
         parents=[run_parser, io_parser, icu_parser],
     )
 
+    # EDW tensorization
+    edw_tensorization_parser = subparser.add_parser(
+        name="tensorize_edw",
+        description="TODO",
+        parents=[run_parser, io_parser, icu_parser],
+    )
+
+    # Bedmaster tensorization
+    bedmaster_tensorization_parser = subparser.add_parser(
+        name="tensorize_bedmaster",
+        description="TODO",
+        parents=[run_parser, io_parser, icu_parser],
+    )
+
     # Model Architecture Parameters
     model_parser = argparse.ArgumentParser(add_help=False)
     model_parser.add_argument(
@@ -956,24 +970,18 @@ def parse_args() -> argparse.Namespace:
         ),
     )
 
-    # Check structure parser
-    check_structure_parser = subparser.add_parser(
-        "check_structure",
-        description="Verify EDW and Bedmaster files and directories structure "
-        "before tensorizing.",
+    # Check EDW structure parser
+    check_edw_structure_parser = subparser.add_parser(
+        "check_edw_structure",
+        description="Verify EDW files and directories structure " "before tensorizing.",
         parents=[icu_parser],
     )
-    check_structure_parser.add_argument(
-        "--check_edw",
-        action="store_true",
-        help="If this parameter is set, the EDW files and directory structure "
-        "are verified.",
-    )
-    check_structure_parser.add_argument(
-        "--check_bedmaster",
-        action="store_true",
-        help="If this parameter is set, the Bedmaster files and directory "
-        "structure are verified.",
+    # Check Bedmaster structure parser
+    check_bedmaster_structure_parser = subparser.add_parser(
+        "check_bedmaster_structure",
+        description="Verify Bedmaster files and directories structure "
+        "before tensorizing.",
+        parents=[icu_parser],
     )
 
     # Match patient parser
@@ -1144,12 +1152,12 @@ def _load_tensor_maps(args: argparse.Namespace):
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
 
-    from tensormap.TensorMap import update_tmaps  # isort: skip
+    from tensormap.TensorMap import TensorMap, update_tmaps  # isort: skip
 
     needed_tmaps_names = args.input_tensors + args.output_tensors
 
     # Update dict of tmaps to include all needed tmaps
-    tmaps = {}
+    tmaps: Dict[str, TensorMap] = {}
     for tmap_name in needed_tmaps_names:
         tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
 

@@ -11,12 +11,16 @@ import pandas as pd
 from ml4c3.utils import get_unix_timestamps
 from definitions.edw import EDW_FILES
 from definitions.icu import BEDMASTER_EXT, MAPPING_DEPARTMENTS
-from ingest.icu.utils import get_files_in_directory
+from tensorize.utils import get_files_in_directory
 
 # pylint: disable=too-many-branches, line-too-long
 
 
 class PatientBedmasterMatcher:
+    """
+    Match Bedmaster files with patient's MRN and EncounterID using ADT table.
+    """
+
     def __init__(
         self,
         bedmaster: str,
@@ -24,7 +28,7 @@ class PatientBedmasterMatcher:
         desired_departments: List[str] = None,
     ):
         """
-        Init Patient Bedmaster matcher.
+        Init Patient Bedmaster Matcher.
 
         :param bedmaster: <str> Directory containing all the Bedmaster files.
         :param adt: <str> Path to ADT table.

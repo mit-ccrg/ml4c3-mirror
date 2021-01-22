@@ -14,7 +14,7 @@ from ml4c3.utils import get_unix_timestamps
 from definitions.edw import EDW_FILES
 from definitions.icu import MAPPING_DEPARTMENTS
 from tensormap.icu_signals import get_tmap as GET_SIGNAL_TMAP
-from ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
+from tensorize.bedmaster.match_patient_bedmaster import PatientBedmasterMatcher
 
 EXPECTED_FILES = []
 for file_type in EDW_FILES:
@@ -313,9 +313,9 @@ class ICUCoverageAssesser:
             adt=os.path.join(self.output_dir, "adt.csv"),
             desired_departments=matching_depts,
         )
-        xref_str = os.path.join(self.output_dir, "xref.csv")
+        path_xref = os.path.join(self.output_dir, "xref.csv")
         bedmaster_matcher.match_files(
-            xref=xref_str,
+            xref=path_xref,
         )
 
         # Initialize empty table
@@ -335,7 +335,7 @@ class ICUCoverageAssesser:
         # Iterate through departments
         for department in departments:
             cohort = pd.read_csv(self.cohort_path)
-            xref = pd.read_csv(xref_str)
+            xref = pd.read_csv(path_xref)
             xref = xref.dropna(subset=["MRN", "PatientEncounterID"])
 
             if time_column and event_column:

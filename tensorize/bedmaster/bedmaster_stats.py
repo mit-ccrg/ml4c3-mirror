@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 # Imports: first party
-from ingest.icu.data_objects import BedmasterSignal
+from tensorize.bedmaster.data_objects import BedmasterSignal
 
 
 class BedmasterStats:

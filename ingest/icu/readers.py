@@ -26,8 +26,8 @@ from ingest.icu.data_objects import (
     BedmasterAlarm,
     BedmasterSignal,
 )
-from ingest.icu.bedmaster_stats import BedmasterStats
-from ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
+from tensorize.bedmaster.bedmaster_stats import BedmasterStats
+from tensorize.bedmaster.match_patient_bedmaster import PatientBedmasterMatcher
 
 # pylint: disable=too-many-branches, dangerous-default-value
 
@@ -55,7 +55,7 @@ class Reader(ABC):
             try:
                 data = np.ascontiguousarray(data, dtype=dtype)
             except (UnicodeEncodeError, SystemError):
-                logging.info("Uknown character. Not ensuring contiguous array.")
+                logging.info("Unknown character. Not ensuring contiguous array.")
                 new_data = []
                 for element in data:
                     new_data.append(unidecode.unidecode(str(element)))
@@ -1586,6 +1586,7 @@ class CrossReferencer:
             for folder in os.listdir(self.edw_dir)
             if os.path.isdir(os.path.join(self.edw_dir, folder))
         ]
+
         if mrns:
             xref = xref[xref["MRN"].isin(mrns)]
             edw_mrns = [ele for ele in edw_mrns if ele in mrns]

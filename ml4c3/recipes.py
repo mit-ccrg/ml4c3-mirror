@@ -14,7 +14,7 @@ import numpy as np
 from ml4c3.arguments import parse_args
 from definitions.globals import MODEL_EXT
 
-# pylint: disable=redefined-outer-name, broad-except
+# pylint: disable=redefined-outer-name, broad-except, import-outside-toplevel
 
 
 def run(args: argparse.Namespace):
@@ -60,6 +60,14 @@ def run(args: argparse.Namespace):
             pull_edw_data(args)
             tensorize_icu(args)
 
+        elif args.recipe == "tensorize_edw":
+            from tensorize.edw.tensorizer import tensorize as tensorize_edw  # isort: skip, pylint: disable=line-too-long
+            tensorize_edw(args)
+
+        elif args.recipe == "tensorize_bedmaster":
+            from tensorize.bedmaster.tensorizer import tensorize as tensorize_bedmaster  # isort: skip, pylint: disable=line-too-long
+            tensorize_bedmaster(args)
+
         elif args.recipe == "explore":
             from ml4c3.explorations import explore  # isort: skip
             explore(args=args, disable_saving_output=args.explore_disable_saving_output)
@@ -70,20 +78,25 @@ def run(args: argparse.Namespace):
 
         elif args.recipe == "build":
             build_multimodal_multitask(args)
+
         elif args.recipe == "assess_coverage":
             from ingest.icu.assess_coverage import assess_coverage  # isort: skip
             assess_coverage(args)
 
-        elif args.recipe == "check_icu_structure":
-            from ingest.icu.check_structure import check_icu_structure  # isort: skip
-            check_icu_structure(args)
+        elif args.recipe == "check_edw_structure":
+            from tensorize.edw.check_structure import check_edw_structure  # isort: skip
+            check_edw_structure(args)
+
+        elif args.recipe == "check_bedmaster_structure":
+            from tensorize.bedmaster.check_structure import check_bedmaster_structure  # isort: skip, pylint: disable=line-too-long
+            check_bedmaster_structure(args)
 
         elif args.recipe == "pre_tensorize_explore":
-            from ingest.icu.pre_tensorize_explorations import pre_tensorize_explore  # isort: skip
+            from ingest.icu.pre_tensorize_explorations import pre_tensorize_explore  # isort: skip, pylint: disable=line-too-long
             pre_tensorize_explore(args)
 
         elif args.recipe == "match_patient_bedmaster":
-            from ingest.icu.match_patient_bedmaster import match_data  # isort: skip
+            from tensorize.bedmaster.match_patient_bedmaster import match_data  # isort: skip, pylint: disable=line-too-long
             match_data(args)
 
         elif args.recipe == "visualize":
@@ -91,7 +104,7 @@ def run(args: argparse.Namespace):
             run_visualizer(args)
 
         elif args.recipe == "extract_ecg_features":
-            from ingest.icu.ecg_features_extraction import extract_ecg_features  # isort: skip
+            from tensorize.bedmaster.ecg_features_extraction import extract_ecg_features  # isort: skip, pylint: disable=line-too-long
             extract_ecg_features(args)
 
         else:

@@ -3,13 +3,12 @@ import os
 from typing import List, Optional
 
 # Imports: third party
-import numpy as np
 import pandas as pd
 import pytest
 
 # Imports: first party
 # pylint: disable=no-member
-from ingest.icu.match_patient_bedmaster import PatientBedmasterMatcher
+from tensorize.bedmaster.match_patient_bedmaster import PatientBedmasterMatcher
 
 
 def get_patient_bedmaster_matcher(

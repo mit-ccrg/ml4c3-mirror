@@ -9,7 +9,7 @@ import pytest
 
 # Imports: first party
 from definitions.icu import MAPPING_DEPARTMENTS
-from ingest.icu.check_structure import BedmasterChecker
+from tensorize.bedmaster.check_structure import BedmasterChecker
 
 DEPARTMENTS = set()
 for department in MAPPING_DEPARTMENTS:
