@@ -664,8 +664,15 @@ def test_sliding_window_tmaps(hd5_data: TEST_DATA):
 
     step = 200
     window = 50
+    buffer_adm_time = 24
     num_of_windows = (
-        int((event_time - window * 60 * 60 - admin_date) / 60 / 60 / step) + 1
+        int(
+            (event_time - (buffer_adm_time + window) * 60 * 60 - admin_date)
+            / 60
+            / 60
+            / step
+        )
+        + 1
     )
 
     tm1 = get_around_tmap(
