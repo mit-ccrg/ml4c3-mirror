@@ -398,7 +398,7 @@ def explore(
         windows = ["all"]
     else:
         if use_time:
-            title = title.replace(" ", "_")
+            title = title.replace(" ", "-")
             dfs.append(df_aggregated)
             windows.append("all_windows")
         else:

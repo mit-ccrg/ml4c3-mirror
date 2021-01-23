@@ -156,12 +156,12 @@ def predict_and_evaluate(
                 for cm, idx in tm.channel_map.items():
                     if idx == negative_label_idx:
                         continue
-                    save_data[f"{tm.name}_{cm}_actual"] = y_actual[..., idx]
-                    save_data[f"{tm.name}_{cm}_predicted"] = y_prediction[..., idx]
+                    save_data[f"{tm.name}-{cm}-truth"] = y_actual[..., idx]
+                    save_data[f"{tm.name}-{cm}-predicted"] = y_prediction[..., idx]
             else:
-                save_data[f"{tm.name}_actual"] = y_actual.flatten()
-                save_data[f"{tm.name}_predicted"] = y_prediction.flatten()
-        path = os.path.join(plot_path, f"predictions_{data_split}{CSV_EXT}")
+                save_data[f"{tm.name}-truth"] = y_actual.flatten()
+                save_data[f"{tm.name}-predicted"] = y_prediction.flatten()
+        path = os.path.join(plot_path, f"predictions-{data_split}{CSV_EXT}")
         pd.DataFrame(save_data).round(6).to_csv(path, index=False)
         logging.info(f"Saved predictions at: {path}")
 

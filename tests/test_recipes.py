@@ -24,7 +24,7 @@ class TestRecipes:
         infer_multimodal_multitask(default_arguments_infer)
         path = os.path.join(
             default_arguments_infer.output_folder,
-            "predictions_test.csv",
+            "predictions-test.csv",
         )
         predictions = pd.read_csv(path)
         test_samples = pd.read_csv(

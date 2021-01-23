@@ -1243,8 +1243,8 @@ def _load_tensor_maps(args: argparse.Namespace):
 
 
 def _setup_arg_file(args: argparse.Namespace):
-    now_string = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
-    args_file = os.path.join(args.output_folder, "arguments_" + now_string + ".txt")
+    now_string = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
+    args_file = os.path.join(args.output_folder, "arguments-" + now_string + ".txt")
     command_line = f"\n./scripts/run.sh {' '.join(sys.argv)}\n"
 
     if not os.path.exists(os.path.dirname(args_file)):
@@ -1258,7 +1258,7 @@ def _setup_arg_file(args: argparse.Namespace):
     load_config(
         log_level=args.logging_level,
         log_dir=args.output_folder,
-        log_file_basename="log_" + now_string,
+        log_file_basename="log-" + now_string,
     )
     logging.info(f"Command line was: {command_line}")
 
@@ -1278,6 +1278,11 @@ def _process_args(args: argparse.Namespace):
                     f"instead got: {tensor}",
                 )
         args.tensors = tensors if len(tensors) > 1 else tensors[0]
+
+    # If infer recipe, set default args
+    if args.recipe == "infer":
+        args.batch_size = 256
+        args.optimizer = "adam"
 
     if "bottleneck_type" in args:
         args.bottleneck_type = BOTTLENECK_STR_TO_ENUM[args.bottleneck_type]

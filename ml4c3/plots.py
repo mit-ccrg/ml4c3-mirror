@@ -287,7 +287,7 @@ def plot_prediction_calibration(
 
     figure_path = os.path.join(
         prefix,
-        "calibrations_" + title + "_" + data_split + image_ext,
+        "calibrations-" + title + "-" + data_split + image_ext,
     )
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))

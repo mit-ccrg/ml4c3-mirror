@@ -178,7 +178,7 @@ def per_class_recall(labels):
     recall_fxns = []
     for label_key in labels:
         label_idx = labels[label_key]
-        fxn_name = label_key.replace("-", "_").replace(" ", "_")
+        fxn_name = label_key.replace(" ", "-")
         string_fxn = "def " + fxn_name + "_recall(y_true, y_pred):\n"
         string_fxn += (
             "\ttrue_positives = K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0)\n"
@@ -206,7 +206,7 @@ def per_class_precision(labels):
 
     for label_key in labels:
         label_idx = labels[label_key]
-        fxn_name = label_key.replace("-", "_").replace(" ", "_")
+        fxn_name = label_key.replace(" ", "-")
         string_fxn = "def " + fxn_name + "_precision(y_true, y_pred):\n"
         string_fxn += (
             "\ttrue_positives = K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0)\n"
@@ -234,7 +234,7 @@ def per_class_recall_3d(labels):
 
     for label_key in labels:
         label_idx = labels[label_key]
-        fxn_prefix = label_key.replace("-", "_").replace(" ", "_")
+        fxn_prefix = label_key.replace(" ", "-")
         string_fxn = "def " + fxn_prefix + "_recall(y_true, y_pred):\n"
         string_fxn += (
             "\ttrue_positives = K.sum(K.sum(K.round(K.clip(y_true*y_pred, 0, 1)),"
@@ -264,7 +264,7 @@ def per_class_precision_3d(labels):
 
     for label_key in labels:
         label_idx = labels[label_key]
-        fxn_prefix = label_key.replace("-", "_").replace(" ", "_")
+        fxn_prefix = label_key.replace(" ", "-")
         string_fxn = "def " + fxn_prefix + "_precision(y_true, y_pred):\n"
         string_fxn += (
             "\ttrue_positives = K.sum(K.sum(K.round(K.clip(y_true*y_pred, 0, 1)),"
@@ -294,7 +294,7 @@ def per_class_recall_4d(labels):
 
     for label_key in labels:
         label_idx = labels[label_key]
-        fxn_prefix = label_key.replace("-", "_").replace(" ", "_")
+        fxn_prefix = label_key.replace(" ", "-")
         string_fxn = "def " + fxn_prefix + "_recall(y_true, y_pred):\n"
         string_fxn += (
             "\ttrue_positives = K.sum(K.sum(K.sum(K.round(K.clip(y_true*y_pred, 0, 1)),"
@@ -324,7 +324,7 @@ def per_class_precision_4d(labels):
 
     for label_key in labels:
         label_idx = labels[label_key]
-        fxn_prefix = label_key.replace("-", "_").replace(" ", "_")
+        fxn_prefix = label_key.replace(" ", "-")
         string_fxn = "def " + fxn_prefix + "_precision(y_true, y_pred):\n"
         string_fxn += (
             "\ttrue_positives = K.sum(K.sum(K.sum(K.round(K.clip(y_true*y_pred, 0, 1)),"
@@ -354,7 +354,7 @@ def per_class_recall_5d(labels):
 
     for label_key in labels:
         label_idx = labels[label_key]
-        fxn_prefix = label_key.replace("-", "_").replace(" ", "_")
+        fxn_prefix = label_key.replace(" ", "-")
         string_fxn = "def " + fxn_prefix + "_recall(y_true, y_pred):\n"
         string_fxn += (
             "\ttrue_positives = K.sum(K.sum(K.sum(K.sum(K.round(K.clip(y_true*y_pred,"
@@ -384,7 +384,7 @@ def per_class_precision_5d(labels):
 
     for label_key in labels:
         label_idx = labels[label_key]
-        fxn_prefix = label_key.replace("-", "_").replace(" ", "_")
+        fxn_prefix = label_key.replace(" ", "-")
         string_fxn = "def " + fxn_prefix + "_precision(y_true, y_pred):\n"
         string_fxn += (
             "\ttrue_positives = K.sum(K.sum(K.sum(K.sum(K.round(K.clip(y_true*y_pred,"

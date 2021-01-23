@@ -670,7 +670,7 @@ def test_sliding_window_tmaps(hd5_data: TEST_DATA):
             (event_time - (buffer_adm_time + window) * 60 * 60 - admin_date)
             / 60
             / 60
-            / step
+            / step,
         )
         + 1
     )
