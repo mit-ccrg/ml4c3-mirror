@@ -147,7 +147,7 @@ def train_model_from_datasets(
     :return: The optimized model which achieved the best validation loss or training
              loss if validation data was not provided
     """
-    model_file = os.path.join(output_folder, "model_weights" + MODEL_EXT)
+    model_file = os.path.join(output_folder, "model-weights" + MODEL_EXT)
     if not os.path.exists(os.path.dirname(model_file)):
         os.makedirs(os.path.dirname(model_file))
 
