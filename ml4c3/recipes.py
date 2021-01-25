@@ -30,10 +30,13 @@ def run(args: argparse.Namespace):
             "train_sklearn_xbost",
         ]:
             train_model(args)
+
         elif args.recipe == "train_simclr":
             train_simclr_model(args)
+
         elif args.recipe == "infer":
             infer_multimodal_multitask(args)
+
         elif args.recipe == "hyperoptimize":
             from ml4c3.hyperoptimizers import hyperoptimize  # isort: skip
             hyperoptimize(args)
@@ -44,16 +47,13 @@ def run(args: argparse.Namespace):
 
         elif args.recipe == "cluster":
             if args.cluster_mode == "ui":
-                # Imports: first party
-                from clustering.entry import cluster_ui
+                from clustering.entry import cluster_ui # isort: skip
                 cluster_ui(args)
             elif args.cluster_mode == "finder":
-                # Imports: first party
-                from clustering.entry import find
+                from clustering.entry import find # isort: skip
                 find(args)
             elif args.cluster_mode == "extract":
-                # Imports: first party
-                from clustering.entry import extract
+                from clustering.entry import extract # isort: skip
                 extract(args)
 
         elif args.recipe == "pull_adt":
