@@ -507,47 +507,49 @@ def make_multimodal_multitask_model(
     **kwargs,
 ) -> Model:
     custom_dict = _get_custom_objects(tensor_maps_out)
+
+    if model_file is not None:
+        logging.info(f"Attempting to load model file from: {model_file}")
+        model = load_model(model_file, custom_objects=custom_dict)
+        if remap_layer:
+            for old_layer_name, new_layer_name in remap_layer.items():
+                try:
+                    # rename layer
+                    layer = model.get_layer(old_layer_name)
+                    layer._name = new_layer_name
+
+                    # rename if input
+                    for i in model.inputs:
+                        if old_layer_name in i.name:
+                            i._name = i.name.replace(old_layer_name, new_layer_name)
+                            model.input_names = [
+                                new_layer_name if i_name == old_layer_name else i_name
+                                for i_name in model.input_names
+                            ]
+
+                    # rename if output
+                    for o in model.outputs:
+                        if old_layer_name in o.name:
+                            o._name = o.name.replace(old_layer_name, new_layer_name)
+                            model.output_names = [
+                                new_layer_name if o_name == old_layer_name else o_name
+                                for o_name in model.output_names
+                            ]
+                except ValueError:
+                    logging.warning(
+                        f"Could not remap layer {old_layer_name}, layer not found",
+                    )
+        model.summary()
+        logging.info(f"Loaded model file from: {model_file}")
+        return model
+
+    # If we do not load a model file, specify the optimizer
     opt = get_optimizer(
         name=optimizer,
         learning_rate=learning_rate,
         learning_rate_schedule=learning_rate_schedule,
         optimizer_kwargs=kwargs.get("optimizer_kwargs"),
     )
-    if model_file is not None:
-        logging.info(f"Attempting to load model file from: {model_file}")
-        m = load_model(model_file, custom_objects=custom_dict, compile=False)
-        if remap_layer:
-            for old_layer_name, new_layer_name in remap_layer.items():
-                try:
-                    # rename layer
-                    layer = m.get_layer(old_layer_name)
-                    layer._name = new_layer_name
-
-                    # rename if input
-                    for i in m.inputs:
-                        if old_layer_name in i.name:
-                            i._name = i.name.replace(old_layer_name, new_layer_name)
-                            m.input_names = [
-                                new_layer_name if i_name == old_layer_name else i_name
-                                for i_name in m.input_names
-                            ]
-
-                    # rename if output
-                    for o in m.outputs:
-                        if old_layer_name in o.name:
-                            o._name = o.name.replace(old_layer_name, new_layer_name)
-                            m.output_names = [
-                                new_layer_name if o_name == old_layer_name else o_name
-                                for o_name in m.output_names
-                            ]
-                except ValueError:
-                    logging.warning(
-                        f"Could not remap layer {old_layer_name}, layer not found",
-                    )
-        m.compile(optimizer=opt, loss=custom_dict["loss"])
-        m.summary()
-        logging.info(f"Loaded model file from: {model_file}")
-        return m
 
     # list of filter dimensions should match the number of blocks
     conv_blocks = conv_blocks or []

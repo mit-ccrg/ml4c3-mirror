@@ -1282,7 +1282,6 @@ def _process_args(args: argparse.Namespace):
     # If infer recipe, set default args
     if args.recipe == "infer":
         args.batch_size = 256
-        args.optimizer = "adam"
 
     if "bottleneck_type" in args:
         args.bottleneck_type = BOTTLENECK_STR_TO_ENUM[args.bottleneck_type]
