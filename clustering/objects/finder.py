@@ -11,7 +11,6 @@ from matplotlib import pyplot as plt
 from tqdm.notebook import tqdm as log_progress
 
 # Imports: first party
-from clustering.globals import SIGNAL_PATHS
 from clustering.objects.structures import Bundle, HD5File
 
 
@@ -51,13 +50,13 @@ class Explorer:
                     if not hd5.visits:
                         logging.warning(f"File {file} has no visits")
                         self.report.add_row(
-                            readable=True,
+                            is_readable=True,
                             sources=hd5.sources,
                             file=file,
                         )
             except OSError:
                 logging.warning(f"File {file} could not be read")
-                self.report.add_row(readable=False)
+                self.report.add_row(is_readable=False)
 
         return self.report
 
@@ -78,7 +77,7 @@ class Explorer:
                     if not visits:
                         logging.warning(f"File {file} has no visits")
                         self.report.add_row(
-                            readable=True,
+                            is_readable=True,
                             sources=hd5.sources,
                             file=file,
                         )
@@ -95,9 +94,9 @@ class Explorer:
                                     if keyword in sig:
                                         proposed_sigs[sig] += 1
                                         logging.info(f"Found new signal!: {sig}")
-            except OSError:
+            except (OSError, KeyError):
                 logging.warning(f"File {file} could not be read")
-                self.report.add_row(readable=False)
+                self.report.add_row(is_readable=False)
 
         return proposed_sigs
 
@@ -206,7 +205,7 @@ class Explorer:
             return row
 
         results = []
-        for file in log_progress(self.files[:20], desc="Finding files..."):
+        for file in log_progress(self.files, desc="Finding files..."):
             file_path = os.path.join(self.path, file)
             logging.info(f"\t file: {file_path}")
             try:
@@ -305,7 +304,7 @@ class ExploreReport:
 
     def add_row(
         self,
-        readable: bool = False,
+        is_readable: bool = False,
         sources: Union[list, str] = "-",
         sig_type: str = "-",
         file: str = "-",
@@ -319,7 +318,7 @@ class ExploreReport:
             if "and" not in source:
                 source = f"Only {source}"
 
-        readable = "Readable" if readable else "Not readable"
+        readable = "Readable" if is_readable else "Not readable"
         self.data.append([readable, source, sig_type, file, visit, blk08])
 
     @property

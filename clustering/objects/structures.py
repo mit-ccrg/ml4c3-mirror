@@ -19,8 +19,7 @@ from tqdm.notebook import tqdm as log_progress
 # Imports: first party
 from clustering.utils import IncorrectSignalError, format_time, get_signal_type
 
-# from ml4icu.tmaps import TMAPS, Interpretation
-from clustering.globals import SIGNAL_PATHS, METADATA_MEDS
+from clustering.globals import METADATA_MEDS
 from tensormap.TensorMap import Interpretation, update_tmaps
 from clustering.objects.modifiers import (
     Padder,
@@ -33,7 +32,7 @@ from clustering.objects.modifiers import (
     DimensionsReducer,
 )
 
-TMAPS = {}
+TMAPS: Dict = {}
 
 
 def _get_tmap(key):
@@ -145,7 +144,7 @@ class HD5File(h5py.File):
         it evaluates only if the visit contains that signal type.
         """
         type_path = self.get_full_type_path(sig_type)
-        visits = [visit] if visit else self.visits()
+        visits = [visit] if visit else self.visits
         has_sig = any([type_path.replace("*", visit) in self for visit in visits])
         return has_sig
 
@@ -577,10 +576,6 @@ class Signal:
         if self.time is None or self.values is None or self.time.size == 0:
             raise ValueError(f"Signal {self.name} does not have either time or values")
         if self.time.size != self.values.size:
-            # Imports: standard library
-            import code
-
-            code.interact(local=locals())
             raise ValueError(
                 f"Signal {self.name} has different len for time ({self.time.size}) "
                 f"and values ({self.values.size})",
@@ -654,9 +649,9 @@ class Patient:
         visit=None,
         file=None,
     ):
-        if isinstance(signals, Dict):
+        if isinstance(signals, dict):
             self.signals = OrderedDict(signals)
-        elif isinstance(signals, List):
+        elif isinstance(signals, list):
             self.signals = OrderedDict({signal.name: signal for signal in signals})
         else:
             raise TypeError("signals should be either a list or a dict")
@@ -700,11 +695,10 @@ class Patient:
         ids = [ident for ident in (self.mrn, self.visit) if ident is not None]
         if len(ids) == 2:
             return f"{self.mrn} - {self.visit}"
-        elif len(ids) == 1:
+        if len(ids) == 1:
             return ids[0]
-        else:
-            rand_id = "".join(random.choice(string.digits) for _ in range(8))
-            return f"Unknown {rand_id}"
+        rand_id = "".join(random.choice(string.digits) for _ in range(8))
+        return f"Unknown {rand_id}"
 
     def time_range(self):
         any_signal = next(iter(self.signals.values()))
@@ -781,7 +775,7 @@ class Patient:
                     f"Patient {self} is being analyzed for a longer time range: "
                     f"{real_span / 3600}h than it should (max: {teoric_max_span}h)",
                 )
-            elif real_span < teoric_max_span:
+            if real_span < teoric_max_span:
                 if self.meta["BLK08 end"] != self.meta["End time"]:
                     blk08_stay = self.meta["BLK08 end"] - self.meta["BLK08 start"]
                     raise ValueError(
@@ -985,7 +979,7 @@ class Bundle:
         self.verify()
         self.processes["normalize"] = [method, kwargs]
 
-    def downsample(self, method=None, list_methods=False, n_workers=1, **kwargs):
+    def downsample(self, method=None, list_methods=False, **kwargs):
         """
         Downsamples all the signals on the bundle. Use list_methods=True for the
         list of methods available to do so.
@@ -1077,7 +1071,7 @@ class Bundle:
         return dist_matrix
 
     def distance_matrix(
-        self, method, store_path=None, list_methods=False, verbose=False, **kwargs
+        self, method=None, store_path=None, list_methods=False, verbose=False, **kwargs
     ):
         """
         Calculates the distance matrix from the bundle. Use list_methods=True
@@ -1150,7 +1144,7 @@ class Bundle:
         )
 
         cluster_results = {}
-        for idx, (patient_name, patient) in enumerate(sorted(self.patients.items())):
+        for idx, patient_name in enumerate(sorted(self.patients)):
             cluster_results[patient_name] = clusters.labels_[idx]
         cluster_results = ClusterResult(cluster_results)
 
@@ -1158,7 +1152,7 @@ class Bundle:
             if p_name not in cluster_results.patients:
                 raise ValueError(f"Patient {p_name} does not have a cluster!")
 
-        return clusters
+        return cluster_results
 
     def rescale(self):
         """ Undoes normalization step  """
@@ -1198,7 +1192,7 @@ class Bundle:
         """ Returns a ClusterReport object with summary statistics of the clusters """
         cluster_report = ClusterReport()
         for patient in self.patients.values():
-            cluster = cluster_results[patient]
+            cluster = cluster_results[patient.name]
             cluster_report.add_patient(patient, cluster=cluster)
         return cluster_report
 
@@ -1293,6 +1287,12 @@ class ClusterResult:
         self.clusters = list(set(self.patient_cluster.values()))
         self.patients = list(self.patient_cluster.keys())
 
+    def __getitem__(self, item):
+        return self.patient_cluster[item]
+
+    def __setitem__(self, key, value):
+        self.patient_cluster[key] = value
+
     def patients_per_cluster(self):
         patients_per_cluster = {cluster: [] for cluster in self.clusters}
         for patient, cluster in self.patient_cluster:
@@ -1314,9 +1314,23 @@ class ClusterReport:
         self.cluster_info = {}
         self.clusters = list(self.cluster_info)
 
+    def __getitem__(self, item):
+        return self.cluster_info[item]
+
+    def __setitem__(self, key, value):
+        self.cluster_info[key] = value
+
+    @staticmethod
+    def _format_categorical(data):
+        value_count = {}
+        unique_values = set(data)
+        for uval in unique_values:
+            value_count[f"{uval} (%)"] = (data.count(uval) / len(data)) * 100
+        return value_count
+
     def add_patient(self, patient, cluster):
         if cluster not in self.cluster_info:
-            self.cluster_info[cluster] = {"patients": 0}
+            self.cluster_info[cluster] = {"patients": 0, "patient_list": []}
 
         for key, value in patient.meta.items():
             if key not in self.cluster_info[cluster]:
@@ -1342,7 +1356,7 @@ class ClusterReport:
             cluster_name = f"Cluster {cluster}"
             cluster_report[cluster_name] = {}
             for key, value in cluster_stats.items():
-                if key in ("tobacco", "alcohol", "race"):
+                if key in ("tobacco", "alcohol", "race", "patient_list"):
                     continue
                 if isinstance(value, list):
                     if isinstance(value[0], (int, float, np.integer)):
@@ -1364,13 +1378,6 @@ class ClusterReport:
 
         return pd.DataFrame(cluster_report)
 
-    def _format_categorical(self, data):
-        value_count = {}
-        unique_values = set(data)
-        for uval in unique_values:
-            value_count[f"{uval} (%)"] = (data.count(uval) / len(data)) * 100
-        return value_count
-
     def _format_list(self, data, percent=False, include_std=False):
         data = np.array(data)
         data = data[~np.isnan(data)]
@@ -1380,15 +1387,14 @@ class ClusterReport:
         if include_std:
             std = np.std(data)
             return f"{mean:.2f} +/- {std:.2f}"
-        else:
-            return mean
+        return mean
 
     def plot_distribution(self, field):
         for cluster in sorted(self.cluster_info):
             data = self.cluster_info[cluster][field]
             if not isinstance(data[0], (int, float, np.integer)):
                 raise ValueError(
-                    "Can't make histograms of non numerical " "variables",
+                    "Can't make histograms of non numerical variables",
                 )
             plt.hist(data, label=f"Cluster {cluster}", bins=100)
         plt.legend()
