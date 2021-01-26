@@ -90,6 +90,7 @@ echo -e "${BLUE}Building Docker image '${REPO}:${LATEST_TAG}' from base image '$
 
 # --network host allows for the container's network stack to use the Docker host's network
 docker build ${CONTEXT} \
+    --no-cache \
     --build-arg BASE_IMAGE=${BASE_IMAGE} \
     --tag "${REPO}:${LATEST_TAG}" \
     --network host \

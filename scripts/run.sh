@@ -157,7 +157,9 @@ fi
 
 ################### SCRIPT BODY ##########################################
 
-# Pull Docker image
+# Try to pull the specified docker image;
+# if the user specifies a custom docker image that is local but not on ghcr.io,
+# it cannot be puleld and the message below will be displayed.
 if ! docker pull ${DOCKER_IMAGE}; then
     echo "Could not pull the image ${DOCKER_IMAGE}."
 fi
