@@ -141,7 +141,7 @@ def stage_bedmaster_files(
 
     # Iterate over all Bedmaster file paths to copy to staging directory
     path_destination_dir = os.path.join(staging_dir, "bedmaster_temp")
-    for path_source_file in xref_subset["path"]:
+    for path_source_file in xref_subset["Path"]:
         if os.path.exists(path_source_file):
             try:
                 shutil.copy(path_source_file, path_destination_dir)
