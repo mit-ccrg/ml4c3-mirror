@@ -10,17 +10,17 @@ import numpy as np
 from ml4c3.utils import get_unix_timestamps
 from definitions.edw import EDW_PREFIX
 from definitions.icu import ICU_SCALE_UNITS
-from ml4c3.validators import (
-    validator_no_empty,
-    validator_no_negative,
-    validator_not_all_zero,
-)
 from tensormap.TensorMap import (
     TensorMap,
     PatientData,
     Interpretation,
     get_visits,
     get_local_timestamps,
+)
+from tensormap.validators import (
+    validator_no_empty,
+    validator_no_negative,
+    validator_not_all_zero,
 )
 from definitions.icu_tmaps import DEFINED_TMAPS
 from tensormap.icu_first_visit_with_signal import get_tmap as get_visit_tmap

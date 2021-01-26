@@ -8,14 +8,14 @@ import pandas as pd
 
 # Imports: first party
 from definitions.ici import ICI_PREFIX, ICI_CASE_COLUMN, ICI_DATE_COLUMN
-from ml4c3.normalizer import (
+from tensormap.TensorMap import TensorMap, PatientData, Interpretation
+from tensormap.normalizer import (
     ZScore,
     RobustScale,
     ZScorePopulation,
     RobustScalePopulation,
 )
-from ml4c3.validators import validator_not_all_zero
-from tensormap.TensorMap import TensorMap, PatientData, Interpretation
+from tensormap.validators import validator_not_all_zero
 
 continuous_field_map = {
     "ici_age_zscore_pop": ("Age", ZScorePopulation(mean=64.13, std=13.25)),

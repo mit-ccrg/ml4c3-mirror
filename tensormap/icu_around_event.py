@@ -8,8 +8,8 @@ import numpy as np
 
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
-from ml4c3.validators import validator_no_nans
 from tensormap.TensorMap import Axis, TensorMap, Interpretation
+from tensormap.validators import validator_no_nans
 from tensormap.icu_signals import get_tmap as get_signal_tmap
 from tensormap.icu_signals import admin_age_tensor_from_file
 from tensormap.icu_ecg_features import get_tmap as get_ecg_tmap

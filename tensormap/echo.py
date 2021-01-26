@@ -6,14 +6,18 @@ import numpy as np
 
 # Imports: first party
 from definitions.echo import ECHO_PREFIX, ECHO_DATETIME_COLUMN
-from ml4c3.normalizer import RobustScalePopulation
-from ml4c3.validators import RangeValidator, validator_no_nans, validator_not_all_zero
 from tensormap.TensorMap import (
     Dates,
     TensorMap,
     PatientData,
     Interpretation,
     is_dynamic_shape,
+)
+from tensormap.normalizer import RobustScalePopulation
+from tensormap.validators import (
+    RangeValidator,
+    validator_no_nans,
+    validator_not_all_zero,
 )
 
 tmaps: Dict[str, TensorMap] = {}

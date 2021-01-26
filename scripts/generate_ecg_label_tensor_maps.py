@@ -96,7 +96,7 @@ def _write_tmap(
         f"    '{task}',\n"
         f"    interpretation=Interpretation.CATEGORICAL,\n"
         f"    time_series_limit=0,\n"
-        f"    path_prefix='{TENSOR_PATH_PREFIX}',\n"
+        f"    path_prefix={TENSOR_PATH_PREFIX},\n"
         f"    channel_map={channel_map},\n"
         f"    validators=validator_not_all_zero,\n"
         f"    tensor_from_file={MAKE_TFF_FUNCTION_NAME}(\n"
@@ -126,15 +126,20 @@ def _write_tmap(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--label_maps_dir",
-        default=os.path.expanduser("~/dropbox/ecg/labeling"),
-        help="Path to directory with c_task.csv or c_task.xlsx label maps. Files should have a header row.",
-    )
-    parser.add_argument(
         "--hd5_keys",
         default=["read_md_clean", "read_pc_clean"],
         nargs="+",
         help="Keys to reads in hd5s from which to extract labels.",
+    )
+    parser.add_argument(
+        "--label_maps_dir",
+        default=os.path.expanduser("~/dropbox/ecg/labeling"),
+        help="Path to directory with c-task.csv or c-task.xlsx label maps. Files should have a header row.",
+    )
+    parser.add_argument(
+        "--label_map_prefix",
+        default="c-",
+        help="Prefix before each label map file name.",
     )
     args = parser.parse_args()
 
@@ -144,7 +149,6 @@ if __name__ == "__main__":
     path_to_repo = os.path.abspath(__file__).replace(f"/scripts/{this_script_name}", "")
     path_to_new_script = os.path.join(
         path_to_repo,
-        "ml4c3",
         "tensormap",
         NEW_SCRIPT_NAME,
     )
@@ -156,11 +160,11 @@ if __name__ == "__main__":
         py_file.write(
             f"from tensormap.ecg import {MAKE_TFF_FUNCTION_NAME}, {MAKE_ANY_TFF_FUNCTION_NAME}\n",
         )
-        py_file.write(f"from ml4c3.validators import validator_not_all_zero\n\n\n")
+        py_file.write(f"from tensormap.validators import validator_not_all_zero\n\n\n")
         py_file.write("tmaps: Dict[str, TensorMap] = {}\n")
 
         for file in os.listdir(args.label_maps_dir):
-            if not file.startswith("c_"):
+            if not file.startswith(args.label_map_prefix):
                 continue
 
             path = os.path.join(args.label_maps_dir, file)
@@ -168,7 +172,7 @@ if __name__ == "__main__":
             if ext == ".csv":
                 df = pd.read_csv(path).fillna("")
             elif ext == ".xlsx":
-                df = pd.read_excel(path).fillna("")
+                df = pd.read_excel(io=path).fillna("")
             else:
                 print(f"Creating labels from {ext} files not supported: {path}")
                 continue
@@ -191,12 +195,6 @@ if __name__ == "__main__":
                     keys=args.hd5_keys,
                     not_found_channel=f"no_{label}",
                 )
+            print(f"Created TensorMaps from label map: {file}")
 
-                # TODO subclasses https://github.com/aguirre-lab/ml4c3/issues/290
-                # for sublevel in df.columns[2:]:
-                #     for sublabel, subgroup in df.groupby(sublevel):
-                #         pass
-
-            print(f"Created tmaps from label map: {file}")
-
-    print(f"ECG label tmaps saved to {path_to_new_script}")
+    print(f"ECG read label TensorMaps saved to {path_to_new_script}")

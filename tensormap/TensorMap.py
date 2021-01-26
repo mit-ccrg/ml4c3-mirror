@@ -23,8 +23,8 @@ from ml4c3.metrics import (
     per_class_precision_5d,
     survival_likelihood_loss,
 )
-from ml4c3.normalizer import Normalizer
 from definitions.globals import TIMEZONE
+from tensormap.normalizer import Normalizer
 
 Axis = Union[int, None]
 Dates = Union[List[str], pd.Series]

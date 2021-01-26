@@ -8,8 +8,6 @@ import numpy as np
 
 # Imports: first party
 from definitions.sts import STS_PREFIX, STS_SURGERY_DATE_COLUMN
-from ml4c3.normalizer import MinMax, RobustScalePopulation
-from ml4c3.validators import validator_no_nans, validator_not_all_zero
 from tensormap.TensorMap import (
     Dates,
     TensorMap,
@@ -19,6 +17,8 @@ from tensormap.TensorMap import (
     is_dynamic_shape,
     outcome_channels,
 )
+from tensormap.normalizer import MinMax, RobustScalePopulation
+from tensormap.validators import validator_no_nans, validator_not_all_zero
 
 tmaps: Dict[str, TensorMap] = {}
 

@@ -3,8 +3,8 @@
 from typing import Optional
 
 # Imports: first party
-from ml4c3.normalizer import MinMax, ZScore, ZScorePopulation, RobustScalePopulation
 from tensormap.TensorMap import TensorMap
+from tensormap.normalizer import MinMax, ZScore, ZScorePopulation, RobustScalePopulation
 from definitions.icu_tmaps import ICU_TMAPS_METADATA
 from tensormap.icu_around_event import get_tmap as get_around_tmap
 

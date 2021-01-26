@@ -14,21 +14,21 @@ from definitions.ecg import (
     ECG_REST_LEADS_ALL,
     ECG_REST_LEADS_INDEPENDENT,
 )
-from ml4c3.normalizer import ZScore, RobustScale, ZScorePopulation
-from ml4c3.validators import (
-    RangeValidator,
-    validator_no_empty,
-    validator_clean_mrn,
-    validator_no_negative,
-    validator_not_all_zero,
-    validator_voltage_no_zero_padding,
-)
 from definitions.globals import YEAR_DAYS
 from tensormap.TensorMap import (
     TensorMap,
     Interpretation,
     make_hd5_path,
     is_dynamic_shape,
+)
+from tensormap.normalizer import ZScore, RobustScale, ZScorePopulation
+from tensormap.validators import (
+    RangeValidator,
+    validator_no_empty,
+    validator_clean_mrn,
+    validator_no_negative,
+    validator_not_all_zero,
+    validator_voltage_no_zero_padding,
 )
 
 tmaps: Dict[str, TensorMap] = {}
