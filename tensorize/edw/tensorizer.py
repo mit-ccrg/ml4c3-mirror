@@ -305,8 +305,8 @@ def tensorize(args):
         )
         elapsed_time = time.time() - init
         logging.info(
-            f"EDW files and ADT and xref tables copied from {args.edw}, {args.adt} "
-            f"and {args.xref} respectively in {elapsed_time:.2f} sec",
+            f"EDW files and ADT table copied from {args.edw} and {args.adt} "
+            f"respectively in {elapsed_time:.2f} sec",
         )
 
         # Get paths to staging directories

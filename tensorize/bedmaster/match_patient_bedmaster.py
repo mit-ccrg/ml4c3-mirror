@@ -140,10 +140,10 @@ class PatientBedmasterMatcher:
 
         metadata = pd.DataFrame(
             {
-                "path": bedmaster_files,
-                "department": departments,
-                "room_bed": room_beds,
-                "start_time": start_times,
+                "Path": bedmaster_files,
+                "DepartmentDSC": departments,
+                "BedLabelNM": room_beds,
+                "StartTime": start_times,
             },
         )
         return metadata
@@ -193,12 +193,25 @@ class PatientBedmasterMatcher:
         logging.info("Cross referencing metadata and ADT DataFrames")
 
         # Merge adt and metadata on the room_bed
-        xref_df = adt_df.merge(metadata, left_on="BedLabelNM", right_on="room_bed")
+        metadata = metadata[["Path", "StartTime", "BedLabelNM"]]
+        xref_df = adt_df.merge(metadata, how="left", on="BedLabelNM")
 
         # Keep rows with ADT start time within Bedmaster file transfer times
         xref_df = xref_df[
-            (xref_df["TransferInDTS"] - 3600 <= xref_df["start_time"].astype(float))
-            & (xref_df["start_time"].astype(float) < xref_df["TransferOutDTS"])
+            (xref_df["TransferInDTS"] - 3600 <= xref_df["StartTime"].astype(float))
+            & (xref_df["StartTime"].astype(float) < xref_df["TransferOutDTS"])
+        ]
+        xref_df = xref_df[
+            [
+                "MRN",
+                "PatientEncounterID",
+                "Path",
+                "TransferInDTS",
+                "TransferOutDTS",
+                "DepartmentID",
+                "DepartmentDSC",
+                "StartTime",
+            ]
         ]
 
         # Save xref table to CSV

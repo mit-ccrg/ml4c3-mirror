@@ -758,7 +758,12 @@ def make_bp_array_tensor_from_file(position: int = None):
                         tensor[i][index] = pressures[position]
                     else:
                         pressures = [float(pressure) for pressure in value.split("/")]
-                        tensor[i][index] = (pressures[0] - pressures[-1]) / pressures[0]
+                        if pressures[0] and pressures[0] != 0:
+                            tensor[i][index] = (
+                                pressures[0] - pressures[-1]
+                            ) / pressures[0]
+                        else:
+                            tensor[i][index] = pressures[0]
         else:
             raise ValueError(
                 f"Incorrect interpretation '{tm.interpretation}' for measurement tmap.",

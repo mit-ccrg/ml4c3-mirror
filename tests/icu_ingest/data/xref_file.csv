@@ -1,6 +1,6 @@
-StartTime,EndTime,stpIn,tStart,tEnd,tDischarge,tAdmit,path,TransferInDTS,TransferOutDTS,fileStartTime,MRN,PatientEncounterID,grp,Department
-Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,file1-123_1_v4.mat,100,200,Wrong,123,345,Wrong,Wrong
-Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,file1-123_2_v4.mat,100,200,Wrong,123,345,Wrong,Wrong
-Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,file1-123_10_v4.mat,100,200,Wrong,123,345,Wrong,Wrong
-Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,file2-123_1_v4.mat,600,700,Wrong,123,890,Wrong,Wrong
-Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,Wrong,file3-123_1_v4.mat,250,350,Wrong,456,980,Wrong,Wrong
+StartTime,Path,TransferInDTS,TransferOutDTS,MRN,PatientEncounterID,DepartmentID,DepartmentDSC
+Wrong,file1-123_1_v4.mat,100,200,123,345,Wrong,Wrong
+Wrong,file1-123_2_v4.mat,100,200,123,345,Wrong,Wrong
+Wrong,file1-123_10_v4.mat,100,200,123,345,Wrong,Wrong
+Wrong,file2-123_1_v4.mat,600,700,123,890,Wrong,Wrong
+Wrong,file3-123_1_v4.mat,250,350,456,980,Wrong,Wrong

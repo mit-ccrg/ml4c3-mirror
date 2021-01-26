@@ -24,10 +24,11 @@ def check_flowsheet_rows(depts):
                 matched_dept = matched_dept.drop_duplicates()[0]
                 if isinstance(matched_dept, pd.Series):
                     print(
-                        f"Check measurement MRN/CSN/Recorded {row['MRN']}/{row['PatientEncounterID']}/{row['RecordedDTS']}",
+                        f"Check measurement MRN/CSN/Recorded {row['MRN']}/"
+                        f"{row['PatientEncounterID']}/{row['RecordedDTS']}",
                     )
                     raise KeyError(
-                        f"Measurement cannot be taken in more than 1 department",
+                        "Measurement cannot be taken in more than 1 department",
                     )
             return row["DepartmentID"] == matched_dept
         except:
@@ -48,7 +49,8 @@ def dedupe_flowsheet(mrn_csn, df):
     cleaned_flowsheet_path = os.path.join(args.edw_cleaned, str(mrn), str(csn), csv)
     if not os.path.isfile(flowsheet_path):
         return 0
-
+    if not os.path.isfile(cleaned_flowsheet_path):
+        return 1
     shutil.copytree(
         src=os.path.dirname(flowsheet_path),
         dst=os.path.dirname(cleaned_flowsheet_path),
@@ -65,7 +67,6 @@ def dedupe_flowsheet(mrn_csn, df):
         return 0
 
     flowsheet = pd.read_csv(cleaned_flowsheet_path, low_memory=False)
-    flowsheet["RecordedDTS"] = pd.to_datetime(flowsheet["RecordedDTS"])
     mask = flowsheet.apply(check_flowsheet_rows(depts), axis=1)
     flowsheet[mask].to_csv(cleaned_flowsheet_path, index=False)
     return 1
@@ -93,11 +94,11 @@ def parse_args():
         help="Path to ADT table.",
     )
     parser.add_argument(
-        "--edw-source",
+        "--edw_source",
         help="Path to directory containing EDW flowsheet CSVs to deduplicate.",
     )
     parser.add_argument(
-        "--edw-cleaned",
+        "--edw_cleaned",
     )
     parser.add_argument(
         "--num_workers",

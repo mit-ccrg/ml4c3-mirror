@@ -160,6 +160,7 @@ DEFINED_TMAPS: Dict[str, Any] = {
         "ppi",
         "r_heart_rate_source",
         "r_saturated_venous_o2",
+        "r_phs_ip_pulse_spo2",
         "r_map",
         "r_cpn_glasgow_coma_scale_score",
         "r_level_of_consciousness",

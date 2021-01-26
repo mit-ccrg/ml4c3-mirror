@@ -1578,7 +1578,7 @@ class CrossReferencer:
         adt_df = adt_df[adt_columns].drop_duplicates()
 
         xref = pd.read_csv(self.xref_file)
-        xref = xref.drop_duplicates(subset=["MRN", "PatientEncounterID", "path"])
+        xref = xref.drop_duplicates(subset=["MRN", "PatientEncounterID", "Path"])
         xref["MRN"] = xref["MRN"].astype(str)
 
         edw_mrns = [
@@ -1648,7 +1648,7 @@ class CrossReferencer:
                 csn = str(int(row["PatientEncounterID"]))
             except ValueError:
                 csn = str(row["PatientEncounterID"])
-            fname = os.path.split(row["path"])[1]
+            fname = os.path.split(row["Path"])[1]
             bedmaster_path = os.path.join(self.bedmaster_dir, fname)
             if mrn not in self.crossref:
                 self.crossref[mrn] = {csn: [bedmaster_path]}
@@ -1721,7 +1721,7 @@ class CrossReferencer:
             xref_csns_set = set(_xref_csns_set.astype(int).astype(str))
         except ValueError:
             xref_csns_set = set(xref["PatientEncounterID"].unique())
-        xref_bedmaster_files_set = set(xref["path"].unique())
+        xref_bedmaster_files_set = set(xref["Path"].unique())
 
         crossref_mrns_set = set(self.crossref.keys())
         crossref_csns_set = set()

@@ -57,7 +57,7 @@ def test_xref_file_generation(temp_dir):
         obt_df = pd.read_csv(cross_ref_file_matched)
 
         # Remove the path prefix to leave just the file name
-        obt_df["path"] = obt_df["path"].apply(lambda path: os.path.split(path)[1])
+        obt_df["Path"] = obt_df["Path"].apply(lambda path: os.path.split(path)[1])
         assert (expected_df == obt_df).all().all()
 
         matcher2 = get_patient_bedmaster_matcher(
@@ -68,10 +68,10 @@ def test_xref_file_generation(temp_dir):
         obt_df2 = pd.read_csv(cross_ref_file_matched)
 
         # Remove the path prefix to leave just the file name
-        obt_df2["path"] = obt_df2["path"].apply(lambda path: os.path.split(path)[1])
+        obt_df2["Path"] = obt_df2["Path"].apply(lambda path: os.path.split(path)[1])
 
         assert (
-            expected_df[expected_df["department"] == "BLK08"]
+            expected_df[expected_df["DepartmentDSC"] == "MGH BLAKE 8 CARD SICU"]
             .reset_index(drop=True)
             .equals(obt_df2.reset_index(drop=True))
         )

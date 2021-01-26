@@ -239,11 +239,17 @@ def make_sliding_window_outcome_tensor_from_file(
             event_tm_2, hd5, visits=visit, **kwargs
         )
         event_time_2 = event_time_2[0][0]
-        labels = np.logical_and(
-            windows + prediction * 60 * 60 >= event_time_2,
-            windows + gap * 60 * 60 <= event_time_2,
+        prediction_array = windows + prediction * 60 * 60 >= event_time_2
+        gap_array = windows + gap * 60 * 60 >= event_time_2
+        labels = prediction_array - 2 * gap_array
+        tensor = np.array(
+            list(
+                map(
+                    lambda x: np.nan if x < 0 else ([0, 1] if x == 1 else [1, 0]),
+                    labels,
+                ),
+            ),
         )
-        tensor = np.array(list(map(lambda x: [0, 1] if x else [1, 0], labels)))
         return tensor
 
     return _tensor_from_file
@@ -495,7 +501,7 @@ def create_around_explore_tmap(tmap_name: str) -> Optional[TensorMap]:
     match = None
     if not match:
         pattern = re.compile(
-            r"^(.*)_(\d+)_to_(\d+)_hrs_(pre|post)_(.*)_explore$",
+            r"^(.*)_(\d+)_hrs_(pre|post)_(.*)_(\d+)_hrs_window_explore$",
         )
         match = pattern.findall(tmap_name)
         if match:
@@ -538,7 +544,7 @@ def length_of_stay_event_tensor_from_file(
         event_time = event_tm.tensor_from_file(event_tm, hd5, visits=visit, **kwargs)[
             0
         ][0]
-        sign = np.array(list(map(lambda x: -1 if periods == "pre" else 1)))
+        sign = np.array(list(map(lambda x: -1 if x == "pre" else 1, periods)))
         tensor = event_time + sign * hrs_to_event * 60 * 60 - admin_date
         return tensor
 

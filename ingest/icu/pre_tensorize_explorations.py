@@ -157,7 +157,7 @@ class PreTensorizeExplorer:
         xref_file = xref_file.dropna(subset=["MRN"])
         bedmaster_mrns = set(xref_file["MRN"].unique())
         bedmaster_csns = set(xref_file["PatientEncounterID"].unique())
-        cross_ref_bedmaster_files = set(xref_file["path"].unique())
+        cross_ref_bedmaster_files = set(xref_file["Path"].unique())
 
         bedmaster_files, _ = get_files_in_directory(
             directory=self.bedmaster,
