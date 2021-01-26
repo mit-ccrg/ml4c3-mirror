@@ -931,8 +931,9 @@ def patient_csv_to_set(
         ]
         mrn_column_name = infer_mrn_column(df, patient_csv)
 
-    # Isolate MRN column from dataframe, cast to int
-    patient_ids = df[mrn_column_name].dropna().astype(int)
+    # Isolate MRN column from dataframe, cast to float (to convert strings),
+    # and finally cast to int
+    patient_ids = df[mrn_column_name].dropna().astype(float).astype(int)
 
     return set(patient_ids)
 
