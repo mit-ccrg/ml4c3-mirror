@@ -1,13 +1,18 @@
 # Imports: standard library
+import os
 from typing import Dict
 
 # Imports: third party
+import ray
 import numpy as np
 import pandas as pd
 from data import get_downstream_datasets, get_pretraining_datasets
 from hyperoptimize import build_downstream_model, build_pretraining_model
 from sklearn.metrics import r2_score, roc_auc_score
 from train_downstream import _get_configs_and_models
+
+
+N_INFER = 10000000000  # hacky way to get all the data at once
 
 
 def get_metrics(true: np.ndarray, pred: np.ndarray) -> Dict[str, float]:
@@ -26,47 +31,21 @@ def get_metrics(true: np.ndarray, pred: np.ndarray) -> Dict[str, float]:
     return metrics
 
 
-def infer_upstream_models(models_folder: str, csv_folder: str):
-    results = []
-    for name, config, model_file in _get_configs_and_models(models_folder):
-        config["model_file"] = model_file
+@ray.remote(num_gpus=.5, max_calls=1)
+def infer_model(config, upstream: bool, output_folder: str):
+    if upstream:
         (_, valid, test), stats, cleanups = get_pretraining_datasets(
             ecg_length=config["ecg_length"],
             augmentation_strengths={},
             num_augmentations=0,
             hd5_folder=config["hd5_folder"],
             num_workers=4,
-            batch_size=1000,  # hacky way to get all the data at once
-            csv_folder=csv_folder,
+            batch_size=N_INFER,
+            csv_folder=config["csv_folder"],
         )
         model = build_pretraining_model(**config)
-        model.load_weights(model_file)
-        x, y = next(valid.as_numpy_iterator())
-        for cleanup in cleanups:
-            cleanup()
-        pred = model.predict(x)
-        metrics = get_metrics(y, pred)
-        description = config["description"]
-        metrics["pretraining_loss"] = float(
-            description.split(" ")[-1][:-1],
-        )  # hacky way to get pretraining performance
-        metrics["description"] = description
-        print(description, metrics)
-        results.append(metrics)
-        for cleanup in cleanups:
-            cleanup()
-    return pd.DataFrame(results)
-
-
-def infer_downstream_models(models_folder: str, csv_folder: str):
-    configs = _get_configs_and_models(models_folder)
-    results = []
-    for name, config, model_file in configs:
-        description = config["description"]
-        if "Frozen" in description:
-            continue
-        print(f"Beginning inference on {description}")
-        config["model_file"] = model_file
+        model.load_weights(config['model_file'])
+    else:
         (_, valid, test), stats, cleanups = get_downstream_datasets(
             downstream_tmap_name=config["downstream_tmap_name"],
             downstream_size=config["downstream_size"],
@@ -75,22 +54,23 @@ def infer_downstream_models(models_folder: str, csv_folder: str):
             num_augmentations=0,
             hd5_folder=config["hd5_folder"],
             num_workers=4,
-            batch_size=1000,  # hacky way to get all the data at once
-            csv_folder=csv_folder,
+            batch_size=N_INFER,  # hacky way to get all the data at once
+            csv_folder=config['csv_folder'],
         )
         model = build_downstream_model(**config)
-        x, y = next(valid.as_numpy_iterator())
-        for cleanup in cleanups:
-            cleanup()
-        pred = model.predict(x)
-        metrics = get_metrics(y, pred)
-        print(description, metrics)
-        metrics["description"] = description
-        metrics["task"] = config["downstream_tmap_name"]
-        metrics["downstream_size"] = config["downstream_size"]
-        metrics["pretraining_loss"] = float(
-            description.split(" ")[-1][:-1],
-        )  # hacky way to get pretraining performance
-        metrics["pretraining_method"] = description.split(" ")[0]
-        results.append(metrics)
-    return pd.DataFrame(results)
+    description = config["description"]
+    print(f'Running inference for {description}')
+    x, y = next(valid.as_numpy_iterator())
+    output_path = os.path.join(output_folder, f'{description}.csv')
+    print(f'Saving {output_path}')
+    pd.DataFrame({**model.predict(x), **y}).to_csv(output_path, index=False)
+
+
+def infer_models(models_folder: str, output_folder: str, upstream: bool):
+    configs = _get_configs_and_models(models_folder)
+    for _, config, model_file in configs:
+        config['model_file'] = model_file
+    ray.get([
+        infer_model.remote(config=config, output_folder=output_folder, upstream=upstream)
+        for name, config, model_file in configs
+    ])
