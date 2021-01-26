@@ -24,7 +24,7 @@ from ray.tune.schedulers import HyperBandForBOHB
 from ray.tune.suggest.bohb import TuneBOHB
 from tensorflow.keras.layers import Input
 from tensorflow.keras.backend import clear_session
-from tensorflow_addons.optimizers import SGDW
+from tensorflow_addons.optimizers import SGDW, RectifiedAdam
 from tensorflow.keras.experimental import CosineDecay
 from tensorflow.python.keras.utils.layer_utils import count_params
 
@@ -107,8 +107,10 @@ def build_pretraining_model(
         momentum=0.9,
         weight_decay=5 * 5e-5,
     )  # following RegNet's setup
+    optimizer = RectifiedAdam(learning_rate)
     model({input_name: Input(shape=(ecg_length, 12))})  # initialize model
     model.compile(loss=[tm.loss for tm in tmaps_out], optimizer=optimizer)
+    print(model.summary())
     return model
 
 
@@ -194,6 +196,7 @@ def get_optimizer_iterations(model) -> int:
 
 def get_optimizer_lr(model) -> float:
     """Assumes optimizer is using a learning rate schedule"""
+    return -1
     iters = get_optimizer_iterations(model)
     return model.optimizer.learning_rate(iters).numpy()
 
@@ -502,11 +505,12 @@ def run(
         augmentation_params["num_augmentations"] = 0
 
     model_params = {
-        "ecg_length": tune.qrandint(1250, 5000, 250),
+        # "ecg_length": tune.qrandint(1250, 5000, 250),
+        "ecg_length": 2500,
         "kernel_size": tune.randint(3, 30),
         "group_size": tune.qrandint(1, 64, 8),
         "depth": tune.randint(12, 28),
-        "initial_width": tune.qrandint(16, 64, 4),  # TODO: too small?
+        "initial_width": tune.qrandint(16, 256, 4),
         "width_growth_rate": tune.uniform(0, 4),
         "width_quantization": tune.uniform(1.5, 3),
     }
@@ -516,7 +520,8 @@ def run(
         "num_workers": cpus_per_model,
     }
     optimizer_params = {
-        "learning_rate": tune.loguniform(1e-6, 1e-1),
+        # "learning_rate": tune.loguniform(1e-6, 1e-1),
+        "learning_rate": 5e-3,
         "decay_steps": STEPS_PER_EPOCH * epochs,
     }
     hyperparams = {**augmentation_params, **model_params, **optimizer_params}
@@ -537,6 +542,7 @@ def run(
         metric="val_loss",
         mode="min",
         max_t=epochs,
+        reduction_factor=2,
     )
 
     print(

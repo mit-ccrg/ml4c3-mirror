@@ -200,9 +200,9 @@ def get_lvh_tmap() -> TensorMap:
 def get_downstream_tmaps() -> List[TensorMap]:
     return [
         get_age_tmap(),
-        get_sex_tmap(),
+        # get_sex_tmap(),
         get_afib_tmap(),
-        get_lvh_tmap(),
+        # get_lvh_tmap(),
     ]
 
 
@@ -416,7 +416,9 @@ def explore_all_data(
                     folder=output_folder,
                     tmap=tmap,
                 )
-                save_df = not_null_df["sample_id"].iloc[:size]
+                save_df = not_null_df["sample_id"]
+                if name != DOWNSTREAM_NAMES[-1]:  # If not test data, truncate length
+                    save_df = save_df.iloc[:size]
                 print(f"Writing {len(save_df)} {name} ids to {path}")
                 save_df.to_csv(path, index=False)
 

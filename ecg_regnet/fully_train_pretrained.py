@@ -8,7 +8,12 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 from ray.tune import Analysis, run, stopper
-from hyperoptimize import EarlyStopping, RegNetTrainable, build_pretraining_model
+from hyperoptimize import (
+    STEPS_PER_EPOCH,
+    EarlyStopping,
+    RegNetTrainable,
+    build_pretraining_model,
+)
 from ray.tune.experiment import Experiment
 
 
@@ -70,6 +75,8 @@ def _run_experiments(
     gpus_per_model: float,
 ):
     names, configs = _get_configs(ray_output_folder, num_experiments, True)
+    for config in configs:
+        config["decay_steps"] = epochs * STEPS_PER_EPOCH
     stopper = EarlyStopping(patience=patience, max_epochs=epochs)
     experiments = [
         Experiment(

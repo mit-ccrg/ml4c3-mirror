@@ -1,6 +1,6 @@
 hpbandster
 ConfigSpace
-ray[tune]
+ray[tune]==1.0.1
 tensorflow_addons
 tensorboardX
 matplotlib
