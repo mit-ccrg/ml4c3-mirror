@@ -1,0 +1,13 @@
+Field,Name,Type,Val_1,Val_2,Val_3,Choices
+rl,max_memory,quniform,30000,60000,10000,
+rl,reply_start_size,quniform,50,150,10,
+rl,sync_steps,quniform,5,50,5,
+rl,discount_gamma,uniform,0.9,0.99,,
+rl,max_epsilon,uniform,0.9,1,,
+rl,lmbda,loguniform,1E-05,0.001,,
+nn,policy_batch_size,quniform,50,150,25,
+nn,policy_learning_rate,loguniform,0.0001,0.01,,
+nn,beta1,uniform,0.8,0.9,,
+nn,beta2,uniform,0.9,0.99,,
+nn,activation,choice,,,,relu - elu - leaky_relu
+nn,hidden_architecture,choice,,,,"[16, 16] - [32, 32] - [16,16,16]"

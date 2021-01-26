@@ -28,3 +28,7 @@ tqdm
 unidecode
 xgboost
 xmltodict
+cryptography
+gym
+ray
+ray[tune]

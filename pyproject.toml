@@ -13,7 +13,7 @@ known_third_party = ["gitlint", "h5py", "matplotlib", "numpy", "pandas", "pytest
 ignore_whitespace = "True"
 
 [tool.pylint.'MESSAGES CONTROL']
-disable="too-many-nested-blocks, too-many-lines, too-many-branches, invalid-name, too-many-boolean-expressions, bad-continuation, missing-module-docstring, missing-function-docstring, too-few-public-methods, too-many-arguments, too-many-locals, too-many-instance-attributes, too-many-ancestors, fixme, logging-fstring-interpolation, protected-access, ungrouped-imports, too-many-statements"
+disable="import-error, too-many-nested-blocks, too-many-lines, too-many-branches, invalid-name, too-many-boolean-expressions, bad-continuation, missing-module-docstring, missing-function-docstring, too-few-public-methods, too-many-arguments, too-many-locals, too-many-instance-attributes, too-many-ancestors, fixme, logging-fstring-interpolation, protected-access, ungrouped-imports, too-many-statements"
 
 [tool.pylint.'SIMILARITIES']
 min-similarity-lines="10"

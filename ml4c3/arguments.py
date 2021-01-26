@@ -6,7 +6,6 @@ import argparse
 import datetime
 import operator
 import multiprocessing
-from typing import Dict
 
 # Imports: third party
 import numpy as np
@@ -52,7 +51,10 @@ def parse_args() -> argparse.Namespace:
         "\t * check_icu_structure: ADD DESCRIPTION. \n"
         "\t * pre_tensorize_explore: ADD DESCRIPTION. \n"
         "\t * match_patient_bedmaster: ADD DESCRIPTION. \n"
-        "\t * extract_ecg_features: ADD DESCRIPTION. \n",
+        "\t * extract_ecg_features: ADD DESCRIPTION. \n"
+        "\t * rl_training: Apply RL to train a policy. \n"
+        "\t * rl_hyperoptimize: Optimize hyperparameters. \n"
+        "\t * rl_simulate: Simulate environment with or without policy.",
         dest="recipe",
     )
 
@@ -1175,6 +1177,288 @@ def parse_args() -> argparse.Namespace:
         default="dwt",
         help="Can be one of dwt (default) for discrete wavelet transform "
         "or cwt for continuous wavelet transform.",
+    )
+
+    # Reinforcement learning parsers
+    # General parser for all subparsers
+    gen_parser = argparse.ArgumentParser(add_help=False)
+    gen_parser.add_argument(
+        "--save_dir",
+        type=str,
+        default="/home/rp415/repos/rl-ccu/saved_elements",
+        help="Directory to save all desired data.",
+    )
+    gen_parser.add_argument(
+        "--save_name",
+        type=str,
+        default="test",
+        help="Name of saved files.",
+    )
+
+    # Environment parser. Parent parser for training, hyperoptimize and simulation
+    env_parser = argparse.ArgumentParser(add_help=False)
+    env_parser.add_argument(
+        "--tables_dir",
+        type=str,
+        default="/home/rp415/repos/rl-ccu/rl4cs/tables",
+        help="Directory to all tables.",
+    )
+    env_parser.add_argument(
+        "--environment",
+        type=str,
+        default="cv_model",
+        help="Environment of the RL problem. Options: cartpole, cv_model.",
+    )
+    env_parser.add_argument(
+        "--render",
+        action="store_true",
+        help="If argument set, PV loops and info are plot during training.",
+    )
+    env_parser.add_argument(
+        "--save",
+        action="store_true",
+        help="If argument set, RL states/observations and parameters are saved.",
+    )
+    env_parser.add_argument(
+        "--init_conditions",
+        type=float,
+        nargs="+",
+        default=[43.3, 105.6, 350.0, 40.0, 195.0, 16.0],
+        help="Initial conditions for simulation, introduce 6 volumes.",
+    )
+
+    # Parent parser for training and hyperoptimize subparsers
+    rl_parser = argparse.ArgumentParser(add_help=False)
+    rl_parser.add_argument(
+        "--num_episodes",
+        type=int,
+        default=100,
+        help="Number of episodes to train the policy. Default: 100.",
+    )
+    rl_parser.add_argument(
+        "--max_episode_steps",
+        type=int,
+        default=288,
+        help="Number of steps per episode. Default: 288 (simulating 2 days).",
+    )
+    rl_parser.add_argument(
+        "--reply_start_size",
+        type=int,
+        default=100,
+        help="Minimum stored experiences to start training. "
+        "Default: 100 (double default batch size).",
+    )
+    rl_parser.add_argument(
+        "--sync_steps",
+        type=int,
+        default=10,
+        help="Number of steps that have to pass between synchronization "
+        "between Q-network and Q-target. Default: 10.",
+    )
+    rl_parser.add_argument(
+        "--discount_gamma",
+        type=float,
+        default=0.99,
+        help="Discount factor (gamma) for Q-function update. Default: 0.99.",
+    )
+    rl_parser.add_argument(
+        "--max_epsilon",
+        type=float,
+        default=0.99,
+        help="Max epsilon for epsilon-greedy action selection strategy. Default: 0.99.",
+    )
+    rl_parser.add_argument(
+        "--min_epsilon",
+        type=float,
+        default=0.05,
+        help="Min epsilon for epsilon-greedy action selection strategy. Default: 0.05.",
+    )
+    rl_parser.add_argument(
+        "--lmbda",
+        type=float,
+        default=0.00005,
+        help="Decay for epsilon-greedy action selection strategy. Default: 0.00005.",
+    )
+    rl_parser.add_argument(
+        "--max_memory",
+        type=int,
+        default=50000,
+        help="Max memory in buffer of experiences. Default: 50000.",
+    )
+    rl_parser.add_argument(
+        "--policy_batch_size",
+        type=int,
+        default=50,
+        help="Batch size used when training the Q-network. Default: 50.",
+    )
+    rl_parser.add_argument(
+        "--hidden_architecture",
+        type=int,
+        nargs="+",
+        default=[20, 20],
+        help="Hidden architecture of the Q-network. "
+        "Default: 2 hidden layers with 20 neurons each.",
+    )
+    rl_parser.add_argument(
+        "--activation",
+        type=str,
+        default="relu",
+        help="Activation function for neurons. Default: relu.",
+    )
+    rl_parser.add_argument(
+        "--policy_learning_rate",
+        type=float,
+        default=0.001,
+        help="Learning rate for . Default: 0.001.",
+    )
+    rl_parser.add_argument(
+        "--beta1",
+        type=float,
+        default=0.9,
+        help="Beta 1 constant from Adam optimizer. Default: 0.9.",
+    )
+    rl_parser.add_argument(
+        "--beta2",
+        type=float,
+        default=0.99,
+        help="Beta 2 constant from Adam optimizer. Default: 0.999.",
+    )
+
+    # RL training parser
+    train_parser = subparser.add_parser(
+        name="rl_training",
+        description="Apply reinforcement learning to train a policy.",
+        parents=[run_parser, io_parser, gen_parser, rl_parser, env_parser],
+    )
+    train_parser.add_argument(
+        "--patient_state",
+        type=str,
+        default=None,
+        help="Initial patient state (sick state). Possibilities: "
+        "normal, mild, moderate and severe",
+    )
+    train_parser.add_argument(
+        "--randomization",
+        type=str,
+        default=None,
+        help="Randomization for domain randomization. "
+        "Possibilities: uniform and triangular",
+    )
+
+    # RL hyperoptimize parser
+    hyperopt_parser = subparser.add_parser(
+        name="rl_hyperoptimize",
+        description="Optimize RL and NN hyperparameters.",
+        parents=[run_parser, io_parser, gen_parser, rl_parser, env_parser],
+    )
+    hyperopt_parser.add_argument(
+        "--params_tab",
+        type=str,
+        default="hyperparams.csv",
+        help="Table with hyperparameters to optimize (.csv).",
+    )
+    hyperopt_parser.add_argument(
+        "--params_subspace",
+        type=str,
+        default="all",
+        help="Subspace of states to optimize. Options: all, rl and nn.",
+    )
+    hyperopt_parser.add_argument(
+        "--extreme_type",
+        type=str,
+        default="min",
+        help="Either min or max.",
+    )
+    hyperopt_parser.add_argument(
+        "--len_reward",
+        type=int,
+        default=10,
+        help="Number of last rewards to average.",
+    )
+    hyperopt_parser.add_argument(
+        "--num_samples",
+        type=int,
+        default=15,
+        help="Number of samples to optimize in parallel.",
+    )
+    hyperopt_parser.add_argument(
+        "--num_epochs",
+        type=int,
+        default=100,
+        help="Number of epochs to train the neural network.",
+    )
+    hyperopt_parser.add_argument(
+        "--terminate_loss",
+        type=float,
+        default=0.1,
+        help="Min loss to end training.",
+    )
+    hyperopt_parser.add_argument(
+        "--results_name",
+        type=str,
+        default="hyperopt_results.csv",
+        help="Name of the results table (.csv).",
+    )
+
+    # RL simulation parser
+    sim_parser = subparser.add_parser(
+        name="rl_simulate",
+        description="Simulate environment and get states & observations.",
+        parents=[run_parser, io_parser, gen_parser, env_parser],
+    )
+    sim_parser.add_argument(
+        "--start_time",
+        type=int,
+        default=0,
+        help="Initial time to take states/observations from simulation. Only for "
+        "transient simulation. Units are in seconds.",
+    )
+    sim_parser.add_argument(
+        "--end_time",
+        type=int,
+        default=None,
+        help="Final time to take states/observations and stop simulation. "
+        "Units are in seconds for transient simulation and in minutes "
+        "for steady-state simulation.",
+    )
+    sim_parser.add_argument(
+        "--sim_type",
+        type=str,
+        default="steady-state",
+        help="Mode for simulation can be: transient or steady-state. "
+        "Default is: steady-state",
+    )
+    sim_parser.add_argument(
+        "--policy_name",
+        type=str,
+        default="",
+        help="Policy name. If argument not set, simulation "
+        "is performed without policy.",
+    )
+    sim_parser.add_argument(
+        "--plot_list_states",
+        type=str,
+        nargs="+",
+        default=["v_lv", "p_lv"],
+        help="List of states to plot. Possible states are: v_lv, v_cas, v_cvs, "
+        "v_rv, v_cap, v_cvp, p_lv, p_cas, p_cvs, p_rv, p_cap, p_cvp and c_out",
+    )
+    sim_parser.add_argument(
+        "--plot_list_params",
+        type=str,
+        nargs="+",
+        default=["HR", "Ees_lv"],
+        help="List of parameters to plot. Possible parameters are: Ees_rv, Ees_lv, "
+        "Vo_rv, Vo_lv, Tes_rv, Tes_lv, tau_rv, tau_lv, A_rv, A_lv, B_rv, B_lv, "
+        "Ra_pul, Ra_sys, Rc_pul, Rc_sys, Rv_pul, Rv_sys, Rt_pul, Rt_sys, Ca_pul, "
+        "Ca_sys, Cv_pul, Cv_sys, HR, Vt, Vs and Vu.",
+    )
+    sim_parser.add_argument(
+        "--plot_list_others",
+        type=str,
+        nargs="+",
+        default=["pv_loop", "actions"],
+        help="List of other desired elements to plot.",
     )
 
     # Additional subparsers
