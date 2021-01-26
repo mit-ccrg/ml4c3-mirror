@@ -155,8 +155,8 @@ if __name__ == "__main__":
 
     with open(path_to_new_script, "w") as py_file:
         py_file.write(f"from typing import Dict\n")
-        py_file.write(f"from ml4c3.TensorMap import TensorMap, Interpretation\n")
-        py_file.write(f"from ml4c3.definitions import ECG_PREFIX\n")
+        py_file.write(f"from tensormap.TensorMap import TensorMap, Interpretation\n")
+        py_file.write(f"from definitions.ecg import ECG_PREFIX\n")
         py_file.write(
             f"from tensormap.ecg import {MAKE_TFF_FUNCTION_NAME}, {MAKE_ANY_TFF_FUNCTION_NAME}\n",
         )
