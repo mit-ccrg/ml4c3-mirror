@@ -177,7 +177,7 @@ def predict_and_evaluate(
                 tm=tm,
                 y_predictions=y,
                 y_truth=y_truth,
-                title=tm.name,
+                tensor_map_name=tm.name,
                 image_ext=image_ext,
                 folder=plot_path,
                 test_paths=data_paths,
@@ -208,7 +208,7 @@ def evaluate_predictions(
     tm: TensorMap,
     y_predictions: np.ndarray,
     y_truth: np.ndarray,
-    title: str,
+    tensor_map_name: str,
     image_ext: str,
     folder: str,
     test_paths: Optional[List[str]] = None,
@@ -221,22 +221,23 @@ def evaluate_predictions(
     appropriate metrics. Accumulates data in the rocs and scatters lists to
     facilitate subplotting.
 
-    :param tm: The TensorMap predictions to evaluate
-    :param y_predictions: The predictions
-    :param y_truth: The truth
-    :param title: A title for the plots
-    :param image_ext: File type to save images as
-    :param folder: The folder to save the plots at
-    :param test_paths: The tensor paths that were predicted
-    :param max_melt: For multi-dimensional prediction the maximum number of
-                     prediction to allow in the flattened array
+    :param tm: The TensorMap predictions to evaluate.
+    :param y_predictions: The predictions.
+    :param y_truth: The truth.
+    :param tensor_map_name: Name of tensor map from which tensors are plotted.
+    :param image_ext: File type to save images as.
+    :param folder: The folder to save the plots at.
+    :param test_paths: The tensor paths that were predicted.
+    :param max_melt: For multi-dimensional prediction, this is the maximum number of
+           predictions to allow in the flattened array.
     :param rocs: (output) List of Tuples which are inputs for ROC curve plotting to
-                 allow subplotting downstream
+           allow subplotting downstream.
     :param scatters: (output) List of Tuples which are inputs for scatter plots to
-                     allow subplotting downstream
-    :param data_split: The data split being evaluated (train, valid, or test)
+           allow subplotting downstream.
+    :param data_split: The data split being evaluated (train, valid, or test).
+
     :return: Dictionary of performance metrics with string keys for labels and float
-             values
+             values.
     """
     performance_metrics = {}
     if tm.is_categorical and tm.axes == 1:
@@ -251,7 +252,7 @@ def evaluate_predictions(
                 prediction=y_predictions,
                 truth=y_truth,
                 labels=tm.channel_map,
-                title=title,
+                tensor_map_name=tensor_map_name,
                 image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
@@ -261,7 +262,7 @@ def evaluate_predictions(
             prediction=y_predictions,
             truth=y_truth,
             labels=tm.channel_map,
-            title=title,
+            tensor_map_name=tensor_map_name,
             image_ext=image_ext,
             prefix=folder,
             data_split=data_split,
@@ -270,7 +271,7 @@ def evaluate_predictions(
             prediction=y_predictions,
             truth=y_truth,
             labels=tm.channel_map,
-            title=title,
+            tensor_map_name=tensor_map_name,
             image_ext=image_ext,
             prefix=folder,
             data_split=data_split,
@@ -283,7 +284,7 @@ def evaluate_predictions(
                 prediction=y_predictions,
                 truth=y_truth,
                 labels=tm.channel_map,
-                title=title,
+                tensor_map_name=tensor_map_name,
                 image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
@@ -306,7 +307,7 @@ def evaluate_predictions(
                 prediction=y_predictions,
                 truth=y_truth,
                 labels=tm.channel_map,
-                title=title,
+                tensor_map_name=tensor_map_name,
                 image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
@@ -317,7 +318,7 @@ def evaluate_predictions(
                 prediction=y_predictions,
                 truth=y_truth,
                 labels=tm.channel_map,
-                title=title,
+                tensor_map_name=tensor_map_name,
                 image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
@@ -327,7 +328,7 @@ def evaluate_predictions(
             prediction=y_predictions,
             truth=y_truth,
             labels=tm.channel_map,
-            title=title,
+            tensor_map_name=tensor_map_name,
             image_ext=image_ext,
             prefix=folder,
             data_split=data_split,
@@ -350,7 +351,7 @@ def evaluate_predictions(
                 prediction=y_predictions,
                 truth=y_truth,
                 labels=tm.channel_map,
-                title=title,
+                tensor_map_name=tensor_map_name,
                 image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
@@ -361,7 +362,7 @@ def evaluate_predictions(
                 prediction=y_predictions,
                 truth=y_truth,
                 labels=tm.channel_map,
-                title=title,
+                tensor_map_name=tensor_map_name,
                 image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
@@ -371,7 +372,7 @@ def evaluate_predictions(
             prediction=y_predictions,
             truth=y_truth,
             labels=tm.channel_map,
-            title=title,
+            tensor_map_name=tensor_map_name,
             image_ext=image_ext,
             prefix=folder,
             data_split=data_split,
@@ -397,7 +398,7 @@ def evaluate_predictions(
                 prediction=y_predictions,
                 truth=y_truth,
                 labels=tm.channel_map,
-                title=title,
+                tensor_map_name=tensor_map_name,
                 image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
@@ -408,7 +409,7 @@ def evaluate_predictions(
                 prediction=y_predictions,
                 truth=y_truth,
                 labels=tm.channel_map,
-                title=title,
+                tensor_map_name=tensor_map_name,
                 image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
@@ -418,7 +419,7 @@ def evaluate_predictions(
             prediction=y_predictions,
             truth=y_truth,
             labels=tm.channel_map,
-            title=title,
+            tensor_map_name=tensor_map_name,
             image_ext=image_ext,
             prefix=folder,
             data_split=data_split,
@@ -430,7 +431,7 @@ def evaluate_predictions(
                 prediction=y_predictions,
                 truth=y_truth,
                 labels=tm.channel_map,
-                title=title,
+                tensor_map_name=tensor_map_name,
                 image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
@@ -441,7 +442,7 @@ def evaluate_predictions(
                 prediction=y_predictions,
                 truth=y_truth,
                 labels=tm.channel_map,
-                title=title,
+                tensor_map_name=tensor_map_name,
                 image_ext=image_ext,
                 prefix=folder,
                 data_split=data_split,
@@ -453,7 +454,7 @@ def evaluate_predictions(
             plot_scatter(
                 prediction=tm.rescale(y_predictions),
                 truth=tm.rescale(y_truth),
-                title=title,
+                tensor_map_name=tensor_map_name,
                 image_ext=image_ext,
                 prefix=folder,
                 paths=test_paths,
@@ -461,7 +462,12 @@ def evaluate_predictions(
             ),
         )
         scatters.append(
-            (tm.rescale(y_predictions), tm.rescale(y_truth), title, test_paths),
+            (
+                tm.rescale(y_predictions),
+                tm.rescale(y_truth),
+                tensor_map_name,
+                test_paths,
+            ),
         )
     else:
         logging.warning(f"No evaluation clause for tensor map {tm.name}")

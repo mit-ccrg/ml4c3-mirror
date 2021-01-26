@@ -18,7 +18,7 @@ import pandas as pd
 import seaborn as sns
 
 # Imports: first party
-from ml4c3.plots import SUBPLOT_SIZE
+from ml4c3.plots import SUBPLOT_SIZE, plot_histogram_continuous_tensor
 from ml4c3.datasets import (
     make_dataset,
     tensors_to_sources,
@@ -465,7 +465,7 @@ def explore(
                             if tm.channel_map:
                                 names = [f"{tm.name}_{cm}" for cm in tm.channel_map]
                             for name in names:
-                                _plot_histogram_continuous_tensor(
+                                plot_histogram_continuous_tensor(
                                     tmap_name=name,
                                     df=_df,
                                     output_folder=args.output_folder,
@@ -613,55 +613,6 @@ def _get_labels(df: pd.DataFrame, explore_stratify_label: str) -> list:
             ],
         )
     return labels
-
-
-def _plot_histogram_continuous_tensor(
-    tmap_name: str,
-    df: pd.DataFrame,
-    output_folder: str,
-    window: str,
-    stratify_label: str,
-    image_ext: str,
-):
-    sns.set_context("talk")
-    plot_width = SUBPLOT_SIZE * 1.3 if stratify_label is not None else SUBPLOT_SIZE
-    plot_height = SUBPLOT_SIZE * 0.6
-    fig = plt.figure(figsize=(plot_width, plot_height))
-    ax = plt.gca()
-    plt.title(f"{tmap_name}: n={len(df)}")
-
-    # Iterate through unique values of stratify label
-    if stratify_label is not None:
-        for stratify_label_value in df[stratify_label].unique():
-            n = sum(df[stratify_label] == stratify_label_value)
-            legend_str = f"{stratify_label}={stratify_label_value} (n={n})"
-            data = df[df[stratify_label] == stratify_label_value][tmap_name]
-            kde = not np.isclose(data.var(), 0)
-            if kde:
-                sns.kdeplot(data, label=legend_str)
-                sns.histplot(data, label=legend_str, stat="density")
-            else:
-                sns.displot(data, label=legend_str)
-            plt.xlabel("Value")
-        box = ax.get_position()
-        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        ax.legend(frameon=False, loc="center left", bbox_to_anchor=(1, 0.5))
-    else:
-        data = df[tmap_name].to_numpy()
-        kde = not np.isclose(data.var(), 0)
-        if kde:
-            sns.kdeplot(data)
-            sns.histplot(data, stat="density")
-        else:
-            sns.displot(data, kde=kde)
-        plt.xlabel("Value")
-    fpath = os.path.join(
-        output_folder,
-        f"histogram_{tmap_name}_{window}{image_ext}",
-    )
-    plt.savefig(fpath, dpi=150, bbox_inches="tight")
-    plt.close()
-    logging.info(f"Saved histogram of {tmap_name} to {fpath}")
 
 
 def _calculate_summary_stats(df: pd.DataFrame, key: str, interpretation) -> dict:

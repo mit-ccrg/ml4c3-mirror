@@ -125,6 +125,110 @@ ECG_REST_PLOT_AMP_LEADS = [
     [2, 5, 8, 11],
 ]
 
+color_palette = sns.color_palette("pastel")
+
+
+def plot_histogram_continuous_tensor(
+    tmap_name: str,
+    df: pd.DataFrame,
+    output_folder: str,
+    window: str,
+    image_ext: str,
+    stratify_label: str = None,
+):
+
+    # Iterate through unique values of stratify label, using existing histplot method
+    # to calculate number of bins per histogram
+    num_bins = []
+    if stratify_label is not None:
+        for i, stratify_label_value in enumerate(np.sort(df[stratify_label].unique())):
+            n = sum(df[stratify_label] == stratify_label_value)
+            data = df[df[stratify_label] == stratify_label_value][tmap_name]
+            histogram = sns.histplot(data)
+            num_bins.append(len(histogram.patches))
+    else:
+        data = df[tmap_name]
+        histogram = sns.histplot(data)
+        num_bins.append(len(histogram.patches))
+    plt.close()
+
+    # Given minimum number of bins, calculate exact bins to share across histograms
+    min_bins = np.min(num_bins)
+    bins = np.histogram(df[tmap_name], bins=min_bins)[1]
+
+    sns.set_context("talk")
+    plot_width = SUBPLOT_SIZE * 1.3 if stratify_label is not None else SUBPLOT_SIZE
+    plot_height = SUBPLOT_SIZE * 0.6
+    fig = plt.figure(figsize=(plot_width, plot_height))
+    ax = plt.gca()
+    plt.title(f"{tmap_name}: n={len(df)}")
+
+    # Iterate through unique values of stratify label and plot each one
+    if stratify_label is not None:
+        for i, stratify_label_value in enumerate(np.sort(df[stratify_label].unique())):
+            n = sum(df[stratify_label] == stratify_label_value)
+            legend_str = f"{stratify_label}={stratify_label_value} (n={n})"
+            data = df[df[stratify_label] == stratify_label_value][tmap_name]
+            kde = not np.isclose(data.var(), 0)
+
+            if kde:
+                sns.kdeplot(data, color=color_palette[i])
+                sns.histplot(
+                    data,
+                    label=legend_str,
+                    stat="density",
+                    color=color_palette[i],
+                    bins=bins,
+                    element="step",
+                )
+            else:
+                sns.histplot(
+                    data,
+                    label=legend_str,
+                    color=color_palette[i],
+                    bins=bins,
+                    element="step",
+                )
+
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        ax.legend(frameon=False, loc="center left", bbox_to_anchor=(1, 0.5))
+    else:
+        data = df[tmap_name].to_numpy()
+        kde = not np.isclose(data.var(), 0)
+        if kde:
+            sns.kdeplot(data, color=color_palette[0])
+            sns.histplot(
+                data,
+                stat="density",
+                color=color_palette[0],
+                bins=bins,
+                element="step",
+            )
+        else:
+            sns.histplot(
+                data,
+                kde=kde,
+                color=color_palette[0],
+                bins=bins,
+                element="step",
+            )
+
+    plt.xlabel("Value")
+    if stratify_label is None:
+        fpath = os.path.join(
+            output_folder,
+            f"histogram-{tmap_name}-{window}{image_ext}",
+        )
+    else:
+        fpath = os.path.join(
+            output_folder,
+            f"histogram-{tmap_name}-stratified-{window}{image_ext}",
+        )
+    plt.savefig(fpath, dpi=150, bbox_inches="tight")
+    plt.close()
+    logging.info(f"Saved histogram of {tmap_name} to {fpath}")
+
 
 def plot_metric_history(
     history,
@@ -194,7 +298,7 @@ def plot_prediction_calibration(
     prediction: np.ndarray,
     truth: np.ndarray,
     labels: Dict[str, int],
-    title: str,
+    tensor_map_name: str,
     image_ext: str,
     prefix: str = "./figures/",
     n_bins: int = 10,
@@ -278,7 +382,9 @@ def plot_prediction_calibration(
     ax1.set_ylabel("Fraction of positives")
     ax1.set_ylim([-0.05, 1.05])
     ax1.legend(loc="lower right")
-    ax1.set_title(f'{title.replace("_", " ")}\nCalibration plot (equally sized bins)')
+    ax1.set_title(
+        f'{tensor_map_name.replace("_", " ")}\nCalibration plot (equally sized bins)',
+    )
     ax2.set_xlabel("Mean predicted value")
     ax2.set_ylabel("Count")
     ax2.legend(loc="upper center", ncol=2)
@@ -287,7 +393,7 @@ def plot_prediction_calibration(
 
     figure_path = os.path.join(
         prefix,
-        "calibrations-" + title + "-" + data_split + image_ext,
+        "calibrations_" + tensor_map_name + "-" + data_split + image_ext,
     )
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
@@ -300,7 +406,7 @@ def plot_confusion_matrix(
     prediction: np.ndarray,
     truth: np.ndarray,
     labels: Dict[str, int],
-    title: str,
+    tensor_map_name: str,
     image_ext: str,
     prefix: str,
     data_split: str,
@@ -318,7 +424,7 @@ def plot_confusion_matrix(
 
     cms = []
     for matrix_title, normalize, ax in [
-        (f"{title} confusion matrix, n = {len(class_truth)}", None, ax1),
+        (f"{tensor_map_name} confusion matrix, n = {len(class_truth)}", None, ax1),
         ("normalized to true classes", "true", ax2),
     ]:
         cm = confusion_matrix(
@@ -342,7 +448,7 @@ def plot_confusion_matrix(
 
     figure_path = os.path.join(
         prefix,
-        f"confusion_matrix_{title}_{data_split}{image_ext}",
+        f"confusion_matrix_{tensor_map_name}_{data_split}{image_ext}",
     )
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
@@ -356,58 +462,66 @@ def plot_confusion_matrix(
 def plot_scatter(
     prediction: np.array,
     truth: np.array,
-    title: str,
+    tensor_map_name: str,
     image_ext: str,
     data_split: str,
     prefix: str = "./figures/",
     paths=None,
-    top_k=3,
+    num_outliers_to_plot=3,
     alpha=0.5,
 ):
     prediction = prediction.ravel()
     truth = truth.ravel()
     margin = float((np.max(truth) - np.min(truth)) / 100)
     _, (ax1, ax2) = plt.subplots(2, 1, figsize=(SUBPLOT_SIZE, 2 * SUBPLOT_SIZE))
-    ax1.plot(
-        [np.min(truth), np.max(truth)],
-        [np.min(truth), np.max(truth)],
-        linewidth=2,
-    )
+
     ax1.plot(
         [np.min(prediction), np.max(prediction)],
         [np.min(prediction), np.max(prediction)],
         linewidth=4,
+        color=color_palette[0],
     )
+
+    ax1.plot(
+        [np.min(truth), np.max(truth)],
+        [np.min(truth), np.max(truth)],
+        linewidth=2,
+        color=color_palette[1],
+    )
+
     pearson = np.corrcoef(prediction.flatten(), truth.flatten())[
         1,
         0,
     ]  # corrcoef returns full covariance matrix
     big_r_squared = coefficient_of_determination(truth, prediction)
-    logging.info(
-        f"Pearson:{pearson:0.3f} r^2:{pearson*pearson:0.3f} R^2:{big_r_squared:0.3f}",
+
+    correlation_stats_string = (
+        f"Pearson: {pearson:0.3f} / "
+        f"r^2: {pearson*pearson:0.3f} / "
+        f"R^2: {big_r_squared:0.3f}\n"
     )
+    logging.info(correlation_stats_string)
     ax1.scatter(
         prediction,
         truth,
-        label=(
-            f"Pearson:{pearson:0.3f} r^2:{pearson*pearson:0.3f}"
-            f" R^2:{big_r_squared:0.3f}"
-        ),
+        label=correlation_stats_string,
         marker=".",
+        color=color_palette[0],
         alpha=alpha,
     )
     if paths is not None:
         diff = np.abs(prediction - truth)
         arg_sorted = diff.argsort()
-        # The path of the best prediction, ie the inlier
+
+        # Plot path of the best prediction (inliers)
         _text_on_plot(
             ax1,
             prediction[arg_sorted[0]] + margin,
             truth[arg_sorted[0]] + margin,
             os.path.basename(paths[arg_sorted[0]]),
         )
-        # Plot the paths of the worst predictions ie the outliers
-        for idx in arg_sorted[-top_k:]:
+        # Plot the paths of the worst predictions (outliers)
+        for idx in arg_sorted[-num_outliers_to_plot:]:
             _text_on_plot(
                 ax1,
                 prediction[idx] + margin,
@@ -415,24 +529,45 @@ def plot_scatter(
                 os.path.basename(paths[idx]),
             )
 
-    ax1.set_xlabel("Predictions")
-    ax1.set_ylabel("Actual")
-    ax1.set_title(title + "\n")
-    ax1.legend(loc="lower right")
+    ax1.set_xlabel("Predicted")
+    ax1.set_ylabel("Truth")
+    ax1.set_title(tensor_map_name)
+    ax1.legend(loc="lower right", frameon=False)
 
-    sns.kdeplot(prediction, label="Predicted", color="r", ax=ax2)
-    sns.histplot(prediction, label="Predicted", color="r", ax=ax2, stat="density")
-    sns.kdeplot(truth, label="Truth", color="b", ax=ax2)
-    sns.histplot(truth, label="Truth", color="b", ax=ax2, stat="density")
-    ax2.legend(loc="upper left")
+    # Plot distribution of predicted values
+    sns.kdeplot(prediction, color=color_palette[0], ax=ax2)
+    sns.histplot(
+        prediction,
+        label="Predicted",
+        color=color_palette[0],
+        ax=ax2,
+        stat="density",
+        alpha=alpha,
+    )
 
-    figure_path = os.path.join(prefix, f"scatter_{title}_{data_split}{image_ext}")
+    # Plot distribution of true values
+    sns.kdeplot(truth, color=color_palette[1], ax=ax2)
+    sns.histplot(
+        truth,
+        label="Truth",
+        color=color_palette[1],
+        ax=ax2,
+        stat="density",
+        alpha=alpha,
+    )
+    ax2.legend(loc="upper left", frameon=False)
+    ax2.set_xlabel("Value")
+
+    figure_path = os.path.join(
+        prefix,
+        f"scatter_{tensor_map_name}_{data_split}{image_ext}",
+    )
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
     logging.info(f"Try to save scatter plot at: {figure_path}")
     plt.savefig(figure_path)
     plt.close()
-    return {title + "_pearson": pearson}
+    return {tensor_map_name + "_pearson": pearson}
 
 
 def subplot_scatters(
@@ -440,7 +575,7 @@ def subplot_scatters(
     data_split: str,
     image_ext: str,
     plot_path: str = "./figures/",
-    top_k: int = 3,
+    num_outliers_to_plot: int = 3,
     alpha: float = 0.5,
 ):
     row = 0
@@ -467,7 +602,7 @@ def subplot_scatters(
         axes[row, col].scatter(prediction, truth, marker=".", alpha=alpha)
         margin = float((np.max(truth) - np.min(truth)) / 100)
 
-        # If tensor paths are provided, plot file names of top_k outliers and #1 inlier
+        # If tensor paths are provided, plot file names of num_outliers_to_plot outliers and #1 inlier
         if paths is not None:
             diff = np.abs(prediction - truth)
             arg_sorted = diff.argsort()
@@ -479,7 +614,7 @@ def subplot_scatters(
                 os.path.basename(paths[arg_sorted[0]]),
             )
             # Plot the paths of the worst predictions ie the outliers
-            for idx in arg_sorted[-top_k:]:
+            for idx in arg_sorted[-num_outliers_to_plot:]:
                 _text_on_plot(
                     axes[row, col],
                     prediction[idx] + margin,
@@ -1028,7 +1163,7 @@ def plot_roc_per_class(
     prediction: np.array,
     truth: np.array,
     labels: dict,
-    title: str,
+    tensor_map_name: str,
     image_ext: str,
     prefix: str = "./figures/",
     data_split: str = "test",
@@ -1071,11 +1206,11 @@ def plot_roc_per_class(
     plt.xlabel(FALLOUT_LABEL)
     plt.legend(loc="lower right")
     plt.plot([0, 1], [0, 1], "k:", lw=0.5)
-    plt.title(f"ROC curve: {title}, n={truth.shape[0]:.0f}\n")
+    plt.title(f"ROC curve: {tensor_map_name}, n={truth.shape[0]:.0f}\n")
 
     figure_path = os.path.join(
         prefix,
-        "roc-per-class-" + title + "-" + data_split + image_ext,
+        "roc-per-class-" + tensor_map_name + "-" + data_split + image_ext,
     )
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
@@ -1155,7 +1290,7 @@ def plot_precision_recall_per_class(
     prediction: np.array,
     truth: np.array,
     labels: dict,
-    title: str,
+    tensor_map_name: str,
     image_ext: str,
     prefix: str = "./figures/",
     data_split: str = "test",
@@ -1195,11 +1330,11 @@ def plot_precision_recall_per_class(
     plt.xlabel(RECALL_LABEL)
     plt.ylabel(PRECISION_LABEL)
     plt.legend(loc="lower right")
-    plt.title(f"PR curve: {title}, n={np.sum(true_sums):.0f}\n")
+    plt.title(f"PR curve: {tensor_map_name}, n={np.sum(true_sums):.0f}\n")
 
     figure_path = os.path.join(
         prefix,
-        "precision-recall-" + title + "-" + data_split + image_ext,
+        "precision-recall-" + tensor_map_name + "-" + data_split + image_ext,
     )
     if not os.path.exists(os.path.dirname(figure_path)):
         os.makedirs(os.path.dirname(figure_path))
