@@ -29,6 +29,7 @@ setup:
 > @echo Setting up the repo...
 > @conda env create -f .pre-commit-env.yml
 > @conda run -n ml4c3 pre-commit install
+> @conda run -n ml4c3 pre-commit autoupdate
 
 clean:
 > @echo Cleaning files...

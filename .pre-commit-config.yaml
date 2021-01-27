@@ -34,7 +34,7 @@ repos:
     files: ".py"
 
 - repo: https://github.com/asottile/add-trailing-comma
-  rev: v2.0.2
+  rev: v2.1.0
   hooks:
   - id: add-trailing-comma
 
@@ -49,6 +49,14 @@ repos:
   hooks:
   - id: black
 
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: v0.800
+  hooks:
+  - id: mypy
+    args:
+    - --ignore-missing-imports
+    - --follow-imports=skip
+
 - repo: local
   hooks:
   - id: pylint
@@ -56,11 +64,3 @@ repos:
     entry: pylint
     language: system
     types: [python]
-
-- repo: git://github.com/luismayta/pre-commit-mypy
-  rev: master
-  hooks:
-  - id: mypy
-    args:
-    - --ignore-missing-imports
-    - --follow-imports=skip
