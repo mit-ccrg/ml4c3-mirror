@@ -15,10 +15,9 @@ from collections import OrderedDict, defaultdict
 import h5py
 import numpy as np
 import pandas as pd
-import seaborn as sns
 
 # Imports: first party
-from ml4c3.plots import SUBPLOT_SIZE, plot_histogram_continuous_tensor
+from ml4c3.plots import plot_histogram_continuous_tensor
 from ml4c3.datasets import (
     make_dataset,
     tensors_to_sources,
@@ -34,13 +33,6 @@ from tensormap.TensorMap import (
     find_negative_label_and_channel,
 )
 
-# fmt: off
-# need matplotlib -> Agg -> pyplot
-import matplotlib                       # isort:skip
-matplotlib.use("Agg")                   # isort:skip
-from matplotlib import pyplot as plt    # isort:skip
-# fmt: on
-
 
 def explore(
     args: argparse.Namespace,
@@ -50,13 +42,11 @@ def explore(
 
     cohort_counts: Dict[str, Any] = OrderedDict()
 
-    src_path = args.tensors
     src_name = args.source_name
     src_join = args.join_tensors
     src_cols = None if args.join_tensors is None else list(src_join)
     src_time = args.time_tensor
 
-    ref_path = args.reference_tensors
     ref_name = args.reference_name
     ref_join = args.reference_join_tensors
     ref_cols = None if args.reference_join_tensors is None else list(ref_join)
@@ -424,7 +414,6 @@ def explore(
             df=df_window,
             src_name=src_name,
             src_cols=src_cols,
-            src_join=src_join,
             window=window,
             title=title,
         )
@@ -434,6 +423,8 @@ def explore(
             [df_window, df_window.dropna()],
             ["union", "intersect"],
         ):
+            if _df.empty:
+                continue
             # Get labels from dataframe of tensors
             labels = _get_labels(
                 df=_df,
@@ -686,7 +677,6 @@ def _update_cohort_counts(
     df: pd.DataFrame,
     src_name: str,
     src_cols: List,
-    src_join: str,
     window: str,
     title: str,
 ) -> dict:
@@ -714,7 +704,7 @@ def _save_label_distribution(
     labels = [f"{stratify_label}={label}" for label in label_counts.keys()]
     labels.append("all")
 
-    counts = [count for count in label_counts.values()]
+    counts = list(label_counts.values())
     counts.append(df.shape[0])
 
     fractions = [count / df.shape[0] for count in counts]
@@ -1018,7 +1008,7 @@ def _tensors_to_df_with_dataset(
         allow_empty_split=True,
     )
     hd5_sources, csv_sources = tensors_to_sources(tensors, tensor_maps_in)
-    dataset, stats, cleanup = make_dataset(
+    dataset, _, cleanup = make_dataset(
         data_split="explore",
         hd5_sources=hd5_sources,
         csv_sources=csv_sources,
@@ -1107,7 +1097,7 @@ def _tensors_to_df(
     paths.extend(zip(train_paths, ["train"] * len(train_paths)))
     paths.extend(zip(valid_paths, ["valid"] * len(valid_paths)))
     paths.extend(zip(test_paths, ["test"] * len(test_paths)))
-    tmaps = [tm for tm in tensor_maps_in]
+    tmaps = tensor_maps_in
 
     TensorsToDataFrameParallelWrapper(
         tmaps=tmaps,
@@ -1176,7 +1166,7 @@ def _modify_tmap_to_return_mean(tmap: TensorMap) -> TensorMap:
         _tensor = tmap.tensor_from_file(tmap, data)
         if tmap.time_series_limit is None:
             _tensor = np.array([_tensor])
-        for i in range(len(_tensor)):
+        for i, _ in enumerate(_tensor):
             try:
                 _tensor[i] = tmap.postprocess_tensor(_tensor[i], data, augment=False)
             except:
