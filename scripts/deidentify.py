@@ -2,14 +2,16 @@
 import os
 import shutil
 import argparse
+import datetime
 from timeit import default_timer as timer
-from typing import Dict
+from typing import Dict, List, Tuple
 from multiprocessing import Pool, cpu_count
 
 # Imports: third party
 import h5py
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 # Imports: first party
 from ml4c3.datasets import patient_csv_to_set
@@ -64,7 +66,7 @@ phi_keys = {
 
 def _get_hd5_mrns(args):
     mrns = set()
-    if args.path_to_hd5_deidentified is not None:
+    if args.path_to_hd5 is not None:
         for root, dirs, files in os.walk(args.path_to_hd5):
             for file in files:
                 split = os.path.splitext(file)
@@ -163,17 +165,22 @@ def _remap_mrns(args):
     # Get new MRNs from HD5 and CSV sources that are not already in mrn_map
     existing_mrns = set(mrn_map.keys())
     new_mrns = _get_mrns(args, skip_mrns=existing_mrns)
-    new_ids = list(range(starting_id, len(new_mrns) + starting_id))
-    np.random.shuffle(new_ids)
-    mrn_map.update(dict(zip(new_mrns, new_ids)))
-    print(f"New MRNs remapped starting at ID {starting_id}")
+
+    if len(new_mrns) > 0:
+        new_ids = list(range(starting_id, len(new_mrns) + starting_id))
+        np.random.shuffle(new_ids)
+        mrn_map.update(dict(zip(new_mrns, new_ids)))
+        print(f"New MRNs remapped starting at ID {starting_id}")
+    print(f"Last ID used in remapping MRNs was {max(mrn_map.values())}")
+
+    today = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
+    mrn_map_filename = args.mrn_map.replace(".csv", "")
+    mrn_map_path_new = f"{mrn_map_filename}-{today}.csv"
 
     df = pd.DataFrame.from_dict(mrn_map, orient="index", columns=["new_id"])
     df.index.name = "mrn"
-    os.makedirs(os.path.dirname(args.mrn_map), exist_ok=True)
-    df.sort_values("new_id").to_csv(args.mrn_map)
-    print(f"MRN map saved to {args.mrn_map}")
-    print(f"Last ID used in remapping MRNs was {df['new_id'].max()}")
+    df.sort_values("new_id").to_csv(mrn_map_path_new, index=False)
+    print(f"MRN map saved to {mrn_map_path_new}")
 
     return mrn_map
 
@@ -198,7 +205,7 @@ def _swap_path_prefix(path, prefix, new_prefix):
     return new_path
 
 
-def _deidentify_hd5(old_new_path: str):
+def _deidentify_hd5(old_new_path: List[Tuple]):
     """
     Given a path to an existing HD5, copy it to a new path and delete all identifiable
     information. Currently only set up for ECG data.
@@ -296,7 +303,6 @@ def _deidentify_csv(path: str, mrn_map: dict, columns_to_remove: list):
     # Drop PHI columns and other user-specified columns
     cols_to_drop = set(df.columns) & (phi_keys | set(columns_to_remove))
     df = df.drop(cols_to_drop, axis=1)
-
     df.to_csv(path, index=False)
 
 
@@ -342,10 +348,13 @@ def _deidentify_csvs(
                 )
                 new_paths.append(new_path)
 
-    for old_path, new_path in zip(old_paths, new_paths):
+    # Iterate over all old, new path pairs
+    path_pairs = list(zip(old_paths, new_paths))
+    for old_path, new_path in tqdm(path_pairs):
         if os.path.exists(new_path):
             os.remove(new_path)
         shutil.copyfile(old_path, new_path)
+
         # if there was no PHI in the original file, copy it without trying to deidentify
         global path_of_csv_to_skip
         if old_path in path_of_csv_to_skip:
@@ -386,7 +395,7 @@ def parse_args():
     parser.add_argument(
         "--mrn_map",
         default=os.path.expanduser("~/dropbox/mrn-deid-maps/mgh.csv"),
-        help="Path to CSV in which to store map from MRN -> deidentified ID.",
+        help="Path to CSV with existing map from MRN -> deidentified ID.",
     )
     parser.add_argument(
         "--starting_id",
@@ -425,7 +434,6 @@ def parse_args():
         help="List of strings defining columns to remove from the final dataframe "
         "prior to saving to CSV",
     )
-
     args = parser.parse_args()
     if args.path_to_csv is not None and args.path_to_csv_deidentified is None:
         raise ValueError(
