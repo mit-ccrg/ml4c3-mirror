@@ -10,6 +10,7 @@ This page describes how to contribute to the `ml4c3` repo.
 1. [:rocket: Pull requests](#rocket-pull-requests)
 1. [:construction: Code reviews](#construction-code-reviews)
 1. [:globe_with_meridians: Wiki](#globe_with_meridians-wiki)
+1. [:scream: I accidentally pushed sensitive data](#scream-i-accidentally-pushed-sensitive-info-what-do-i-do)
 
 ## :octocat: Workflow
 You have an idea for a new way to visualize data. Or, you identified a bug in some machine learning infrastructure. Or, you want to speed up tensorization with a new Python package.
@@ -213,3 +214,91 @@ Documentation is in the repo's [wiki](https://github.com/aguirre-lab/ml4c3/wiki)
 
 Do not directly edit the `ml4c3` wiki! Instead, submit issues and PRs to the [wiki repo](https://github.com/aguirre-lab/ml4c3-wiki/).
 The `ml4c3` wiki is automatically updated from the `ml4c3-wiki` repo via Travis.
+
+
+## :scream: I accidentally pushed sensitive info! What do I do?
+Don't worry, there is a fix for that!
+
+**Note**: This process will affect opened PR and branches. You must tell the team to
+pause work, not submit new PRs, etc. Also, minimize the number of opened branches and
+PRs by merging as many of them as possible.
+
+
+1. Notify Github support with
+   [this form](https://support.github.com/contact/sensitive-data).
+   When filling out the form, detail the file and lines where the sensitive data is
+   added, as well as a link to the file. Explain that you will run
+   `git filter-branch` and ask them to remove cached views and references to the
+   sensitive PR. Provide them a link to that PR that introduced the data too.
+
+1. Clean the remote history:
+    1. Start from a newly cloned version of the repo:
+       ```
+       git clone https://github.com/aguirre-lab/ml4c3.git
+       cd ml4c3
+       ```
+    1. Remove the sensitive file from the repo's commit history. To do so:
+
+       ```
+       git filter-branch --force --index-filter \
+       "git rm --cached --ignore-unmatch PATH-TO-YOUR-FILE-WITH-SENSITIVE-DATA" \
+       --prune-empty --tag-name-filter cat -- --all
+       ```
+       replacing `PATH-TO-YOUR-FILE-WITH-SENSITIVE-DATA` with the path from the repo's root
+       to your sensitive file.
+
+    1. Now that the sensitive data is erased from your local history, you have to overwrite
+       the remote's history. To do so, force push your local history to the repo:
+       ```
+       git push origin --force --all
+       ```
+
+1. The rest of the team will need to fetch the new history. They will pull a version of
+   the branch exactly as it was on the remote repo at the time when the cleaning was
+   performed. So if the branch contains changes that were not pushed by that time,
+   they will be lost. To avoid that, follow the next steps:
+
+   1. The simplest solution is to just back up any changed file locally, remove the
+   local repo, reclone it and copy back the backed-up files.
+
+   1. If you want to avoid deleting the local repo, you can backup the files and run:
+      ```
+      git fetch
+      git checkout <branch>
+      git reset --hard origin/<branch>
+      ```
+      Where `<branch>` will probably be master but could also be a recently opened
+      branch without changes or with new files still not known by git.
+
+      Then you can copy back the backed-up files.
+
+   1. You have changes committed changed and not pushed them, so you have local commits
+   that you want to keep. Option B would reset your branch to its remote version,
+   even if you backup the changed files, you will loose the part of the commit history
+   that differes from the remote version. If you want to preserve the commits as they
+   were on your local branch, follow this workaround:
+
+   Create a copy of your branch before fetching:
+   ```
+   # BEFORE FETCHING!
+   git checkout <branch>
+   git branch old-<branch> origin/<branch>
+   ```
+   This will create a new branch called `old-<branch>` that will keep the contents
+   and commit history of your current state of the branch. Now you can fetch and
+   then rebase remote branch with your local one. Then you can delete the `old-<branch>`
+   ```
+   git fetch
+   git rebase --onto origin/foo old-foo foo
+   git branch -D old-foo
+       ```
+
+1. At this point, the team can resume work on the repo normally. Inform GitHub that
+they can perform the rest of the cleaning. Once they finish, the repo will be
+completely free of sensitive data.
+
+
+Sources:
+[1](https://stackoverflow.com/questions/48267025/how-to-sync-local-history-after-massive-git-history-rewrite),
+[2](https://stackoverflow.com/questions/4084868/how-do-i-recover-resynchronise-after-someone-pushes-a-rebase-or-a-reset-to-a-pub)
+[3](https://docs.github.com/en/github/authenticating-to-github/removing-sensitive-data-from-a-repository)
