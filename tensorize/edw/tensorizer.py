@@ -255,6 +255,10 @@ def _copy_hd5(staging_dir, destination_dir, file):
 
 
 def tensorize(args):
+
+    if not os.path.isdir(args.edw) or len(os.listdir(args.edw)) == 0:
+        raise ValueError(f"Server with EDW data is not mounted in {args.edw}")
+
     # Iterate over batch of patients
     missed_patients = []
     num_mrns_tensorized = []

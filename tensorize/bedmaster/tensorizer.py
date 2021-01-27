@@ -104,10 +104,11 @@ class Tensorizer:
             )
 
         df = pd.DataFrame.from_dict(self.untensorized_files)
-        df.to_csv(
-            os.path.join(tensors, "untensorized_bedmaster_files.csv"),
-            index=False,
-        )
+        if not df.empty:
+            df.to_csv(
+                os.path.join(tensors, "untensorized_bedmaster_files.csv"),
+                index=False,
+            )
 
     def _main_write(
         self,
@@ -274,6 +275,12 @@ def _copy_hd5(staging_dir, destination_dir, file):
 
 
 def tensorize(args):
+
+    if not os.path.isdir(args.bedmaster) or len(os.listdir(args.bedmaster)) == 0:
+        raise ValueError(
+            f"Server with Bedmaster data is not mounted in {args.bedmaster}",
+        )
+
     # Cross reference ADT table against Bedmaster metadata;
     # this results in the creation of xref.csv
     if not os.path.isfile(args.xref):
