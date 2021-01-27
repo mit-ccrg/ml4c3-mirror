@@ -25,8 +25,8 @@ class EDWChecker:
         self.edw_dir = edw_dir
 
     @staticmethod
-    def _check_file_columns(full_file_path, file_expected_columns):
-        data_frame = pd.read_csv(full_file_path)
+    def _check_file_columns(full_file_path, file_expected_columns, remove_flag):
+        data_frame = pd.read_csv(full_file_path, low_memory=False)
         columns = set(data_frame.columns)
         missing_columns = file_expected_columns.difference(columns)
         if len(missing_columns) > 0:
@@ -34,8 +34,13 @@ class EDWChecker:
                 f"Wrong file format: the columns {sorted(missing_columns)} "
                 f"were not found in the input file {full_file_path}.",
             )
+            if remove_flag:
+                os.remove(full_file_path)
+                logging.info(
+                    f"Remove flag is set to True. File {full_file_path} is removed.",
+                )
 
-    def _check_adt(self):
+    def _check_adt(self, remove_flag):
         adt_file = EDW_FILES["adt_file"]["name"]
         adt_file_path = os.path.join(self.edw_dir, adt_file)
         adt_columns = set(EDW_FILES["adt_file"]["columns"])
@@ -53,7 +58,7 @@ class EDWChecker:
         # Check adt table content.
         else:
             other_files_path.remove(adt_file_path)
-            self._check_file_columns(adt_file_path, adt_columns)
+            self._check_file_columns(adt_file_path, adt_columns, remove_flag)
         # Check if there are any unexpected file in edw_dir.
         if len(other_files_path) > 0:
             logging.warning(
@@ -61,14 +66,15 @@ class EDWChecker:
                 f"table and mrns folders should be stored in {self.edw_dir}.",
             )
 
-    def check_structure(self, patient_csv: str = None):
+    def check_structure(self, patient_csv: str = None, remove_flag: bool = False):
         """
         Checks if edw_dir is structured properly.
 
         :param patient_csv: <str> Path to CSV with MRNs to parse; no other MRNs
                will be parsed.
+        :param remove_flag: <bool> Flag to remove files with wrong or empty format.
         """
-        self._check_adt()
+        self._check_adt(remove_flag)
 
         expected_columns = {}
         for element in EDW_FILES:
@@ -126,7 +132,11 @@ class EDWChecker:
                 for file_name in expected_files.intersection(files):
                     full_file_path = os.path.join(csn_folder, file_name)
                     file_expected_columns = expected_columns[file_name]
-                    self._check_file_columns(full_file_path, file_expected_columns)
+                    self._check_file_columns(
+                        full_file_path,
+                        file_expected_columns,
+                        remove_flag,
+                    )
                 # Check if if there are any unexpected file in csns folders.
                 if len(unexpected) > 0:
                     unexpected_list = [
@@ -141,4 +151,4 @@ class EDWChecker:
 
 def check_edw_structure(args):
     edw_checker = EDWChecker(args.edw)
-    edw_checker.check_structure(args.patient_csv)
+    edw_checker.check_structure(args.patient_csv, args.remove_empty)

@@ -6,6 +6,7 @@ import argparse
 import datetime
 import operator
 import multiprocessing
+from typing import Dict
 
 # Imports: third party
 import numpy as np
@@ -978,6 +979,12 @@ def parse_args() -> argparse.Namespace:
         description="Verify EDW files and directories structure " "before tensorizing.",
         parents=[icu_parser],
     )
+    check_edw_structure_parser.add_argument(
+        "--remove_empty",
+        action="store_true",
+        help="If argument set, remove tables (.csv) without column names.",
+    )
+
     # Check Bedmaster structure parser
     check_bedmaster_structure_parser = subparser.add_parser(
         "check_bedmaster_structure",
