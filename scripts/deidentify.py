@@ -155,8 +155,11 @@ def _remap_mrns(args):
 
         # Scenario 2:  user specifies starting_id
 
-    # If no existing map
+    # Map file does not exist
     else:
+        # Ensure directory housing the map file exists
+        os.makedirs(os.path.dirname(args.mrn_map), exist_ok=True)
+
         # Scenario 3: no existing map, so use 1 for starting_id
         if starting_id is None:
             starting_id = 1
@@ -166,22 +169,24 @@ def _remap_mrns(args):
     existing_mrns = set(mrn_map.keys())
     new_mrns = _get_mrns(args, skip_mrns=existing_mrns)
 
+    # If there are new MRNs in the data sources that were not present in existing
+    # MRN map, save new MRN map
     if len(new_mrns) > 0:
         new_ids = list(range(starting_id, len(new_mrns) + starting_id))
         np.random.shuffle(new_ids)
         mrn_map.update(dict(zip(new_mrns, new_ids)))
         print(f"New MRNs remapped starting at ID {starting_id}")
+
+        today = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
+        mrn_map_filename = args.mrn_map.replace(".csv", "")
+        mrn_map_path_new = f"{mrn_map_filename}-{today}.csv"
+
+        df = pd.DataFrame.from_dict(mrn_map, orient="index", columns=["new_id"])
+        df.index.name = "mrn"
+        df.sort_values("new_id").to_csv(mrn_map_path_new, index=False)
+        print(f"MRN map saved to {mrn_map_path_new}")
+
     print(f"Last ID used in remapping MRNs was {max(mrn_map.values())}")
-
-    today = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
-    mrn_map_filename = args.mrn_map.replace(".csv", "")
-    mrn_map_path_new = f"{mrn_map_filename}-{today}.csv"
-
-    df = pd.DataFrame.from_dict(mrn_map, orient="index", columns=["new_id"])
-    df.index.name = "mrn"
-    df.sort_values("new_id").to_csv(mrn_map_path_new, index=False)
-    print(f"MRN map saved to {mrn_map_path_new}")
-
     return mrn_map
 
 
