@@ -1,9 +1,11 @@
 # pylint: disable=too-many-return-statements
 # Imports: standard library
+import os
 import logging
 from typing import Dict, Tuple, Callable, Optional
 
 # Imports: third party
+import h5py
 import numpy as np
 
 # Imports: first party
@@ -758,12 +760,7 @@ def make_bp_array_tensor_from_file(position: int = None):
                         tensor[i][index] = pressures[position]
                     else:
                         pressures = [float(pressure) for pressure in value.split("/")]
-                        if pressures[0] and pressures[0] != 0:
-                            tensor[i][index] = (
-                                pressures[0] - pressures[-1]
-                            ) / pressures[0]
-                        else:
-                            tensor[i][index] = pressures[0]
+                        tensor[i][index] = (pressures[0] - pressures[-1]) / pressures[0]
         else:
             raise ValueError(
                 f"Incorrect interpretation '{tm.interpretation}' for measurement tmap.",
@@ -1261,6 +1258,67 @@ def create_categorical_tmap(key: str, channel_map: Dict[str, int]) -> TensorMap:
     return tmap
 
 
+sao2_key = "r_phs_ip_arterial_o2_for_fick_calculation"
+svo2_key = "r_phs_ip_mixed_venous_o2_for_fick_calculation"
+hgb_key = "r_phs_ip_hgb_to_be_used_for_fick_calculation"
+co_key = "r_cardiac_output"
+
+
+def o2_consumption_tff(tm: TensorMap, data: PatientData) -> np.ndarray:
+    if isinstance(data, h5py.File):
+        mrn = int(os.path.basename(data.filename)[:-4])
+    else:
+        mrn = data.id
+    tensors = []
+    for csn in data["edw"]:
+        sao2_t = data[f"edw/{csn}/flowsheet/{sao2_key}/time"][()]
+        svo2_t = data[f"edw/{csn}/flowsheet/{svo2_key}/time"][()]
+        hgb_t = data[f"edw/{csn}/flowsheet/{hgb_key}/time"][()]
+        co_t = data[f"edw/{csn}/flowsheet/{co_key}/time"][()]
+        times = list(set(sao2_t) & set(svo2_t) & set(hgb_t) & set(co_t))
+        if tm.name == "vo2_time":
+            tensor = co_t[np.isin(co_t, times)]
+        elif tm.name == "vo2_mrn":
+            tensor = np.array([str(mrn)] * len(times))
+        elif tm.name == "vo2_csn":
+            tensor = np.array([str(int(float(csn)))] * len(times))
+        else:
+            sao2_v = data[f"edw/{csn}/flowsheet/{sao2_key}/value"][()]
+            svo2_v = data[f"edw/{csn}/flowsheet/{svo2_key}/value"][()]
+            hgb_v = data[f"edw/{csn}/flowsheet/{hgb_key}/value"][()]
+            co_v = data[f"edw/{csn}/flowsheet/{co_key}/value"][()]
+            sao2 = sao2_v[np.isin(sao2_t, times)]
+            svo2 = svo2_v[np.isin(svo2_t, times)]
+            hgb = hgb_v[np.isin(hgb_t, times)]
+            co = co_v[np.isin(co_t, times)]
+            if tm.name == "sao2_value":
+                tensor = sao2
+            elif tm.name == "svo2_value":
+                tensor = svo2
+            elif tm.name == "hemoglobin_value":
+                tensor = hgb
+            elif tm.name == "cardiac_output_value":
+                tensor = co
+            else:
+                tensor = co * (sao2 - svo2) * hgb * 1.34 / 10
+        tensors.append(tensor)
+    return np.concatenate(tensors)[:, None]
+
+
+def create_vo2_tmap(tm_name: str) -> TensorMap:
+    interpretation = Interpretation.CONTINUOUS
+    if tm_name == "vo2_mrn" or tm_name == "vo2_csn":
+        interpretation = Interpretation.LANGUAGE
+    tm = TensorMap(
+        name=tm_name,
+        shape=(1,),
+        interpretation=interpretation,
+        tensor_from_file=o2_consumption_tff,
+        time_series_limit=0,
+    )
+    return tm
+
+
 def get_tmap(tm_name: str) -> Optional[TensorMap]:
     # Because we have so many tensor maps being made in this one function, we may
     # occasionally have partial matches for names (e.g. sodium in labs and medications)
@@ -1341,5 +1399,16 @@ def get_tmap(tm_name: str) -> Optional[TensorMap]:
         tm = create_age_tmap()
     elif tm_name == "sex_double":
         tm = create_sex_double_tmap()
+    elif (
+        tm_name == "vo2_mrn"
+        or tm_name == "vo2_csn"
+        or tm_name == "vo2_time"
+        or tm_name == "vo2_value"
+        or tm_name == "sao2_value"
+        or tm_name == "svo2_value"
+        or tm_name == "hemoglobin_value"
+        or tm_name == "cardiac_output_value"
+    ):
+        tm = create_vo2_tmap(tm_name=tm_name)
 
     return tm
