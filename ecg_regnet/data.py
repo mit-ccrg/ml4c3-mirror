@@ -190,6 +190,7 @@ def get_sex_tmap() -> TensorMap:
 def get_afib_tmap() -> TensorMap:
     afib = ecg_label_tmaps["atrial_fibrillation"]
     afib.time_series_filter = most_recent_ecg_date
+    afib.loss = sigmoid_focal_crossentropy
     return afib
 
 

@@ -159,6 +159,7 @@ def analyze_inference(inference_folder: str, output_folder: str) -> pd.DataFrame
     csvs = glob.glob(f"{inference_folder}/*.csv")
     out = []
     sns.set_theme(style="dark")
+    os.makedirs(output_folder, exist_ok=True)
     for csv in csvs:
         description = os.path.splitext(os.path.basename(csv))[0]
         df = pd.read_csv(csv)
