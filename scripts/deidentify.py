@@ -179,8 +179,9 @@ def _remap_mrns(args):
 
         # Generate new file name and path
         today = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
-        mrn_map_filename = args.mrn_map.replace(".csv", "")
-        mrn_map_path_new = f"{mrn_map_filename}-{today}.csv"
+        path_dir = os.path.dirname(args.mrn_map)
+        new_file_name = f"{args.mrn_map_prefix}-{today}.csv"
+        mrn_map_path_new = os.path.join(path_dir, new_file_name)
 
         # Convert dict of MRN map to dataframe and save to disk
         df = pd.DataFrame(list(mrn_map.items()), columns=["mrn", "id"])
@@ -404,6 +405,11 @@ def parse_args():
         "--mrn_map",
         default=os.path.expanduser("~/dropbox/mrn-deid-maps/mgh.csv"),
         help="Path to CSV with existing map from MRN -> deidentified ID.",
+    )
+    parser.add_argument(
+        "--mrn_map_prefix",
+        default="mgb",
+        help="Prefix before date time in MRN map file name, e.g. $prefix-2021-01-04-14:21:03.csv",
     )
     parser.add_argument(
         "--starting_id",
