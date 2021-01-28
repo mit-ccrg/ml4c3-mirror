@@ -144,9 +144,9 @@ def _remap_mrns(args):
     if os.path.isfile(args.mrn_map):
         # call _get_csv_mrns to determine which CSVs to skip for deidentification
         _get_csv_mrns(args)
-        mrn_map = pd.read_csv(args.mrn_map, low_memory=False, usecols=["mrn", "new_id"])
+        mrn_map = pd.read_csv(args.mrn_map, low_memory=False, usecols=["mrn", "id"])
         mrn_map = mrn_map.set_index("mrn")
-        mrn_map = mrn_map["new_id"].to_dict()
+        mrn_map = mrn_map["id"].to_dict()
 
         # Scenario 1: use last ID in map as starting_id
         if starting_id is None:
@@ -177,13 +177,14 @@ def _remap_mrns(args):
         mrn_map.update(dict(zip(new_mrns, new_ids)))
         print(f"New MRNs remapped starting at ID {starting_id}")
 
+        # Generate new file name and path
         today = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
         mrn_map_filename = args.mrn_map.replace(".csv", "")
         mrn_map_path_new = f"{mrn_map_filename}-{today}.csv"
 
-        df = pd.DataFrame.from_dict(mrn_map, orient="index", columns=["new_id"])
-        df.index.name = "mrn"
-        df.sort_values("new_id").to_csv(mrn_map_path_new, index=False)
+        # Convert dict of MRN map to dataframe and save to disk
+        df = pd.DataFrame(list(mrn_map.items()), columns=["mrn", "id"])
+        df.sort_values("mrn").to_csv(mrn_map_path_new, index=False)
         print(f"MRN map saved to {mrn_map_path_new}")
 
     print(f"Last ID used in remapping MRNs was {max(mrn_map.values())}")
@@ -378,18 +379,20 @@ def run(args):
     start_time = timer()
     mrn_map = _remap_mrns(args)
 
-    _deidentify_hd5s(
-        path_to_hd5_deidentified=args.path_to_hd5_deidentified,
-        path_to_hd5=args.path_to_hd5,
-        mrn_map=mrn_map,
-        num_workers=args.num_workers,
-    )
     _deidentify_csvs(
         path_to_csv_deidentified=args.path_to_csv_deidentified,
         path_to_csv=args.path_to_csv,
         mrn_map=mrn_map,
         columns_to_remove=args.columns_to_remove,
     )
+
+    _deidentify_hd5s(
+        path_to_hd5_deidentified=args.path_to_hd5_deidentified,
+        path_to_hd5=args.path_to_hd5,
+        mrn_map=mrn_map,
+        num_workers=args.num_workers,
+    )
+
     end_time = timer()
     elapsed_time = end_time - start_time
     print(f"De-identification took {elapsed_time:.2f} seconds.")
