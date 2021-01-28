@@ -18,7 +18,6 @@ from tqdm.notebook import tqdm as log_progress
 
 # Imports: first party
 from clustering.utils import IncorrectSignalError, format_time, get_signal_type
-
 from clustering.globals import METADATA_MEDS
 from tensormap.TensorMap import Interpretation, update_tmaps
 from clustering.objects.modifiers import (
@@ -32,6 +31,8 @@ from clustering.objects.modifiers import (
     DimensionsReducer,
 )
 
+# pylint: disable=global-statement
+
 TMAPS: Dict = {}
 
 
@@ -43,8 +44,13 @@ def _get_tmap(key):
 
 
 class HD5File(h5py.File):
+    """
+    Wrapper wround an h5py File containing methods specific to get information
+    from tensorized hd5 files.
+    """
+
     def __init__(self, path):
-        super(HD5File, self).__init__(path, "r")
+        super().__init__(path, "r")
 
     @staticmethod
     def get_full_type_path(sig_type, visit=None):
@@ -55,7 +61,7 @@ class HD5File(h5py.File):
         """
         if sig_type in ["flowsheet", "labs", "med", "surgery", "transfusions"]:
             path = f"edw/*/{sig_type}"
-        elif sig_type in ["vitals", "wavefor"]:
+        elif sig_type in ["vitals", "waveform"]:
             path = f"bedmaster/*/{sig_type}"
         else:
             raise ValueError(f"Invalid signal type: {sig_type}")
@@ -109,8 +115,8 @@ class HD5File(h5py.File):
         sig_types = set()
         visits = self.visits if not visit else [visit]
         for source in self.sources:
-            for visit in visits:
-                sig_types = sig_types | set(self[source][visit])
+            for visit_id in visits:
+                sig_types = sig_types | set(self[source][visit_id])
         return sig_types
 
     def has_source(self, source, visit=None):
@@ -128,11 +134,11 @@ class HD5File(h5py.File):
                     f"is corrupted and can't be accessed.",
                 )
                 return False
-            for visit in visits:
-                has_visit = visit in self[source]
+            for visit_id in visits:
+                has_visit = visit_id in self[source]
                 if has_visit:
-                    has_signals = bool(list(self[source][visit]))
-                    has_attrs = bool(list(self[source][visit]))
+                    has_signals = bool(list(self[source][visit_id]))
+                    has_attrs = bool(list(self[source][visit_id]))
                     source_is_full = has_attrs or has_signals
                     if source_is_full:
                         return True
@@ -254,14 +260,14 @@ class HD5File(h5py.File):
         :param output: 3 options:
             - existence: output is a boolean that confirms existence of the signal
             - length: output is the duration of the signal in seconds
-            - percentage: output is the percentage of existence of the signal with respect
-                          to the BLK08 stay.
+            - percentage: output is the percentage of existence of the signal with
+                          respect to the BLK08 stay.
         :param max_length: crop the BLK08 stay to a maximum of <max_lenth> hours.
         """
         sig_path = HD5File.get_full_signal_path(signal=signal, visit=visit)
         if sig_path not in self:
             logging.info(f"File {self.mrn} has no signal {signal}")
-            return {}
+            return {"_existence": False}
 
         duration = self.get_blk08_duration(
             visit,
@@ -274,13 +280,13 @@ class HD5File(h5py.File):
         time = self[sig_path]["time"]
         if not time.size:
             logging.info(f"Signal {signal} exists on {self.mrn} but it's empty.")
-            return {}
+            return {"_existence": False}
         valid_idx = np.where((time[()] >= blk08_start) & (time[()] <= blk08_end))[0]
         if not valid_idx.size:
             logging.info(
                 f"Signal {signal} exists on {self.mrn} but is out of BLK08 range.",
             )
-            return {}
+            return {"_existence": False}
 
         start_time, end_time = time[valid_idx[0]], time[valid_idx[-1]]
         unfilled = np.diff(
@@ -288,25 +294,38 @@ class HD5File(h5py.File):
         )
         max_unfilled = unfilled.max()
 
-        time_diff = np.diff(time[valid_idx])
-        non_monotonicities = time_diff[time_diff < 0]
+        valid_time = time[valid_idx]
+        time_diff = np.diff(valid_time)
 
-        signal_exists = valid_idx.size != 0
+        is_nm = time_diff < 0
+        non_monotonicities = time_diff[is_nm]
+
         overlap_length = end_time - start_time
         overlap_percent = (end_time - start_time) / (blk08_end - blk08_start) * 100
         non_monotonicities_num = non_monotonicities.size
-        max_non_monotonicity = (
-            abs(non_monotonicities.min()) if non_monotonicities_num else 0
-        )
+        if non_monotonicities_num:
+            max_non_monotonicity = abs(non_monotonicities).max()
+            non_monotonicities_sum = abs(non_monotonicities).sum()
+            mask = np.concatenate(([False], is_nm, [False]))
+            changes = np.nonzero(mask[1:] != mask[:-1])[0]
+            durations = changes[1::2] - changes[::2]
+            longest_non_mon = durations.max()
+        else:
+            max_non_monotonicity = 0
+            non_monotonicities_sum = 0
+            longest_non_mon = 0
+
         results = {
-            "existence": signal_exists,
-            "overlap_length": overlap_length,
-            "overlap_percent": overlap_percent,
-            "start_time": start_time,
-            "end_time": end_time,
-            "max_unfilled": max_unfilled,
-            "non_monotonicities": non_monotonicities_num,
-            "max_non_monotonicity": max_non_monotonicity,
+            "_existence": True,
+            "_overlap_length": overlap_length,
+            "_overlap_percent": overlap_percent,
+            "_start_time": start_time,
+            "_end_time": end_time,
+            "max_unfilled_(s)": max_unfilled,
+            "non_monotonicities_(#)": non_monotonicities_num,
+            "max_non_monotonicity_(s)": max_non_monotonicity,
+            "non_monotonicities_sum_(s)": non_monotonicities_sum,
+            "longest_consecutive_non_mono_(#)": longest_non_mon,
         }
         return results
 
@@ -358,9 +377,8 @@ class HD5File(h5py.File):
                     stype=sig_type,
                 )
                 return signal
-            else:
-                logging.info(f"Signal {signal_name} not found on BLK08 on {self.mrn}")
-                raise ValueError(f"Signal {signal_name} not found!")
+            logging.info(f"Signal {signal_name} not found on BLK08 on {self.mrn}")
+            raise ValueError(f"Signal {signal_name} not found!")
 
         tmap = _get_tmap(f"{signal_name}_units")
         units = tmap.tensor_from_file(tmap, self, visits=visit)[0]
@@ -532,7 +550,7 @@ class HD5File(h5py.File):
                     f"Signal {signal_name} could not be extracted"
                     f"from file {self.mrn}. Patient won't be extracted.",
                 )
-                return
+                return None
 
         metadata = self.get_patient_metadata(visit, max_len=max_length)
         patient = Patient(
@@ -546,6 +564,8 @@ class HD5File(h5py.File):
 
 
 class Signal:
+    """ Represents a signal with timestamps, values and methods associated """
+
     def __init__(
         self,
         name=None,
@@ -641,6 +661,8 @@ class Signal:
 
 
 class Patient:
+    """ A patient containing a set of signals a methods associated """
+
     def __init__(
         self,
         signals: Union[Dict[str, Signal], List[Signal]],
@@ -666,8 +688,7 @@ class Patient:
     def __contains__(self, item):
         if isinstance(item, Signal):
             return item in self.signals.values()
-        else:
-            return item in self.signals.keys()
+        return item in self.signals.keys()
 
     def __iter__(self):
         return iter(sorted(self.signals.items(), key=lambda x: x[0]))
@@ -780,17 +801,17 @@ class Patient:
                     blk08_stay = self.meta["BLK08 end"] - self.meta["BLK08 start"]
                     raise ValueError(
                         f"Patient {self} has a shorter analyzed timespan ({real_span}) "
-                        f"than the max: ({teoric_max_span / 3600}h) but it does not come"
-                        f"from a shorter BLK08 stay, which is {blk08_stay}",
+                        f"than the max: ({teoric_max_span / 3600}h) but it does not "
+                        f"come from a shorter BLK08 stay, which is {blk08_stay}",
                     )
             t_min, t_max = self.time_range()
             signals_range = t_max - t_min
             if not self.out_padded:
                 if signals_range > real_span:
                     raise ValueError(
-                        f"Patient {self}'s signals take larger time range than they should: "
-                        f"{signals_range / 3600}h which are larger than the time span"
-                        f"{real_span}h",
+                        f"Patient {self}'s signals take larger time range than they "
+                        f"should: {signals_range / 3600}h which are larger than the "
+                        f"time span {real_span}h",
                     )
             else:
                 if signals_range != teoric_max_span:
@@ -868,12 +889,14 @@ class Patient:
 
 
 class Bundle:
+    """ Represents a set of patients with methods associated. """
+
     def __init__(self, patients: Dict[str, Patient], name=None):
         self.name = name
         self.patients = OrderedDict(patients)
 
         self.out_padded = False
-        self.processes = OrderedDict({"raw": {}})
+        self.processes: OrderedDict = OrderedDict({"raw": {}})
 
         self.verify()
 
@@ -967,6 +990,7 @@ class Bundle:
 
         self.verify()
         self.processes["outliers_removal"] = [method, kwargs]
+        return None
 
     def normalize(self, method=None, list_methods=False, **kwargs):
         """
@@ -978,6 +1002,7 @@ class Bundle:
         Normalizer.normalize(method, bundle=self, **kwargs)
         self.verify()
         self.processes["normalize"] = [method, kwargs]
+        return None
 
     def downsample(self, method=None, list_methods=False, **kwargs):
         """
@@ -990,6 +1015,7 @@ class Bundle:
             patient.downsample(method, **kwargs)
         self.verify()
         self.processes["downsample"] = [method, kwargs]
+        return None
 
     def pad(
         self,
@@ -1030,6 +1056,7 @@ class Bundle:
         self.out_padded = out_pad
         self.verify()
         self.processes[process_name] = [filling, kwargs]
+        return None
 
     def plot_signal(self, signal_name, patients=None):
         """
@@ -1119,7 +1146,8 @@ class Bundle:
     ):
         """
         Clusters patients on the bundle.
-        :param method: method for clustering. Use list_methods=True for a list of available ones.
+        :param method: method for clustering. Use list_methods=True for a list of
+                       available ones.
         :param distances: distance matrix to use for clustering.
         :param distance_algo: algorithm to treat the distances on the distance matrix.
                              Use list_methods=True for a list of the available ones.
@@ -1250,7 +1278,7 @@ class Bundle:
             "Time range": f"{str(self.time_range())}h",
             "Patients with complete time range": max_trange_patients,
             "Patients with early discharge": len(self.patients) - max_trange_patients,
-            f"\t More than {int(early_dc_time / 3600)}h early discharge": early_dischage_patients,
+            f"Sooner than {int(early_dc_time / 3600)}h": early_dischage_patients,
         }
         return report
 
@@ -1258,7 +1286,7 @@ class Bundle:
         if rename_subfiles:
             folder, name_with_ext = os.path.split(path)
             folder = folder if folder else "."
-            new_name, ext = os.path.splitext(name_with_ext)
+            new_name, _ = os.path.splitext(name_with_ext)
 
             old_name = self.name
             other_bundles = [
@@ -1282,6 +1310,8 @@ class Bundle:
 
 
 class ClusterResult:
+    """ Class that associates every patient on a Bundle with a cluster"""
+
     def __init__(self, patient_cluster: Dict):
         self.patient_cluster = patient_cluster
         self.clusters = list(set(self.patient_cluster.values()))
@@ -1310,6 +1340,11 @@ class ClusterResult:
 
 
 class ClusterReport:
+    """
+    Class that contains summary statistics about each cluster from a ClusterResult
+    on a Bundle.
+    """
+
     def __init__(self):
         self.cluster_info = {}
         self.clusters = list(self.cluster_info)
@@ -1327,6 +1362,18 @@ class ClusterReport:
         for uval in unique_values:
             value_count[f"{uval} (%)"] = (data.count(uval) / len(data)) * 100
         return value_count
+
+    @staticmethod
+    def _format_list(data, percent=False, include_std=False):
+        data = np.array(data)
+        data = data[~np.isnan(data)]
+        mean = np.mean(data)
+        if percent:
+            mean = mean * 100
+        if include_std:
+            std = np.std(data)
+            return f"{mean:.2f} +/- {std:.2f}"
+        return mean
 
     def add_patient(self, patient, cluster):
         if cluster not in self.cluster_info:
@@ -1377,17 +1424,6 @@ class ClusterReport:
                     cluster_report[cluster_name][key] = value
 
         return pd.DataFrame(cluster_report)
-
-    def _format_list(self, data, percent=False, include_std=False):
-        data = np.array(data)
-        data = data[~np.isnan(data)]
-        mean = np.mean(data)
-        if percent:
-            mean = mean * 100
-        if include_std:
-            std = np.std(data)
-            return f"{mean:.2f} +/- {std:.2f}"
-        return mean
 
     def plot_distribution(self, field):
         for cluster in sorted(self.cluster_info):

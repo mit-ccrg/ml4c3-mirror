@@ -10,7 +10,6 @@ def find(args):
     finder = Explorer(args.tensors)
     report = finder.find(
         args.signals,
-        cell=args.cell_value,
         stay_length=args.max_stay_length,
     )
     report.to_csv(os.path.join(args.output_folder, f"{args.csv_name}.csv"))
@@ -23,16 +22,16 @@ def extract(args):
 
     logging.debug(f"Reading report from {report_path}...")
     report = RequestReport.from_csv(report_path)
-    logging.debug(f"Report loaded!")
+    logging.debug("Report loaded!")
 
     logging.debug(f"Extracting data from {hd5_path}...")
     explorer = Explorer(hd5_path)
     bundle = explorer.extract_data(report)
-    logging.debug(f"Data extracted and bundle created!")
+    logging.debug("Data extracted and bundle created!")
 
     logging.debug(f"Saving bundle on {output_path}...")
     bundle.store(output_path)
-    logging.debug(f"Bundle saved!")
+    logging.debug("Bundle saved!")
 
 
 def cluster_ui(args):

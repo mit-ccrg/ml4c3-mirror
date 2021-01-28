@@ -1,8 +1,9 @@
 # Imports: standard library
 import os
+import pickle
 import logging
 from typing import Union
-from collections import Counter
+from collections import Counter, namedtuple
 
 # Imports: third party
 import numpy as np
@@ -12,6 +13,8 @@ from tqdm.notebook import tqdm as log_progress
 
 # Imports: first party
 from clustering.objects.structures import Bundle, HD5File
+
+FILE_ID = namedtuple("FILE_ID", ["file", "visit"])
 
 
 class Explorer:
@@ -100,7 +103,7 @@ class Explorer:
 
         return proposed_sigs
 
-    def find(self, signals, cell="existence", stay_length=0):
+    def find(self, signals, stay_length=0):
         """
         Create a table with the overlap time of the input signals during the BLK08
         stay of the patient. If stay length is set, the considered time will be the
@@ -116,110 +119,66 @@ class Explorer:
 
         :param path: path where the hd5 files are
         :param signals: list with the signals to be searched
-        :param cell: 3 options:
-            - existence: cells are boolean that confirms existence of the signal
-            - length: cells are the seconds of duration of the signal
-            - percentage: cells are the percentage of existence of the signal with respect
-                          to the BLK08 stay.
         :param stay_length: length of the stay (in hours) to consider the signal.
                             If set to 0 it will take the whole BLK08 stay
         :return:
         """
 
-        def _find_on_file(hd5, signals, visit_id, stay_length):
-            if not hd5.has_source("edw", visit=visit_id):
-                logging.info(
-                    f"CSN {visit_id} of MRN {hd5.mrn} does not "
-                    f"have edw data. Ignorning it",
-                )
-                return
-
-            blk08_stays = hd5.get_blk08_duration(
-                visit_id,
-                max_len=stay_length,
-                only_first=True,
-            )
-            if not blk08_stays:
-                logging.info(
-                    f"CSN {visit_id} of MRN {hd5.mrn} didn't go "
-                    f"through BLK08. Ignoring it",
-                )
-                return
-
-            row = {}
-
-            blk08_stay = blk08_stays[0]
-            blk08_duration = blk08_stay["end"] - blk08_stay["start"]
-            blk08_duration = blk08_duration.total_seconds() / 3600
-
-            min_value = 0
-            max_value = np.inf
-            local_max_gap = 0
-            complete_overlap = True
-            non_mono_num = 0
-            max_non_mono = 0
-            for signal in signals:
-                signal_info = hd5.find_signal(
-                    signal,
-                    visit=visit_id,
-                    max_length=stay_length,
-                )
-                if signal_info:
-                    if cell not in signal_info:
-                        raise ValueError(
-                            f"Cell value {cell} not valid! "
-                            f"Valid ones are: {list(signal_info.keys())}",
-                        )
-                    if signal_info["start_time"] >= min_value:
-                        min_value = signal_info["start_time"]
-                    if signal_info["end_time"] <= max_value:
-                        max_value = signal_info["end_time"]
-                    if signal_info["max_unfilled"] > local_max_gap:
-                        local_max_gap = signal_info["max_unfilled"]
-                    if signal_info["non_monotonicities"] > non_mono_num:
-                        non_mono_num = signal_info["non_monotonicities"]
-                    if signal_info["max_non_monotonicity"] > max_non_mono:
-                        max_non_mono = signal_info["max_unfilled"]
-                else:
-                    complete_overlap = False
-
-                if cell in signal_info:
-                    row[signal] = signal_info[cell]
-                else:
-                    row[signal] = np.nan
-
-            signals_overlap = min_value <= max_value and complete_overlap
-            overlap_len = max_value - min_value if complete_overlap else 0
-            overlap_percent = overlap_len / (3600 * blk08_duration) * 100
-
-            row["File"] = file
-            row["Visit"] = visit_id
-            row["Time studied (h)"] = blk08_duration
-            row["Max unfilled time (s)"] = local_max_gap
-            row["Max non-monotonicities (#)"] = non_mono_num
-            row["Max non-monotonicity (s)"] = max_non_mono
-            row["Overlap"] = signals_overlap
-            row["Overlap length (h)"] = overlap_len / 3600
-            row["Overlap percent (%)"] = overlap_percent
-
-            return row
-
-        results = []
+        results = {}
         for file in log_progress(self.files, desc="Finding files..."):
             file_path = os.path.join(self.path, file)
             logging.info(f"\t file: {file_path}")
             try:
                 with HD5File(file_path) as hd5:
                     for visit_id in hd5.visits:
-                        row = _find_on_file(hd5, signals, visit_id, stay_length)
-                        if not row:
+
+                        file_id = FILE_ID(file, visit_id)
+
+                        if not hd5.has_source("edw", visit=visit_id):
+                            logging.info(
+                                f"CSN {visit_id} of MRN {hd5.mrn} "
+                                f"does not have edw data. Ignorning it",
+                            )
                             continue
-                        results.append(row)
+
+                        blk08_stays = hd5.get_blk08_duration(
+                            visit_id,
+                            max_len=stay_length,
+                            only_first=True,
+                        )
+                        if not blk08_stays:
+                            logging.info(
+                                f"CSN {visit_id} of MRN {hd5.mrn} didn't go "
+                                f"through BLK08. Ignoring it",
+                            )
+                            continue
+
+                        file_info = {}
+
+                        blk08_stay = blk08_stays[0]
+                        blk08_duration = blk08_stay["end"] - blk08_stay["start"]
+                        blk08_duration = blk08_duration.total_seconds() / 3600
+
+                        file_info["_period_studied"] = blk08_duration
+
+                        for signal in signals:
+                            signal_info = hd5.find_signal(
+                                signal,
+                                visit=visit_id,
+                                max_length=stay_length,
+                            )
+
+                            for info in signal_info:
+                                if info not in file_info:
+                                    file_info[info] = {}
+                                file_info[info][signal] = signal_info[info]
+
+                        results[file_id] = file_info
 
             except OSError:
                 print(f"File {file} is invalid!")
 
-        request_report = RequestReport(pd.DataFrame(results))
+        request_report = RequestReport(results)
         return request_report
 
     def extract_data(self, report):
@@ -297,6 +256,8 @@ class Explorer:
 
 
 class ExploreReport:
+    """ Report containing summary statistics about the hd5 files stored in a path """
+
     def __init__(self, data=None):
         if not data:
             data = []
@@ -371,19 +332,66 @@ class ExploreReport:
 
 
 class RequestReport:
-    def __init__(self, df):
-        self.df = df
-        self.not_signal_columns = [
-            "File",
-            "Visit",
-            "Time studied (h)",
-            "Overlap",
-            "Overlap length (h)",
-            "Overlap percent (%)",
-            "Max unfilled time (s)",
-            "Max non-monotonicities (#)",
-            "Max non-monotonicity (s)",
-        ]
+    """ Report containing statistics about the signals. Generated by Explorer.find """
+
+    def __init__(self, data):
+        self.data = data
+        self.df = self.generate_table()
+
+    def generate_table(self, signals=None):
+        if signals is None:
+            signals = self.signals
+        unknown_signals = set(signals) - set(self.signals)
+        if len(unknown_signals) != 0:
+            raise ValueError(f"Signals {unknown_signals} are not found in data")
+
+        data = []
+        for file_id, file_data in self.data.items():
+            row = {"File": file_id.file, "Visit": file_id.visit}
+
+            existing_signals = [
+                signal
+                for signal in file_data["_existence"]
+                if file_data["_existence"][signal]
+            ]
+            available_signals = set(existing_signals) & set(signals)
+
+            if len(available_signals) == 0:
+                duration = np.nan
+            else:
+                start_time = max(
+                    file_data["_start_time"][signal] for signal in available_signals
+                )
+                end_time = min(
+                    file_data["_end_time"][signal] for signal in available_signals
+                )
+                duration = (end_time - start_time) / 3600
+
+            period_studied = file_data["_period_studied"]
+            duration_percent = (duration / period_studied) * 100
+
+            row["Overlap"] = duration > 0 and len(available_signals) == len(signals)
+            row["Signals found"] = f"{len(available_signals)}/{len(signals)}"
+            row["Overlap percent (%)"] = (
+                duration_percent if duration_percent > 0 else np.nan
+            )
+            row["Overlap length (h)"] = duration if duration > 0 else np.nan
+            row["Time studied (h)"] = period_studied
+
+            for info_key, signal_values in file_data.items():
+                if not info_key.startswith("_"):
+                    curated_key = info_key.replace("_", " ").capitalize()
+                    row[curated_key] = max(
+                        value
+                        for signal, value in signal_values.items()
+                        if signal in signals
+                    )
+
+            data.append(row)
+
+        self.df = pd.DataFrame(data)
+        self.df = self.df.round(2)
+        return self.df
 
     @property
     def time_studied(self):
@@ -391,7 +399,7 @@ class RequestReport:
 
     @property
     def signals(self):
-        signals = [col for col in self.df.columns if col not in self.not_signal_columns]
+        signals = list(next(iter(self.data.values()))["_existence"].keys())
         return signals
 
     @property
@@ -402,12 +410,21 @@ class RequestReport:
         return file_visits
 
     @staticmethod
-    def from_csv(path="data/all_files.csv"):
+    def from_csv(path):
         df = pd.read_csv(path, index_col=False)
         return RequestReport(df)
 
     def to_csv(self, path):
         self.df.to_csv(path, index=False)
+
+    @staticmethod
+    def from_pickle(path):
+        with open(path, "rb") as file:
+            return pickle.load(file)
+
+    def to_pickle(self, path):
+        with open(path, "wb") as out:
+            pickle.dump(self, out, pickle.HIGHEST_PROTOCOL)
 
     def plot_overlap_length(self):
         plt.hist(self.df["Overlap length (h)"], 24, cumulative=-1)
@@ -428,3 +445,22 @@ class RequestReport:
         freq.plot(kind="hist", cumulative=True, bins=24, density=1, title=signal)
         plt.xlabel("Recording duration")
         plt.show()
+
+    def plot_signals_frequency(self):
+        counts = []
+        for signal in self.signals:
+            count = np.count_nonzero(~np.isnan(self.df[signal]))
+            counts.append(count)
+        plt.bar(self.signals, counts)
+        plt.legend()
+        plt.show()
+
+    def plot_signal_cells(self):
+        for signal in self.signals:
+            values = ~np.isnan(self.df[signal])
+            plt.hist(values, label=signal)
+        plt.legend()
+        plt.show()
+
+    def remove_signal(self):
+        pass

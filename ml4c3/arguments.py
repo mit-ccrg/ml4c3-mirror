@@ -1099,22 +1099,6 @@ def parse_args() -> argparse.Namespace:
         default=[],
         help="Signals to be used",
     )
-    find_parser.add_argument(
-        "--cell_value",
-        "-c",
-        default="overlap_length",
-        choices=[
-            "existence",
-            "overlap_length",
-            "overlap_percent",
-            "start_time",
-            "end_time",
-            "max_unfilled",
-            "non_monotonicities",
-            "max_non_monotonicity",
-        ],
-        help="Detailed statistic for each signal.",
-    )
 
     extract_parser = clustering_subparsers.add_parser(
         name="extract",
