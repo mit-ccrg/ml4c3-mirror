@@ -127,6 +127,7 @@ def get_ecg_tmap(length: int, augmentations: List) -> TensorMap:
         path_prefix=ECG_PREFIX,
         tensor_from_file=make_voltage_tff(exact_length=False),
         normalizers=ZeroMeanStd1(),  # TODO: build clip normalizer? Need to pick a physioligical range
+        # normalizers=Standardize(0, 2000),  # TODO: build clip normalizer? Need to pick a physioligical range
         channel_map=ECG_REST_LEADS_ALL,
         time_series_limit=0,
         time_series_filter=most_recent_ecg_date,

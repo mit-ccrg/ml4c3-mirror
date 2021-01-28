@@ -80,7 +80,6 @@ def build_pretraining_model(
     initial_width: int,
     width_growth_rate: int,
     width_quantization: float,
-    decay_steps: int,  # optimizer settings
     learning_rate: float,
     **kwargs,
 ):
@@ -98,20 +97,25 @@ def build_pretraining_model(
         input_name,
         output_name_to_shape,
     )
-    lr_schedule = CosineDecay(
-        initial_learning_rate=learning_rate,
-        decay_steps=decay_steps,
-    )
-    optimizer = SGDW(
-        learning_rate=lr_schedule,
-        momentum=0.9,
-        weight_decay=5 * 5e-5,
-    )  # following RegNet's setup
-    optimizer = RectifiedAdam(learning_rate)
     model({input_name: Input(shape=(ecg_length, 12))})  # initialize model
+    optimizer = RectifiedAdam(learning_rate)
     model.compile(loss=[tm.loss for tm in tmaps_out], optimizer=optimizer)
-    print(model.summary())
+    model.summary()
     return model
+
+
+def _unfreeze_regnet(model):
+    for layer in model.layers:
+        if "reg_net_y_body" in layer.name:
+            print(f"Unfreezing {layer.name}")
+            layer.trainable = True
+
+
+def _freeze_regnet(model):
+    for layer in model.layers:
+        if "reg_net_y_body" in layer.name:
+            print(f"Freezing {layer.name}")
+            layer.trainable = False
 
 
 def build_downstream_model(
@@ -123,7 +127,6 @@ def build_downstream_model(
     initial_width: int,
     width_growth_rate: int,
     width_quantization: float,
-    decay_steps: int,  # optimizer settings
     learning_rate: float,
     model_file: str = None,
     freeze_weights: bool = False,
@@ -143,25 +146,32 @@ def build_downstream_model(
         input_name,
         output_name_to_shape,
     )
-    lr_schedule = CosineDecay(
-        initial_learning_rate=learning_rate,
-        decay_steps=decay_steps,
-    )
-    optimizer = SGDW(
-        learning_rate=lr_schedule,
-        momentum=0.9,
-        weight_decay=5 * 5e-5,
-    )  # following RegNet's setup
     model({input_name: Input(shape=(ecg_length, 12))})  # initialize model
     if model_file is not None:
         print(f"Loading model weights from {model_file}")
-        model.load_weights(
-            model_file,
-            skip_mismatch=True,
-            by_name=True,
-        )  # load all weights besides new last layer
-        model.layers[0].trainable = not freeze_weights
+        try:
+            model.load_weights(
+                model_file,
+                skip_mismatch=False,
+                by_name=True,
+            )  # load all weights besides new last layer
+        except ValueError:
+            print(
+                "Model file was likely from frozen model. Trying to load with frozen weights",
+            )
+            _freeze_regnet(model)
+            model.load_weights(
+                model_file,
+                skip_mismatch=False,
+                by_name=True,
+            )  # load all weights besides new last layer
+        if freeze_weights:
+            _freeze_regnet(model)
+        else:
+            _unfreeze_regnet(model)
+    optimizer = RectifiedAdam(learning_rate)
     model.compile(loss=[tmap.loss], optimizer=optimizer)
+    model.summary()
     return model
 
 
@@ -177,6 +187,7 @@ def load_optimizer(folder: str, optimizer):
 
 def save_model(folder: str, model) -> str:
     checkpoint_path = os.path.join(folder, "pretraining_model.h5")
+
     model.save_weights(checkpoint_path)
     save_optimizer(folder, model.optimizer)
     return folder
@@ -203,7 +214,6 @@ def get_optimizer_lr(model) -> float:
 
 def _build_test_model():
     return build_pretraining_model(
-        decay_steps=10,
         ecg_length=100,
         kernel_size=3,
         group_size=2,
@@ -250,7 +260,6 @@ def _test_build_pretraining_model():
 
 def _test_build_pretraining_model_bad_group_size():
     m = build_pretraining_model(
-        decay_steps=10,
         ecg_length=2250,
         kernel_size=3,
         group_size=32,
@@ -277,7 +286,6 @@ def _test_build_pretraining_model_bad_group_size():
 def _test_build_downstream_model():
     m = build_downstream_model(
         downstream_tmap_name="age",
-        decay_steps=10,
         ecg_length=100,
         kernel_size=3,
         group_size=2,
@@ -317,7 +325,6 @@ def _test_build_downstream_model_pretrained():
         downstream = build_downstream_model(
             downstream_tmap_name="age",
             model_file=path,
-            decay_steps=10,
             ecg_length=100,
             kernel_size=3,
             group_size=2,
@@ -357,12 +364,12 @@ def _test_build_downstream_model_pretrained_freeze_weights():
         batch_size=2,
         validation_data=(dummy_in, dummy_out),
     )
+    # can we load pretrained models that were not frozen?
     with tempfile.TemporaryDirectory() as tmpdir:
         path = os.path.join(save_model(tmpdir, m), "pretraining_model.h5")
         downstream = build_downstream_model(
             downstream_tmap_name="age",
             model_file=path,
-            decay_steps=10,
             ecg_length=100,
             kernel_size=3,
             group_size=2,
@@ -393,6 +400,37 @@ def _test_build_downstream_model_pretrained_freeze_weights():
     )
     assert "val_loss" in history.history
 
+    # can we load pretrained models that were frozen?
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = os.path.join(save_model(tmpdir, downstream), "pretraining_model.h5")
+        new_downstream = build_downstream_model(
+            downstream_tmap_name="age",
+            model_file=path,
+            ecg_length=100,
+            kernel_size=3,
+            group_size=2,
+            depth=10,
+            initial_width=8,
+            width_growth_rate=2,
+            width_quantization=1.5,
+            learning_rate=1e-5,
+            freeze_weights=True,
+        )
+    new_downstream.summary()
+    dummy_in = {m.input_name: np.zeros((10, 100, 12))}
+    dummy_out = {"output_age_continuous": np.zeros((10, 1))}
+    history = new_downstream.fit(
+        dummy_in,
+        dummy_out,
+        batch_size=2,
+        validation_data=(dummy_in, dummy_out),
+    )
+    np.testing.assert_allclose(  # did the pretrained layers stay the same?
+        m.layers[0](rand_in),
+        downstream.layers[0](rand_in),
+    )
+    assert "val_loss" in history.history
+
 
 class RegNetTrainable(tune.Trainable):
     def setup(self, config):
@@ -411,10 +449,13 @@ class RegNetTrainable(tune.Trainable):
             for name, strength in config.items()
             if "strength" in name
         }
-
+        self.steps_per_epoch = STEPS_PER_EPOCH
+        self.validation_steps_per_epoch = VALIDATION_STEPS_PER_EPOCH
         downstream_tmap_name = config.get("downstream_tmap_name", False)
         if downstream_tmap_name:  # downstream training
             size = config.get("downstream_size", False)
+            self.steps_per_epoch = size // 128
+            self.validation_steps_per_epoch = size // 128
             assert size
             datasets, stats, cleanups = get_downstream_datasets(
                 downstream_tmap_name=downstream_tmap_name,
@@ -459,8 +500,8 @@ class RegNetTrainable(tune.Trainable):
     def step(self):
         history = self.model.fit(
             x=self.train_dataset,
-            steps_per_epoch=STEPS_PER_EPOCH,
-            validation_steps=VALIDATION_STEPS_PER_EPOCH,
+            steps_per_epoch=self.steps_per_epoch,
+            validation_steps=self.validation_steps_per_epoch,
             epochs=self.iteration + 1,
             validation_data=self.valid_dataset,
             initial_epoch=self.iteration,
@@ -522,7 +563,6 @@ def run(
     optimizer_params = {
         # "learning_rate": tune.loguniform(1e-6, 1e-1),
         "learning_rate": 5e-3,
-        "decay_steps": STEPS_PER_EPOCH * epochs,
     }
     hyperparams = {**augmentation_params, **model_params, **optimizer_params}
 

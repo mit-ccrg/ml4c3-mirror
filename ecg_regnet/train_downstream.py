@@ -3,6 +3,7 @@ import os
 import glob
 import shutil
 from typing import Dict, List, Tuple
+from itertools import product
 
 # Imports: third party
 import pandas as pd
@@ -30,10 +31,55 @@ def _get_configs_and_models(folder: str) -> List[Tuple[str, Dict, str]]:
             f"checkpoint_{best_checkpoint_idx}",
             "pretraining_model.h5",
         )
-        assert os.path.exists(model_file)
+        if not os.path.exists(model_file):
+            print(
+                f'Skipping {config["description"]} because it has no checkpoint saved',
+            )
+            continue
         name = os.path.basename(trial)
         out.append((name, config, model_file))
     return out
+
+
+def _scratch_model_experiment_from_config(tmap, size, config):
+    config = config.copy()
+    config["model_file"] = None
+    config["downstream_tmap_name"] = tmap.name
+    config["downstream_size"] = size
+    config["num_augmentations"] = 0
+    config[
+        "description"
+    ] = f"Not pretrained {tmap.name} model. Downstream labels {size}. {config['description']}."
+    print(f"Set up config with description: {config['description']}")
+    return config
+
+
+def _pretrained_model_experiment_from_config(tmap, size, config, model_file):
+    print(model_file)
+    config = config.copy()
+    config["model_file"] = model_file
+    config["downstream_tmap_name"] = tmap.name
+    config["downstream_size"] = size
+    config["num_augmentations"] = 0
+    config[
+        "description"
+    ] = f"Pretrained {tmap.name} model. Downstream labels {size}. {config['description']}."
+    print(f"Set up config with description: {config['description']}")
+    return config
+
+
+def _frozen_model_experiment_from_config(tmap, size, config, model_file):
+    config = config.copy()
+    config["model_file"] = model_file
+    config["downstream_tmap_name"] = tmap.name
+    config["downstream_size"] = size
+    config["num_augmentations"] = 0
+    config["freeze_weights"] = True
+    config[
+        "description"
+    ] = f"Frozen {tmap.name} model. Downstream labels {size}. {config['description']}."
+    print(f"Set up config with description: {config['description']}")
+    return config
 
 
 def _run_experiments(
@@ -48,23 +94,27 @@ def _run_experiments(
     stopper = EarlyStopping(patience=patience, max_epochs=epochs)
     experiments = []
     for name, original_config, model_file in configs_models:
-        for size in DOWNSTREAM_SIZES:
-            for tmap in get_downstream_tmaps():
-                original_config["model_file"] = None
-                original_config["decay_steps"] = epochs * STEPS_PER_EPOCH
-                original_config["downstream_tmap_name"] = tmap.name
-                original_config["downstream_size"] = size
-                original_config["num_augmentations"] = 0
-                config = original_config.copy()
-                config[
-                    "description"
-                ] = f"Not pretrained {tmap.name} model. Downstream labels {size}. {original_config['description']}."
-                print(f"Set up config with description: {config['description']}")
+        for size, tmap in product(DOWNSTREAM_SIZES, get_downstream_tmaps()):
+            for modified_config in [
+                _scratch_model_experiment_from_config(tmap, size, original_config),
+                _pretrained_model_experiment_from_config(
+                    tmap,
+                    size,
+                    original_config,
+                    model_file,
+                ),
+                _frozen_model_experiment_from_config(
+                    tmap,
+                    size,
+                    original_config,
+                    model_file,
+                ),
+            ]:
                 experiments.append(
                     Experiment(
-                        name=f"{name}_{size}_not_pretrained",
+                        name=modified_config["description"],
                         run=RegNetTrainable,
-                        config=config,
+                        config=modified_config,
                         keep_checkpoints_num=1,
                         checkpoint_score_attr="min-val_loss",
                         checkpoint_freq=1,
@@ -76,46 +126,6 @@ def _run_experiments(
                         local_dir=output_folder,
                     ),
                 )
-                original_config["model_file"] = model_file
-                config = original_config.copy()
-                config[
-                    "description"
-                ] = f"Pretrained {tmap.name} model. Downstream labels {size}. {original_config['description']}."
-                print(f"Set up config with description: {config['description']}")
-                experiments.append(
-                    Experiment(
-                        name=f"{name}_{size}_pretrained",
-                        run=RegNetTrainable,
-                        config=config,
-                        keep_checkpoints_num=1,
-                        checkpoint_score_attr="min-val_loss",
-                        checkpoint_freq=1,
-                        stop=stopper,
-                        resources_per_trial={
-                            "cpu": cpus_per_model,
-                            "gpu": gpus_per_model,
-                        },
-                        local_dir=output_folder,
-                    ),
-                )
-                # config = original_config.copy()
-                # config["description"] = f"Frozen pretrained {tmap.name} model. Downstream labels {size}. {original_config['description']}."
-                # config["freeze_weights"] = True
-                # print(f"Set up config with description: {config['description']}")
-                # experiments.append(Experiment(
-                #     name=f"{name}_{size}_frozen",
-                #     run=RegNetTrainable,
-                #     config=config,
-                #     keep_checkpoints_num=1,
-                #     checkpoint_score_attr="min-val_loss",
-                #     checkpoint_freq=1,
-                #     stop=stopper,
-                #     resources_per_trial={
-                #         "cpu": cpus_per_model,
-                #         "gpu": gpus_per_model,
-                #     },
-                #     local_dir=output_folder,
-                # ))
     print(f"Training {len(experiments)} models")
     run(
         experiments,

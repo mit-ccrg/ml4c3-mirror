@@ -75,8 +75,6 @@ def _run_experiments(
     gpus_per_model: float,
 ):
     names, configs = _get_configs(ray_output_folder, num_experiments, True)
-    for config in configs:
-        config["decay_steps"] = epochs * STEPS_PER_EPOCH
     stopper = EarlyStopping(patience=patience, max_epochs=epochs)
     experiments = [
         Experiment(
