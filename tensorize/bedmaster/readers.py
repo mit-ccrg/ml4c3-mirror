@@ -737,9 +737,10 @@ class CrossReferencer:
         adt_df = pd.read_csv(self.adt)
         adt_columns = EDW_FILES["adt_file"]["columns"]
         adt_df = adt_df[adt_columns].drop_duplicates()
+        adt_df["MRN"] = adt_df["MRN"].astype(str)
 
         xref = pd.read_csv(self.xref_file)
-        xref = xref.drop_duplicates(subset=["MRN", "PatientEncounterID", "path"])
+        xref = xref.drop_duplicates(subset=["MRN", "PatientEncounterID", "Path"])
         xref["MRN"] = xref["MRN"].astype(str)
 
         if mrns:
@@ -799,7 +800,7 @@ class CrossReferencer:
                 csn = str(int(row["PatientEncounterID"]))
             except ValueError:
                 csn = str(row["PatientEncounterID"])
-            fname = os.path.split(row["path"])[1]
+            fname = os.path.split(row["Path"])[1]
             bedmaster_path = os.path.join(self.bedmaster_dir, fname)
             if mrn not in self.crossref:
                 self.crossref[mrn] = {csn: [bedmaster_path]}

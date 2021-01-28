@@ -217,7 +217,7 @@ class PreTensorizeExplorer:
                 file = os.path.split(bedmaster_file_path)[-1]
                 # pylint: disable=cell-var-from-loop
                 csns = set(
-                    xref_file[list(map(lambda x: x in file, xref_file["path"]))][
+                    xref_file[list(map(lambda x: x in file, xref_file["Path"]))][
                         "PatientEncounterID"
                     ].unique(),
                 )

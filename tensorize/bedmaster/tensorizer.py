@@ -175,6 +175,7 @@ class Tensorizer:
                         wv_signal = reader.get_wv(channel, wv_signal_name)
                         if wv_signal:
                             writer.write_signal(wv_signal)
+
                     previous_max = reader.max_segment
             except Exception as error:
                 untensorized_files["file"].append(bedmaster_file)
@@ -224,7 +225,7 @@ def stage_bedmaster_files(
 
     # Iterate over all Bedmaster file paths to copy to staging directory
     path_destination_dir = os.path.join(staging_dir, "bedmaster_temp")
-    for path_source_file in xref_subset["path"]:
+    for path_source_file in xref_subset["Path"]:
         if os.path.exists(path_source_file):
             try:
                 shutil.copy(path_source_file, path_destination_dir)

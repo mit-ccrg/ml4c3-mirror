@@ -13,21 +13,10 @@ import numpy as np
 # Imports: first party
 from ml4c3.arguments import parse_args
 from definitions.globals import MODEL_EXT
-from ingest.edw.pipeline import pull_edw_data
-from tensormap.TensorMap import TensorMap
-from ingest.ecg.tensorizer import tensorize as tensorize_ecg
-from ingest.icu.tensorizer import tensorize as tensorize_icu
-from ml4c3.hyperoptimizers import hyperoptimize
-from ingest.icu.assess_coverage import assess_coverage
 
-# from ingest.icu.check_structure import check_icu_structure
 from rl4cs.optimizers.hyperoptimize import run_hyperoptimizer
 from rl4cs.model_simulation.simulation import main_simulation
-
-# from ingest.icu.ecg_features_extraction import extract_ecg_features
-# from ingest.icu.match_patient_bedmaster import match_data
 from rl4cs.model_training.main_training import main_training
-from ingest.icu.pre_tensorize_explorations import pre_tensorize_explore
 
 # pylint: disable=redefined-outer-name, broad-except, import-outside-toplevel
 
@@ -406,6 +395,7 @@ def train_simclr_model(args: argparse.Namespace):
         image_ext=args.image_ext,
         return_history=True,
         plot=True,
+        num_workers=args.num_workers,
     )
 
     for cleanup in cleanups:
