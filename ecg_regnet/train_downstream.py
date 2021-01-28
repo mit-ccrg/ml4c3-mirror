@@ -55,7 +55,6 @@ def _scratch_model_experiment_from_config(tmap, size, config):
 
 
 def _pretrained_model_experiment_from_config(tmap, size, config, model_file):
-    print(model_file)
     config = config.copy()
     config["model_file"] = model_file
     config["downstream_tmap_name"] = tmap.name

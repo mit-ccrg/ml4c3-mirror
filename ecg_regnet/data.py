@@ -9,6 +9,7 @@ import h5py
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from tensorflow_addons.losses import sigmoid_focal_crossentropy
 
 # Imports: first party
 from ml4c3.datasets import train_valid_test_datasets
