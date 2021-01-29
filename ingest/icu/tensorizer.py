@@ -354,8 +354,9 @@ def tensorize(args):
         raise ValueError(
             f"Server with Bedmaster data is not mounted in {args.bedmaster}",
         )
-    if not os.path.isdir(args.edw) or len(os.listdir(args.edw)) == 0:
-        raise ValueError(f"Server with EDW data is not mounted in {args.edw}")
+    if args.recipe != "tensorize_icu_no_edw_pull":
+        if not os.path.isdir(args.edw) or len(os.listdir(args.edw)) == 0:
+            raise ValueError(f"Server with EDW data is not mounted in {args.edw}")
 
     # Cross reference ADT table against Bedmaster metadata;
     # this results in the creation of xref.csv

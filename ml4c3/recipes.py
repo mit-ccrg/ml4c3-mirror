@@ -31,7 +31,7 @@ def run(args: argparse.Namespace):
             "train_sklearn_logreg",
             "train_sklearn_randomforest",
             "train_sklearn_svm",
-            "train_sklearn_xbost",
+            "train_sklearn_xgboost",
         ]:
             train_model(args)
 
