@@ -6,7 +6,7 @@ import argparse
 import pandas as pd
 
 # Imports: first party
-from ml4c3.definitions.icu import ALARMS_FILES
+from definitions.icu import ALARMS_FILES
 
 COLUMNS = [
     "UnitBedUID",

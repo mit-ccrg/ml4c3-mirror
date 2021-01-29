@@ -620,7 +620,7 @@ def test_around_event_tmaps(hd5_data: TEST_DATA):
             time_array > event_time - 6 * 60 * 60,
         ),
     )[0]
-    original1 = values_array[indices1]
+    original1 = np.array([values_array[indices1]])
     assert np.array_equal(original1, tensor1)
 
     tensor2 = tm2.tensor_from_file(tm2, hd5)
@@ -640,7 +640,7 @@ def test_around_event_tmaps(hd5_data: TEST_DATA):
     assert np.array_equal(original2, tensor2)
 
     tensor3 = tm3.tensor_from_file(tm3, hd5)
-    original3 = np.array([original1, time_array[indices1]])
+    original3 = np.array([np.array([original1[0], time_array[indices1]])])
     assert np.array_equal(original3, tensor3)
 
     tensor4 = tm4.tensor_from_file(tm4, hd5)
@@ -728,7 +728,7 @@ def test_signal_metrics_tmaps(hd5_data: TEST_DATA):
             time_array > event_time - 6 * 60 * 60,
         ),
     )[0]
-    original1 = np.array([np.nanmax(values_array[indices1])])
+    original1 = np.array([np.array([np.nanmax(values_array[indices1])])])
     assert np.array_equal(original1, tensor1)
 
     tensor2 = tm2.tensor_from_file(tm2, hd5)
@@ -755,7 +755,11 @@ def test_signal_metrics_tmaps(hd5_data: TEST_DATA):
     ).argmin()
     indice = len(indices1) - indice - 1
     original3 = np.array(
-        [np.nanmedian(values_array[indices1]), time_array[indices1][indice]],
+        [
+            np.array(
+                [np.nanmedian(values_array[indices1]), time_array[indices1][indice]],
+            ),
+        ],
     )
     assert np.array_equal(original3, tensor3)
 

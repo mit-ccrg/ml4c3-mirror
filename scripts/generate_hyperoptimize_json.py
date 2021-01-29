@@ -48,18 +48,24 @@ def generate_hyperoptimize_json_arrest(path_json: str, model_type: str):
     """
     tmaps: Dict[str, TensorMap] = {}
 
-    output_tensors_set: List[List[str]] = [["arrest_double"]]
-    for tmap_list in output_tensors_set:
-        for tmap_name in tmap_list:
-            tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
-
-    windows = [
-        (1, 24, 24),
-        (1, 24, 48),
-        (1, 24, 72),
-        (1, 48, 24),
-        (1, 48, 48),
-        (1, 48, 72),
+    sliding_window_params = [
+        (24, 2),
+        (24, 4),
+        (24, 6),
+        (48, 2),
+        (48, 4),
+        (48, 6),
+        (72, 2),
+        (72, 4),
+        (72, 6),
+    ]
+    outcome = [
+        (12, 1),
+        (12, 2),
+        (6, 1),
+        (6, 2),
+        (3, 1),
+        (3, 0),
     ]
     signals = [
         "blood_pressure_systolic_value",
@@ -79,32 +85,34 @@ def generate_hyperoptimize_json_arrest(path_json: str, model_type: str):
         "glucose_value",
         "anion_gap_value",
         "ppi_value",
-        "ppt_value",
+        "plt_value",
     ]
-    features = [
-        "min",
-        "max",
-        "mean",
-        "std",
-        "first",
-        "last",
-        "count",
-        # "mean_slope",
-        # "mean_crossing_rate",
-    ]
+    features = ["min", "max", "mean", "std", "first", "last", "count"]
+
     input_tensors_set: List[List[str]] = []
-    for T1, T2, T3 in windows:
+    output_tensors_set: List[List[str]] = []
+    for window, step in sliding_window_params:
         input_tmaps = []
-        window = (
-            f"{T1}_hrs_pre_arrest_start_date_{T2}_hrs_post_admin_date_{T3}_hrs_window"
+        sliding_window = (
+            f"{window}_hrs_sliding_window_admin_date_to_arrest_start_date_"
+            f"{step}_hrs_step"
         )
+
         for signal in signals:
             for feature in features:
-                input_tmaps.append(f"{signal}_{window}_{feature}")
-        input_tmaps.append("age_first_visit_arrest_start_date_double")
-        input_tmaps.append(f"length_of_stay_{T1}_hrs_pre_arrest_start_date")
+                input_tmaps.append(f"{signal}_{sliding_window}_{feature}")
+        # input_tmaps.append("age_first_visit_arrest_start_date_double")
+        # input_tmaps.append(f"length_of_stay_{T1}_hrs_pre_arrest_start_date")
         input_tensors_set.append(input_tmaps)
-    for tmap_list in input_tensors_set:
+
+        for prediction, gap in outcome:
+            output_tmaps = []
+            output_tmaps.append(
+                f"{sliding_window}_{prediction}_hrs_prediction_{gap}_hrs_gap",
+            )
+            output_tensors_set.append(output_tmaps)
+
+    for tmap_list in input_tensors_set + output_tensors_set:
         for tmap_name in tmap_list:
             tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
 
@@ -115,7 +123,6 @@ def generate_hyperoptimize_json_arrest(path_json: str, model_type: str):
             "output_tensors": output_tensors_set,
             "patient_csv": [
                 "/media/ml4c3/cohorts_lists/rr-and-codes.csv",
-                "/media/ml4c3/cohorts_lists/rr-and-codes-non-icu.csv",
             ],
         },
     )

@@ -86,6 +86,10 @@ def get_sliding_windows(
         step * 60 * 60,
     )
     get_sliding_windows.windows_cache[hd5.id] = windows
+    if windows.size == 0:
+        raise ValueError(
+            "It is not possible to compute a sliding window with the given parameters.",
+        )
     return windows
 
 
@@ -99,6 +103,7 @@ def make_around_event_tensor_from_file(
     signal_tm: TensorMap,
     signal_time_tm: TensorMap,
     imputation_type: str = None,
+    sample_and_hold: bool = True,
     flag_time_unix: bool = False,
 ):
     if not isinstance(times, (list, np.ndarray)):
@@ -167,12 +172,12 @@ def make_around_event_tensor_from_file(
                 hd5=hd5,
                 **kwargs,
             )
-            if len(times) == 1:
-                tensor = window_tensor
-            elif i == 0:
-                tensor = [window_tensor]
+            if i == 0:
+                tensor = np.array([window_tensor])
             else:
-                tensor = np.append(tensor, [window_tensor], axis=0)
+                if sample_and_hold and np.isnan(window_tensor).all():
+                    window_tensor = tensor[-1]
+                tensor = np.append(tensor, np.array([window_tensor]), axis=0)
         return tensor
 
     return _tensor_from_file
@@ -245,7 +250,9 @@ def make_sliding_window_outcome_tensor_from_file(
         tensor = np.array(
             list(
                 map(
-                    lambda x: np.nan if x < 0 else ([0, 1] if x == 1 else [1, 0]),
+                    lambda x: [np.nan, np.nan]
+                    if x < 0
+                    else ([0, 1] if x == 1 else [1, 0]),
                     labels,
                 ),
             ),
@@ -450,6 +457,7 @@ def create_sliding_window_tmap(tmap_name: str) -> Optional[TensorMap]:
         path_prefix=signal_tm.path_prefix,
         interpretation=signal_tm.interpretation,
         validators=validator_no_nans,
+        time_series_limit=0,
     )
 
 
@@ -465,7 +473,6 @@ def create_sliding_window_outcome_tmap(tmap_name: str) -> Optional[TensorMap]:
             window, event_proc_tm_1, event_proc_tm_2, step, prediction, gap = match[0]
             make_tensor_from_file = make_sliding_window_outcome_tensor_from_file
 
-            shape = (None, 2)
             visit_tm = get_visit_tmap(
                 re.sub(r"(end_date|start_date)", "first_visit", event_proc_tm_2),
             )
@@ -476,10 +483,9 @@ def create_sliding_window_outcome_tmap(tmap_name: str) -> Optional[TensorMap]:
             prediction = int(prediction)
             gap = int(gap)
             name = event_proc_tm_2.name
-            channel_map = ({f"no_{name}": 0, name: 1},)
             return TensorMap(
                 name=tmap_name,
-                shape=shape,
+                shape=(2,),
                 tensor_from_file=make_tensor_from_file(
                     window=window,
                     step=step,
@@ -489,10 +495,11 @@ def create_sliding_window_outcome_tmap(tmap_name: str) -> Optional[TensorMap]:
                     event_tm_2=event_proc_tm_2,
                     visit_tm=visit_tm,
                 ),
-                channel_map=channel_map,
+                channel_map={f"no_{name}": 0, name: 1},
                 path_prefix=event_proc_tm_2.path_prefix,
-                interpretation=event_proc_tm_2.interpretation,
+                interpretation=Interpretation.CATEGORICAL,
                 validators=validator_no_nans,
+                time_series_limit=0,
             )
     return None
 
