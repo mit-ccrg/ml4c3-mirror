@@ -38,43 +38,16 @@ def analyze_results(results_folder: str, output_folder: str) -> pd.DataFrame:
 
     # plot training curves
     plt.figure(figsize=(15, 15))
+    fig, (ax2, ax1) = plt.subplots(1, 2, figsize=(10, 5))
     for tdf in training_dfs:
-        if (tdf["val_loss"] > cutoff).any():
-            continue
-        plt.plot(tdf["epoch"], tdf["val_loss"])
-    tdf = training_dfs[np.nanargmin(best_val_loss)]
-    plt.plot(
-        tdf["epoch"],
-        tdf["val_loss"],
-        linestyle="--",
-        c="k",
-        label="best model",
-        linewidth=6,
-    )
-    plt.legend()
-    plt.ylabel("validation loss")
-    plt.xlabel("epoch")
-    plt.ylim(0, 5)
-    plt.savefig(os.path.join(output_folder, f"val_loss_training_curves.png"), dpi=200)
+        ax1.plot(tdf["epoch"], tdf["val_loss"])
+    ax1.set_ylabel("validation loss")
+    ax1.set_xlabel("epoch")
 
-    plt.figure(figsize=(15, 15))
     for tdf in training_dfs:
-        if (tdf["val_loss"] > cutoff).any():
-            continue
-        plt.plot(tdf["epoch"], tdf["loss"])
-    tdf = training_dfs[np.nanargmin(best_val_loss)]
-    plt.plot(
-        tdf["epoch"],
-        tdf["loss"],
-        linestyle="--",
-        c="k",
-        label="best model",
-        linewidth=6,
-    )
-    plt.legend()
-    plt.ylabel("loss")
-    plt.xlabel("epoch")
-    plt.ylim(0, 5)
+        ax2.plot(tdf["epoch"], tdf["loss"])
+    ax2.set_ylabel("training loss")
+    ax2.set_xlabel("epoch")
     plt.savefig(os.path.join(output_folder, f"loss_training_curves.png"), dpi=200)
 
     # plot best validation loss vs. config columns
@@ -103,6 +76,7 @@ def analyze_results(results_folder: str, output_folder: str) -> pd.DataFrame:
             c="k",
             s=5,
         )
+        plt.scatter(df[col], df[best_val_loss_col], c="gray")
         plt.plot(
             best_across_runs[col],
             best_across_runs[best_val_loss_col],

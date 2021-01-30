@@ -937,7 +937,7 @@ class TensorsToDataFrameParallelWrapper:
                                     for cm in tm.channel_map:
                                         dict_of_tensor_dicts[i][
                                             f"{tm.name}_{cm}"
-                                        ] = tensor[tm.channel_map[cm]]
+                                        ] = tensor[tm.channel_map[cm]].mean()
                                 else:
                                     # If tensor is a scalar, isolate value in array;
                                     # otherwise, retain value as array

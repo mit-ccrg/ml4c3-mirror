@@ -8,12 +8,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 from ray.tune import Analysis, run, stopper
-from hyperoptimize import (
-    STEPS_PER_EPOCH,
-    EarlyStopping,
-    RegNetTrainable,
-    build_pretraining_model,
-)
+from hyperoptimize import EarlyStopping, RegNetTrainable, build_pretraining_model
 from ray.tune.experiment import Experiment
 
 

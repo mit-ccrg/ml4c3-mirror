@@ -8,6 +8,7 @@ from functools import partial
 import h5py
 import numpy as np
 import pandas as pd
+import seaborn as sns
 from matplotlib import pyplot as plt
 from tensorflow_addons.losses import sigmoid_focal_crossentropy
 
@@ -27,7 +28,7 @@ from ml4c3.tensormap.TensorMap import TensorMap
 from ml4c3.tensormap.ecg_labels import tmaps as ecg_label_tmaps
 
 PRETRAIN_NAMES = "pretrain_train", "pretrain_valid", "pretrain_test"
-DOWNSTREAM_SIZES = 500, 1000, 10000
+DOWNSTREAM_SIZES = 512, 1024, 2048, 4096, 8192
 DOWNSTREAM_NAMES = "downstream_train", "downstream_valid", "downstream_test"
 
 
@@ -127,8 +128,11 @@ def get_ecg_tmap(length: int, augmentations: List) -> TensorMap:
         shape=(length, len(ECG_REST_LEADS_ALL)),
         path_prefix=ECG_PREFIX,
         tensor_from_file=make_voltage_tff(exact_length=False),
-        normalizers=ZeroMeanStd1(),  # TODO: build clip normalizer? Need to pick a physioligical range
-        # normalizers=Standardize(0, 2000),  # TODO: build clip normalizer? Need to pick a physioligical range
+        # normalizers=ZeroMeanStd1(),  # TODO: build clip normalizer? Need to pick a physioligical range
+        normalizers=Standardize(
+            0,
+            1000,
+        ),  # Converts to volts. Out of 10k ECGs, largest lead I was 10 with this.
         channel_map=ECG_REST_LEADS_ALL,
         time_series_limit=0,
         time_series_filter=most_recent_ecg_date,
@@ -138,23 +142,34 @@ def get_ecg_tmap(length: int, augmentations: List) -> TensorMap:
 
 
 # Pretraining tmaps
+def validator_not_negative_one(tm: TensorMap, tensor: np.ndarray, hd5: h5py.File):
+    if tensor == -1:
+        raise ValueError("tensor was -1")
+
+
 def get_axis_tmaps() -> List[TensorMap]:
-    keys = "ecg_paxis_std_md", "ecg_raxis_std_md", "ecg_taxis_std_md"
+    keys = "ecg_paxis_md", "ecg_raxis_md", "ecg_taxis_md"
     out = []
     for key in keys:
         tmap = tmaps[key]
         tmap.loss = "mse"
         tmap.time_series_filter = most_recent_ecg_date
+        tmap.normalizers = [Standardize(0, 360)]
+        if "paxis" in key:
+            # paxis muse uses -1 as sentinel value"""
+            tmap.validators.append(validator_not_negative_one)
         out.append(tmap)
     return out
 
 
 def get_interval_tmaps() -> List[TensorMap]:
-    keys = "ecg_rate_std_md", "ecg_pr_std_md", "ecg_qrs_std_md", "ecg_qt_std_md"
+    keys = "ecg_rate_md", "ecg_pr_md", "ecg_qrs_md", "ecg_qt_md"
     out = []
     for key in keys:
         tmap = tmaps[key]
         tmap.loss = "mse"
+        lo, hi = tmap.validators[0].minimum, tmap.validators[0].maximum
+        tmap.normalizers = [Standardize(lo + (hi - lo) / 2, (hi - lo) / 2)]
         tmap.time_series_filter = most_recent_ecg_date
         out.append(tmap)
     return out
@@ -176,7 +191,7 @@ def get_age_tmap() -> TensorMap:
         time_series_limit=0,
         time_series_filter=most_recent_ecg_date,
         validators=RangeValidator(20, 90),
-        normalizers=Standardize(54, 21),
+        normalizers=Standardize(55, 35),
     )
 
 
@@ -203,9 +218,9 @@ def get_lvh_tmap() -> TensorMap:
 def get_downstream_tmaps() -> List[TensorMap]:
     return [
         get_age_tmap(),
-        # get_sex_tmap(),
+        get_sex_tmap(),
         get_afib_tmap(),
-        # get_lvh_tmap(),
+        get_lvh_tmap(),
     ]
 
 
@@ -347,13 +362,16 @@ def explore_all_data(
     **kwargs,
 ):
     """Builds all of the sample CSVs for pretraining and downstream tasks"""
-    run_id = "pretraining_explore"
+    run_id = "explore_folder"
     os.makedirs(os.path.join(args.output_folder, run_id), exist_ok=True)
+    plot_folder = os.path.join(args.output_folder, "plots")
+    os.makedirs(plot_folder, exist_ok=True)
     sample_freq_tmap = tmaps["ecg_sampling_frequency_pc_continuous"]
     sample_freq_tmap.time_series_filter = most_recent_ecg_date
+    sample_freq_tmap.validators = [RangeValidator(250 - 1, 500 + 1)]
 
     ecg_tmaps = [get_ecg_tmap(2500, []), sample_freq_tmap]
-    pretraining_tmaps = get_downstream_tmaps()
+    pretraining_tmaps = get_pretraining_tasks()
     downstream_tmaps = get_downstream_tmaps()
 
     explore_tmaps = ecg_tmaps + pretraining_tmaps + downstream_tmaps
@@ -374,11 +392,24 @@ def explore_all_data(
         int(os.path.splitext(os.path.basename(path))[0]) for path in df["fpath"]
     ]
     df["sample_id"] = sample_ids
+    df = df.sort_values("sample_id")
     df.to_csv(
-        os.path.join(output_folder, "pretraining_explore.tsv"),
+        os.path.join(output_folder, "explore_results.tsv"),
         index=False,
         sep="\t",
     )
+
+    # plotting distributions
+    for col in map(_get_null_check_col, explore_tmaps):
+        fig = plt.figure(figsize=(8, 8))
+        print("plotting", col)
+        mean, std, m, M = df[col].agg(["mean", "std", "min", "max"])
+        plt.title(
+            f"{col}\nnull {df[col].isna().sum()} / {len(df)}, mean {mean:.2f}, std {std:.2f}, range [{m:.2f}, {M:.2f}]",
+        )
+        sns.histplot(data=df, x=col, kde=df[col].nunique() > 2)
+        fig.savefig(os.path.join(plot_folder, f"{col}.png"), dpi=200)
+        plt.close(fig)
 
     shuffled_df = df.sample(frac=1, random_state=3005).dropna(
         subset=list(

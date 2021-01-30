@@ -452,35 +452,29 @@ def make_ecg_tensor(
 
         for i, ecg_date in enumerate(ecg_dates):
             path = make_hd5_path(tm, ecg_date, key)
-            try:
-                data = hd5[path][()]
-                if tm.interpretation == Interpretation.CATEGORICAL:
-                    matched = False
-                    data = f"{channel_prefix}{data}"
-                    for cm in tm.channel_map:
-                        if data.lower() == cm.lower():
-                            slices = (
-                                (i, tm.channel_map[cm])
-                                if dynamic
-                                else (tm.channel_map[cm],)
-                            )
-                            tensor[slices] = 1.0
-                            matched = True
-                            break
-                    if not matched:
+            data = hd5[path][()]
+            if tm.interpretation == Interpretation.CATEGORICAL:
+                matched = False
+                data = f"{channel_prefix}{data}"
+                for cm in tm.channel_map:
+                    if data.lower() == cm.lower():
                         slices = (
-                            (i, tm.channel_map[channel_unknown])
+                            (i, tm.channel_map[cm])
                             if dynamic
-                            else (tm.channel_map[channel_unknown],)
+                            else (tm.channel_map[cm],)
                         )
                         tensor[slices] = 1.0
-                else:
-                    tensor[i] = data
-            except (KeyError, ValueError):
-                logging.debug(
-                    f"Could not obtain tensor {tm.name} from ECG on {ecg_date} in"
-                    f" {hd5.filename}",
-                )
+                        matched = True
+                        break
+                if not matched:
+                    slices = (
+                        (i, tm.channel_map[channel_unknown])
+                        if dynamic
+                        else (tm.channel_map[channel_unknown],)
+                    )
+                    tensor[slices] = 1.0
+            else:
+                tensor[i] = data
         if tm.interpretation == Interpretation.LANGUAGE:
             tensor = tensor.astype(str)
         return tensor
@@ -871,34 +865,34 @@ tmaps[tmap_name] = TensorMap(
 # fmt: off
 # TMap name      ->      (hd5 key,          fill, validator,                 normalizer)
 interval_key_map = {
-    "ecg_rate":          ("ventricularrate", 0,   RangeValidator(10, 200),   None),
-    "ecg_rate_std":      ("ventricularrate", 0,   RangeValidator(10, 200),   Standardize(mean=70, std=16)),
-    "ecg_pr":            ("printerval",      0,   RangeValidator(50, 500),   None),
-    "ecg_pr_std":        ("printerval",      0,   RangeValidator(50, 500),   Standardize(mean=175, std=36)),
-    "ecg_qrs":           ("qrsduration",     0,   RangeValidator(20, 400),   None),
-    "ecg_qrs_std":       ("qrsduration",     0,   RangeValidator(20, 400),   Standardize(mean=104, std=26)),
-    "ecg_qt":            ("qtinterval",      0,   RangeValidator(100, 800),  None),
-    "ecg_qt_std":        ("qtinterval",      0,   RangeValidator(100, 800),  Standardize(mean=411, std=45)),
-    "ecg_qtc":           ("qtcorrected",     0,   RangeValidator(100, 800),  None),
-    "ecg_qtc_std":       ("qtcorrected",     0,   RangeValidator(100, 800),  Standardize(mean=440, std=39)),
-    "ecg_paxis":         ("paxis",           999, RangeValidator(-90, 360),  None),
-    "ecg_paxis_std":     ("paxis",           999, RangeValidator(-90, 360),  Standardize(mean=47, std=30)),
-    "ecg_raxis":         ("raxis",           999, RangeValidator(-90, 360),  None),
-    "ecg_raxis_std":     ("raxis",           999, RangeValidator(-90, 360),  Standardize(mean=18, std=53)),
-    "ecg_taxis":         ("taxis",           999, RangeValidator(-90, 360),  None),
-    "ecg_taxis_std":     ("taxis",           999, RangeValidator(-90, 360),  Standardize(mean=58, std=63)),
-    "ecg_qrs_count":     ("qrscount",        -1,  RangeValidator(0, 100),    None),
-    "ecg_qrs_count_std": ("qrscount",        -1,  RangeValidator(0, 100),    Standardize(mean=12, std=3)),
-    "ecg_qonset":        ("qonset",          -1,  RangeValidator(0, 500),    None),
-    "ecg_qonset_std":    ("qonset",          -1,  RangeValidator(0, 500),    Standardize(mean=204, std=36)),
-    "ecg_qoffset":       ("qoffset",         -1,  RangeValidator(0, 500),    None),
-    "ecg_qoffset_std":   ("qoffset",         -1,  RangeValidator(0, 500),    Standardize(mean=252, std=44)),
-    "ecg_ponset":        ("ponset",          -1,  RangeValidator(0, 1000),   None),
-    "ecg_ponset_std":    ("ponset",          -1,  RangeValidator(0, 1000),   Standardize(mean=122, std=27)),
-    "ecg_poffset":       ("poffset",         -1,  RangeValidator(10, 500),   None),
-    "ecg_poffset_std":   ("poffset",         -1,  RangeValidator(10, 500),   Standardize(mean=170, std=42)),
-    "ecg_toffset":       ("toffset",         -1,  RangeValidator(0, 1000),   None),
-    "ecg_toffset_std":   ("toffset",         -1,  RangeValidator(0, 1000),   Standardize(mean=397, std=73)),
+    "ecg_rate":          ("ventricularrate", np.nan,   RangeValidator(10, 200),   None),
+    "ecg_rate_std":      ("ventricularrate", np.nan,   RangeValidator(10, 200),   Standardize(mean=70, std=16)),
+    "ecg_pr":            ("printerval",      np.nan,   RangeValidator(50, 500),   None),
+    "ecg_pr_std":        ("printerval",      np.nan,   RangeValidator(50, 500),   Standardize(mean=175, std=36)),
+    "ecg_qrs":           ("qrsduration",     np.nan,   RangeValidator(20, 400),   None),
+    "ecg_qrs_std":       ("qrsduration",     np.nan,   RangeValidator(20, 400),   Standardize(mean=104, std=26)),
+    "ecg_qt":            ("qtinterval",      np.nan,   RangeValidator(100, 800),  None),
+    "ecg_qt_std":        ("qtinterval",      np.nan,   RangeValidator(100, 800),  Standardize(mean=411, std=45)),
+    "ecg_qtc":           ("qtcorrected",     np.nan,   RangeValidator(100, 800),  None),
+    "ecg_qtc_std":       ("qtcorrected",     np.nan,   RangeValidator(100, 800),  Standardize(mean=440, std=39)),
+    "ecg_paxis":         ("paxis",           np.nan,   RangeValidator(-90, 360),  None),
+    "ecg_paxis_std":     ("paxis",           np.nan,   RangeValidator(-90, 360),  Standardize(mean=47, std=30)),
+    "ecg_raxis":         ("raxis",           np.nan,   RangeValidator(-90, 360),  None),
+    "ecg_raxis_std":     ("raxis",           np.nan,   RangeValidator(-90, 360),  Standardize(mean=18, std=53)),
+    "ecg_taxis":         ("taxis",           np.nan,   RangeValidator(-90, 360),  None),
+    "ecg_taxis_std":     ("taxis",           np.nan,   RangeValidator(-90, 360),  Standardize(mean=58, std=63)),
+    "ecg_qrs_count":     ("qrscount",        np.nan,   RangeValidator(0, 100),    None),
+    "ecg_qrs_count_std": ("qrscount",        np.nan,   RangeValidator(0, 100),    Standardize(mean=12, std=3)),
+    "ecg_qonset":        ("qonset",          np.nan,   RangeValidator(0, 500),    None),
+    "ecg_qonset_std":    ("qonset",          np.nan,   RangeValidator(0, 500),    Standardize(mean=204, std=36)),
+    "ecg_qoffset":       ("qoffset",         np.nan,   RangeValidator(0, 500),    None),
+    "ecg_qoffset_std":   ("qoffset",         np.nan,   RangeValidator(0, 500),    Standardize(mean=252, std=44)),
+    "ecg_ponset":        ("ponset",          np.nan,   RangeValidator(0, 1000),   None),
+    "ecg_ponset_std":    ("ponset",          np.nan,   RangeValidator(0, 1000),   Standardize(mean=122, std=27)),
+    "ecg_poffset":       ("poffset",         np.nan,   RangeValidator(10, 500),   None),
+    "ecg_poffset_std":   ("poffset",         np.nan,   RangeValidator(10, 500),   Standardize(mean=170, std=42)),
+    "ecg_toffset":       ("toffset",         np.nan,   RangeValidator(0, 1000),   None),
+    "ecg_toffset_std":   ("toffset",         np.nan,   RangeValidator(0, 1000),   Standardize(mean=397, std=73)),
 }
 # fmt: on
 

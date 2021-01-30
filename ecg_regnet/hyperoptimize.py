@@ -2,7 +2,6 @@
 import os
 import pickle
 import argparse
-import tempfile
 from typing import List, DefaultDict
 from collections import defaultdict
 
@@ -28,8 +27,6 @@ from tensorflow_addons.optimizers import SGDW, RectifiedAdam
 from tensorflow.keras.experimental import CosineDecay
 from tensorflow.python.keras.utils.layer_utils import count_params
 
-STEPS_PER_EPOCH = 100
-VALIDATION_STEPS_PER_EPOCH = 10
 BATCH_SIZE = 128  # following RegNet
 
 
@@ -212,226 +209,6 @@ def get_optimizer_lr(model) -> float:
     return model.optimizer.learning_rate(iters).numpy()
 
 
-def _build_test_model():
-    return build_pretraining_model(
-        ecg_length=100,
-        kernel_size=3,
-        group_size=2,
-        depth=10,
-        initial_width=8,
-        width_growth_rate=2,
-        width_quantization=1.5,
-        learning_rate=1e-5,
-    )
-
-
-def _test_build_pretraining_model():
-    m = _build_test_model()
-    m.summary()
-    dummy_in = {m.input_name: np.zeros((10, 100, 12))}
-    dummy_out = {
-        tm.output_name: np.zeros((10,) + tm.shape) for tm in get_pretraining_tasks()
-    }
-    assert np.isclose(get_optimizer_lr(m), 1e-5)
-    history = m.fit(
-        dummy_in,
-        dummy_out,
-        batch_size=2,
-        validation_data=(dummy_in, dummy_out),
-    )
-    lr = get_optimizer_lr(m)
-    assert "val_loss" in history.history
-    with tempfile.TemporaryDirectory() as tmpdir:
-        path = save_model(tmpdir, m)
-        m2 = load_model(path, m)
-    assert np.isclose(
-        get_optimizer_lr(m),
-        lr,
-    )  # does the learning rate stay the same after loading?
-    history = m2.fit(
-        dummy_in,
-        dummy_out,
-        batch_size=2,
-        validation_data=(dummy_in, dummy_out),
-    )
-    assert get_optimizer_iterations(m) == 10
-    assert "val_loss" in history.history
-
-
-def _test_build_pretraining_model_bad_group_size():
-    m = build_pretraining_model(
-        ecg_length=2250,
-        kernel_size=3,
-        group_size=32,
-        depth=13,
-        initial_width=28,
-        width_growth_rate=2.11,
-        width_quantization=2.6,
-        learning_rate=1e-5,
-    )
-    m.summary()
-    dummy_in = {m.input_name: np.zeros((10, 100, 12))}
-    dummy_out = {
-        tm.output_name: np.zeros((10,) + tm.shape) for tm in get_pretraining_tasks()
-    }
-    history = m.fit(
-        dummy_in,
-        dummy_out,
-        batch_size=2,
-        validation_data=(dummy_in, dummy_out),
-    )
-    assert "val_loss" in history.history
-
-
-def _test_build_downstream_model():
-    m = build_downstream_model(
-        downstream_tmap_name="age",
-        ecg_length=100,
-        kernel_size=3,
-        group_size=2,
-        depth=10,
-        initial_width=8,
-        width_growth_rate=2,
-        width_quantization=1.5,
-        learning_rate=1e-5,
-    )
-    m.summary()
-    dummy_in = {m.input_name: np.zeros((10, 100, 12))}
-    dummy_out = {"output_age_continuous": np.random.randn(10, 1)}
-    history = m.fit(
-        dummy_in,
-        dummy_out,
-        batch_size=2,
-        validation_data=(dummy_in, dummy_out),
-    )
-    assert "val_loss" in history.history
-
-
-def _test_build_downstream_model_pretrained():
-    m = _build_test_model()
-    m.summary()
-    dummy_in = {m.input_name: np.zeros((10, 100, 12))}
-    dummy_out = {
-        tm.output_name: np.zeros((10,) + tm.shape) for tm in get_pretraining_tasks()
-    }
-    history = m.fit(
-        dummy_in,
-        dummy_out,
-        batch_size=2,
-        validation_data=(dummy_in, dummy_out),
-    )
-    with tempfile.TemporaryDirectory() as tmpdir:
-        path = os.path.join(save_model(tmpdir, m), "pretraining_model.h5")
-        downstream = build_downstream_model(
-            downstream_tmap_name="age",
-            model_file=path,
-            ecg_length=100,
-            kernel_size=3,
-            group_size=2,
-            depth=10,
-            initial_width=8,
-            width_growth_rate=2,
-            width_quantization=1.5,
-            learning_rate=1e-5,
-        )
-    rand_in = np.random.randn(1, 100, 12)
-    np.testing.assert_allclose(  # did the pretrained layers get loaded?
-        m.layers[0](rand_in),
-        downstream.layers[0](rand_in),
-    )
-    downstream.summary()
-    dummy_in = {m.input_name: np.zeros((10, 100, 12))}
-    dummy_out = {"output_age_continuous": np.zeros((10, 1))}
-    history = downstream.fit(
-        dummy_in,
-        dummy_out,
-        batch_size=2,
-        validation_data=(dummy_in, dummy_out),
-    )
-    assert "val_loss" in history.history
-
-
-def _test_build_downstream_model_pretrained_freeze_weights():
-    m = _build_test_model()
-    m.summary()
-    dummy_in = {m.input_name: np.zeros((10, 100, 12))}
-    dummy_out = {
-        tm.output_name: np.zeros((10,) + tm.shape) for tm in get_pretraining_tasks()
-    }
-    history = m.fit(
-        dummy_in,
-        dummy_out,
-        batch_size=2,
-        validation_data=(dummy_in, dummy_out),
-    )
-    # can we load pretrained models that were not frozen?
-    with tempfile.TemporaryDirectory() as tmpdir:
-        path = os.path.join(save_model(tmpdir, m), "pretraining_model.h5")
-        downstream = build_downstream_model(
-            downstream_tmap_name="age",
-            model_file=path,
-            ecg_length=100,
-            kernel_size=3,
-            group_size=2,
-            depth=10,
-            initial_width=8,
-            width_growth_rate=2,
-            width_quantization=1.5,
-            learning_rate=1e-5,
-            freeze_weights=True,
-        )
-    rand_in = np.random.randn(1, 100, 12)
-    np.testing.assert_allclose(  # did the pretrained layers get loaded?
-        m.layers[0](rand_in),
-        downstream.layers[0](rand_in),
-    )
-    downstream.summary()
-    dummy_in = {m.input_name: np.zeros((10, 100, 12))}
-    dummy_out = {"output_age_continuous": np.zeros((10, 1))}
-    history = downstream.fit(
-        dummy_in,
-        dummy_out,
-        batch_size=2,
-        validation_data=(dummy_in, dummy_out),
-    )
-    np.testing.assert_allclose(  # did the pretrained layers stay the same?
-        m.layers[0](rand_in),
-        downstream.layers[0](rand_in),
-    )
-    assert "val_loss" in history.history
-
-    # can we load pretrained models that were frozen?
-    with tempfile.TemporaryDirectory() as tmpdir:
-        path = os.path.join(save_model(tmpdir, downstream), "pretraining_model.h5")
-        new_downstream = build_downstream_model(
-            downstream_tmap_name="age",
-            model_file=path,
-            ecg_length=100,
-            kernel_size=3,
-            group_size=2,
-            depth=10,
-            initial_width=8,
-            width_growth_rate=2,
-            width_quantization=1.5,
-            learning_rate=1e-5,
-            freeze_weights=True,
-        )
-    new_downstream.summary()
-    dummy_in = {m.input_name: np.zeros((10, 100, 12))}
-    dummy_out = {"output_age_continuous": np.zeros((10, 1))}
-    history = new_downstream.fit(
-        dummy_in,
-        dummy_out,
-        batch_size=2,
-        validation_data=(dummy_in, dummy_out),
-    )
-    np.testing.assert_allclose(  # did the pretrained layers stay the same?
-        m.layers[0](rand_in),
-        downstream.layers[0](rand_in),
-    )
-    assert "val_loss" in history.history
-
-
 class RegNetTrainable(tune.Trainable):
     def setup(self, config):
         # Imports: third party
@@ -449,13 +226,9 @@ class RegNetTrainable(tune.Trainable):
             for name, strength in config.items()
             if "strength" in name
         }
-        self.steps_per_epoch = STEPS_PER_EPOCH
-        self.validation_steps_per_epoch = VALIDATION_STEPS_PER_EPOCH
         downstream_tmap_name = config.get("downstream_tmap_name", False)
         if downstream_tmap_name:  # downstream training
             size = config.get("downstream_size", False)
-            self.steps_per_epoch = size // 128
-            self.validation_steps_per_epoch = size // 128
             assert size
             datasets, stats, cleanups = get_downstream_datasets(
                 downstream_tmap_name=downstream_tmap_name,
@@ -500,8 +273,6 @@ class RegNetTrainable(tune.Trainable):
     def step(self):
         history = self.model.fit(
             x=self.train_dataset,
-            steps_per_epoch=self.steps_per_epoch,
-            validation_steps=self.validation_steps_per_epoch,
             epochs=self.iteration + 1,
             validation_data=self.valid_dataset,
             initial_epoch=self.iteration,
@@ -510,8 +281,6 @@ class RegNetTrainable(tune.Trainable):
         if "val_loss" not in history_dict:
             raise ValueError(f"No val loss in epoch {self.iteration}")
         history_dict["epoch"] = self.iteration
-        history_dict["optimizer_lr"] = get_optimizer_lr(self.model)
-        history_dict["optimizer_iter"] = get_optimizer_iterations(self.model)
         print(f"Completed epoch {self.iteration}")
         return history_dict
 
@@ -549,7 +318,7 @@ def run(
         # "ecg_length": tune.qrandint(1250, 5000, 250),
         "ecg_length": 2500,
         "kernel_size": tune.randint(3, 30),
-        "group_size": tune.qrandint(1, 64, 8),
+        "group_size": tune.qrandint(8, 64, 8),
         "depth": tune.randint(12, 28),
         "initial_width": tune.qrandint(16, 256, 4),
         "width_growth_rate": tune.uniform(0, 4),
@@ -566,37 +335,16 @@ def run(
     }
     hyperparams = {**augmentation_params, **model_params, **optimizer_params}
 
-    max_concurrent = min(
-        cpus // cpus_per_model,
-        len(tf_config.list_physical_devices("GPU")) // gpus_per_model
-        if gpus_per_model
-        else np.inf,
-    )
-    bohb_search = TuneBOHB(
-        metric="val_loss",
-        mode="min",
-        max_concurrent=max_concurrent,
-    )
-    bohb_scheduler = HyperBandForBOHB(
-        time_attr="training_iteration",
-        metric="val_loss",
-        mode="min",
-        max_t=epochs,
-        reduction_factor=2,
-    )
-
     print(
-        f"Running BOHB tune for {num_trials} trials with {max_concurrent} maximum concurrent trials",
+        f"Running random search for {num_trials} trials",
     )
     print(f"Results will appear in {output_folder}")
 
     stopper = EarlyStopping(patience=patience, max_epochs=epochs)
     analysis = tune.run(
         RegNetTrainable,
-        verbose=1,
+        verbose=2,
         num_samples=num_trials,  # how many hyperparameter trials
-        search_alg=bohb_search,
-        scheduler=bohb_scheduler,
         resources_per_trial={
             "cpu": cpus_per_model,
             "gpu": gpus_per_model,
@@ -618,7 +366,7 @@ def parse_args():
     parser.add_argument(
         "--epochs",
         type=int,
-        help=f"Number of training epochs of size 128 (batch size) * {STEPS_PER_EPOCH} (steps per epoch).",
+        help=f"Number of training epochs.",
         required=True,
     )
     parser.add_argument(
