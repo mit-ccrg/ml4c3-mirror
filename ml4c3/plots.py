@@ -154,7 +154,7 @@ def plot_histogram_continuous_tensor(
 
     # Given minimum number of bins, calculate exact bins to share across histograms
     min_bins = np.min(num_bins)
-    bins = np.histogram(df[tmap_name], bins=min_bins)[1]
+    bins = np.histogram(df[df[tmap_name].notna()][tmap_name], bins=min_bins)[1]
 
     sns.set_context("talk")
     plot_width = SUBPLOT_SIZE * 1.3 if stratify_label is not None else SUBPLOT_SIZE
