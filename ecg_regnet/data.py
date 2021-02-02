@@ -1,7 +1,8 @@
 # Imports: standard library
 import os
+import copy
 import argparse
-from typing import Dict, List, Callable
+from typing import Set, Dict, List, Callable
 from functools import partial
 
 # Imports: third party
@@ -128,7 +129,6 @@ def get_ecg_tmap(length: int, augmentations: List) -> TensorMap:
         shape=(length, len(ECG_REST_LEADS_ALL)),
         path_prefix=ECG_PREFIX,
         tensor_from_file=make_voltage_tff(exact_length=False),
-        # normalizers=ZeroMeanStd1(),  # TODO: build clip normalizer? Need to pick a physioligical range
         normalizers=Standardize(
             0,
             1000,
@@ -136,15 +136,20 @@ def get_ecg_tmap(length: int, augmentations: List) -> TensorMap:
         channel_map=ECG_REST_LEADS_ALL,
         time_series_limit=0,
         time_series_filter=most_recent_ecg_date,
-        validators=validator_voltage_no_zero_padding,  # TODO: physiolical range check?
+        validators=[validator_voltage_no_zero_padding, RangeValidator(-10000, 10000)],
         augmenters=augmentations,
     )
 
 
 # Pretraining tmaps
-def validator_not_negative_one(tm: TensorMap, tensor: np.ndarray, hd5: h5py.File):
-    if tensor == -1:
-        raise ValueError("tensor was -1")
+def validator_skip_values(
+    tm: TensorMap,
+    tensor: np.ndarray,
+    hd5: h5py.File,
+    values: Set[float],
+):
+    if set(tensor.ravel()).intersection(values):
+        raise ValueError(f"tensor was in {values}")
 
 
 def get_axis_tmaps() -> List[TensorMap]:
@@ -156,8 +161,8 @@ def get_axis_tmaps() -> List[TensorMap]:
         tmap.time_series_filter = most_recent_ecg_date
         tmap.normalizers = [Standardize(0, 360)]
         if "paxis" in key:
-            # paxis muse uses -1 as sentinel value"""
-            tmap.validators.append(validator_not_negative_one)
+            # paxis muse uses 0 and -1 as sentinel values
+            tmap.validators.append(partial(validator_skip_values, values={-1, 0}))
         out.append(tmap)
     return out
 
@@ -190,7 +195,10 @@ def get_age_tmap() -> TensorMap:
         shape=(1,),
         time_series_limit=0,
         time_series_filter=most_recent_ecg_date,
-        validators=RangeValidator(20, 90),
+        validators=[
+            RangeValidator(19.99, 90.01),
+            partial(validator_skip_values, values={55}),
+        ],
         normalizers=Standardize(55, 35),
     )
 
@@ -375,6 +383,15 @@ def explore_all_data(
     downstream_tmaps = get_downstream_tmaps()
 
     explore_tmaps = ecg_tmaps + pretraining_tmaps + downstream_tmaps
+    unclean_tmaps = []  # for validation of normalization and validators
+    for tmap in explore_tmaps:
+        unclean = copy.deepcopy(tmap)
+        unclean.validators = []
+        unclean.normalizers = []
+        unclean.name = tmap.name + "_unclean"
+        unclean_tmaps.append(unclean)
+    explore_tmaps += unclean_tmaps
+
     df = _tensors_to_df(
         tensor_maps_in=explore_tmaps,
         tensors=hd5_folder,
