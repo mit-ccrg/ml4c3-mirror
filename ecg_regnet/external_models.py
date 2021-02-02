@@ -88,7 +88,11 @@ def transform_datasets_ribeiro(
 ) -> List[tf.data.Dataset]:
     """Ribeiro et al. has units of 10^-4 volts vs. our dataset's milli volts"""
     name = get_ecg_tmap(0, []).input_name
-    return [dataset.apply(lambda x: x[0][name] * 10) for dataset in datasets]
+    return [
+        datasets[0].map(lambda x, y: ({name: x[name] * 10}, y)),  # train
+        datasets[1].map(lambda x, y: ({name: x[name] * 10}, y)),  # valid
+        datasets[2].map(lambda x, y, z: ({name: x[name] * 10}, y, z)),  # test
+    ]
 
 
 def _test_ribeiro():
@@ -197,6 +201,9 @@ class RibeiroTrainable(Trainable):
             output_name_to_shape=output_name_to_shape,
             ribeiro_weights_path=config["model_file"],
         )
+        self.model(
+            {input_name: np.zeros((1, 4096, 12), dtype=np.float32)},
+        )  # initialize model
         optimizer = RectifiedAdam(config["learning_rate"])
         self.model.compile(loss=tmap.loss, optimizer=optimizer)
         self.model.summary()
