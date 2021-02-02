@@ -352,6 +352,8 @@ def run(
         local_dir=output_folder,
         config={**hyperparams, **training_config},
         stop=stopper,
+        checkpoint_freq=1,
+        keep_checkpoints_num=1,
     )
     analysis.results_df.to_csv(os.path.join(output_folder, "results.tsv"), sep="\t")
 
