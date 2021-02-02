@@ -1,17 +1,18 @@
+# Imports: standard library
 from typing import Dict, List
 
+# Imports: third party
 import numpy as np
-import tensorflow_hub as hub
-from ray.tune import Trainable
 import tensorflow as tf
+import tensorflow_hub as hub
+from data import get_ecg_tmap, get_downstream_datasets, downstream_tmap_from_name
+from ray.tune import Trainable
+from hyperoptimize import BATCH_SIZE
 from tensorflow.keras import Model
-from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import Dense, Reshape
+from tensorflow.keras.models import load_model
 from tensorflow_addons.optimizers import SGDW, RectifiedAdam
 from tensorflow.python.keras.utils.layer_utils import count_params
-
-from data import get_downstream_datasets, get_ecg_tmap, downstream_tmap_from_name
-from hyperoptimize import BATCH_SIZE
 
 
 class ML4C3EfficientNet(Model):
@@ -21,15 +22,13 @@ class ML4C3EfficientNet(Model):
         self,
         input_name: str,
         output_name_to_shape: Dict[str, int],
-        freeze: bool = False,
     ):
         super(ML4C3EfficientNet, self).__init__()
         self.body = hub.KerasLayer(
             "https://tfhub.dev/google/efficientnet/b0/feature-vector/1",
-            input_shape=(100, 100)
+            input_shape=(100, 100),
+            trainable=False,  # EfficientNet models from hub can't be trained
         )
-        if freeze:
-            self.body.trainable = False
         self.input_name = input_name
         self.denses = {
             name: Dense(shape, name=name)
@@ -45,7 +44,9 @@ class ML4C3EfficientNet(Model):
 
 
 def _test_efficient_net():
+    # Imports: third party
     import numpy as np
+
     m = ML4C3EfficientNet("ecg", {"age": 1})
     x = m.predict({"ecg": np.zeros((5, 2500, 12), dtype=np.float32)})
     assert x["age"].shape == (5, 1)
@@ -56,12 +57,13 @@ class ML4C3Ribeiro(Model):
     ml4c3 compatible model with weights from https://www.nature.com/articles/s41467-020-15432-4
     weights can be downloaded at https://zenodo.org/record/3765717#.YBiPzXdKhhE
     """
+
     def __init__(
-            self,
-            input_name: str,
-            output_name_to_shape: Dict[str, int],
-            ribeiro_weights_path: str,
-            freeze: bool = False,
+        self,
+        input_name: str,
+        output_name_to_shape: Dict[str, int],
+        ribeiro_weights_path: str,
+        freeze: bool = False,
     ):
         super(ML4C3Ribeiro, self).__init__()
         self.input_name = input_name
@@ -81,16 +83,18 @@ class ML4C3Ribeiro(Model):
         return {name: dense(x) for name, dense in self.denses.items()}
 
 
-def transform_datasets_ribeiro(datasets: List[tf.data.Dataset]) -> List[tf.data.Dataset]:
+def transform_datasets_ribeiro(
+    datasets: List[tf.data.Dataset],
+) -> List[tf.data.Dataset]:
     """Ribeiro et al. has units of 10^-4 volts vs. our dataset's milli volts"""
     name = get_ecg_tmap(0, []).input_name
-    return [
-        dataset.apply(lambda x: x[0][name] * 10) for dataset in datasets
-    ]
+    return [dataset.apply(lambda x: x[0][name] * 10) for dataset in datasets]
 
 
 def _test_ribeiro():
+    # Imports: third party
     import numpy as np
+
     m = ML4C3Ribeiro("ecg", {"age": 1}, "/Users/ndiamant/Downloads/model/model.hdf5")
     x = m.predict({"ecg": np.zeros((5, 4096, 12), dtype=np.float32)})
     assert x["age"].shape == (5, 1)
@@ -98,6 +102,7 @@ def _test_ribeiro():
 
 class EfficientNetTrainable(Trainable):
     def setup(self, config):
+        # Imports: third party
         import tensorflow as tf  # necessary for ray tune
 
         gpus = tf.config.experimental.list_physical_devices("GPU")
@@ -116,6 +121,9 @@ class EfficientNetTrainable(Trainable):
             input_name=input_name,
             output_name_to_shape=output_name_to_shape,
         )
+        self.model(
+            {input_name: np.zeros((1, 2500, 12), dtype=np.float32)},
+        )  # initialize model
         optimizer = RectifiedAdam(config["learning_rate"])
         self.model.compile(loss=tmap.loss, optimizer=optimizer)
         self.model.summary()
@@ -142,7 +150,8 @@ class EfficientNetTrainable(Trainable):
         self.train_dataset, self.valid_dataset, _ = datasets
 
     def save_checkpoint(self, tmp_checkpoint_dir):
-        return self.model.save(tmp_checkpoint_dir)
+        self.model.save(tmp_checkpoint_dir)
+        return tmp_checkpoint_dir
 
     def load_checkpoint(self, checkpoint):
         self.model = load_model(checkpoint)
@@ -168,6 +177,7 @@ class EfficientNetTrainable(Trainable):
 
 class RibeiroTrainable(Trainable):
     def setup(self, config):
+        # Imports: third party
         import tensorflow as tf  # necessary for ray tune
 
         gpus = tf.config.experimental.list_physical_devices("GPU")
@@ -185,7 +195,7 @@ class RibeiroTrainable(Trainable):
         self.model = ML4C3Ribeiro(
             input_name=input_name,
             output_name_to_shape=output_name_to_shape,
-            ribeiro_weights_path=config["model_file"]
+            ribeiro_weights_path=config["model_file"],
         )
         optimizer = RectifiedAdam(config["learning_rate"])
         self.model.compile(loss=tmap.loss, optimizer=optimizer)
@@ -212,7 +222,8 @@ class RibeiroTrainable(Trainable):
         self.train_dataset, self.valid_dataset, _ = transform_datasets_ribeiro(datasets)
 
     def save_checkpoint(self, tmp_checkpoint_dir):
-        return self.model.save(tmp_checkpoint_dir)
+        self.model.save(tmp_checkpoint_dir)
+        return tmp_checkpoint_dir
 
     def load_checkpoint(self, checkpoint):
         self.model = load_model(checkpoint)
