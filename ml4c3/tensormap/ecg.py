@@ -438,18 +438,13 @@ def make_ecg_tensor(
         if tm.interpretation == Interpretation.LANGUAGE:
             tensor = np.full(shape, "", dtype=object)
         elif tm.interpretation == Interpretation.CONTINUOUS:
-            tensor = (
-                np.zeros(shape, dtype=float)
-                if fill == 0
-                else np.full(shape, fill, dtype=float)
-            )
+            tensor = np.full(shape, fill, dtype=float)
         elif tm.interpretation == Interpretation.CATEGORICAL:
             tensor = np.zeros(shape, dtype=float)
         else:
             raise NotImplementedError(
                 f"unsupported interpretation for ecg tmaps: {tm.interpretation}",
             )
-
         for i, ecg_date in enumerate(ecg_dates):
             path = make_hd5_path(tm, ecg_date, key)
             data = hd5[path][()]
@@ -929,25 +924,12 @@ tmaps[tmap_name] = TensorMap(
 def get_ecg_age_from_hd5(tm, hd5):
     ecg_dates = tm.time_series_filter(hd5)
     dynamic, shape = is_dynamic_shape(tm, len(ecg_dates))
-    tensor = np.full(shape, fill_value=-1, dtype=float)
+    tensor = np.full(shape, fill_value=np.nan, dtype=float)
     for i, ecg_date in enumerate(ecg_dates):
         if i >= shape[0]:
             break
         path = lambda key: make_hd5_path(tm, ecg_date, key)
-        try:
-            birthday = hd5[path("dateofbirth")][()]
-            acquisition = hd5[path("acquisitiondate")][()]
-            delta = _ecg_str2date(acquisition) - _ecg_str2date(birthday)
-            years = delta.days / YEAR_DAYS
-            tensor[i] = years
-        except KeyError:
-            try:
-                tensor[i] = hd5[path("patientage")][()]
-            except KeyError:
-                logging.debug(
-                    f"Could not get patient date of birth or age from ECG on {ecg_date}"
-                    f" in {hd5.filename}",
-                )
+        tensor[i] = hd5[path("patientage")][()]
     return tensor
 
 
