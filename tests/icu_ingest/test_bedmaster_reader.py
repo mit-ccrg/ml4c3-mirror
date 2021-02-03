@@ -1,6 +1,6 @@
 # Imports: standard library
 import copy
-from typing import Dict, Union
+from typing import Dict, Union, Iterator, Optional
 
 # Imports: third party
 import h5py
@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 
 # Imports: first party
-from ingest.icu.readers import BedmasterReader
-from ingest.icu.data_objects import BedmasterSignal
+from tensorize.bedmaster.readers import BedmasterReader
+from tensorize.bedmaster.data_objects import BedmasterSignal
 
 # pylint: disable=invalid-name
 
@@ -17,7 +17,7 @@ from ingest.icu.data_objects import BedmasterSignal
 @pytest.fixture(scope="function")
 def bedmaster_reader(
     test_scale_units: Dict[str, Dict[str, Union[int, float, str]]],
-) -> BedmasterReader:
+) -> Iterator[BedmasterReader]:
     with h5py.File(pytest.mat_file, "r") as mat_file:
         reader = BedmasterReader(mat_file.filename, test_scale_units)
         yield reader
@@ -54,6 +54,8 @@ def test_get_vs(bedmaster_reader: BedmasterReader, matfile: h5py.File):
 
     # Standard case
     heart_rate = bedmaster_reader.get_vs("HR")
+    if heart_rate is None:
+        assert False
     assert heart_rate.name == "HR"
     assert np.array_equal(heart_rate.value, _linearize(matfile["vs/HR"][()]))
     assert np.array_equal(
@@ -76,12 +78,15 @@ def test_get_vs(bedmaster_reader: BedmasterReader, matfile: h5py.File):
         "timeCorr": 3,
     }
     heart_rate_corr = bedmaster_reader.get_vs("HR")
-
+    if heart_rate_corr is None:
+        assert False
     assert len(heart_rate_corr.time) == len(heart_rate.time) - 11
     assert len(heart_rate_corr.value) == len(heart_rate.value) - 11
 
     # Case with unknown scale factor and unit
     spo2r = bedmaster_reader.get_vs("SPO2R")
+    if spo2r is None:
+        assert False
     assert spo2r.scale_factor == 1
     assert spo2r.units == "UNKNOWN"
     assert spo2r.sample_freq == np.array([(0.5, 0)], dtype="float,int")
@@ -93,6 +98,8 @@ def test_get_wv(bedmaster_reader: BedmasterReader, matfile: h5py.File):
 
     # Check standard case
     ecgv = bedmaster_reader.get_wv("ch10", "V")
+    if ecgv is None:
+        assert False
     assert ecgv.name == "V"
     assert np.array_equal(ecgv.value, linearize(matfile["wv/ch10"][()]))
     assert np.array_equal(
@@ -105,6 +112,8 @@ def test_get_wv(bedmaster_reader: BedmasterReader, matfile: h5py.File):
 
     # Check that it works without specifying signal name
     ecgv_copy = bedmaster_reader.get_wv("ch10")
+    if ecgv_copy is None:
+        assert False
     assert ecgv_copy.name == ecgv.name
     assert np.array_equal(ecgv_copy.value, ecgv.value)
 
@@ -116,6 +125,8 @@ def test_get_wv(bedmaster_reader: BedmasterReader, matfile: h5py.File):
 
     # Case with multiple sample frequency
     ecg2 = bedmaster_reader.get_wv("ch8", "II")
+    if ecg2 is None:
+        assert False
     assert np.array_equal(
         ecg2.sample_freq,
         np.array([(240, 0), (120, 80)], dtype="float,int"),
@@ -128,7 +139,8 @@ def test_get_wv(bedmaster_reader: BedmasterReader, matfile: h5py.File):
         "timeCorr": 8,
     }
     ecg2_corr = bedmaster_reader.get_wv("ch8", "II")
-
+    if ecg2_corr is None:
+        assert False
     values_cut = overlap * ecg2_corr.sample_freq[0][0] / 4
     assert len(ecg2_corr.time) == len(ecgv.time) - overlap
     assert len(ecg2_corr.value) == len(ecgv.value) - values_cut
@@ -139,6 +151,8 @@ def test_get_wv(bedmaster_reader: BedmasterReader, matfile: h5py.File):
 
     # Case with unknown scale factor and unit
     ecg3 = bedmaster_reader.get_wv("ch9", "III")
+    if ecg3 is None:
+        assert False
     assert ecg3.units == "??V"
     assert ecg3.scale_factor == 2.44
     assert np.array_equal(ecg3.sample_freq, np.array([(240, 0)], dtype="float,int"))
@@ -199,7 +213,11 @@ def test_decode_data(bedmaster_reader: BedmasterReader):
 
 def test_contiguous_nparrays(bedmaster_reader: BedmasterReader):
     heart_rate = bedmaster_reader.get_vs("HR")
+    if heart_rate is None:
+        assert False
     ecgv = bedmaster_reader.get_wv("ch10", "V")
+    if ecgv is None:
+        assert False
     signals = [heart_rate, ecgv]
     for signal in signals:
         assert not signal.value.dtype == object
@@ -246,7 +264,11 @@ def test_max_segment(bedmaster_reader: BedmasterReader):
 
 def test_get_interbundle_correction(bedmaster_reader: BedmasterReader):
     art1d = bedmaster_reader.get_vs("CO")
+    if art1d is None:
+        assert False
     ch10 = bedmaster_reader.get_wv("ch10", "v")
+    if ch10 is None:
+        assert False
 
     no_correction = {"vs": None, "wv": None}
     prev_max_vs = {
@@ -302,7 +324,9 @@ def test_apply_interbundle_correction(bedmaster_reader: BedmasterReader):
         }
         return source_corr
 
-    def _apply_and_assert_ib(signal: BedmasterSignal, sig_type: str):
+    def _apply_and_assert_ib(signal: Optional[BedmasterSignal], sig_type: str):
+        if signal is None:
+            assert False
         signal.time_corr_arr = np.unpackbits(signal.time_corr_arr)
         signal_original = copy.deepcopy(signal)
         bedmaster_reader.interbundle_corr[sig_type] = _create_ib_corr_dict(

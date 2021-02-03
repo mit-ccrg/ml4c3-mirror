@@ -1437,8 +1437,10 @@ class BedmasterAlarmsReader(Reader):
             movement_df = pd.read_csv(self.move_file)
         else:
             adt_df = pd.read_csv(self.adt)
-            movement_df = adt_df[adt_df["MRN"] == self.mrn]
-            movement_df = movement_df[movement_df["PatientEncounterID"] == self.csn]
+            movement_df = adt_df[adt_df["MRN"].astype("str") == self.mrn]
+            movement_df = movement_df[
+                movement_df["PatientEncounterID"].astype("str") == self.csn
+            ]
 
         department_nm = np.array(movement_df["DepartmentDSC"], dtype=str)
         room_bed = np.array(movement_df["BedLabelNM"], dtype=str)

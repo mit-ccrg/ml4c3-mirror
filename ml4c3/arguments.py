@@ -48,7 +48,6 @@ def parse_args() -> argparse.Namespace:
         "\t * tensorize_icu_no_edw_pull: ADD DESCRIPTION. \n"
         "\t * tensorize_icu: ADD DESCRIPTION. \n"
         "\t * tensorize_sts: ADD DESCRIPTION. \n"
-        "\t * assess_icu_coverage: ADD DESCRIPTION. \n"
         "\t * check_icu_structure: ADD DESCRIPTION. \n"
         "\t * pre_tensorize_explore: ADD DESCRIPTION. \n"
         "\t * match_patient_bedmaster: ADD DESCRIPTION. \n"
@@ -1116,35 +1115,6 @@ def parse_args() -> argparse.Namespace:
         "-f",
         help="Path to a csv listing the files and signals to extract. Generated"
         "by the 'find' command.",
-    )
-
-    # Assess coverage parser
-    assess_coverage_parser = subparser.add_parser(
-        "assess_coverage",
-        description="Assess Bedmaster and HD5 coverage by means of MRNs and CSNs.",
-        parents=[io_parser, run_parser, icu_parser],
-    )
-    assess_coverage_parser.add_argument(
-        "--event_column",
-        type=str,
-        help="Name of the event column (if exists) in --cohort_query/--cohort_csv.",
-    )
-    assess_coverage_parser.add_argument(
-        "--time_column",
-        type=str,
-        help="Name of the event time column (if exists) in "
-        "--cohort_query/--cohort_csv.",
-    )
-    assess_coverage_parser.add_argument(
-        "--cohort_csv",
-        type=str,
-        help="Full path of the .csv file containing a list of patients. "
-        "If --cohort_query is set, this parameter will be ignored.",
-    )
-    assess_coverage_parser.add_argument(
-        "--count",
-        action="store_true",
-        help="Count the number of unique rows (events) in --cohort_query/--cohort_csv.",
     )
 
     # ECG feature extraction parser

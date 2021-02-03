@@ -4,14 +4,13 @@ import pytest
 
 # Imports: first party
 from definitions.icu import ALARMS_FILES
-from ingest.icu.readers import BedmasterAlarmsReader
+from tensorize.bedmaster.readers import BedmasterAlarmsReader
 
 
 @pytest.fixture(scope="function")
 def alarms_reader() -> BedmasterAlarmsReader:
     reader = BedmasterAlarmsReader(
         pytest.alarms_dir,
-        pytest.edw_dir,
         pytest.example_mrn,
         pytest.example_visit_id,
         pytest.adt_path,

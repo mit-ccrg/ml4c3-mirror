@@ -8,7 +8,7 @@ import pytest
 
 # Imports: first party
 from definitions.edw import EDW_FILES
-from ingest.icu.readers import EDWReader
+from tensorize.edw.readers import EDWReader
 
 # pylint: disable=no-member, redefined-outer-name
 

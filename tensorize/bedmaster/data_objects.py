@@ -4,6 +4,9 @@ from abc import ABC, abstractmethod
 # Imports: third party
 import numpy as np
 
+# Imports: first party
+from definitions.icu import ALARMS_FILES
+
 # pylint: disable=abstract-method, unnecessary-pass
 
 
@@ -152,4 +155,35 @@ class BedmasterSignal(ICUContinuousData):
         return self.source.replace("Bedmaster_", "")
 
 
-BedmasterType = BedmasterSignal
+class BedmasterAlarm(ICUDiscreteData):
+    """
+    Implementation of the parent ICU Discrete Data Object class for Bedmaster
+    alarms data.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        start_date: np.ndarray,
+        duration: np.ndarray,
+        level: int,
+    ):
+        """
+        Init a BedmasterAlarm object.
+
+        :param name: <str> Alarm name.
+        :param start_date: <np.ndarray> List of unix timestamps when the alarm is
+                           triggered.
+        :param duration: <np.ndarray> List of alarm triggered durations in seconds.
+        :param level: <int> Alarm Level.
+        """
+        super().__init__(name, ALARMS_FILES["source"], start_date)
+        self.duration = duration
+        self.level = level
+
+    @property
+    def _source_type(self):
+        return self.source.replace("Bedmaster_", "")
+
+
+BedmasterType = (BedmasterSignal, BedmasterAlarm)

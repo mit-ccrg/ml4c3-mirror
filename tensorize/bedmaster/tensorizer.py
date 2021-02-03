@@ -12,9 +12,13 @@ from typing import Dict, List
 import pandas as pd
 
 # Imports: first party
-from definitions.icu import ICU_SCALE_UNITS
+from definitions.icu import ICU_SCALE_UNITS, MAPPING_DEPARTMENTS
 from tensorize.utils import save_mrns_and_csns_csv
-from tensorize.bedmaster.readers import BedmasterReader, CrossReferencer
+from tensorize.bedmaster.readers import (
+    BedmasterReader,
+    CrossReferencer,
+    BedmasterAlarmsReader,
+)
 from tensorize.bedmaster.writers import Writer
 from tensorize.bedmaster.match_patient_bedmaster import PatientBedmasterMatcher
 
@@ -27,6 +31,7 @@ class Tensorizer:
     def __init__(
         self,
         bedmaster: str,
+        alarms: str,
         xref: str,
         adt: str,
     ):
@@ -34,12 +39,14 @@ class Tensorizer:
         Initialize Tensorizer object.
 
         :param bedmaster: <str> Directory containing all the Bedmaster data.
+        :param alarms: <str> Directory containing all the Bedmaster alarms data.
         :param xref: <str> Full path of the file containing
                cross reference between EDW and Bedmaster.
         :param adt: <str> Full path of the file containing
                the adt patients' info to be tensorized.
         """
         self.bedmaster = bedmaster
+        self.alarms = alarms
         self.xref = xref
         self.adt = adt
         self.untensorized_files: Dict[str, List[str]] = {"file": [], "error": []}
@@ -135,6 +142,15 @@ class Tensorizer:
                     self.untensorized_files["file"].append(untensorized_files["file"])
                     self.untensorized_files["error"].append(untensorized_files["error"])
 
+                    # Write alarms data
+                    self._write_bedmaster_alarms_data(
+                        self.alarms,
+                        self.adt,
+                        mrn,
+                        visit_id,
+                        writer=writer,
+                    )
+
                     writer.write_completed_flag(all_files)
                     logging.info(
                         f"Tensorized data from MRN {mrn}, CSN {visit_id} into "
@@ -183,6 +199,20 @@ class Tensorizer:
         if len(untensorized_files["file"]) > 0:
             all_files = False
         return all_files, untensorized_files
+
+    @staticmethod
+    def _write_bedmaster_alarms_data(
+        alarms_path: str,
+        adt: str,
+        mrn: str,
+        visit_id: str,
+        writer: Writer,
+    ):
+        reader = BedmasterAlarmsReader(alarms_path, mrn, visit_id, adt)
+        alarms = reader.list_alarms()
+        for alarm in alarms:
+            alarm_instance = reader.get_alarm(alarm)
+            writer.write_signal(alarm_instance)
 
 
 def create_folders(staging_dir: str):
@@ -233,6 +263,47 @@ def stage_bedmaster_files(
                 logging.warning(f"{path_source_file} not found. Error given: {e}")
         else:
             logging.warning(f"{path_source_file} not found.")
+
+
+def stage_bedmaster_alarms(
+    staging_dir: str,
+    adt: str,
+    alarms: str,
+):
+    """
+    Find Bedmaster alarms and copy them to staging directory.
+
+    :param staging_dir: <str> Path to temporary staging directory.
+    :param adt: <str> Path to CSV containing ADT table.
+    :param alarms: <str> Path to directory with alarm data.
+    """
+    path_patients = os.path.join(staging_dir, "patients.csv")
+    mrns_and_csns = pd.read_csv(path_patients)
+    mrns = mrns_and_csns["MRN"].drop_duplicates()
+
+    adt_df = pd.read_csv(adt).sort_values(by=["MRN"], ascending=True)
+    adt_filt = adt_df[adt_df["MRN"].isin(mrns)]
+
+    departments = adt_filt["DepartmentDSC"].drop_duplicates()
+    for department in departments:
+        try:
+            short_names = MAPPING_DEPARTMENTS[department]
+        except KeyError:
+            continue
+        # Skip department short names that are None
+        for short_name in [sn for sn in short_names if sn is not None]:
+            source_path = os.path.join(
+                alarms,
+                f"bedmaster_alarms_{short_name}.csv",
+            )
+            destination_path = os.path.join(
+                staging_dir,
+                "bedmaster_alarms_temp",
+            )
+            try:
+                shutil.copy(source_path, destination_path)
+            except FileNotFoundError as e:
+                logging.warning(f"{source_path} not found. Error given: {e}")
 
 
 def cleanup_staging_files(staging_dir: str):
@@ -344,10 +415,23 @@ def tensorize(args):
             f"Bedmaster files copied from {args.bedmaster} in {elapsed_time:.2f} sec",
         )
 
+        # Copy Bedmaster alarms from this batch of patients
+        init = time.time()
+        stage_bedmaster_alarms(
+            staging_dir=args.staging_dir,
+            adt=args.adt,
+            alarms=args.alarms,
+        )
+        elapsed_time = time.time() - init
+        logging.info(
+            f"Alarms copied from {args.alarms} in {elapsed_time:.2f} sec",
+        )
+
         # Get paths to staging directories
         get_path_to_staging_dir = lambda f: os.path.join(args.staging_dir, f)
 
         bedmaster_staging = get_path_to_staging_dir("bedmaster_temp")
+        alarms_staging = get_path_to_staging_dir("bedmaster_alarms_temp")
         xref_staging = get_path_to_staging_dir("bedmaster_temp/xref.csv")
         adt_staging = get_path_to_staging_dir("bedmaster_temp/adt.csv")
         path_tensors_staging = get_path_to_staging_dir("results_temp")
@@ -355,6 +439,7 @@ def tensorize(args):
         # Run tensorization
         tensorizer = Tensorizer(
             bedmaster=bedmaster_staging,
+            alarms=alarms_staging,
             xref=xref_staging,
             adt=adt_staging,
         )

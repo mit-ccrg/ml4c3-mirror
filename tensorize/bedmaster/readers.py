@@ -3,7 +3,8 @@ import os
 import re
 import logging
 from abc import ABC
-from typing import Any, Dict, List, Optional
+from typing import Any, Set, Dict, List, Optional
+from datetime import datetime
 
 # Imports: third party
 import h5py
@@ -14,8 +15,9 @@ import unidecode
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
 from definitions.edw import EDW_FILES
-from definitions.icu import ICU_SCALE_UNITS
-from tensorize.bedmaster.data_objects import BedmasterSignal
+from definitions.icu import ALARMS_FILES, ICU_SCALE_UNITS
+from definitions.globals import TIMEZONE
+from tensorize.bedmaster.data_objects import BedmasterAlarm, BedmasterSignal
 from tensorize.bedmaster.bedmaster_stats import BedmasterStats
 from tensorize.bedmaster.match_patient_bedmaster import PatientBedmasterMatcher
 
@@ -667,6 +669,155 @@ class BedmasterReader(h5py.File, Reader):
                 units = "UNKNOWN"
 
         return float(scaling_factor), units
+
+
+class BedmasterAlarmsReader(Reader):
+    """
+    Implementation of the Reader for Bedmaster Alarms data.
+    """
+
+    def __init__(
+        self,
+        alarms: str,
+        mrn: str,
+        csn: str,
+        adt: str,
+    ):
+        """
+        Init Bedmaster Alarms Reader.
+
+        :param alarms: Absolute path of Bedmaster alarms directory.
+        :param mrn: MRN of the patient.
+        :param csn: CSN of the patient visit.
+        :param adt: Path to adt table.
+        """
+        self.alarms = alarms
+        self.mrn = mrn
+        self.csn = csn
+        self.adt = adt
+        self.alarms_dfs = self._get_alarms_dfs()
+
+    def list_alarms(self) -> List[str]:
+        """
+        List all the Bedmaster alarms registered from the patient.
+
+        :return: <List[str]>  List with all the registered Bedmaster alarms.
+                 from the patient
+        """
+        alarms: Set[str] = set()
+        alarm_name_column = ALARMS_FILES["columns"][3]
+        for alarms_df in self.alarms_dfs:
+            alarms = alarms.union(
+                set(alarms_df[alarm_name_column].astype("str").str.upper()),
+            )
+        return list(alarms)
+
+    def get_alarm(self, alarm_name: str) -> BedmasterAlarm:
+        """
+        Get the Bedmaster alarms data from the Bedmaster Alarms .csv files.
+
+        :return: <BedmasterAlarm> wrapped information.
+        """
+        dates = np.array([])
+        durations = np.array([])
+        date_column, level_column, alarm_name_column, duration_column = ALARMS_FILES[
+            "columns"
+        ][1:5]
+        first = True
+        for alarm_df in self.alarms_dfs:
+            idx = np.where(
+                alarm_df[alarm_name_column].astype("str").str.upper() == alarm_name,
+            )[0]
+            dates = np.append(dates, np.array(alarm_df[date_column])[idx])
+            durations = np.append(durations, np.array(alarm_df[duration_column])[idx])
+            if len(idx) > 0 and first:
+                first = False
+                level = np.array(alarm_df[level_column])[idx[0]]
+        dates = self._ensure_contiguous(dates)
+        durations = self._ensure_contiguous(durations)
+        return BedmasterAlarm(
+            name=alarm_name,
+            start_date=dates,
+            duration=durations,
+            level=level,
+        )
+
+    def _get_alarms_dfs(self) -> List[pd.core.frame.DataFrame]:
+        """
+        List all the Bedmaster alarms data frames containing data for the given
+        patient.
+
+        :return: <List[pd.core.frame.DataFrame]> List with all the Bedmaster alarms
+                 data frames containing data for the given patient.
+        """
+        adt_df = pd.read_csv(self.adt)
+        movement_df = adt_df[adt_df["MRN"].apply(str) == self.mrn]
+        movement_df = movement_df[
+            movement_df["PatientEncounterID"].apply(str) == self.csn
+        ]
+
+        department_nm = np.array(movement_df["DepartmentDSC"], dtype=str)
+        room_bed = np.array(movement_df["BedLabelNM"], dtype=str)
+        transfer_in = np.array(movement_df["TransferInDTS"], dtype=str)
+        transfer_out = np.array(movement_df["TransferOutDTS"], dtype=str)
+        alarms_dfs = []
+        for i, dept in enumerate(department_nm):
+            move_in = self._get_unix_timestamp(transfer_in[i])
+            move_out = self._get_unix_timestamp(transfer_out[i])
+            if dept in ALARMS_FILES["names"]:
+                names = ALARMS_FILES["names"][dept]
+            else:
+                logging.warning(
+                    f"Department {dept} is not found in ALARMS_FILES['names'] "
+                    "in ml4c3/definitions.py. No alarms data will be searched for this "
+                    "department. Please, add this information to "
+                    "ALARMS_FILES['names'].",
+                )
+                continue
+            bed = room_bed[i][-3:]
+            if any(s.isalpha() for s in bed):
+                bed = room_bed[i][-5:-2] + room_bed[i][-1]
+            for csv_name in names:
+                if not os.path.isfile(
+                    os.path.join(self.alarms, f"bedmaster_alarms_{csv_name}.csv"),
+                ):
+                    continue
+                alarms_df = pd.read_csv(
+                    os.path.join(self.alarms, f"bedmaster_alarms_{csv_name}.csv"),
+                    low_memory=False,
+                )
+                alarms_df = alarms_df[alarms_df["Bed"].astype(str) == bed]
+                alarms_df = alarms_df[alarms_df["AlarmStartTime"] >= move_in]
+                alarms_df = alarms_df[alarms_df["AlarmStartTime"] <= move_out]
+                if len(alarms_df.index) > 0:
+                    alarms_dfs.append(alarms_df)
+        return alarms_dfs
+
+    @staticmethod
+    def _get_unix_timestamp(time_stamp_str: str) -> int:
+        """
+        Convert readable time stamps to unix time stamps.
+
+        :param time_stamps: <str> String with readable time stamps.
+        :return: <int> Integer Unix time stamp.
+        """
+        try:
+            time_stamp = pd.to_datetime(time_stamp_str)
+        except pd.errors.ParserError as error:
+            raise ValueError("Array contains non datetime values.") from error
+        # Convert readable local timestamps in local seconds timestamps
+        local_timestamp = (
+            np.array(time_stamp, dtype=np.datetime64)
+            - np.datetime64("1970-01-01T00:00:00")
+        ) / np.timedelta64(1, "s")
+        # Find local time shift to UTC
+        init_dt = datetime.strptime(time_stamp_str[:-1], "%Y-%m-%d %H:%M:%S.%f")
+        offset = TIMEZONE.utcoffset(  # type: ignore
+            init_dt,
+            is_dst=True,
+        ).total_seconds()
+        unix_timestamp = int(local_timestamp) - int(offset)
+        return unix_timestamp
 
 
 class CrossReferencer:

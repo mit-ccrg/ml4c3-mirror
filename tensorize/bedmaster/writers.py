@@ -9,6 +9,7 @@ import numpy as np
 # Imports: first party
 from tensorize.bedmaster.data_objects import (
     BedmasterType,
+    BedmasterAlarm,
     ICUDiscreteData,
     ICUContinuousData,
 )
@@ -19,7 +20,6 @@ from tensorize.bedmaster.data_objects import (
 class Writer(h5py.File):
     """
     Class used to write the signals into the final HD5 file.
-
     This class is a Wrapper around h5py.File. Thanks to that,
     it can be used with python's 'with' as in the example.
 
@@ -34,13 +34,6 @@ class Writer(h5py.File):
                 data and metadata
             ...
         ...
-    <edw>
-        <visitID>/
-            <signal name>/
-                data and metadata
-            ...
-        ...
-    ...
     """
 
     bedmaster_dir = "bedmaster"
@@ -101,7 +94,9 @@ class Writer(h5py.File):
         signal_name = signal_name.replace("(", "").replace(")", "")
 
         if isinstance(signal, BedmasterType):
-            if signal.value.size == 0 or signal.time.size == 0:
+            if isinstance(signal, BedmasterAlarm):
+                pass
+            elif signal.value.size == 0 or signal.time.size == 0:
                 logging.info(
                     f"Signal {signal.name} not written: time or value is empty",
                 )

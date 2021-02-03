@@ -114,7 +114,10 @@ def generate_hyperoptimize_json_arrest(path_json: str, model_type: str):
 
     for tmap_list in input_tensors_set + output_tensors_set:
         for tmap_name in tmap_list:
-            tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
+            try:
+                tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
+            except Exception as e:
+                raise ValueError(f"Unable to create tmap {tmap_name}") from e
 
     parameters: Dict[str, List[Any]] = generate_model_dict(model_type)
     parameters.update(

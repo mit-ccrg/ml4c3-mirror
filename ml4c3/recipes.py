@@ -97,10 +97,6 @@ def run(args: argparse.Namespace):
         elif args.recipe == "build":
             build_multimodal_multitask(args)
 
-        elif args.recipe == "assess_coverage":
-            from ingest.icu.assess_coverage import assess_coverage  # isort: skip
-            assess_coverage(args)
-
         elif args.recipe == "check_edw_structure":
             from tensorize.edw.check_structure import check_edw_structure  # isort: skip
             check_edw_structure(args)
