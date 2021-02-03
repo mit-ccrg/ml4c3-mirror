@@ -32,7 +32,7 @@ def main_training(args: argparse.Namespace):
             "CV_Typed-v0",
             init_conditions=args.init_conditions,
             paths=[
-                os.path.join(args.tables_dir, "discrete_action_space_v2.csv"),
+                os.path.join(args.tables_dir, "discrete_action_space.csv"),
                 args.save_dir,
             ],
             save_flag=args.save,

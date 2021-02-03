@@ -19,6 +19,7 @@ VISUALIZER_COMMAND="python $PWD/ml4c3/recipes.py visualize --debug"
 SCRIPT_NAME=$( echo $0 | sed 's#.*/##g' )
 CONTAINER_NAME=""
 ENV_VARS=""
+VOLUMES_FLAG=""
 
 ################### USERNAME & GROUPS ####################################
 
@@ -79,6 +80,8 @@ usage()
 
         -v               Run visualizer.
 
+        -x               Run with X server.
+
         -n               Run Docker container non-interactively.
 
         -r               Call Python script as root. If this flag is not specified,
@@ -91,7 +94,7 @@ USAGE_MESSAGE
 
 ################### OPTION PARSING #######################################
 
-while getopts ":i:d:m:p:jstvnrh" opt ; do
+while getopts ":i:d:m:p:jstvnrhx" opt ; do
     case ${opt} in
         h)
             usage
@@ -123,6 +126,27 @@ while getopts ":i:d:m:p:jstvnrh" opt ; do
             ;;
         v)
             PYTHON_COMMAND=${VISUALIZER_COMMAND}
+            ;;
+        x)
+            # First check if .Xauthority exists
+            FILE=~/.Xauthority
+            if [ -f "$FILE" ]; then
+              echo "$FILE exists, able to render."
+            else
+              echo "$FILE doesn't exist, create it before running Docker with -x arg."
+              exit 126
+            fi
+            # Adapt display depending on the workstation:
+            if [[ ${DISPLAY:0:9} == "localhost" ]]; then
+              export DISPLAY=${DISPLAY:9:20}
+            fi
+            XSOCK=/tmp/.X11-unix
+            XAUTH=/tmp/.docker.xauth.$USER
+            touch $XAUTH
+            xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f $XAUTH nmerge -
+            ENV_VARS="${ENV_VARS} XAUTHORITY=${XAUTH} "
+            VOLUMES_FLAG="${VOLUMES_FLAG} --volume=${XSOCK}:${XSOCK}:rw"
+            VOLUMES_FLAG="${VOLUMES_FLAG} --volume=${XAUTH}:${XAUTH}:rw"
             ;;
         n)
             INTERACTIVE=""
@@ -221,6 +245,14 @@ else
     PORT_FLAG_STRING="# no ports specified"
 fi
 
+if [[ "$VOLUME_FLAG" ]]
+then
+    VOLUME_FLAG="$VOLUME_FLAG"
+else
+    VOLUME_FLAG_STRING="# no volumes specified"
+fi
+
+
 if [[ "$CONTAINER_NAME" ]]
 then
     CONTAINER_NAME_STRING="$CONTAINER_NAME"
@@ -238,6 +270,7 @@ Attempting to run Docker with:
     --ipc=host \\
     ${MOUNTS_STRING} \\
     ${PORT_FLAG_STRING} \\
+    ${VOLUME_FLAG_STRING} \\
     ${CONTAINER_NAME_STRING} \\
     ${DOCKER_IMAGE} /bin/bash -c \\
     "${SETUP_USER}
@@ -255,8 +288,10 @@ ${INTERACTIVE} \
 ${GPU_DEVICE} \
 --uts=host \
 --ipc=host \
+--env='DISPLAY' \
 ${MOUNTS} \
 ${PORT_FLAG} \
+${VOLUMES_FLAG} \
 ${CONTAINER_NAME} \
 ${DOCKER_IMAGE} /bin/bash -c \
 "${SETUP_USER}

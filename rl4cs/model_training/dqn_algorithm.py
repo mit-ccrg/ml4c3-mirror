@@ -7,7 +7,6 @@ from typing import List, Optional
 import numpy as np
 
 # Imports: first party
-from rl4cs.utils.element_saver import ElementSaver
 from rl4cs.model_training.memory import Memory
 from rl4cs.model_training.nn_model import NNModel
 from rl4cs.environments.cv_env_typed import CVEnvTyped
@@ -63,7 +62,6 @@ class DQNAlgorithm:
         self.reward_store: List[float] = []
         self.loss_store: List[float] = []
         self.render = False
-        self.saver = ElementSaver("/home/rp415/repos/rl-ccu/saved_elements")
 
     def run(self):
         """
@@ -86,7 +84,6 @@ class DQNAlgorithm:
 
             # Add samples to memory
             self.memory.add_sample((states, action, reward, next_states))
-            # self.saver.buff_states.append((states, action, reward, next_states))
 
             # Syncronize q_nn and q_target
             if self.steps % self.sync_steps == 0:

@@ -28,9 +28,8 @@ class RLPlotter:
         :param axis_labels: <str> Axis labels.
         :param axis_lims: <str> Axis limits.
         """
-        # Change matplotlib backend
-        # matplotlib.use("TkAgg")
-        matplotlib.use("agg")
+        # Backend changed if class is used
+        matplotlib.use("TkAgg")
 
         # Set fixed params for figure
         self.fig, self.axs = plt.subplots(1, 1)

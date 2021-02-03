@@ -15,8 +15,6 @@ import numpy as np
 from gym import logger, spaces
 from gym.utils import seeding
 
-# from gym.envs.classic_control import rendering
-
 # pylint: disable=invalid-name,attribute-defined-outside-init
 
 
@@ -134,7 +132,7 @@ class CartPoleEnv(gym.Env):
             force = -self.force_mag
         else:
             raise ValueError(
-                f"Action out of scope (action > {self.action_space.n -1}), not allowed.",
+                f"Action out of scope (Above {self.action_space.n -1}), not allowed.",
             )
 
         # Get previous state
@@ -221,6 +219,9 @@ class CartPoleEnv(gym.Env):
         :param mode: <str> Rendering mode.
         :return: <Optional[Union[bool, np.ndarray]]> Viewer.
         """
+        # Imports: third party
+        from gym.envs.classic_control import rendering
+
         screen_width = 600
         screen_height = 400
 
