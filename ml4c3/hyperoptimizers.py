@@ -24,12 +24,13 @@ def train_model_worker(
     performance_metrics = {}
     try:
         if args.recipe != "train":
-            gpu = ""
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
-        # Imports: first party
-        from ml4c3.logger import load_config
-        from ml4c3.recipes import train_model
-        from ml4c3.arguments import _load_tensor_maps
+            os.environ["CUDA_VISIBLE_DEVICES"] = str("")
+        else:
+            os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
+        # pylint: disable=import-outside-toplevel
+        from ml4c3.logger import load_config  # isort: skip
+        from ml4c3.recipes import train_model  # isort: skip
+        from ml4c3.arguments import _load_tensor_maps  # isort: skip
 
         now_string = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
         load_config(
@@ -52,7 +53,7 @@ def collect_results(
     n_permutations: int,
 ):
     result_path = os.path.join(base_output_folder, "metrics-and-hyperparameters.csv")
-    for i in range(n_permutations):
+    for _ in range(n_permutations):
         trial, performance_metrics = result_q.get()
         for key, value in performance_metrics.items():
             result_df.loc[trial, key] = f"{value:.3}"
@@ -79,12 +80,18 @@ def hyperoptimize(args: argparse.Namespace):
     )
 
     # Infer the number of hyperoptimize workers as the number of available gpus
-    if args.hyperoptimize_workers is None:
+    if "sklearn" in permutations[0]["recipe"]:
+        resource = "CPUs"
+    else:
+        resource = "GPUs"
+    if args.hyperoptimize_workers is None and resource == "GPUs":
         # Cannot rely on built-in tensorflow methods because importing tensorflow
         # makes all gpus visible and prevents setting visible devices within workers
         n_gpus = str(subprocess.check_output(["nvidia-smi", "-L"])).count("UUID")
         args.hyperoptimize_workers = n_gpus
-    logging.info(f"Using {args.hyperoptimize_workers} GPUs for hyperoptimization")
+    elif args.hyperoptimize_workers is None:
+        args.hyperoptimize_workers = 1
+    logging.info(f"Using {args.hyperoptimize_workers} {resource} for hyperoptimization")
 
     # Setup workers, prepopulate dataframe to circumvent concurrent access by result
     # worker and start result collection worker
