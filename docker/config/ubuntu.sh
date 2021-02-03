@@ -24,3 +24,4 @@ echo "[FreeTDS]
 Description=FreeTDS ODBC Driver
 Driver64=/usr/lib/x86_64-linux-gnu/odbc/libtdsodbc.so
 FileUsage=1" >> /etc/odbcinst.ini
+apt-get install -y odbc-postgresql
