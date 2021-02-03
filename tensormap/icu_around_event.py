@@ -97,7 +97,7 @@ def make_around_event_tensor_from_file(
     times: Union[int, List[int]],
     window: int,
     periods: Union[str, List[str]],
-    feature: str,
+    features: List[str],
     event_tms: Union[TensorMap, List[TensorMap]],
     visit_tm: TensorMap,
     signal_tm: TensorMap,
@@ -145,22 +145,25 @@ def make_around_event_tensor_from_file(
             **kwargs,
         )
         indices = np.where(np.logical_and(start < time_tensor, end > time_tensor)[0])[0]
-
-        tensor = compute_feature(
-            tm=signal_tm,
-            hd5=hd5,
-            visit=visit,
-            indices=indices,
-            feature=feature,
-            period=period,
-            imputation_type=imputation_type,
-            **kwargs,
-        )
-
+        tensor = np.array([])
+        for feature in features:
+            new_tensor = compute_feature(
+                tm=signal_tm,
+                hd5=hd5,
+                visit=visit,
+                indices=indices,
+                feature=feature,
+                period=period,
+                imputation_type=imputation_type,
+                **kwargs,
+            )
+            if feature == "raw":
+                return new_tensor
+            tensor = np.append(tensor, new_tensor)
         return tensor
 
-    def _tensor_from_file(tm, hd5, **kwargs):
-        if feature == "raw" or feature.endswith("_last_values"):
+    def _tensor_from_file(tm, hd5, **kwargs):  # pylint: disable=unused-argument
+        if features == ["raw"] or features[-1].endswith("_last_values"):
             tensor = np.array([[]])
         else:
             tensor = np.array([])
@@ -186,7 +189,7 @@ def make_around_event_tensor_from_file(
 def make_sliding_window_tensor_from_file(
     window: int,
     step: int,
-    feature: str,
+    features: List[str],
     event_tm_1: TensorMap,
     event_tm_2: TensorMap,
     visit_tm: TensorMap,
@@ -207,7 +210,7 @@ def make_sliding_window_tensor_from_file(
             times=windows,
             window=window,
             periods=["pre"] * windows.size,
-            feature=feature,
+            features=features,
             event_tms=[event_tm_2] * windows.size,
             visit_tm=visit_tm,
             signal_tm=signal_tm,
@@ -230,7 +233,7 @@ def make_sliding_window_outcome_tensor_from_file(
     event_tm_2: TensorMap,
     visit_tm: TensorMap,
 ):
-    def _tensor_from_file(tm, hd5, **kwargs):
+    def _tensor_from_file(tm, hd5, **kwargs):  # pylint: disable=unused-argument
         windows = get_sliding_windows(
             hd5=hd5,
             window=window,
@@ -287,7 +290,7 @@ def create_around_tmap(tmap_name: str) -> Optional[TensorMap]:
     period_2 = None
     event_proc_tm_2 = None
     imputation_type = None
-    feature = "raw"
+    features = []
 
     shape: Optional[Tuple[Axis, ...]] = None
     make_tensor_from_file = None
@@ -305,10 +308,22 @@ def create_around_tmap(tmap_name: str) -> Optional[TensorMap]:
 
     pattern = re.compile(fr"^(.*)_({FEATURES})$")
     match = pattern.findall(tmap_match_name)
-    if match:
-        _, feature = match[0]
-        tmap_match_name = tmap_match_name.replace(f"_{feature}", "")
-        match = None
+    k = 0
+    channel_map = {}
+    while match:
+        _, new_feature = match[0]
+        tmap_match_name = tmap_match_name.replace(f"_{new_feature}", "")
+        features.append(new_feature)
+        channel_map[f"{new_feature}"] = k
+        match = pattern.findall(tmap_match_name)
+        k += 1
+    if not features:
+        features = ["raw"]
+    if len(features) == 1:
+        channel_map = None
+
+    if not features:
+        features = ["raw"]
 
     if not match:
         pattern = re.compile(
@@ -346,15 +361,15 @@ def create_around_tmap(tmap_name: str) -> Optional[TensorMap]:
         return None
 
     if signal_tm.endswith("_timeseries"):
-        if feature == "raw":
+        if features == ["raw"]:
             shape = (None, 2)
         else:
             shape = (2,)
     else:
-        if feature == "raw":
+        if features == ["raw"]:
             shape = (None,)
         else:
-            shape = (1,)
+            shape = (len(features),)
 
     time_tm = get_time_tm(signal_tm)
 
@@ -375,14 +390,14 @@ def create_around_tmap(tmap_name: str) -> Optional[TensorMap]:
             times=times,
             periods=periods,
             window=window,
-            feature=feature,
+            features=features,
             event_tms=event_proc_tms,
             visit_tm=visit_tm,
             signal_tm=signal_tm,
             signal_time_tm=time_tm,
             imputation_type=imputation_type,
         ),
-        channel_map=signal_tm.channel_map,
+        channel_map=channel_map,
         path_prefix=signal_tm.path_prefix,
         interpretation=signal_tm.interpretation,
         validators=validator_no_nans,
@@ -393,7 +408,7 @@ def create_sliding_window_tmap(tmap_name: str) -> Optional[TensorMap]:
     match = None
 
     imputation_type = None
-    feature = "raw"
+    features = []
     tmap_match_name = tmap_name
 
     pattern = re.compile(r"^(.*)_(mean_imputation)$")
@@ -405,10 +420,19 @@ def create_sliding_window_tmap(tmap_name: str) -> Optional[TensorMap]:
 
     pattern = re.compile(fr"^(.*)_({FEATURES})$")
     match = pattern.findall(tmap_match_name)
-    if match:
-        _, feature = match[0]
-        tmap_match_name = tmap_match_name.replace(f"_{feature}", "")
-        match = None
+    k = 0
+    channel_map = {}
+    while match:
+        _, new_feature = match[0]
+        tmap_match_name = tmap_match_name.replace(f"_{new_feature}", "")
+        features.append(new_feature)
+        channel_map[f"{new_feature}"] = 1
+        match = pattern.findall(tmap_match_name)
+        k += 1
+    if not features:
+        features = ["raw"]
+    if len(features) == 1:
+        channel_map = None
 
     if not match:
         pattern = re.compile(
@@ -422,10 +446,10 @@ def create_sliding_window_tmap(tmap_name: str) -> Optional[TensorMap]:
     if not match:
         return None
 
-    if feature == "raw":
-        shape = (None, None)
-    else:
+    if features == ["raw"]:
         shape = (None,)
+    else:
+        shape = (len(features),)
     if signal_tm.endswith("_timeseries"):
         shape += (2,)
 
@@ -450,10 +474,10 @@ def create_sliding_window_tmap(tmap_name: str) -> Optional[TensorMap]:
             visit_tm=visit_tm,
             signal_tm=signal_tm,
             signal_time_tm=time_tm,
-            feature=feature,
+            features=features,
             imputation_type=imputation_type,
         ),
-        channel_map=signal_tm.channel_map,
+        channel_map=channel_map,
         path_prefix=signal_tm.path_prefix,
         interpretation=signal_tm.interpretation,
         validators=validator_no_nans,
@@ -585,7 +609,7 @@ def length_of_stay_sliding_window_tensor_from_file(
 
 def admin_age_event_visit_tensor_from_file(
     visit_tm: TensorMap,
-    samples: int = 1,
+    samples: int = 1,  # pylint: disable=unused-argument
     window: int = None,
     step: int = None,
     event_tm_1: TensorMap = None,
