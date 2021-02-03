@@ -32,7 +32,8 @@ def main_training(args: argparse.Namespace):
             "CV_Typed-v0",
             init_conditions=args.init_conditions,
             paths=[
-                os.path.join(args.tables_dir, "discrete_action_space.csv"),
+                os.path.join(args.tables_dir, "discrete_action_space_v2.csv"),
+                os.path.join(args.tables_dir, "reward_params.json"),
                 args.save_dir,
             ],
             save_flag=args.save,
@@ -123,7 +124,6 @@ def main_training(args: argparse.Namespace):
         env.saver.save_params(args.save_name + ".npy")
     saver = ElementSaver(args.save_dir)
     saver.save_qfunc(args.save_name + ".h5", q_nn_model.model)
-    # rl_algorithm.saver.save_states(args.save_name + ".npy")
 
     # Print total reward evolution over episodes
     if args.render:

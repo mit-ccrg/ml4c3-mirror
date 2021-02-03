@@ -10,6 +10,7 @@ from gym.utils import seeding
 
 # Imports: first party
 from rl4cs.utils.element_saver import ElementSaver
+from rl4cs.environments.rewards import Reward
 from rl4cs.environments.burkhoff_model.cv_model import CVModel
 
 
@@ -86,7 +87,7 @@ class CVEnvTyped(gym.Env, ABC):
         """
         # Init
         self.init_conditions = init_conditions
-        self.path_saver = paths[1]
+        self.path_saver = paths[2]
         self.np_random = None
         self.seed()
         self.time_step = 0
@@ -104,9 +105,14 @@ class CVEnvTyped(gym.Env, ABC):
         self.obs_min = np.array(obs_limits["lower"])
         self.obs_max = np.array(obs_limits["upper"])
 
-        reward_limits = self._set_limits_reward()
-        self.min_lim_reward = np.array(reward_limits["lower"])
-        self.max_lim_reward = np.array(reward_limits["upper"])
+        # Define reward
+        self.reward = Reward(
+            paths[1],
+            type_rew="continuous",
+            cardiac_output=True,
+            drug_penalty=False,
+            power=True,
+        )
 
         self.params_lims: Dict[str, List] = {
             "Vs": [250, 4000],
@@ -141,17 +147,6 @@ class CVEnvTyped(gym.Env, ABC):
         }
         return limits
 
-    @staticmethod
-    def _set_limits_reward() -> Dict:
-        """
-        Set lower and upper limits for reward terms. List order is:
-        Card_output.
-
-        :return: <Dict> Lower and upper bounds of the reward terms.
-        """
-        limits: Dict[str, List[float]] = {"lower": [3], "upper": [5]}
-        return limits
-
     def seed(self, seed=None) -> List:
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
@@ -184,22 +179,13 @@ class CVEnvTyped(gym.Env, ABC):
         :return: <Tuple> Reward and terminate condition
         """
         # Reward function
+        reward = self.reward.compute_reward(self.observations, action)
         card_output = self.observations[-1]
-        if card_output < self.min_lim_reward:
-            reward = 0.0
-        elif self.min_lim_reward < card_output < self.max_lim_reward:
-            reward = 0.2
-        else:
-            reward = 1.0
-        if 0 < action <= 3 or action == 6:
-            reward += -0.2
-        if 3 < action < 6 or action > 6:
-            reward += -0.3
 
         # Terminate condition
         done = (
             (self.time_step >= self.max_time_rl)
-            or (card_output < 1)
+            or (card_output < 2)
             or any(self.observations < self.obs_min)
             or any(self.observations > self.obs_max)
             or self.model.params["Ees_rv"] > max(self.params_lims["Ees_rv"])

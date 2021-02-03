@@ -1,0 +1,44 @@
+{
+    "caridac_output":
+        {
+            "continuous":
+                {
+                    "l": 1.0,
+                    "k": 5.0,
+                    "off": 4.5
+                },
+            "discrete":
+                {
+                    "low_rew": 0.0,
+                    "intermed_rew": 0.1,
+                    "high_rew": 1.0,
+                    "low_threshold": 4.0,
+                    "high_threshold": 5.0
+                }
+        },
+    "drug_penalty":
+        {
+            "low_rew": 0.0,
+            "intermed_rew": -0.2,
+            "high_rew": -0.3,
+            "low_threshold": 1,
+            "high_threshold": 2
+        },
+    "power_penalty":
+        {
+            "continuous":
+                {
+                    "l": 20.0,
+                    "m": 0.5,
+                    "off": 1.1
+                },
+            "discrete":
+                {
+                    "low_rew": 0.0,
+                    "intermed_rew": -0.2,
+                    "high_rew": -0.4,
+                    "low_threshold": 1.0,
+                    "high_threshold": 1.5
+                }
+        }
+}

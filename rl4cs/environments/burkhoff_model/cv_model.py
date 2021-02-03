@@ -40,7 +40,7 @@ class CVModel:
         self.episode = 0
 
         self.path_act_space = paths[0]
-        self.path_saver = paths[1]
+        self.path_saver = paths[2]
 
         self.warm_up = 10  # [s]
         self.tstep = 0.001  # [s]
