@@ -1,3 +1,5 @@
+# pylint: disable=line-too-long
+
 PAIRWISE_DISTANCES = {
     "cityblock": [],
     "cosine": [],
@@ -24,18 +26,8 @@ PAIRWISE_DISTANCES = {
     "yule": [],
 }
 
-SIGNAL_PATHS = {
-    "bedmaster": {
-        "vitals": ["hr", "pa2s", "pa2d", "pa2m", "art1s", "art1d", "art1m"],
-        "waveform": ["pa2", "art1", "spo2"],
-    },
-    "edw": {
-        "flowsheet": [],
-        "labs": [],
-        "med": ["norepinephrine_infusion_syringe_in_swfi_80_mcg|ml_cmpd_central_mgh"],
-        "surgery": [],
-        "transfusions": [],
-    },
+DEPARTMENT_NAMES = {
+    "BLK08": "MGH BLAKE 8 CARD SICU",
 }
 
 METADATA_MEDS = {
@@ -50,4 +42,6 @@ SIGNAL_LIMITS = {
     "art1s": (30, 220),
     "art1m": (30, 220),
     "art1d": (30, 220),
+    "bt": (2.0, 5.0),
+    "spo2r": (0, 300),
 }

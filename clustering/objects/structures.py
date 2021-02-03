@@ -6,6 +6,7 @@ import random
 import string
 import logging
 import datetime
+import itertools
 from typing import Dict, List, Union
 from collections import OrderedDict
 
@@ -14,11 +15,11 @@ import h5py
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from tqdm.notebook import tqdm as log_progress
+from tqdm import tqdm as log_progress
 
 # Imports: first party
 from clustering.utils import IncorrectSignalError, format_time, get_signal_type
-from clustering.globals import METADATA_MEDS
+from clustering.globals import METADATA_MEDS, DEPARTMENT_NAMES
 from tensormap.TensorMap import Interpretation, update_tmaps
 from clustering.objects.modifiers import (
     Padder,
@@ -31,7 +32,7 @@ from clustering.objects.modifiers import (
     DimensionsReducer,
 )
 
-# pylint: disable=global-statement
+# pylint: disable=global-statement, too-many-public-methods
 
 TMAPS: Dict = {}
 
@@ -78,7 +79,7 @@ class HD5File(h5py.File):
         >>> HD5File.get_full_signal_path("pa2s", visit="123")
         bm/123/vitals/pa2s
         """
-        _, sig_type = get_signal_type(signal)
+        sig_type = get_signal_type(signal)
         type_path = HD5File.get_full_type_path(sig_type, visit)
         sig_path = f"{type_path}/{signal}"
         return sig_path
@@ -164,22 +165,50 @@ class HD5File(h5py.File):
         has_sig = any([type_path.replace("*", visit) in self for visit in visits])
         return has_sig
 
-    def get_blk08_duration(
+    def list_signals(self, visit=None, include_path=False, types=None):
+        """
+        Returns a list with all the following timeseries on the existing on file
+        for a given visit:
+        * BM waveforms
+        * BM vitals
+        * EDW flowsheets
+        * EDW labs
+        * EDW meds
+        """
+        if not types:
+            types = ["vitals", "waveform", "flowsheet", "labs", "med"]
+        signals = []
+        visits = [visit] if visit else self.visits
+        for visit_id in visits:
+            visit_types = set(self.signal_types(visit_id)) & set(types)
+            for sig_type in visit_types:
+                if sig_type in ["surgery", "transfusions"]:
+                    continue
+                sig_type_path = self.get_full_type_path(sig_type, visit_id)
+                type_signals = list(self[sig_type_path].keys())
+                if include_path:
+                    type_signals = [f"{sig_type_path}/{sig}" for sig in type_signals]
+                signals.extend(type_signals)
+        return signals
+
+    def get_department_duration(
         self,
         visit,
+        department,
         max_len=None,
         asunix=False,
         only_first=True,
     ) -> List[Dict]:
         """
-        Returns a list with all the blake08 stay of a patient. Stays are represented
-        as a dictionary in the form {"start_date": start_date, "end_date": end_date}.
-        Dates are datetimes in UTC time zone or ints that represent the unix timestamp.
+        Returns a list with all the stay of a patient on a given department.
+        Stays are represented as a dictionary in the form
+        {"start_date": start_date, "end_date": end_date}. Dates are datetimes in UTC
+        time zone or ints that represent the unix timestamp.
 
         Note:
-        -   if multiple blk08 entrances are concatenated, the algorithm authomatically
-            merges them into one. For example: [ELS09, BLK08, BlK08, ELS09, BLK08]
-            becomes [ELS09, BLK08, ELS09, BK08].
+        -   if multiple entrances on the department are concatenated, the algorithm
+            automatically merges them into one. For example:
+            [ELS09, BLK08, BlK08, ELS09, BLK08] becomes [ELS09, BLK08, ELS09, BK08].
         -   the patient may return an empty dict. There are three reasons for that:
             1. The patient has not gone through blake08
             2. The patient has gone through blk08 but the start time or the end time
@@ -196,124 +225,169 @@ class HD5File(h5py.File):
         :param only_first: <bool> if True, only the first BLK08 stay will be returned
         """
 
-        def _get_end_time(start_idx):
-            for rel_idx, _ in enumerate(movements_list[start_idx:]):
+        def _get_static_info(field_name):
+            tmap = _get_tmap(field_name)
+            field = tmap.tensor_from_file(tmap, self, visits=visit)[0]
+            if field[0] == "nan":
+                field = np.nan
+            return field
+
+        def _get_department_end_time(start_idx):
+            for rel_idx, _ in enumerate(movement_times[start_idx:]):
                 abs_idx = rel_idx + start_idx
-                if abs_idx not in blk08_idx:
-                    end_time = movements_list[abs_idx]
+                if abs_idx not in dpmt_idx:
+                    end_time = movement_times[abs_idx]
                     return end_time
-            tmap = _get_tmap("end_date")
-            end_time = tmap.tensor_from_file(tmap, self, visits=visit)[0][0]
-            if end_time == "nan":
-                end_time = np.nan
-            return end_time
+            return hosp_end_time
 
-        tmap = _get_tmap("department_nm")
-        department_list = tmap.tensor_from_file(tmap, self, visits=visit)[0]
-        blk08_idx = np.where(department_list == "MGH BLAKE 8 CARD SICU")[0]
-        tmap = _get_tmap("move_time")
-        movements_list = tmap.tensor_from_file(tmap, self, visits=visit)[0]
+        hosp_start_time = _get_static_info("admin_date")
+        if not pd.isnull(hosp_start_time):
+            hosp_start_time = hosp_start_time[0]
+        hosp_end_time = _get_static_info("end_date")
+        if not pd.isnull(hosp_end_time):
+            hosp_end_time = hosp_end_time[0]
 
-        blk08_stays = []
-        blk08_starts = [
-            blk08_idx[i]
-            for i, _ in enumerate(blk08_idx)
-            if blk08_idx[i - 1] != blk08_idx[i] - 1
-        ]
-        for idx in blk08_starts:
-            start_time = movements_list[idx]
-            end_time = _get_end_time(start_idx=idx)
+        if department and department != "any":
+            department_str = DEPARTMENT_NAMES[department]
+            department_list = _get_static_info("department_nm")
+            dpmt_idx = np.where(department_list == department_str)[0]
+            movement_times = _get_static_info("move_time")
 
+            dpmt_start_idx = [
+                dpmt_idx[i]
+                for i, _ in enumerate(dpmt_idx)
+                if dpmt_idx[i - 1] != dpmt_idx[i] - 1
+            ]
+            start_end_times = [
+                (movement_times[idx], _get_department_end_time(start_idx=idx))
+                for idx in dpmt_start_idx
+            ]
+        else:
+            start_end_times = [(hosp_start_time, hosp_end_time)]
+
+        dpmt_stays = []
+        for start_time, end_time in start_end_times:
             if pd.isna(start_time) or pd.isna(end_time):
                 logging.info(
                     f"File {self.mrn} on visit {visit} has unknown start or"
-                    f"discharge from BLK08",
+                    f"discharge from {department}",
                 )
-                continue
+            else:
+                start_time = format_time(start_time)
+                end_time = format_time(end_time)
 
-            start_time = format_time(start_time)
-            end_time = format_time(end_time)
+                if max_len:
+                    end_time = min(
+                        start_time + datetime.timedelta(hours=max_len),
+                        end_time,
+                    )
 
-            if max_len:
-                end_time = min(
-                    start_time + datetime.timedelta(hours=max_len),
-                    end_time,
-                )
+                if asunix:
+                    start_time = start_time.timestamp()
+                    end_time = end_time.timestamp()
 
-            if asunix:
-                start_time = start_time.timestamp()
-                end_time = end_time.timestamp()
+                dpmt_stays.append({"start": start_time, "end": end_time})
 
-            blk08_stays.append({"start": start_time, "end": end_time})
             if only_first:
-                return blk08_stays
+                return dpmt_stays
 
-        return blk08_stays
+        return dpmt_stays
 
-    def find_signal(self, signal, visit, max_length=None):
+    def find_signal(self, signal, visit, department=None, max_length=None):
         """
-        Looks for a signal on the given file and visit and during the BLK08 stay
-        (cropped by max_length if set).
+        Looks for a signal on the given file and visit.
+        The signal can be cropped to the duration of the say of a given department
+        and further cropped to a maximum length.
 
         :param signal: signal to search
         :param visit: visit to search
-        :param output: 3 options:
-            - existence: output is a boolean that confirms existence of the signal
-            - length: output is the duration of the signal in seconds
-            - percentage: output is the percentage of existence of the signal with
-                          respect to the BLK08 stay.
-        :param max_length: crop the BLK08 stay to a maximum of <max_lenth> hours.
+        :param department: department on which the signal should be found. If None,
+                           the whole duration of the signal will be taken.
+        :param max_length: crop the BLK08 stay to a maximum of <max_length> hours.
         """
-        sig_path = HD5File.get_full_signal_path(signal=signal, visit=visit)
-        if sig_path not in self:
+        if "/" in signal:
+            signal_path = signal
+            signal = signal.split("/")[-1]
+        else:
+            signal_path = HD5File.get_full_signal_path(signal=signal, visit=visit)
+
+        if signal_path not in self:
             logging.info(f"File {self.mrn} has no signal {signal}")
             return {"_existence": False}
 
-        duration = self.get_blk08_duration(
-            visit,
-            max_length,
-            asunix=True,
-            only_first=True,
-        )[0]
-        blk08_start, blk08_end = duration["start"], duration["end"]
-
-        time = self[sig_path]["time"]
+        try:
+            tmap = _get_tmap(f"{signal}_timeseries")
+            tmap.interpretation = Interpretation.TIMESERIES
+            _, time = tmap.tensor_from_file(tmap, self, visits=visit)[0]
+        except KeyError as err:
+            logging.info(
+                f"Signal {signal} was not found on file {self.mrn}",
+            )
+            return {"_existence": False}
+        except ValueError as err:
+            logging.warning(
+                f"Unexpected format on signal {signal} of "
+                f"file {self.mrn}: \n {err}",
+            )
+            return {"_existence": False}
         if not time.size:
             logging.info(f"Signal {signal} exists on {self.mrn} but it's empty.")
             return {"_existence": False}
-        valid_idx = np.where((time[()] >= blk08_start) & (time[()] <= blk08_end))[0]
+
+        if department:
+            duration = self.get_department_duration(
+                visit,
+                department=department,
+                max_len=max_length,
+                asunix=True,
+                only_first=True,
+            )[0]
+            start, end = duration["start"], duration["end"]
+        else:
+            start, end = 0, np.inf
+
+        valid_idx = np.where((time >= start) & (time <= end))[0]
         if not valid_idx.size:
             logging.info(
                 f"Signal {signal} exists on {self.mrn} but is out of BLK08 range.",
             )
             return {"_existence": False}
 
-        start_time, end_time = time[valid_idx[0]], time[valid_idx[-1]]
-        unfilled = np.diff(
-            np.concatenate(([blk08_start], time[valid_idx], [blk08_end])),
-        )
-        max_unfilled = unfilled.max()
-
         valid_time = time[valid_idx]
-        time_diff = np.diff(valid_time)
 
-        is_nm = time_diff < 0
-        non_monotonicities = time_diff[is_nm]
+        time_with_limits = valid_time
+        if department:
+            time_with_limits = np.concatenate(([start], time_with_limits, [end]))
+        max_unfilled = np.diff(time_with_limits).max()
 
+        max_nm_length = 0
+        max_nm_jump = 0
+        non_mono_indexes = np.where(np.diff(valid_time) < 0)[0]
+        for nm_idx in non_mono_indexes:
+            last_correct_ts = valid_time[nm_idx]
+            next_correct_idx = np.where(valid_time > last_correct_ts)[0]
+            next_correct_idx = (
+                next_correct_idx[0] if next_correct_idx.size else valid_time.size
+            )
+            nm_length = next_correct_idx - nm_idx
+            if nm_length > max_nm_length:
+                max_nm_length = nm_length
+            nm_jump = valid_time[nm_idx + 1] - last_correct_ts
+            if nm_jump > max_nm_jump:
+                max_nm_jump = nm_jump
+
+        nm_number = non_mono_indexes.size
+        consecutive_nm_condition = non_mono_indexes[1:] == non_mono_indexes[:-1] + 1
+        consecutive_nm = [
+            sum(1 for _ in group)
+            for key, group in itertools.groupby(consecutive_nm_condition)
+            if key
+        ]
+        max_consecutive_nm = max(consecutive_nm) if consecutive_nm else 0
+
+        start_time, end_time = valid_time[0], valid_time[-1]
         overlap_length = end_time - start_time
-        overlap_percent = (end_time - start_time) / (blk08_end - blk08_start) * 100
-        non_monotonicities_num = non_monotonicities.size
-        if non_monotonicities_num:
-            max_non_monotonicity = abs(non_monotonicities).max()
-            non_monotonicities_sum = abs(non_monotonicities).sum()
-            mask = np.concatenate(([False], is_nm, [False]))
-            changes = np.nonzero(mask[1:] != mask[:-1])[0]
-            durations = changes[1::2] - changes[::2]
-            longest_non_mon = durations.max()
-        else:
-            max_non_monotonicity = 0
-            non_monotonicities_sum = 0
-            longest_non_mon = 0
+        overlap_percent = overlap_length / (end - start) * 100 if department else 100
 
         results = {
             "_existence": True,
@@ -322,10 +396,10 @@ class HD5File(h5py.File):
             "_start_time": start_time,
             "_end_time": end_time,
             "max_unfilled_(s)": max_unfilled,
-            "non_monotonicities_(#)": non_monotonicities_num,
-            "max_non_monotonicity_(s)": max_non_monotonicity,
-            "non_monotonicities_sum_(s)": non_monotonicities_sum,
-            "longest_consecutive_non_mono_(#)": longest_non_mon,
+            "non_monotonicities_(#)": nm_number,
+            "max_non_monotonicity_length_(#)": max_nm_length,
+            "max_non_monotonicity_jump_(s)": max_nm_jump,
+            "max_consecutive_non_monotonicities_(#)": max_consecutive_nm,
         }
         return results
 
@@ -345,28 +419,26 @@ class HD5File(h5py.File):
         is not found, instead of raising an error, an empty signal
         (value=0 and time=<start_time>) will be returned.
         """
-        _, sig_type = get_signal_type(signal_name)
+        sig_type = get_signal_type(signal_name)
 
-        valid_idx = np.array([])
-        if self.has_signal(signal_name, visit=visit):
-            try:
-                tmap = _get_tmap(f"{signal_name}_timeseries")
-                tmap.interpretation = Interpretation.TIMESERIES
-                values, time = tmap.tensor_from_file(
-                    tmap, self, visits=visit, **kwargs
-                )[0]
+        try:
+            tmap = _get_tmap(f"{signal_name}_timeseries")
+            tmap.interpretation = Interpretation.TIMESERIES
+            values, time = tmap.tensor_from_file(tmap, self, visits=visit, **kwargs)[0]
+        except KeyError:
+            logging.info(f"Signal {signal_name} not found on file {self.filename}")
+            time = np.array([])
+            values = np.array([])
+        except ValueError:
+            logging.info(
+                f"Signal {signal_name} on file {self.filename} had an incorrect format",
+            )
+            time = np.array([])
+            values = np.array([])
 
-                blk08_idx = np.where((time >= start_time) & (time <= end_time))[0]
-                time = time[blk08_idx]
-                values = values[blk08_idx]
-
-                valid_idx = np.where(~np.isnan(values))[0]
-
-            except ValueError as err:
-                logging.warning(
-                    f"Unexpected format on signal {signal_name} of "
-                    f"file {self.mrn}: \n {err}",
-                )
+        valid_idx = np.where(
+            (time >= start_time) & (time <= end_time) & ~np.isnan(values),
+        )[0]
 
         if valid_idx.size == 0:
             if allow_empty:
@@ -377,14 +449,17 @@ class HD5File(h5py.File):
                     stype=sig_type,
                 )
                 return signal
-            logging.info(f"Signal {signal_name} not found on BLK08 on {self.mrn}")
-            raise ValueError(f"Signal {signal_name} not found!")
+            raise ValueError(
+                f"Signal {signal_name} not found on {self.filename}"
+                f"during the studied period",
+            )
+
+        time = time[valid_idx]
+        values = values[valid_idx]
 
         tmap = _get_tmap(f"{signal_name}_units")
         units = tmap.tensor_from_file(tmap, self, visits=visit)[0]
 
-        time = time[valid_idx]
-        values = values[valid_idx]
         signal = Signal(
             name=signal_name,
             values=values,
@@ -444,7 +519,7 @@ class HD5File(h5py.File):
             return decoded_row
 
         discharge_date = format_time(static_dir["end_date"], asunix=True)
-        admin_date = format_time(static_dir["end_date"], asunix=True)
+        admin_date = format_time(static_dir["admin_date"], asunix=True)
         birth_date = format_time(static_dir["birth_date"], asunix=True)
 
         patient_info["hospital_stay (days)"] = (discharge_date - admin_date) / (
@@ -464,7 +539,12 @@ class HD5File(h5py.File):
             tobacco = _row_to_dict(static_dir["alcohol_hist"])
             patient_info["alcohol"] = tobacco["STATUS"].strip()
 
-        blk08 = self.get_blk08_duration(visit, None, only_first=True, asunix=True)[0]
+        blk08 = self.get_department_duration(
+            visit,
+            department="BLK08",
+            only_first=True,
+            asunix=True,
+        )[0]
         blk08_start, blk08_end = blk08["start"], blk08["end"]
         blk08_duration = (blk08_end - blk08_start) / (3600 * 24)
 
@@ -477,9 +557,10 @@ class HD5File(h5py.File):
         patient_info["BLK08 start"] = format_time(blk08_start)
         patient_info["BLK08 end"] = format_time(blk08_end)
 
-        duration = self.get_blk08_duration(
+        duration = self.get_department_duration(
             visit,
-            max_len,
+            department="BLK08",
+            max_len=max_len,
             only_first=True,
             asunix=True,
         )[0]
@@ -511,25 +592,28 @@ class HD5File(h5py.File):
 
         return patient_info
 
-    def extract_patient(self, visit, signals, max_length=None):
+    def extract_patient(self, visit, signals, department=None, max_length=None):
         """
         Extracts the input signals from a visit along with metadata from that visit,
         and returns a Patient instance with all the information.
 
-        Only the BLK08 part of the signals will be included. Signals can be further
-        cropped to <max_length> if this parameter is set.
+        If `department` is set, only the part of the signals recorded during the patient
+        stay on that department will be included. If it is not set, the whole signal
+        will be taken. Signals can be further cropped to <max_length> if this parameter
+        `max_length` is set.
         """
-        blk08stays = self.get_blk08_duration(
+        dpmt_stays = self.get_department_duration(
             visit,
-            max_length,
+            department=department,
+            max_len=max_length,
             asunix=True,
             only_first=True,
         )[0]
-        blk08_start, blk08_end = blk08stays["start"], blk08stays["end"]
+        start, end = dpmt_stays["start"], dpmt_stays["end"]
 
         extracted_signals = []
         for signal_name in signals:
-            _, signal_type = get_signal_type(signal_name)
+            signal_type = get_signal_type(signal_name)
             if signal_type == "waveform":
                 kwargs = {"interpolation": "complete_no_nans"}
             else:
@@ -539,16 +623,17 @@ class HD5File(h5py.File):
                 signal = self.get_signal(
                     signal_name,
                     visit=visit,
-                    start_time=blk08_start,
-                    end_time=blk08_end,
+                    start_time=start,
+                    end_time=end,
                     allow_empty=allow_empty,
                     **kwargs,
                 )
                 extracted_signals.append(signal)
-            except ValueError:
+            except ValueError as error:
                 logging.warning(
                     f"Signal {signal_name} could not be extracted"
-                    f"from file {self.mrn}. Patient won't be extracted.",
+                    f"from file {self.mrn}. Patient won't be extracted."
+                    f"Reason: {str(error)}",
                 )
                 return None
 

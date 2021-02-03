@@ -1082,11 +1082,11 @@ def parse_args() -> argparse.Namespace:
         "--max_stay_length",
         "-l",
         type=int,
-        default=12,
+        default=None,
         help="Maximum stay length",
     )
     find_parser.add_argument(
-        "--csv_name",
+        "--output_file",
         "-o",
         default="files",
         help="Name of the output csv file with the signals",
@@ -1095,10 +1095,14 @@ def parse_args() -> argparse.Namespace:
         "--signals",
         "-s",
         nargs="+",
-        default=[],
+        default=None,
         help="Signals to be used",
     )
-
+    find_parser.add_argument(
+        "--department",
+        default=None,
+        help="Crop the signals to the stay on a specific department",
+    )
     extract_parser = clustering_subparsers.add_parser(
         name="extract",
         description="Generate a csv with the signals",
@@ -1113,7 +1117,7 @@ def parse_args() -> argparse.Namespace:
     extract_parser.add_argument(
         "--report_path",
         "-f",
-        help="Path to a csv listing the files and signals to extract. Generated"
+        help="Path to a .report file with the files and signals to extract. Generated"
         "by the 'find' command.",
     )
 
