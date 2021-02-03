@@ -30,6 +30,7 @@ setup:
 > @conda env create -f .pre-commit-env.yml
 > @conda run -n ml4c3 pre-commit install
 > @conda run -n ml4c3 pre-commit autoupdate
+> @chmod +x scripts/sensitive_data_githook.py
 
 clean:
 > @echo Cleaning files...

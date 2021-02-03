@@ -64,3 +64,9 @@ repos:
     entry: pylint
     language: system
     types: [python]
+  - id: sdc
+    name: sensitive-data-check
+    entry: scripts/sensitive_data_githook.py
+    language: python
+    types: [text]
+    exclude: tests
