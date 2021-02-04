@@ -1226,6 +1226,13 @@ def parse_args() -> argparse.Namespace:
         "between Q-network and Q-target. Default: 10.",
     )
     rl_parser.add_argument(
+        "--dqn_method",
+        type=str,
+        default="unique",
+        help="DQN method, either taking all values of the Q function to update the Q"
+        "network or only the unique ones that change. Choices: unique or all.",
+    )
+    rl_parser.add_argument(
         "--discount_gamma",
         type=float,
         default=0.99,

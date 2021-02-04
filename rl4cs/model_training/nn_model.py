@@ -127,17 +127,34 @@ class NNModel:
         return self.model(states, training=False)
 
     @tf.function
-    def train_batch(self, x_batch: np.ndarray, y_batch: np.ndarray):
+    def train_batch(
+        self,
+        x_batch: np.ndarray,
+        y_batch: np.ndarray,
+        actions: np.ndarray,
+        dqn_method: str,
+    ):
         """
         Train NN model.
 
         :param x_batch: <np.ndarray> Input batch of states.
-        :param y_batch: <np.ndarray> Output batch of actions.
+        :param y_batch: <np.ndarray> Output batch of Q update.
+        :param actions: <np.ndarray> Batch of actions.
+        :param dqn_method: <str> Either unique or all. Either taking unique elements
+                         that change from the q function or all in order to
+                         update the policy.
         :return: <tf.python.framework.ops.EagerTensor> Loss.
         """
         with tf.GradientTape() as tape:
             logits = self.model(x_batch, training=True)
-            loss_value = self.loss(y_batch, logits)  # type: ignore
+            if dqn_method == "unique":
+                selected_logits = tf.reduce_sum(
+                    logits * tf.one_hot(actions, self.num_actions),
+                    axis=1,
+                )
+                loss_value = self.loss(y_batch, selected_logits)  # type: ignore
+            if dqn_method == "all":
+                loss_value = self.loss(y_batch, logits)  # type: ignore
 
         grads = tape.gradient(loss_value, self.model.trainable_weights)
         self.optimizer.apply_gradients(  # type: ignore
