@@ -164,6 +164,7 @@ DEFINED_TMAPS: Dict[str, Any] = {
         "r_map",
         "r_cpn_glasgow_coma_scale_score",
         "r_level_of_consciousness",
+        "r_phs_ob_spo2_outgoing",
         "temperature",
         "respirations",
         "urine_output",
