@@ -142,13 +142,15 @@ def stage_bedmaster_files(
     # Iterate over all Bedmaster file paths to copy to staging directory
     path_destination_dir = os.path.join(staging_dir, "bedmaster_temp")
     for path_source_file in xref_subset["Path"]:
-        if os.path.exists(path_source_file):
+        fpath_source_file = os.path.join(path_destination_dir, path_source_file)
+        fpath_destination_file = os.path.join(path_destination_dir, path_source_file)
+        if os.path.exists(fpath_source_file):
             try:
-                shutil.copy(path_source_file, path_destination_dir)
+                shutil.copy(fpath_source_file, fpath_destination_file)
             except FileNotFoundError as e:
-                logging.warning(f"{path_source_file} not found. Error given: {e}")
+                logging.warning(f"{fpath_source_file} not found. Error given: {e}")
         else:
-            logging.warning(f"{path_source_file} not found.")
+            logging.warning(f"{fpath_source_file} not found.")
 
 
 def get_files_in_directory(

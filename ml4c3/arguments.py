@@ -236,6 +236,11 @@ def parse_args() -> argparse.Namespace:
         help="Path to save or load ADT table CSV file.",
     )
     icu_parser.add_argument(
+        "--bedmaster_index",
+        default="/media/ml4c3/bedmaster-index.csv",
+        help="Path to the CSV file containing all the bedmaster files information.",
+    )
+    icu_parser.add_argument(
         "--xref",
         default=os.path.expanduser("~/xref.csv"),
         help="Path to CSV file that links MRN, CSN, and Bedmaster file paths. "

@@ -41,6 +41,7 @@ class Tensorizer:
         edw: str,
         xref: str,
         adt: str,
+        bedmaster_index: str = None,
     ):
         """
         Initialize Tensorizer object.
@@ -58,6 +59,7 @@ class Tensorizer:
         self.edw = edw
         self.xref = xref
         self.adt = adt
+        self.bedmaster_index = bedmaster_index
         self.untensorized_files: Dict[str, List[str]] = {"file": [], "error": []}
 
     def tensorize(
@@ -110,6 +112,8 @@ class Tensorizer:
             self.bedmaster,
             self.edw,
             self.xref,
+            self.adt,
+            self.bedmaster_index,
         ).get_xref_files(
             mrns=mrns,
             starting_time=starting_time,
@@ -365,7 +369,7 @@ def tensorize(args):
             bedmaster=args.bedmaster,
             adt=args.adt,
         )
-        matcher.match_files(xref=args.xref)
+        matcher.match_files(bedmaster_index=args.bedmaster_index, xref=args.xref)
 
     # Iterate over batch of patients
     missed_patients = []

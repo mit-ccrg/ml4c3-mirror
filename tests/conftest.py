@@ -23,17 +23,16 @@ from ingest.icu.writers import Writer
 from definitions.globals import TENSOR_EXT
 from tensormap.TensorMap import TensorMap, Interpretation, get_local_timestamps
 from tensormap.icu_signals import get_tmap as GET_SIGNAL_TMAP
-from ingest.icu.data_objects import (
+from tensorize.edw.data_objects import (
     Event,
     Procedure,
     Medication,
     StaticData,
     Measurement,
     ICUDataObject,
-    BedmasterAlarm,
-    BedmasterSignal,
 )
 from tensormap.icu_list_signals import get_tmap as GET_LIST_TMAP
+from tensorize.bedmaster.data_objects import BedmasterAlarm, BedmasterSignal
 
 # pylint: disable=redefined-outer-name, unused-argument, missing-class-docstring
 
@@ -102,6 +101,7 @@ def pytest_configure():
     pytest.bedmaster_dir = os.path.join(pytest.datadir, "bedmaster")
     pytest.mat_file = os.path.join(pytest.bedmaster_dir, "bedmaster_file-123_5_v4.mat")
     pytest.bedmaster_matching = os.path.join(pytest.datadir, "bedmaster_matching_files")
+    pytest.bedmaster_index = os.path.join(pytest.datadir, "bedmaster-index.csv")
 
     # EDW
     pytest.edw_dir = os.path.join(pytest.datadir, "edw")

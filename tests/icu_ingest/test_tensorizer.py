@@ -35,7 +35,7 @@ def test_tensorizer(
     .
     tensorize_icu_no_edw_pull
     --xref {test_dir}/data/xref_file_tensorize.csv
-    --adt {test_dir}/data/edw/adt
+    --adt {test_dir}/data/edw/adt.csv
     --bedmaster {test_dir}/data/bedmaster
     --edw {test_dir}/data/edw
     --alarms {test_dir}/data/bedmaster_alarms
