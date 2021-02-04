@@ -32,7 +32,8 @@ from clustering.objects.modifiers import (
     DimensionsReducer,
 )
 
-# pylint: disable=global-statement, too-many-public-methods
+# pylint: disable=global-statement, expression-not-assigned, too-many-public-methods
+
 
 TMAPS: Dict = {}
 
@@ -739,10 +740,17 @@ class Signal:
         self.values = self.values * (maxv - minv) + minv
         self.scale_factor = (1, 1)
 
-    def plot(self):
+    def plot(self, ax=None):
+        is_ax = True
+        if ax is None:
+            ax = plt
+            is_ax = False
+
         time = (self.time - self.time[0]) / 3600
-        plt.plot(time, self.values)
-        plt.show()
+        ax.plot(time, self.values)
+
+        if not is_ax:
+            plt.show()
 
 
 class Patient:
@@ -923,34 +931,40 @@ class Patient:
             limits = signal_limits[signal.name] if signal_limits else (-np.inf, np.inf)
             signal.remove_outliers(method, signal_limits=limits, **kwargs)
 
-    def plot(self, signals=None):
+    def plot(self, signals=None, ax=None):
         """ Plots signals of the patient. """
         if not signals:
             signals = self.signals.keys()
 
+        is_ax = True
+        if ax is None:
+            ax = plt
+            is_ax = False
+
         for signal_name in signals:
             signal = self.signals[signal_name]
             s_time = (signal.time - signal.time[0]) / 3600
-            plt.plot(s_time, signal.values, label=signal_name)
+            ax.plot(s_time, signal.values, label=signal_name)
 
-        plt.title(self.name)
+        ax.set_title(self.name) if is_ax else ax.title(self.name)
         if self.meta:
             start = self.meta["Start time"].timestamp()
 
             def substract(ts):
                 return (ts.timestamp() - start) / 3600
 
-            plt.axvline(x=substract(self.meta["BLK08 start"]))
-            plt.axvline(x=substract(self.meta["BLK08 end"]))
-            plt.axvline(x=substract(self.meta["Start time"]), color="red")
-            plt.axvline(x=substract(self.meta["End time"]), color="red")
+            ax.axvline(x=substract(self.meta["BLK08 start"]))
+            ax.axvline(x=substract(self.meta["BLK08 end"]))
+            ax.axvline(x=substract(self.meta["Start time"]), color="red")
+            ax.axvline(x=substract(self.meta["End time"]), color="red")
 
-        plt.legend()
-        plt.show()
+        ax.legend()
+        if not is_ax:
+            plt.show()
 
     def force_overlap(self):
         min_time = 0
-        max_time = 10000000000000000
+        max_time = np.inf
         for signal in self.signals.values():
             if signal.time[0] > min_time:
                 min_time = signal.time[0]
@@ -1015,6 +1029,12 @@ class Bundle:
     def signal_list(self):
         return sorted(list(self.any_patient().signals))
 
+    def patient_list(self, include_clean=False):
+        if include_clean:
+            patients = [(path, patient.name) for path, patient in self.patients.items()]
+            return sorted(patients, key=lambda x: x[0])
+        return sorted(list(self.patients))
+
     def time_range(self):
         return self.any_patient().meta["Period studied (h)"]
 
@@ -1022,8 +1042,8 @@ class Bundle:
         return next(iter(self.patients.values()))
 
     def _signal_min_max(self, signal):
-        total_max = -10000000
-        total_min = 10000000
+        total_max = -np.inf
+        total_min = np.inf
         for patient in self.patients.values():
             sig = patient.get_signal(signal)
             sig_max = sig.values.max()
@@ -1033,12 +1053,6 @@ class Bundle:
             if sig_min < total_min:
                 total_min = sig_min
         return total_min, total_max
-
-    def patient_list(self, include_clean=False):
-        if include_clean:
-            patients = [(path, patient.name) for path, patient in self.patients.items()]
-            return sorted(patients, key=lambda x: x[0])
-        return sorted(list(self.patients))
 
     def remove_outliers(
         self, method=None, filter_method=None, list_methods=False, **kwargs
@@ -1143,12 +1157,17 @@ class Bundle:
         self.processes[process_name] = [filling, kwargs]
         return None
 
-    def plot_signal(self, signal_name, patients=None):
+    def plot_signal(self, signal_name, patients=None, ax=None):
         """
         Plots the a signal on the bundle. Specific patients can be selected with the
         `patients` argument. If `patients` is `any`, a random patient will be chosen.
         If `patients` is None, all patients will be plotted.
         """
+        is_ax = True
+        if ax is None:
+            is_ax = False
+            ax = plt
+
         if not patients:
             patients = self.patient_list()
         elif patients == "any":
@@ -1157,12 +1176,14 @@ class Bundle:
         for patient in patients:
             signal = self.patients[patient].get_signal(signal_name)
             s_time = (signal.time - signal.time[0]) / 3600
-            plt.plot(s_time, signal.values)
+            ax.plot(s_time, signal.values)
 
-        plt.title(signal_name)
-        plt.xlabel("Time")
-        plt.ylabel(signal.units)
-        plt.show()
+        ax.set_title(signal_name) if is_ax else ax.title(signal_name)
+        ax.set_xlabel("Time (h)") if is_ax else ax.xlabel("Time (h)")
+        ax.set_ylabel(signal.units) if is_ax else ax.ylabel(signal.units)
+
+        if not is_ax:
+            ax.show()
 
     def feature_matrix(self, method, store_path=None, verbose=False, **kwargs):
         """
@@ -1272,7 +1293,9 @@ class Bundle:
         for patient in self.patients.values():
             patient.rescale()
 
-    def reduce_dimensions(self, method, features=None, list_methods=False, **kwargs):
+    def reduce_dimensions(
+        self, method, features=None, list_methods=False, cluster_results=None, **kwargs
+    ):
         """
         Reduces dimensions of a feature matrix with the given method.
         Use list_methods=True for the list of methods available to do so.
@@ -1296,8 +1319,9 @@ class Bundle:
         space, exp_var = DimensionsReducer.reduce(method, features)
 
         df = pd.DataFrame(space, columns=[f"ax{i + 1}" for i in range(space.shape[1])])
-        df["cluster"] = [p.cluster for _, p in sorted(self.patients.items())]
         df["patient"] = self.patient_list()
+        if cluster_results:
+            df["cluster"] = [cluster_results[pname] for pname in self.patient_list()]
 
         return df, exp_var
 
@@ -1315,24 +1339,49 @@ class Bundle:
         signals = self.signal_list()
         npoints = len(self.any_patient())
 
-        for cluster, cluster_patients in cluster_results.patients_per_cluster:
-            cluster_traj = {}
+        for cluster, cluster_patients in cluster_results.patients_per_cluster().items():
+            cluster_traj = {"mean": {}, "up_quantile": {}, "low_quantile": {}}
             for signal in signals:
-                stacked_values = []
+                mean = []
+                up_quantile = []
+                low_quantile = []
                 for i in range(npoints):
                     i_values = [
                         self.patients[p_name].signals[signal].values[i]
                         for p_name in cluster_patients
                     ]
-                    stacked_values.append(i_values)
-                values = np.array(stacked_values).mean(axis=1)
-                cluster_traj[signal] = Signal(
+                    i_values = np.array(i_values)
+                    mean.append(i_values.mean())
+                    up_quantile.append(np.quantile(i_values, 0.9))
+                    low_quantile.append(np.quantile(i_values, 0.1))
+
+                sample_freq = self.any_patient().signals[signal].sample_freq
+                last_hour = (npoints / sample_freq) / 3600
+                time = np.arange(0, int(last_hour) + 0.00001, 1 / (sample_freq * 3600))
+                stype = self.any_patient().signals[signal].stype
+
+                cluster_traj["mean"][signal] = Signal(
                     name=f"{signal}-mean",
-                    values=values,
-                    time=np.arange(0, values.size),
-                    sample_freq=self.any_patient().signals[signal].sample_freq,
-                    stype=self.any_patient().signals[signal].stype,
+                    values=np.array(mean),
+                    time=time,
+                    sample_freq=sample_freq,
+                    stype=stype,
                 )
+                cluster_traj["up_quantile"][signal] = Signal(
+                    name=f"{signal}-up-quantile",
+                    values=np.array(up_quantile),
+                    time=time,
+                    sample_freq=sample_freq,
+                    stype=stype,
+                )
+                cluster_traj["low_quantile"][signal] = Signal(
+                    name=f"{signal}-low-quantile",
+                    values=np.array(low_quantile),
+                    time=time,
+                    sample_freq=sample_freq,
+                    stype=stype,
+                )
+
             trajectories[cluster] = cluster_traj
 
         return trajectories
@@ -1410,7 +1459,7 @@ class ClusterResult:
 
     def patients_per_cluster(self):
         patients_per_cluster = {cluster: [] for cluster in self.clusters}
-        for patient, cluster in self.patient_cluster:
+        for patient, cluster in self.patient_cluster.items():
             patients_per_cluster[cluster].append(patient)
         return patients_per_cluster
 
@@ -1449,15 +1498,16 @@ class ClusterReport:
         return value_count
 
     @staticmethod
-    def _format_list(data, percent=False, include_std=False):
+    def _format_list(data, percent=False, include_ci=False):
         data = np.array(data)
         data = data[~np.isnan(data)]
         mean = np.mean(data)
         if percent:
             mean = mean * 100
-        if include_std:
-            std = np.std(data)
-            return f"{mean:.2f} +/- {std:.2f}"
+        if include_ci:
+            ci_up = np.quantile(data, 0.9)
+            ci_low = np.quantile(data, 0.1)
+            return f"{mean:.2f} +/- (f{ci_low}-{ci_up})"
         return mean
 
     def add_patient(self, patient, cluster):
@@ -1479,7 +1529,7 @@ class ClusterReport:
         }
         return clust_patients
 
-    def get_summary(self, include_std=False):
+    def get_summary(self, include_ci=False):
         cluster_report = {}
         for cluster, cluster_stats in sorted(
             self.cluster_info.items(),
@@ -1496,7 +1546,7 @@ class ClusterReport:
                         formatted_value = self._format_list(
                             value,
                             percent=is_percent,
-                            include_std=include_std,
+                            include_ci=include_ci,
                         )
                         cluster_report[cluster_name][key] = formatted_value
                     elif isinstance(value[0], str):
@@ -1508,7 +1558,10 @@ class ClusterReport:
                 else:
                     cluster_report[cluster_name][key] = value
 
-        return pd.DataFrame(cluster_report)
+        df = pd.DataFrame(cluster_report)
+        df = df.round(2)
+        df.update(df.select_dtypes(include=np.number).applymap("{:,g}".format))
+        return df
 
     def plot_distribution(self, field):
         for cluster in sorted(self.cluster_info):

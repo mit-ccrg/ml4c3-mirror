@@ -211,6 +211,7 @@ class Explorer:
                                 file_info[info][signal] = signal_info[info]
 
                         results[file_id] = file_info
+
             except OSError:
                 logging.warning(f"File {file} is invalid!")
 

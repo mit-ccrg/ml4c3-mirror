@@ -27,7 +27,7 @@ from clustering.utils import IncorrectSignalError
 from clustering.globals import SIGNAL_LIMITS, PAIRWISE_DISTANCES
 
 
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument, consider-using-enumerate
 
 
 class _Curator:
@@ -387,12 +387,13 @@ class FeatureExtractor(_Curator):
         nsignals = len(_bundle.signal_list())
         dist = np.zeros((npatiens, ntimespans, nsignals))
 
-        for p_idx, patient in log_progress(
-            enumerate(sorted(_bundle.patients.values())),
+        for p_idx, patient_name in log_progress(
+            enumerate(_bundle.patient_list()),
             desc="concatenating...",
         ):
+            patient = _bundle.patients[patient_name]
             # dim1: pacient
-            for ts_idx, _ in range(len(patient)):
+            for ts_idx in range(len(patient)):
                 # dim2: timespan
                 for s_idx in range(len(patient[ts_idx])):
                     # dim3: senyal
