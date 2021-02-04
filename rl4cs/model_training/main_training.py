@@ -32,7 +32,7 @@ def main_training(args: argparse.Namespace):
             "CV_Typed-v0",
             init_conditions=args.init_conditions,
             paths=[
-                os.path.join(args.tables_dir, "discrete_action_space_v2.csv"),
+                os.path.join(args.tables_dir, "discrete_action_space.csv"),
                 os.path.join(args.tables_dir, "reward_params.json"),
                 args.save_dir,
             ],
@@ -126,18 +126,31 @@ def main_training(args: argparse.Namespace):
     saver.save_qfunc(args.save_name + ".h5", q_nn_model.model)
 
     # Print total reward evolution over episodes
-    if args.render:
+    if True:
         title = "Reward evolution over episodes"
         axis_labels = ("Number of episodes", "Total reward")
         axis_lims = None
         plot = RLPlotter(title, axis_labels, axis_lims, args.save_dir)
-        data = np.array(
+        # Compute reward and average reward
+        episodes = list(range(len(rl_algorithm.reward_store)))
+        reward = np.array(rl_algorithm.reward_store)
+        reward_episode = np.array(
             [
-                list(range(len(rl_algorithm.reward_store))),
-                rl_algorithm.reward_store,
+                episodes,
+                reward,
             ],
         ).transpose()
-        plot.update_plot(data)
-        plot.save_figure("plot_reward.png")
+        av_episodes = list(range(0, len(rl_algorithm.reward_store), 10))
+        av_reward = np.mean(reward.reshape(-1, 10), axis=1)
+        average_reward = np.array(
+            [
+                av_episodes,
+                av_reward,
+            ],
+        ).transpose()
+        plot.update_plot(reward_episode)
+        plot.update_plot(average_reward, hold=True)
+
+        plot.save_figure("plot_reward_prova.png")
     if args.recipe == "hyperoptimize":
         return sum(rl_algorithm.reward_store[-args.len_reward :]) / args.len_reward

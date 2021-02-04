@@ -47,15 +47,18 @@ class RLPlotter:
         self,
         data: np.ndarray,
         extra_info: str = None,
+        hold: bool = False,
     ):
         """
         Update plot with data and/or text.
 
         :param data: <np.ndarray> Array with data to plot.
         :param extra_info: <str> Text to show in the figure.
+        :param hold: <bool> If set true, plots are superimposed.
         """
         # Clean figure
-        self.axs.cla()
+        if not hold:
+            self.axs.cla()
 
         # Set params to figure
         if self.title:
