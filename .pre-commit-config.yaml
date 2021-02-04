@@ -70,3 +70,4 @@ repos:
     language: python
     types: [text]
     exclude: tests
+    args: [--ignore_numbers, "3600", "1000", --]
