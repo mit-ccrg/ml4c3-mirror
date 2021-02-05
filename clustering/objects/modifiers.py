@@ -1,18 +1,15 @@
 # Imports: standard library
-import os
-import copy
 import math
 import logging
-import warnings
 import itertools
 
 # Imports: third party
 import numpy as np
 import matplotlib as mpl
+from tqdm import tqdm as log_progress
 from scipy import stats, linalg
 from matplotlib import pyplot as plt
 from scipy.spatial import distance
-from tqdm.notebook import tqdm as log_progress
 from sklearn.cluster import (
     DBSCAN,
     OPTICS,
@@ -30,17 +27,20 @@ from clustering.utils import IncorrectSignalError
 from clustering.globals import SIGNAL_LIMITS, PAIRWISE_DISTANCES
 
 
+# pylint: disable=unused-argument, consider-using-enumerate
+
+
 class _Curator:
     @classmethod
     def methods(cls):
         methods = {}
         for meth_name, meth in cls.__dict__.items():
             if meth_name.startswith("meth"):
-                vars = meth.__func__.__code__.co_varnames[
+                vbls = meth.__func__.__code__.co_varnames[
                     : meth.__func__.__code__.co_argcount
                 ]
-                vars = [var for var in vars if not var.startswith("_") and var != "cls"]
-                methods[meth_name] = vars
+                vbls = [var for var in vbls if not var.startswith("_") and var != "cls"]
+                methods[meth_name] = vbls
 
         return methods
 
@@ -51,6 +51,8 @@ class _Curator:
 
 
 class OutlierRemover(_Curator):
+    """ Used to remove outliers from bundle's signals """
+
     @classmethod
     def remove_outliers(cls, struct, method, **kwargs):
         cls_method = f"meth_{method}"
@@ -168,6 +170,8 @@ class OutlierRemover(_Curator):
 
 
 class Padder:
+    """ Class to pad Signal objects """
+
     @classmethod
     def methods(cls):
         methods = ["zero", "edge", "mean", "median", "reflect", "symmetric", "wrap"]
@@ -187,7 +191,8 @@ class Padder:
         :param filling: Options: (Ex: [1,2,3,4,5])
             - 'zero': pads with 0s. Ex: [0,0,1,2,3,4,5,0,0]
             - 'edge': pads with the first/last value. Ex: [1,1,1,2,3,4,5,5,5]
-            - 'mean': pads with the mean value of the first/last 10% of values. Ex: [3,3,1,2,3,4,5,3,3]
+            - 'mean': pads with the mean value of the first/last 10% of values.
+                      Ex: [3,3,1,2,3,4,5,3,3]
             - 'median': pads with the median value. Ex: [3,3,1,2,3,4,5,3,3]
             - 'reflect': pads with the reflection of the vector mirrored on
                          the first and last values. Ex: [3,2,1,2,3,4,5,4,3]
@@ -250,6 +255,8 @@ class Padder:
 
 
 class Downsampler(_Curator):
+    """ Class to downsample Signal objects """
+
     @classmethod
     def downsample(cls, method, signal, new_rate):
         cls_method = f"meth_{method}"
@@ -268,24 +275,12 @@ class Downsampler(_Curator):
         new_values = []
         time = np.arange(_signal.time[0], _signal.time[-1] + 0.01, new_rate)
 
-        for idx, t in enumerate(time):
-            v = cls._interpolate(_signal, t)
-            if np.isnan(v):
-                print("**** Reason: nan value ****")
-                # Imports: standard library
-                import code
-
-                code.interact(local=locals())
+        for ts in time:
+            v = cls._interpolate(_signal, ts)
             new_values.append(v)
         ds_percent = ((_signal.values.size - time.size) / _signal.values.size) * 100
 
         values = np.array(new_values)
-        if any(values < 0) and _signal.stype == "med":
-            print("**** Reason: med with negative dose ****")
-            # Imports: standard library
-            import code
-
-            code.interact(local=locals())
 
         _signal.time = time
         _signal.values = values
@@ -317,17 +312,6 @@ class Downsampler(_Curator):
 
         new_values = np.nanmean(v_padded.reshape(-1, v_spacing), axis=1)
 
-        if not all(np.diff(new_time) == new_rate):
-            # Imports: standard library
-            import code
-
-            code.interact(local=locals())
-        if new_time.size != new_values.size:
-            # Imports: standard library
-            import code
-
-            code.interact(local=locals())
-
         _signal.values = new_values
         _signal.time = new_time
 
@@ -339,26 +323,25 @@ class Downsampler(_Curator):
         if time in _signal.time:
             idx = np.where(_signal.time == time)[0][0]
             return _signal.values[idx]
-        else:
-            idx = np.where(_signal.time < time)[0]
-            if idx.size == 0:
-                logging.info(
-                    "Signal has a shorted length. Maybe the first points were outliers.",
-                )
-                idx = 0
-            else:
-                idx = idx[-1]
-                if idx + 1 == _signal.time.size:
-                    return _signal.values[idx]
-
-            return _signal.values[idx] + (
-                _signal.values[idx + 1] - _signal.values[idx]
-            ) * (
-                (time - _signal.time[idx]) / (_signal.time[idx + 1] - _signal.time[idx])
+        idx = np.where(_signal.time < time)[0]
+        if idx.size == 0:
+            logging.info(
+                "Signal has a shorted length. " "Maybe the first points were outliers.",
             )
+            idx = 0
+        else:
+            idx = idx[-1]
+            if idx + 1 == _signal.time.size:
+                return _signal.values[idx]
+
+        return _signal.values[idx] + (_signal.values[idx + 1] - _signal.values[idx]) * (
+            (time - _signal.time[idx]) / (_signal.time[idx + 1] - _signal.time[idx])
+        )
 
 
 class Normalizer(_Curator):
+    """ Class to normalize signals from Bundles """
+
     @classmethod
     def normalize(cls, method, bundle, **kwargs):
         cls_method = f"meth_{method}"
@@ -380,6 +363,8 @@ class Normalizer(_Curator):
 
 
 class FeatureExtractor(_Curator):
+    """ Class that extracts features from Bundles """
+
     @classmethod
     def get_feature(cls, method, bundle, **kwargs):
         cls_method = f"meth_{method}"
@@ -402,27 +387,18 @@ class FeatureExtractor(_Curator):
         nsignals = len(_bundle.signal_list())
         dist = np.zeros((npatiens, ntimespans, nsignals))
 
-        for p_idx, (pname, patient) in log_progress(
-            enumerate(sorted(_bundle.patients.items())),
+        for p_idx, patient_name in log_progress(
+            enumerate(_bundle.patient_list()),
             desc="concatenating...",
         ):
+            patient = _bundle.patients[patient_name]
             # dim1: pacient
             for ts_idx in range(len(patient)):
                 # dim2: timespan
                 for s_idx in range(len(patient[ts_idx])):
                     # dim3: senyal
-                    try:
-                        dist[p_idx][ts_idx][s_idx] = patient[ts_idx][s_idx]
-                    except:
-                        # Imports: standard library
-                        import code
+                    dist[p_idx][ts_idx][s_idx] = patient[ts_idx][s_idx]
 
-                        code.interact(local=locals())
-                    if np.isnan(patient[ts_idx][s_idx]):
-                        # Imports: standard library
-                        import code
-
-                        code.interact(local=locals())
                     if verbose:
                         print(f"[{p_idx}][{ts_idx}][{s_idx}]: {patient[ts_idx][s_idx]}")
 
@@ -434,6 +410,8 @@ class FeatureExtractor(_Curator):
 
 
 class DistanceMetric(_Curator):
+    """ Class to calculate distance between Bundle's patients """
+
     @classmethod
     def get_distance(cls, method, patient1, patient2, verbose=False, **kwargs):
         cls_method = f"meth_{method}"
@@ -540,6 +518,8 @@ class DistanceMetric(_Curator):
 
 
 class DimensionsReducer(_Curator):
+    """ Class that reduces dimensions on from a Bundle """
+
     @classmethod
     def reduce(cls, method, features):
         cls_method = f"meth_{method}"
@@ -562,6 +542,7 @@ class DimensionsReducer(_Curator):
 
 
 class Cluster(_Curator):
+    """ Class to cluster Bundles """
 
     ACCEPTED_DISTANCES = {
         "meth_dbscan": {
@@ -751,10 +732,7 @@ class Cluster(_Curator):
                     color_iter,
                 ),
             ):
-                # Imports: standard library
-                import code
 
-                code.interact(local=locals())
                 v, w = linalg.eigh(cov)
                 if not np.any(Y_ == i):
                     continue
@@ -787,11 +765,13 @@ class Cluster(_Curator):
 
         Hyperparameters:
         :param min_samples: min samples on a cluster to consider it as such.
-        Can be an absolute value (int>1) or a fraction of the total number of points (float [0,1])
+        Can be an absolute value (int>1) or a fraction of the total number of points
+        (float [0,1])
         :param cluster_method: either DBSCAN or xi
 
         *Internal params*
-        :param _X: either distance matrix (if metric=precomputed) or sample-features matrix
+        :param _X: either distance matrix (if metric=precomputed) or
+                   sample-features matrix
         :param _distance_algo: metric used to compute distance. Can be precomputed
         :param _optimize: optimize hyperparams instead of cluster
         :param kwargs: any other additional parameter needed
@@ -852,7 +832,7 @@ class Cluster(_Curator):
 
                 # Calculate Gap statistic
                 reference_inertias = []
-                for i in range(50):
+                for _ in range(50):
                     random_data = np.random.random_sample(size=_X.shape)
                     km = KMeans(n_clusters=k, algorithm=_cluster_algo).fit(random_data)
                     reference_inertias.append(km.inertia_)
@@ -889,6 +869,8 @@ class Cluster(_Curator):
 
 
 class ClusterAnalyzer:
+    """ Class to hyperoptimize and analyze clusters created on Bundles """
+
     def __init__(self, distances):
         self.distances = distances
 

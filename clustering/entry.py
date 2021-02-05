@@ -12,7 +12,7 @@ def find(args):
         args.signals,
         stay_length=args.max_stay_length,
     )
-    report.to_csv(os.path.join(args.output_folder, f"{args.csv_name}.csv"))
+    report.to_pickle(os.path.join(args.output_folder, f"{args.output_file}.report"))
 
 
 def extract(args):
@@ -21,7 +21,7 @@ def extract(args):
     output_path = os.path.join(args.output_folder, args.output_file)
 
     logging.debug(f"Reading report from {report_path}...")
-    report = RequestReport.from_csv(report_path)
+    report = RequestReport.from_pickle(report_path)
     logging.debug("Report loaded!")
 
     logging.debug(f"Extracting data from {hd5_path}...")

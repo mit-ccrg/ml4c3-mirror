@@ -17,15 +17,14 @@ from ml4c3.utils import get_unix_timestamps
 from definitions.edw import EDW_FILES, MED_ACTIONS
 from definitions.icu import ALARMS_FILES, ICU_SCALE_UNITS
 from definitions.globals import TIMEZONE
-from ingest.icu.data_objects import (
+from tensorize.edw.data_objects import (
     Event,
     Procedure,
     Medication,
     StaticData,
     Measurement,
-    BedmasterAlarm,
-    BedmasterSignal,
 )
+from tensorize.bedmaster.data_objects import BedmasterAlarm, BedmasterSignal
 from tensorize.bedmaster.bedmaster_stats import BedmasterStats
 from tensorize.bedmaster.match_patient_bedmaster import PatientBedmasterMatcher
 
@@ -1518,14 +1517,14 @@ class CrossReferencer:
         bedmaster_dir: str,
         edw_dir: str,
         xref_file: str,
-        adt: str = EDW_FILES["adt_file"]["name"],
+        adt: str,
+        bedmaster_index: str = None,
     ):
         self.bedmaster_dir = bedmaster_dir
         self.edw_dir = edw_dir
         self.xref_file = xref_file
-        if not adt.endswith(".csv"):
-            adt += ".csv"
-        self.adt = os.path.join(self.edw_dir, adt)
+        self.adt = adt
+        self.bedmaster_index = bedmaster_index
         self.crossref: Dict[str, Dict[str, List[str]]] = {}
 
     def get_xref_files(
@@ -1567,12 +1566,18 @@ class CrossReferencer:
         """
         self.crossref = {}
         if not os.path.exists(self.xref_file):
+            if self.bedmaster_index is None or not os.path.exists(self.bedmaster_index):
+                raise ValueError(
+                    "No method to get xref table.  Specify a valid path to an existing "
+                    "xref table or a bedmaster index table.",
+                )
             bedmaster_matcher = PatientBedmasterMatcher(
                 bedmaster=self.bedmaster_dir,
                 adt=self.adt,
             )
             bedmaster_matcher.match_files(
-                self.xref_file,
+                bedmaster_index=self.bedmaster_index,
+                xref=self.xref_file,
             )
 
         adt_df = pd.read_csv(self.adt)
@@ -1650,8 +1655,7 @@ class CrossReferencer:
                 csn = str(int(row["PatientEncounterID"]))
             except ValueError:
                 csn = str(row["PatientEncounterID"])
-            fname = os.path.split(row["Path"])[1]
-            bedmaster_path = os.path.join(self.bedmaster_dir, fname)
+            bedmaster_path = os.path.join(self.bedmaster_dir, row["Path"])
             if mrn not in self.crossref:
                 self.crossref[mrn] = {csn: [bedmaster_path]}
             elif csn not in self.crossref[mrn]:

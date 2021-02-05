@@ -8,10 +8,11 @@ from collections import Counter, namedtuple
 # Imports: third party
 import numpy as np
 import pandas as pd
+from tqdm import tqdm as log_progress
 from matplotlib import pyplot as plt
-from tqdm.notebook import tqdm as log_progress
 
 # Imports: first party
+from definitions.icu_tmaps import DEFINED_TMAPS
 from clustering.objects.structures import Bundle, HD5File
 
 FILE_ID = namedtuple("FILE_ID", ["file", "visit"])
@@ -37,7 +38,11 @@ class Explorer:
                     for visit in hd5.visits:
                         if hd5.has_source("edw", visit):
                             blk08 = bool(
-                                hd5.get_blk08_duration(visit=visit, only_first=True),
+                                hd5.get_department_duration(
+                                    department="BLK08",
+                                    visit=visit,
+                                    only_first=True,
+                                ),
                             )
                         else:
                             blk08 = "-"
@@ -103,7 +108,7 @@ class Explorer:
 
         return proposed_sigs
 
-    def find(self, signals, stay_length=0):
+    def find(self, signals=None, department=None, stay_length=0):
         """
         Create a table with the overlap time of the input signals during the BLK08
         stay of the patient. If stay length is set, the considered time will be the
@@ -117,12 +122,41 @@ class Explorer:
         * If a patient has gone through BLK08 multiple times, only the first BLK08 stay
           will be used.
 
-        :param path: path where the hd5 files are
-        :param signals: list with the signals to be searched
+        :param signals: list with the signals to be searched.
+        :param department: department where the signal will be looked at. If None,
+                           the whole signal will be taken.
         :param stay_length: length of the stay (in hours) to consider the signal.
-                            If set to 0 it will take the whole BLK08 stay
+                            If set to 0 it will take the whole BLK08 stay.
         :return:
         """
+        timeseries_types = ["vitals", "waveform", "flowsheet", "labs"]
+
+        tmap_signals = []
+        for stype in timeseries_types:
+            tmap_signals.extend(DEFINED_TMAPS[stype])
+
+        if signals:
+            if all(sig in timeseries_types for sig in signals):
+                logging.info(
+                    "Signal types instead of individual signals detected."
+                    "Will take all the tmaps for those types.",
+                )
+                tmap_signals = []
+                for stype in signals:
+                    tmap_signals.extend(DEFINED_TMAPS[stype])
+
+                signals = tmap_signals
+            else:
+                logging.info("Individual signal detected")
+                not_valid_signals = set(signals) - set(tmap_signals)
+                if not_valid_signals:
+                    logging.warning(
+                        f"Signals {not_valid_signals} don't have an "
+                        f"associated tmap. They won't be used",
+                    )
+                signals = set(signals) & set(tmap_signals)
+        else:
+            signals = tmap_signals
 
         results = {}
         for file in log_progress(self.files, desc="Finding files..."):
@@ -141,29 +175,32 @@ class Explorer:
                             )
                             continue
 
-                        blk08_stays = hd5.get_blk08_duration(
+                        dpmt_stays = hd5.get_department_duration(
                             visit_id,
+                            department=department,
                             max_len=stay_length,
                             only_first=True,
+                            asunix=False,
                         )
-                        if not blk08_stays:
-                            logging.info(
-                                f"CSN {visit_id} of MRN {hd5.mrn} didn't go "
-                                f"through BLK08. Ignoring it",
-                            )
+                        if not dpmt_stays:
                             continue
 
                         file_info = {}
 
-                        blk08_stay = blk08_stays[0]
-                        blk08_duration = blk08_stay["end"] - blk08_stay["start"]
-                        blk08_duration = blk08_duration.total_seconds() / 3600
+                        dpmt_stay = dpmt_stays[0]
+                        dpmt_duration = dpmt_stay["end"] - dpmt_stay["start"]
+                        dpmt_duration = dpmt_duration.total_seconds() / 3600
 
-                        file_info["_period_studied"] = blk08_duration
+                        file_info["_period_studied"] = dpmt_duration
+                        file_info["_period_studied_start"] = dpmt_stay[
+                            "start"
+                        ].timestamp()
+                        file_info["_period_studied_end"] = dpmt_stay["end"].timestamp()
 
                         for signal in signals:
                             signal_info = hd5.find_signal(
                                 signal,
+                                department=department,
                                 visit=visit_id,
                                 max_length=stay_length,
                             )
@@ -176,9 +213,9 @@ class Explorer:
                         results[file_id] = file_info
 
             except OSError:
-                print(f"File {file} is invalid!")
+                logging.warning(f"File {file} is invalid!")
 
-        request_report = RequestReport(results)
+        request_report = RequestReport(results, department=department)
         return request_report
 
     def extract_data(self, report):
@@ -190,11 +227,12 @@ class Explorer:
                 with HD5File(file_path) as hd5:
                     patient = hd5.extract_patient(
                         visit,
-                        report.signals,
-                        report.time_studied,
+                        signals=report.current_signals,
+                        department=report.department,
+                        max_length=report.time_studied,
                     )
-
-                patients[patient.name] = patient
+                if patient:
+                    patients[patient.name] = patient
 
             except OSError:
                 logging.warning(f"File {file} is invalid!")
@@ -334,14 +372,16 @@ class ExploreReport:
 class RequestReport:
     """ Report containing statistics about the signals. Generated by Explorer.find """
 
-    def __init__(self, data):
+    def __init__(self, data, department=None):
         self.data = data
         self.df = self.generate_table()
+        self.department = department
+        self.current_signals = self.all_signals
 
-    def generate_table(self, signals=None):
+    def generate_table(self, signals=None, blame_signal=False):
         if signals is None:
-            signals = self.signals
-        unknown_signals = set(signals) - set(self.signals)
+            signals = self.all_signals
+        unknown_signals = set(signals) - set(self.all_signals)
         if len(unknown_signals) != 0:
             raise ValueError(f"Signals {unknown_signals} are not found in data")
 
@@ -381,16 +421,22 @@ class RequestReport:
             for info_key, signal_values in file_data.items():
                 if not info_key.startswith("_"):
                     curated_key = info_key.replace("_", " ").capitalize()
-                    row[curated_key] = max(
-                        value
+                    valid_values = [
+                        (value, signal)
                         for signal, value in signal_values.items()
                         if signal in signals
-                    )
+                    ]
+                    max_value, max_signal = max(valid_values, key=lambda x: x[0])
+                    row[curated_key] = max_value
+                    if blame_signal:
+                        row[f"{curated_key} signal"] = max_signal
 
             data.append(row)
 
         self.df = pd.DataFrame(data)
         self.df = self.df.round(2)
+        self.current_signals = signals
+
         return self.df
 
     @property
@@ -398,7 +444,7 @@ class RequestReport:
         return self.df["Time studied (h)"].max()
 
     @property
-    def signals(self):
+    def all_signals(self):
         signals = list(next(iter(self.data.values()))["_existence"].keys())
         return signals
 
@@ -408,11 +454,6 @@ class RequestReport:
             (file, str(visit)) for file, visit in zip(self.df["File"], self.df["Visit"])
         ]
         return file_visits
-
-    @staticmethod
-    def from_csv(path):
-        df = pd.read_csv(path, index_col=False)
-        return RequestReport(df)
 
     def to_csv(self, path):
         self.df.to_csv(path, index=False)
@@ -448,15 +489,15 @@ class RequestReport:
 
     def plot_signals_frequency(self):
         counts = []
-        for signal in self.signals:
+        for signal in self.current_signals:
             count = np.count_nonzero(~np.isnan(self.df[signal]))
             counts.append(count)
-        plt.bar(self.signals, counts)
+        plt.bar(self.all_signals, counts)
         plt.legend()
         plt.show()
 
     def plot_signal_cells(self):
-        for signal in self.signals:
+        for signal in self.current_signals:
             values = ~np.isnan(self.df[signal])
             plt.hist(values, label=signal)
         plt.legend()

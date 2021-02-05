@@ -12,11 +12,12 @@ from ingest.icu.readers import CrossReferencer
 
 
 @pytest.fixture(scope="function")
-def cross_referencer() -> CrossReferencer:
+def cross_referencer():
     reader = CrossReferencer(
         pytest.bedmaster_dir,
         pytest.edw_dir,
         pytest.cross_ref_file,
+        pytest.adt_path,
     )
     yield reader
 

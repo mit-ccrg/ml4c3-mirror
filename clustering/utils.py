@@ -6,22 +6,17 @@ import numpy as np
 from pytz import timezone
 
 # Imports: first party
-from clustering.globals import SIGNAL_PATHS
-
-
-class HD5FormatError(ValueError):
-    pass
+from definitions.icu_tmaps import DEFINED_TMAPS
 
 
 class IncorrectSignalError(ValueError):
-    pass
+    """ Error raised when the signal has an unacceptable form"""
 
 
 def get_signal_type(signal):
-    for source in SIGNAL_PATHS:
-        for sig_type in SIGNAL_PATHS[source]:
-            if signal in SIGNAL_PATHS[source][sig_type]:
-                return source, sig_type
+    for sig_type in DEFINED_TMAPS:
+        if signal in DEFINED_TMAPS[sig_type]:
+            return sig_type
     raise ValueError(f"Signal {signal} not recognized!")
 
 

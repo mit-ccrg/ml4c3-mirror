@@ -5,6 +5,7 @@ from typing import List, Optional
 
 # Imports: third party
 import numpy as np
+import tensorflow as tf
 
 # Imports: first party
 from rl4cs.model_training.memory import Memory
@@ -31,6 +32,7 @@ class DQNAlgorithm:
         discount: float = 0.99,
         reply_start_size: int = 100,
         sync_steps: int = 100,
+        dqn_method: str = "unique",
     ):
         """
         Init DQNAlgorithm class.
@@ -46,10 +48,16 @@ class DQNAlgorithm:
         :param reply_start_size: <int> Initial size of the buffer to start
                                        experience reply.
         :param sync_steps: <int> Number of steps between sync of q_nn and q_target.
+        :param dqn_method: <str> Either unique or all. Either taking unique elements
+                                 that change from the q function or all in order to
+                                 update the policy.
         """
+        # Environment and policy
         self.env = env
         self.q_nn_model = q_nn_model
         self.q_target = q_target
+
+        # Hyperparameters related to the DQN
         self.memory = memory
         self.max_eps = max_eps
         self.min_eps = min_eps
@@ -58,10 +66,22 @@ class DQNAlgorithm:
         self.reply_start_size = reply_start_size
         self.sync_steps = sync_steps
         self.eps = max_eps
+
+        # Start new variables to count/store
         self.steps = 0
         self.reward_store: List[float] = []
         self.loss_store: List[float] = []
+
+        # Render capability
         self.render = False
+
+        # Choice of dqn method
+        if dqn_method not in ("unique", "all"):
+            raise ValueError(
+                f"DQN method {dqn_method} not supported. Possibilities "
+                f"are: unique or all.",
+            )
+        self.dqn_method = dqn_method
 
     def run(self):
         """
@@ -158,6 +178,9 @@ class DQNAlgorithm:
         # Setup training arrays
         x_imp = np.zeros((len(batch), self.q_nn_model.num_states))
         y_out = np.zeros((len(batch), self.q_nn_model.num_actions))
+        if self.dqn_method == "unique":
+            y_out = y_out[:, 0]
+        actions = np.zeros(len(batch)).astype(int)
         for idx, sample in enumerate(batch):
             states, action, reward, next_states = (
                 sample[0],
@@ -173,8 +196,14 @@ class DQNAlgorithm:
             else:
                 current_q[action] = reward + self.discount * np.amax(q_s_a_next[idx])
             x_imp[idx] = states
-            y_out[idx] = current_q
+            if self.dqn_method == "all":
+                y_out[idx] = current_q
+            if self.dqn_method == "unique":
+                y_out[idx] = np.sum(
+                    current_q * tf.one_hot(action, self.q_nn_model.num_actions),
+                )
+            actions[idx] = int(action)
 
         # Train Q NN model and return its loss
-        loss = self.q_nn_model.train_batch(x_imp, y_out)
+        loss = self.q_nn_model.train_batch(x_imp, y_out, actions)
         return float(loss.numpy())

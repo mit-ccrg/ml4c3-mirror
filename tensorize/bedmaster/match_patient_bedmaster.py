@@ -1,6 +1,4 @@
 # Imports: standard library
-import os
-import re
 import logging
 from typing import Dict, List
 
@@ -10,8 +8,7 @@ import pandas as pd
 # Imports: first party
 from ml4c3.utils import get_unix_timestamps
 from definitions.edw import EDW_FILES
-from definitions.icu import BEDMASTER_EXT, MAPPING_DEPARTMENTS
-from tensorize.utils import get_files_in_directory
+from definitions.icu import MAPPING_DEPARTMENTS
 
 # pylint: disable=too-many-branches, line-too-long
 
@@ -56,105 +53,16 @@ class PatientBedmasterMatcher:
                         departments_new.append(k)
         return set(departments_new)
 
-    @staticmethod
-    def parse_bedmaster_file_paths(
-        bedmaster: str,
-        departments_short_names: set = None,
-    ):
-        """
-        Given a path to a directory, recursively iterate over all Bedmaster files
-        and retrieve metadata from the paths, inlcuding department, room,
-        and start time. Optionally, focus the search on subset of department folders.
-
-        :param bedmaster: <str> path to directory with subdirectories organized
-               by department; subdirectories contain Bedmaster .mat files.
-        :param departments_short_names: <set> Names of departments in short format;
-               these are hard to remember and are thus saved in a dictionary keyed
-               by human-readable department names; this dict is in definitions/icu.
-        :return: <pd.DataFrame> Table of full paths to Bedmaster files, departments,
-                 room_beds, and start time of each file.
-        """
-        logging.info(f"Getting paths to Bedmaster files at {bedmaster}")
-        if departments_short_names is not None:
-            logging.info(
-                f"Restricting search to the following departments: {departments_short_names}",
-            )
-        bedmaster_files, _ = get_files_in_directory(
-            directory=bedmaster,
-            file_extension=BEDMASTER_EXT,
-            departments_short_names=departments_short_names,
-        )
-
-        departments = []
-        room_beds = []
-        start_times = []
-        num_files = len(bedmaster_files)
-        fraction = round(num_files / 20) - 1
-
-        for i, bedmaster_file in enumerate(bedmaster_files):
-            if i % fraction == 0:
-                percent = i / num_files * 100
-                logging.info(
-                    f"Parsed metadata from {i} / {num_files} ({percent:.0f}%) "
-                    "Bedmaster file paths",
-                )
-
-            # Split Bedmaster file name into fields:
-            # <department>_<room_bed>-<start_t>-#_v4.mat is mapped to
-            # department, room_bed, start_t
-            file_name = os.path.split(bedmaster_file)[1]
-            split_info = re.split("[^a-zA-Z0-9]", file_name)
-
-            # If department name contains a hyphen, rejoin the name again:
-            # ELL-7 --> ELL, 7 --> ELL-7
-            if split_info[0].isalpha() and len(split_info[1]) == 1:
-                department = split_info[0] + "-" + split_info[1]
-                # split_info[1] contains the second part of the department name,
-                # e.g. 7 in ELL-7. So we need to delete it so the subsequent indices
-                # are consistent with non-hyphenated department names.
-                del split_info[1]
-            else:
-                department = split_info[0]
-            departments.append(department)
-            k = 2
-
-            # If Bedmaster file name contains a "+" or "~" sign, take next field as it
-            # will contain an empty one.
-            if split_info[k] == "":
-                k = 3
-
-            room_bed = split_info[1]
-
-            if any(s.isalpha() for s in room_bed):
-                room_bed = room_bed[:-1] + " " + room_bed[-1]
-            else:
-                room_bed = room_bed + " A"
-            while len(room_bed) < 6:
-                room_bed = "0" + room_bed
-
-            # Prepend room bed identifier with first character of department
-            room_bed_nm = department[0] + room_bed
-            room_beds.append(room_bed_nm)
-
-            start_times.append(split_info[k])
-
-        metadata = pd.DataFrame(
-            {
-                "Path": bedmaster_files,
-                "DepartmentDSC": departments,
-                "BedLabelNM": room_beds,
-                "StartTime": start_times,
-            },
-        )
-        return metadata
-
     def match_files(
         self,
+        bedmaster_index: str,
         xref: str = None,
     ):
         """
         Match Bedmaster files with patient's MRN and EncounterID.
 
+        :param bedmaster_index: <str> Path to the CSV file containing all the bedmaster
+               files information.
         :param xref: <str> Path to the CSV file containing the xref table.
         """
         logging.info("Matching Bedmaster files with MRNs and CSNs.")
@@ -182,10 +90,9 @@ class PatientBedmasterMatcher:
             )
 
         # Parse Bedmaster file paths into metadata
-        metadata = self.parse_bedmaster_file_paths(
-            bedmaster=self.bedmaster,
-            departments_short_names=departments_short_names,
-        )
+        metadata = pd.read_csv(bedmaster_index)
+        metadata = metadata[metadata["DepartmentDSC"].isin(departments_short_names)]
+        metadata = metadata.drop(["DepartmentDSC"], axis=1)
 
         # Now, we have:
         # adt: patient MRNs, CSNs, and stay information
@@ -193,14 +100,36 @@ class PatientBedmasterMatcher:
         logging.info("Cross referencing metadata and ADT DataFrames")
 
         # Merge adt and metadata on the room_bed
-        metadata = metadata[["Path", "StartTime", "BedLabelNM"]]
         xref_df = adt_df.merge(metadata, how="left", on="BedLabelNM")
 
-        # Keep rows with ADT start time within Bedmaster file transfer times
+        # Keep rows with overlap between ADT and Bedmaster file transfer times
         xref_df = xref_df[
-            (xref_df["TransferInDTS"] - 3600 <= xref_df["StartTime"].astype(float))
-            & (xref_df["StartTime"].astype(float) < xref_df["TransferOutDTS"])
+            (xref_df["StartTime"].astype(float) <= xref_df["TransferOutDTS"])
+            & (xref_df["EndTime"].astype(float) >= xref_df["TransferInDTS"])
         ]
+        # Define type of overlap
+        xref_df["OverlapID"] = (xref_df["StartTime"] < xref_df["TransferInDTS"]) * 1
+        xref_df["OverlapID"] = (
+            xref_df["OverlapID"] + (xref_df["EndTime"] > xref_df["TransferOutDTS"]) * 2
+        )
+        xref_df.loc[
+            xref_df["OverlapID"] == 0,
+            "OverlapDSC",
+        ] = ".mat file is completely within patient's stay"
+        xref_df.loc[
+            xref_df["OverlapID"] == 1,
+            "OverlapDSC",
+        ] = ".mat file overhangs patient's stay on the left"
+        xref_df.loc[
+            xref_df["OverlapID"] == 2,
+            "OverlapDSC",
+        ] = ".mat file overhangs patient's stay on the right"
+        xref_df.loc[
+            xref_df["OverlapID"] == 3,
+            "OverlapDSC",
+        ] = "patient's stay is completely within the .mat file"
+
+        # Keep just useful columns
         xref_df = xref_df[
             [
                 "MRN",
@@ -211,6 +140,9 @@ class PatientBedmasterMatcher:
                 "DepartmentID",
                 "DepartmentDSC",
                 "StartTime",
+                "EndTime",
+                "OverlapID",
+                "OverlapDSC",
             ]
         ]
 
@@ -225,4 +157,4 @@ def match_data(args):
         adt=args.adt,
         desired_departments=args.departments,
     )
-    bedmaster_matcher.match_files(xref=args.xref)
+    bedmaster_matcher.match_files(bedmaster_index=args.bedmaster_index, xref=args.xref)

@@ -236,6 +236,11 @@ def parse_args() -> argparse.Namespace:
         help="Path to save or load ADT table CSV file.",
     )
     icu_parser.add_argument(
+        "--bedmaster_index",
+        default="/media/ml4c3/bedmaster-index.csv",
+        help="Path to the CSV file containing all the bedmaster files information.",
+    )
+    icu_parser.add_argument(
         "--xref",
         default=os.path.expanduser("~/xref.csv"),
         help="Path to CSV file that links MRN, CSN, and Bedmaster file paths. "
@@ -1082,11 +1087,11 @@ def parse_args() -> argparse.Namespace:
         "--max_stay_length",
         "-l",
         type=int,
-        default=12,
+        default=None,
         help="Maximum stay length",
     )
     find_parser.add_argument(
-        "--csv_name",
+        "--output_file",
         "-o",
         default="files",
         help="Name of the output csv file with the signals",
@@ -1095,10 +1100,14 @@ def parse_args() -> argparse.Namespace:
         "--signals",
         "-s",
         nargs="+",
-        default=[],
+        default=None,
         help="Signals to be used",
     )
-
+    find_parser.add_argument(
+        "--department",
+        default=None,
+        help="Crop the signals to the stay on a specific department",
+    )
     extract_parser = clustering_subparsers.add_parser(
         name="extract",
         description="Generate a csv with the signals",
@@ -1113,7 +1122,7 @@ def parse_args() -> argparse.Namespace:
     extract_parser.add_argument(
         "--report_path",
         "-f",
-        help="Path to a csv listing the files and signals to extract. Generated"
+        help="Path to a .report file with the files and signals to extract. Generated"
         "by the 'find' command.",
     )
 
@@ -1215,6 +1224,13 @@ def parse_args() -> argparse.Namespace:
         default=10,
         help="Number of steps that have to pass between synchronization "
         "between Q-network and Q-target. Default: 10.",
+    )
+    rl_parser.add_argument(
+        "--dqn_method",
+        type=str,
+        default="unique",
+        help="DQN method, either taking all values of the Q function to update the Q"
+        "network or only the unique ones that change. Choices: unique or all.",
     )
     rl_parser.add_argument(
         "--discount_gamma",

@@ -6,7 +6,8 @@ import h5py
 import numpy as np
 
 # Imports: first party
-from ingest.icu.data_objects import EDWType, StaticData, BedmasterType, ICUDataObject
+from tensorize.edw.data_objects import EDWType, StaticData, ICUDataObject
+from tensorize.bedmaster.data_objects import BedmasterType
 
 # pylint: disable=too-many-branches
 

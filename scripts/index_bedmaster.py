@@ -147,13 +147,17 @@ def process_batch(to_process_batch: List[Tuple[str, datetime]], bedmaster: str):
                         if key2 not in hd5 or not isinstance(hd5[key2], h5py.Dataset):
                             continue
                         t = hd5[key2]
-                        if (_start := t[0][0]) < start:
+                        if (_start := t[0][0]) < start and _start >= 0:
                             start = int(_start)
                         if (_end := t[-1][0]) > end:
                             end = int(_end)
 
             if start == 4102444800 or end == 0:
                 raise ValueError("could not get start/end time")
+            elif end - start < 0:
+                raise ValueError("end time is earlier than start time")
+            # no upper bound on time delta
+            # see https://github.com/aguirre-lab/ml4c3/issues/1304
 
             fpaths.append(fpath)
             edits.append(t_edit)

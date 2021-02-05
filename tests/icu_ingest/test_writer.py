@@ -8,7 +8,8 @@ import pytest
 
 # Imports: first party
 from ingest.icu.writers import Writer
-from ingest.icu.data_objects import EDWType, BedmasterType, ICUDataObject
+from tensorize.edw.data_objects import EDWType, ICUDataObject
+from tensorize.bedmaster.data_objects import BedmasterType
 
 # pylint: disable=protected-access
 
