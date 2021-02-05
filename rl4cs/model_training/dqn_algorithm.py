@@ -205,5 +205,5 @@ class DQNAlgorithm:
             actions[idx] = int(action)
 
         # Train Q NN model and return its loss
-        loss = self.q_nn_model.train_batch(x_imp, y_out, actions)
+        loss = self.q_nn_model.train_batch(x_imp, y_out, actions, self.dqn_method)
         return float(loss.numpy())

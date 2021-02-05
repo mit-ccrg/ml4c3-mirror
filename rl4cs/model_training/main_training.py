@@ -32,7 +32,7 @@ def main_training(args: argparse.Namespace):
             "CV_Typed-v0",
             init_conditions=args.init_conditions,
             paths=[
-                os.path.join(args.tables_dir, "discrete_action_space.csv"),
+                os.path.join(args.tables_dir, "discrete_action_space_v2.csv"),
                 os.path.join(args.tables_dir, "reward_params.json"),
                 args.save_dir,
             ],
@@ -53,7 +53,7 @@ def main_training(args: argparse.Namespace):
     num_actions = env.action_space.n
 
     # Set Domain randomization training
-    if args.environment == "cv_model" and args.recipe == "training":
+    if args.environment == "cv_model" and args.recipe == "rl_training":
         env.set_domain_randomization(args.patient_state, args.randomization)
 
     # Create q and target nn model, memory and set max steps per episode
@@ -152,7 +152,7 @@ def main_training(args: argparse.Namespace):
         plot.update_plot(reward_episode)
         plot.update_plot(average_reward, hold=True)
 
-        plot.save_figure("plot_reward_prova.png")
+        plot.save_figure("plot_reward_volume_300rand.png")
 
-    if args.recipe == "hyperoptimize":
+    if args.recipe == "rl_hyperoptimize":
         return sum(rl_algorithm.reward_store[-args.len_reward :]) / args.len_reward

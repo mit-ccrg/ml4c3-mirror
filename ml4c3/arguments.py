@@ -1177,6 +1177,7 @@ def parse_args() -> argparse.Namespace:
         "--environment",
         type=str,
         default="cv_model",
+        choices=["cv_model", "cartpole"],
         help="Environment of the RL problem. Options: cartpole, cv_model.",
     )
     env_parser.add_argument(
@@ -1229,6 +1230,7 @@ def parse_args() -> argparse.Namespace:
         "--dqn_method",
         type=str,
         default="unique",
+        choices=["unique", "all"],
         help="DQN method, either taking all values of the Q function to update the Q"
         "network or only the unique ones that change. Choices: unique or all.",
     )
@@ -1280,7 +1282,9 @@ def parse_args() -> argparse.Namespace:
         "--activation",
         type=str,
         default="relu",
-        help="Activation function for neurons. Default: relu.",
+        choices=["relu", "leaky_relu", "sigmoid", "elu", "tanh"],
+        help="Activation function for neurons. Possibilities are: relu, leaky_relu, "
+        "sigmoid, elu and tanh. Default: relu.",
     )
     rl_parser.add_argument(
         "--policy_learning_rate",
@@ -1311,15 +1315,17 @@ def parse_args() -> argparse.Namespace:
         "--patient_state",
         type=str,
         default=None,
+        choices=["normal", "mild", "moderate", "severe"],
         help="Initial patient state (sick state). Possibilities: "
-        "normal, mild, moderate and severe",
+        "normal, mild, moderate and severe. Default: None.",
     )
     train_parser.add_argument(
         "--randomization",
         type=str,
         default=None,
+        choices=["uniform", "triangular"],
         help="Randomization for domain randomization. "
-        "Possibilities: uniform and triangular",
+        "Possibilities: uniform and triangular. Default: None.",
     )
 
     # RL hyperoptimize parser
@@ -1338,12 +1344,14 @@ def parse_args() -> argparse.Namespace:
         "--params_subspace",
         type=str,
         default="all",
+        choices=["all", "rl", "nn"],
         help="Subspace of states to optimize. Options: all, rl and nn.",
     )
     hyperopt_parser.add_argument(
         "--extreme_type",
         type=str,
         default="min",
+        choices=["min", "max"],
         help="Either min or max.",
     )
     hyperopt_parser.add_argument(
@@ -1402,6 +1410,7 @@ def parse_args() -> argparse.Namespace:
         "--sim_type",
         type=str,
         default="steady-state",
+        choices=["transient", "steady-state"],
         help="Mode for simulation can be: transient or steady-state. "
         "Default is: steady-state",
     )
