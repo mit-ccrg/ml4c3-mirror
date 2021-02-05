@@ -118,8 +118,15 @@ class RLPlotter:
 
         if not name[-6:] == "-0.png":
             name = name[:-4] + "-0.png"
-        if os.path.isfile(os.path.join(self.path_store, "plots", self.prev_name)):
-            name_parts = re.split("[-,.]", self.prev_name)
+
+        prev_path = os.path.join(self.path_store, "plots", self.prev_name)
+        current_path = os.path.join(self.path_store, "plots", name)
+
+        if os.path.isfile(prev_path) or os.path.isfile(current_path):
+            if len(self.prev_name) == 0:
+                name_parts = re.split("[-,.]", name)
+            else:
+                name_parts = re.split("[-,.]", self.prev_name)
             name = name_parts[0] + "-" + str(int(name_parts[1]) + 1) + ".png"
         self.prev_name = name
 

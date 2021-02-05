@@ -126,7 +126,7 @@ def main_training(args: argparse.Namespace):
     saver.save_qfunc(args.save_name + ".h5", q_nn_model.model)
 
     # Print total reward evolution over episodes
-    if True:
+    if args.render:
         title = "Reward evolution over episodes"
         axis_labels = ("Number of episodes", "Total reward")
         axis_lims = None
@@ -140,7 +140,7 @@ def main_training(args: argparse.Namespace):
                 reward,
             ],
         ).transpose()
-        av_episodes = list(range(0, len(rl_algorithm.reward_store), 10))
+        av_episodes = list(range(10, len(rl_algorithm.reward_store) + 10, 10))
         av_reward = np.mean(reward.reshape(-1, 10), axis=1)
         average_reward = np.array(
             [
