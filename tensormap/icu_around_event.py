@@ -175,7 +175,9 @@ def make_around_event_tensor_from_file(
                 hd5=hd5,
                 **kwargs,
             )
-            if i == 0:
+            if "_explore" in tm.name:
+                tensor = np.array(window_tensor)
+            elif i == 0:
                 tensor = np.array([window_tensor])
             else:
                 if sample_and_hold and np.isnan(window_tensor).all():
@@ -265,24 +267,6 @@ def make_sliding_window_outcome_tensor_from_file(
     return _tensor_from_file
 
 
-def make_around_event_explore_tensor_from_file(around_tm_name):
-    def _tensor_from_file(tm, hd5, **kwargs):
-        tensor = np.array([])
-        for feature in tm.channel_map:
-            name = f"{around_tm_name}_{feature}"
-            if feature == "mean_slope":
-                name = name.replace("_value", "_timeseries")
-            around_tm = create_around_tmap(name)
-            try:
-                value = around_tm.tensor_from_file(around_tm, hd5, **kwargs)
-            except (ValueError, TypeError):
-                value = np.nan
-            tensor = np.append(tensor, value)
-        return tensor
-
-    return _tensor_from_file
-
-
 def create_around_tmap(tmap_name: str) -> Optional[TensorMap]:
     match = None
 
@@ -295,9 +279,6 @@ def create_around_tmap(tmap_name: str) -> Optional[TensorMap]:
     shape: Optional[Tuple[Axis, ...]] = None
     make_tensor_from_file = None
     tmap_match_name = tmap_name
-
-    if tmap_name.endswith("_explore"):
-        return None
 
     pattern = re.compile(r"^(.*)_(mean_imputation|sample_and_hold)$")
     match = pattern.findall(tmap_match_name)
@@ -322,8 +303,9 @@ def create_around_tmap(tmap_name: str) -> Optional[TensorMap]:
     if len(features) == 1:
         channel_map = None
 
-    if not features:
-        features = ["raw"]
+    if tmap_match_name.endswith("_explore"):
+        tmap_name = tmap_match_name
+        tmap_match_name = tmap_match_name.replace("_explore", "")
 
     if not match:
         pattern = re.compile(
@@ -426,7 +408,7 @@ def create_sliding_window_tmap(tmap_name: str) -> Optional[TensorMap]:
         _, new_feature = match[0]
         tmap_match_name = tmap_match_name.replace(f"_{new_feature}", "")
         features.append(new_feature)
-        channel_map[f"{new_feature}"] = 1
+        channel_map[f"{new_feature}"] = k
         match = pattern.findall(tmap_match_name)
         k += 1
     if not features:
@@ -524,39 +506,6 @@ def create_sliding_window_outcome_tmap(tmap_name: str) -> Optional[TensorMap]:
                 interpretation=Interpretation.CATEGORICAL,
                 validators=validator_no_nans,
                 time_series_limit=0,
-            )
-    return None
-
-
-def create_around_explore_tmap(tmap_name: str) -> Optional[TensorMap]:
-    match = None
-    if not match:
-        pattern = re.compile(
-            r"^(.*)_(\d+)_hrs_(pre|post)_(.*)_(\d+)_hrs_window_explore$",
-        )
-        match = pattern.findall(tmap_name)
-        if match:
-            make_tensor_from_file = make_around_event_explore_tensor_from_file(
-                tmap_name.replace("_explore", ""),
-            )
-            channel_map = {
-                "min": 0,
-                "max": 1,
-                "mean": 2,
-                "std": 3,
-                "first": 4,
-                "last": 5,
-                "count": 6,
-            }
-            path_prefix = create_around_tmap(
-                tmap_name.replace("_explore", ""),
-            ).path_prefix
-            return TensorMap(
-                name=tmap_name,
-                tensor_from_file=make_tensor_from_file,
-                channel_map=channel_map,
-                path_prefix=path_prefix,
-                interpretation=Interpretation.CONTINUOUS,
             )
     return None
 
@@ -735,10 +684,6 @@ def create_static_around_tmap(tm_name: str):
 def get_tmap(tm_name: str) -> Optional[TensorMap]:
 
     tm = create_around_tmap(tm_name)
-    if tm is not None:
-        return tm
-
-    tm = create_around_explore_tmap(tm_name)
     if tm is not None:
         return tm
 

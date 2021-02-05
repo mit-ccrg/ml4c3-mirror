@@ -53,29 +53,29 @@ def generate_hyperoptimize_json_arrest(path_json: str, model_type: str):
         # (24, 4),
         # (24, 6),
         # (48, 2),
-        (48, 4),
+        # (48, 4),
         # (48, 6),
         # (72, 2),
-        # (72, 4),
+        (72, 2),
         # (72, 6),
     ]
     outcome = [
-        (12, 1),
-        (12, 2),
+        # (12, 1),
+        # (12, 2),
         (6, 1),
         (6, 2),
         (3, 1),
-        (3, 0),
     ]
     vitals = [
         "blood_pressure_systolic_value",
         "blood_pressure_diastolic_value",
-        "ppi_value",
         "respirations_value",
         "pulse_value",
+        "r_phs_ob_spo2_outgoing_value",
         "temperature_value",
-        "urine_output_value",
     ]
+    vitals_features = "min_max_mean_std_first_last_count"
+
     labs = [
         "calcium_value",
         "sodium_value",
@@ -87,8 +87,10 @@ def generate_hyperoptimize_json_arrest(path_json: str, model_type: str):
         "hgb_value",
         "glucose_value",
         "anion_gap_value",
+        "ppi_value",
         "plt_value",
     ]
+    labs_features = "last"
 
     input_tensors_set: List[List[str]] = []
     output_tensors_set: List[List[str]] = []
@@ -100,12 +102,11 @@ def generate_hyperoptimize_json_arrest(path_json: str, model_type: str):
         )
 
         for signal in vitals:
-            feature = "min_max_mean_std_first_last_count"
-            input_tmaps.append(f"{signal}_{sliding_window}_{feature}")
+            input_tmaps.append(f"{signal}_{sliding_window}_{vitals_features}")
         for signal in labs:
-            input_tmaps.append(f"{signal}_{sliding_window}_last")
-        # input_tmaps.append("age_first_visit_arrest_start_date_double")
-        # input_tmaps.append(f"length_of_stay_{T1}_hrs_pre_arrest_start_date")
+            input_tmaps.append(f"{signal}_{sliding_window}_{labs_features}")
+        input_tmaps.append(f"age_{sliding_window}")
+        input_tmaps.append(f"length_of_stay_{sliding_window}")
         input_tensors_set.append(input_tmaps)
 
         for prediction, gap in outcome:
@@ -117,7 +118,10 @@ def generate_hyperoptimize_json_arrest(path_json: str, model_type: str):
 
     for tmap_list in input_tensors_set + output_tensors_set:
         for tmap_name in tmap_list:
-            tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
+            try:
+                tmaps = update_tmaps(tmap_name=tmap_name, tmaps=tmaps)
+            except Exception as e:
+                raise ValueError(f"Unable to create tmap {tmap_name}") from e
 
     parameters: Dict[str, List[Any]] = generate_model_dict(model_type)
     parameters.update(
@@ -153,7 +157,7 @@ def generate_model_dict(model_type: str):
 
 def generate_sklearn_logreg_dict():
     parameters: Dict[str, List[Any]] = {
-        "recipe": ["train_sklearn_logreg"],
+        "mode": ["train_sklearn_logreg"],
         # Model Architecture Parameters
         "l1": [0.0, 0.01, 0.02],
         "l2": [0.0, 0.01, 0.02],
@@ -166,7 +170,7 @@ def generate_sklearn_logreg_dict():
 
 def generate_svm_dict():
     parameters: Dict[str, List[Any]] = {
-        "recipe": ["train_sklearn_svm"],
+        "mode": ["train_sklearn_svm"],
         # Model Architecture Parameters
         "c": [0.0, 0.01, 0.04, 0.08, 0.10],
         # Training Parameters
@@ -178,7 +182,7 @@ def generate_svm_dict():
 
 def generate_randomforest_dict():
     parameters: Dict[str, List[Any]] = {
-        "recipe": ["train_sklearn_randomforest"],
+        "mode": ["train_sklearn_randomforest"],
         # Model Architecture Parameters
         "n_estimators": [40, 60, 80, 100, 120, 140],
         "max_depth": [3, 5, 7, 9, 12],
@@ -193,13 +197,13 @@ def generate_randomforest_dict():
 
 def generate_xgboost_dict():
     parameters: Dict[str, List[Any]] = {
-        "recipe": ["train_sklearn_xgboost"],
+        "mode": ["train_sklearn_xgboost"],
         # Model Architecture Parameters
-        "gamma": [0.0, 0.02, 0.06, 0.1, 0.2],
-        "l1": [0.0, 0.01, 0.02],
-        "l2": [0.0, 0.01, 0.02],
-        "n_estimators": [40, 60, 80, 100, 120, 140],
-        "max_depth": [3, 5, 7, 9, 12],
+        "gamma": [0.02, 0.02, 0.06, 0.1, 0.2],
+        "l1": [0.02, 0.04, 0.06, 0.1, 0.2],
+        "l2": [0.02, 0.04, 0.06, 0.1, 0.2],
+        "n_estimators": [120, 140, 200, 300],
+        "max_depth": [7, 9, 12, 20],
         # Training Parameters
         "valid_ratio": [0.2],
         "test_ratio": [0.1],
@@ -209,7 +213,7 @@ def generate_xgboost_dict():
 
 def generate_nn_dict():
     parameters: Dict[str, List[Any]] = {
-        "recipe": ["train"],
+        "mode": ["train"],
         # Model Architecture Parameters
         "activation": ["relu"],
         "block_size": [3],
