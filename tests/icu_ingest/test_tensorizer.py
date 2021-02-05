@@ -26,7 +26,7 @@ def test_tensorizer(
         test_scale_units,
     )
     monkeypatch.setattr(
-        "ingest.icu.readers.ICU_SCALE_UNITS",
+        "tensorize.bedmaster.readers.ICU_SCALE_UNITS",
         test_scale_units,
     )
 

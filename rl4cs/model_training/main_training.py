@@ -90,6 +90,7 @@ def main_training(args: argparse.Namespace):
         args.discount_gamma,
         args.reply_start_size,
         args.sync_steps,
+        args.dqn_method,
     )
     cnt = 0
     start_time = time.time()
@@ -138,6 +139,6 @@ def main_training(args: argparse.Namespace):
             ],
         ).transpose()
         plot.update_plot(data)
-        plot.save_figure("plot_reward.png")
+        plot.save_figure("plot_reward200_volume_newmethod.png")
     if args.recipe == "hyperoptimize":
         return sum(rl_algorithm.reward_store[-args.len_reward :]) / args.len_reward

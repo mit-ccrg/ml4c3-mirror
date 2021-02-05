@@ -226,9 +226,11 @@ def create_folders(staging_dir: str):
     """
     os.makedirs(staging_dir, exist_ok=True)
     os.makedirs(os.path.join(staging_dir, "bedmaster_temp"), exist_ok=True)
+    os.makedirs(os.path.join(staging_dir, "bedmaster_alarms_temp"), exist_ok=True)
 
 
 def stage_bedmaster_files(
+    bedmaster: str,
     staging_dir: str,
     adt: str,
     xref: str,
@@ -259,10 +261,12 @@ def stage_bedmaster_files(
     # Iterate over all Bedmaster file paths to copy to staging directory
     path_destination_dir = os.path.join(staging_dir, "bedmaster_temp")
     for path_source_file in xref_subset["Path"]:
-        fpath_source_file = os.path.join(path_destination_dir, path_source_file)
+        fpath_source_file = os.path.join(bedmaster, path_source_file)
         fpath_destination_file = os.path.join(path_destination_dir, path_source_file)
-        if os.path.exists(path_source_file):
+        fpath_destination_dir = os.path.split(fpath_destination_file)[0]
+        if os.path.exists(fpath_source_file):
             try:
+                os.makedirs(fpath_destination_dir, exist_ok=True)
                 shutil.copy(fpath_source_file, fpath_destination_file)
             except FileNotFoundError as e:
                 logging.warning(f"{fpath_source_file} not found. Error given: {e}")
@@ -318,6 +322,7 @@ def cleanup_staging_files(staging_dir: str):
     :param staging_dir: <str> Path to temporary local directory.
     """
     shutil.rmtree(os.path.join(staging_dir, "bedmaster_temp"))
+    shutil.rmtree(os.path.join(staging_dir, "bedmaster_alarms_temp"))
     shutil.rmtree(os.path.join(staging_dir, "results_temp"))
     os.remove(os.path.join(staging_dir, "patients.csv"))
 
@@ -411,6 +416,7 @@ def tensorize(args):
         # Copy Bedmaster files from this batch of patients
         init = time.time()
         stage_bedmaster_files(
+            bedmaster=args.bedmaster,
             staging_dir=args.staging_dir,
             adt=args.adt,
             xref=args.xref,

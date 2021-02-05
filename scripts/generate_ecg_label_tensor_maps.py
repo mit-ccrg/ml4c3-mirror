@@ -110,7 +110,7 @@ def _write_tmap(
         f"tmaps['{task}_any'] = TensorMap(\n"
         f"    '{task}_any',\n"
         f"    interpretation=Interpretation.CATEGORICAL,\n"
-        f"    path_prefix='{TENSOR_PATH_PREFIX}',\n"
+        f"    path_prefix={TENSOR_PATH_PREFIX},\n"
         f"    channel_map={channel_map},\n"
         f"    validators=validator_not_all_zero,\n"
         f"    tensor_from_file={MAKE_ANY_TFF_FUNCTION_NAME}(\n"

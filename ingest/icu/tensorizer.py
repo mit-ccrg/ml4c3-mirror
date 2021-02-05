@@ -13,19 +13,13 @@ import pandas as pd
 
 # Imports: first party
 from definitions.icu import ICU_SCALE_UNITS
-from ingest.icu.utils import (
-    stage_edw_files,
-    stage_bedmaster_files,
-    save_mrns_and_csns_csv,
-    stage_bedmaster_alarms,
-)
-from ingest.icu.readers import (
-    EDWReader,
-    BedmasterReader,
-    CrossReferencer,
-    BedmasterAlarmsReader,
-)
+from tensorize.utils import save_mrns_and_csns_csv
+from ingest.icu.utils import stage_edw_files, stage_bedmaster_files
+from ingest.icu.readers import CrossReferencer
 from ingest.icu.writers import Writer
+from tensorize.edw.readers import EDWReader
+from tensorize.bedmaster.readers import BedmasterReader, BedmasterAlarmsReader
+from tensorize.bedmaster.tensorizer import stage_bedmaster_alarms
 from tensorize.bedmaster.match_patient_bedmaster import PatientBedmasterMatcher
 
 
@@ -180,7 +174,6 @@ class Tensorizer:
                     # Write alarms data
                     self._write_bedmaster_alarms_data(
                         self.alarms,
-                        self.edw,
                         self.adt,
                         mrn,
                         visit_id,
@@ -246,14 +239,13 @@ class Tensorizer:
     @staticmethod
     def _write_bedmaster_alarms_data(
         alarms_path: str,
-        edw_path: str,
         adt: str,
         mrn: str,
         visit_id: str,
         writer: Writer,
     ):
 
-        reader = BedmasterAlarmsReader(alarms_path, edw_path, mrn, visit_id, adt)
+        reader = BedmasterAlarmsReader(alarms_path, mrn, visit_id, adt)
         alarms = reader.list_alarms()
         for alarm in alarms:
             alarm_instance = reader.get_alarm(alarm)
@@ -458,6 +450,7 @@ def tensorize(args):
         # Copy Bedmaster files from this batch of patients
         init = time.time()
         stage_bedmaster_files(
+            bedmaster=args.bedmaster,
             staging_dir=args.staging_dir,
             xref=args.xref,
         )

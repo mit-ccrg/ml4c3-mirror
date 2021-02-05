@@ -170,7 +170,7 @@ class BedmasterReader(h5py.File, Reader):
         The correction will cut the overlapping values between this bundle
         and the previous one. In addition, it will shift the timespans so that
         the first timespan on this bundle is the continuation of the last
-        timespan of the previouz value.
+        timespan of the previous value.
 
         Note that this shifting will occur until a dataevent 1 or 5 is found.
 
@@ -328,7 +328,12 @@ class BedmasterReader(h5py.File, Reader):
         data = data.astype(dtype)
         return data
 
-    def get_vs(self, signal_name: str) -> Optional[BedmasterSignal]:
+    def get_vs(
+        self,
+        signal_name: str,
+        left_t: Optional[float] = None,
+        right_t: Optional[float] = None,
+    ) -> Optional[BedmasterSignal]:
         """
         Get the corrected vs signal from the.mat file.
 
@@ -344,8 +349,26 @@ class BedmasterReader(h5py.File, Reader):
                 "was not found.",
             )
 
-        # Get values and time
-        values = self["vs"][signal_name][()]
+        # Get time and indices for cutoff
+        time = self["vs_time_corrected"][signal_name]["res_vs"][:, 0]
+        left_idx = 0
+        if left_t is not None:
+            if len(after_left := np.where(time >= left_t)[0]) == 0:
+                # if there are no time points after the left cutoff, no signal
+                return None
+            else:
+                left_idx = after_left[0]
+        right_idx = -1
+        if right_t is not None:
+            if len(before_right := np.where(time <= right_t)[0]) == 0:
+                # if there are no time points before the right cutoff, no signal
+                return None
+            else:
+                right_idx = before_right[-1] + 1
+        time = time[left_idx:right_idx]
+
+        # Get value
+        values = self["vs"][signal_name][left_idx:right_idx]
 
         if values.ndim == 2:
             values = self.format_data(values)
@@ -365,14 +388,12 @@ class BedmasterReader(h5py.File, Reader):
                 f"won't be written.",
             )
 
-        time = np.transpose(self["vs_time_corrected"][signal_name]["res_vs"][:])[0]
-
         # Get the occurrence of event 1 and 5
-        de_1 = self["vs_time_corrected"][signal_name]["data_event_1"]
-        de_5 = self["vs_time_corrected"][signal_name]["data_event_5"]
-        events = (de_1[:] | de_5[:]).astype(np.bool)
+        e1 = self["vs_time_corrected"][signal_name]["data_event_1"][left_idx:right_idx]
+        e5 = self["vs_time_corrected"][signal_name]["data_event_5"][left_idx:right_idx]
+        events = e1 | e5.astype(np.bool)
 
-        # Get scaling factor and units
+        # Get scale factor and units
         if signal_name in self.scaling_and_units:
             scaling_factor = self.scaling_and_units[signal_name]["scaling_factor"]
             units = self.scaling_and_units[signal_name]["units"]
@@ -380,7 +401,7 @@ class BedmasterReader(h5py.File, Reader):
             scaling_factor = 1
             units = "UNKNOWN"
 
-        # Samples per timespan
+        # Samples per timestamp for vital signs are always 1
         samples_per_ts = np.array([1] * len(time))
 
         signal = BedmasterSignal(
@@ -459,7 +480,9 @@ class BedmasterReader(h5py.File, Reader):
     def get_wv(
         self,
         channel_n: str,
-        signal_name: str = None,
+        signal_name: Optional[str] = None,
+        left_t: Optional[float] = None,
+        right_t: Optional[float] = None,
     ) -> Optional[BedmasterSignal]:
         """
         Get the corrected wv signal from the.mat file.
@@ -483,41 +506,65 @@ class BedmasterReader(h5py.File, Reader):
             if not signal_name:
                 signal_name = "?"
 
-        values = np.array(np.transpose(self["wv"][channel_n][:])[0])
-        if values.ndim == 2:
-            values = self.format_data(values)
+        # Get time and indices for cutoff
+        time = self["wv_time_corrected"][channel_n]["res_wv"][:, 0]
+        left_idx = 0
+        if left_t is not None:
+            if len(after_left := np.where(time >= left_t)[0]) == 0:
+                # if there are no time points after the left cutoff, no signal
+                return None
+            else:
+                left_idx = after_left[0]
+        right_idx = -1
+        if right_t is not None:
+            if len(before_right := np.where(time <= right_t)[0]) == 0:
+                # if there are no time points before the right cutoff, no signal
+                return None
+            else:
+                right_idx = before_right[-1] + 1
+        time = time[left_idx:right_idx]
 
-        if values.ndim >= 2:
+        # Get samples per timespan
+        samples_per_ts = self["wv_time_original"][channel_n]["Samples"][:]
+        if samples_per_ts.ndim == 2:
+            samples_per_ts = self.format_data(samples_per_ts)
+
+        left_vidx = sum(samples_per_ts[:left_idx])
+        right_vidx = sum(samples_per_ts[:right_idx])
+        samples_per_ts = samples_per_ts[left_idx:right_idx]
+
+        value = self["wv"][channel_n][left_vidx:right_vidx, 0]
+        if value.ndim == 2:
+            value = self.format_data(value)
+
+        if value.ndim >= 2:
             raise ValueError(
                 f"Something went wrong with signal {signal_name} "
                 f"on file: {self.filename}. Dimension of values "
                 f"formatted values is higher than expected (>1).",
             )
 
-        time = np.transpose(self["wv_time_corrected"][channel_n]["res_wv"][:])[0]
-
         # Get scaling factor and units
         scaling_factor, units = self.get_scaling_and_units(channel_n, signal_name)
 
         # Get the occurrence of event 1 and 5
-        de_1 = self["wv_time_corrected"][channel_n]["data_event_1"]
-        de_5 = self["wv_time_corrected"][channel_n]["data_event_5"]
-        time_reset_events = de_1[:] | de_5[:].astype(np.bool)
+        de_1 = self["wv_time_corrected"][channel_n]["data_event_1"][left_idx:right_idx]
+        de_5 = self["wv_time_corrected"][channel_n]["data_event_5"][left_idx:right_idx]
+        time_reset_events = de_1 | de_5.astype(np.bool)
 
         # Get sample frequency
-        sample_freq = self.get_sample_freq_from_channel(channel_n)
-
-        # Get samples per timespan
-        samples_per_ts = self["wv_time_original"][channel_n]["Samples"][()]
-        if samples_per_ts.ndim == 2:
-            samples_per_ts = self.format_data(samples_per_ts)
+        sample_freq = self.get_sample_freq_from_channel(
+            channel_n,
+            first_idx=left_idx,
+            last_idx=right_idx,
+        )
 
         signal = BedmasterSignal(
             name=signal_name,
             source="waveform",
             channel=channel_n,
-            value=values[:],
-            time=time[:],
+            value=value,
+            time=time,
             units=units,
             sample_freq=sample_freq,
             scale_factor=scaling_factor,
@@ -544,9 +591,9 @@ class BedmasterReader(h5py.File, Reader):
 
         # Add the rest of events and compress the array
         tc_len = len(signal.time_corr_arr)
-        de_2 = self["wv_time_corrected"][channel_n]["data_event_2"]
-        de_3 = self["wv_time_corrected"][channel_n]["data_event_3"]
-        de_4 = self["wv_time_corrected"][channel_n]["data_event_4"]
+        de_2 = self["wv_time_corrected"][channel_n]["data_event_2"][left_idx:right_idx]
+        de_3 = self["wv_time_corrected"][channel_n]["data_event_3"][left_idx:right_idx]
+        de_4 = self["wv_time_corrected"][channel_n]["data_event_4"][left_idx:right_idx]
 
         events = signal.time_corr_arr | de_2[-tc_len:] | de_3[-tc_len:] | de_4[-tc_len:]
         events = np.packbits(np.transpose(events)[0])
@@ -628,8 +675,13 @@ class BedmasterReader(h5py.File, Reader):
         name = "".join([chr(letter) for letter in signals])
         return name
 
-    def get_sample_freq_from_channel(self, channel: str, first_idx=0):
-        sf_arr = self["wv_time_original"][channel]["SampleRate"][first_idx:].T[0]
+    def get_sample_freq_from_channel(
+        self,
+        channel: str,
+        first_idx: int = 0,
+        last_idx: int = -1,
+    ):
+        sf_arr = self["wv_time_original"][channel]["SampleRate"][first_idx:last_idx, 0]
         if sf_arr.shape[0] <= 0:
             logging.info(
                 f"The signal on channel {channel} on file {self.filename} has an "
