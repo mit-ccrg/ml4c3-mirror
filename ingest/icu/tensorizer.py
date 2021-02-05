@@ -6,7 +6,7 @@ import time
 import shutil
 import logging
 import multiprocessing
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 # Imports: third party
 import pandas as pd
@@ -125,14 +125,16 @@ class Tensorizer:
         )
         os.makedirs(tensors, exist_ok=True)
 
-        with multiprocessing.Pool(processes=num_workers) as pool:
-            pool.starmap(
-                self._main_write,
-                [
-                    (tensors, mrn, visits, ICU_SCALE_UNITS)
-                    for mrn, visits in files_per_mrn.items()
-                ],
-            )
+        # with multiprocessing.Pool(processes=num_workers) as pool:
+        #     pool.starmap(
+        #         self._main_write,
+        #         [
+        #             (tensors, mrn, visits, ICU_SCALE_UNITS)
+        #             for mrn, visits in files_per_mrn.items()
+        #         ],
+        #     )
+        for mrn, visits in files_per_mrn.items():
+            self._main_write(tensors, mrn, visits, ICU_SCALE_UNITS)
 
         df = pd.DataFrame.from_dict(self.untensorized_files)
         if not df.empty:
@@ -145,7 +147,7 @@ class Tensorizer:
         self,
         tensors: str,
         mrn: str,
-        visits: Dict,
+        visits: Dict[str, Dict[Tuple[float, float], List[str]]],
         scaling_and_units: Dict,
     ):
         try:
@@ -154,18 +156,26 @@ class Tensorizer:
             with Writer(output_file) as writer:
                 writer.write_completed_flag("bedmaster", False)
                 writer.write_completed_flag("edw", False)
-                for visit_id, bedmaster_files in visits.items():
+                for visit_id, xfers in visits.items():
                     # Set the visit ID
                     writer.set_visit_id(visit_id)
 
-                    # Write Bedmaster data
-                    all_files, untensorized_files = self._write_bedmaster_data(
-                        bedmaster_files,
-                        writer=writer,
-                        scaling_and_units=scaling_and_units,
-                    )
-                    self.untensorized_files["file"].append(untensorized_files["file"])
-                    self.untensorized_files["error"].append(untensorized_files["error"])
+                    for (xfer_in, xfer_out), bedmaster_files in xfers.items():
+
+                        # Write Bedmaster data
+                        all_files, untensorized_files = self._write_bedmaster_data(
+                            bedmaster_files=bedmaster_files,
+                            xfer_in=xfer_in,
+                            xfer_out=xfer_out,
+                            writer=writer,
+                            scaling_and_units=scaling_and_units,
+                        )
+                        self.untensorized_files["file"].append(
+                            untensorized_files["file"],
+                        )
+                        self.untensorized_files["error"].append(
+                            untensorized_files["error"],
+                        )
 
                     # Write alarms data
                     self._write_bedmaster_alarms_data(
@@ -191,6 +201,8 @@ class Tensorizer:
     @staticmethod
     def _write_bedmaster_data(
         bedmaster_files: List[str],
+        xfer_in: float,
+        xfer_out: float,
         writer: Writer,
         scaling_and_units: Dict,
     ):
@@ -208,14 +220,19 @@ class Tensorizer:
                     # >>> if rank == 1:
                     vs_signals = reader.list_vs()
                     for vs_signal_name in vs_signals:
-                        vs_signal = reader.get_vs(vs_signal_name)
+                        vs_signal = reader.get_vs(vs_signal_name, xfer_in, xfer_out)
                         if vs_signal:
                             writer.write_signal(vs_signal)
 
                     # >>> if rank == 2
                     wv_signals = reader.list_wv()
                     for wv_signal_name, channel in wv_signals.items():
-                        wv_signal = reader.get_wv(channel, wv_signal_name)
+                        wv_signal = reader.get_wv(
+                            channel,
+                            wv_signal_name,
+                            xfer_in,
+                            xfer_out,
+                        )
                         if wv_signal:
                             writer.write_signal(wv_signal)
                     previous_max = reader.max_segment

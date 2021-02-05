@@ -5,6 +5,7 @@ import logging
 from abc import ABC
 from typing import Any, Set, Dict, List, Tuple, Optional
 from datetime import datetime
+from collections import defaultdict
 
 # Imports: third party
 import h5py
@@ -842,7 +843,7 @@ class BedmasterReader(h5py.File, Reader):
         The correction will cut the overlapping values between this bundle
         and the previous one. In addition, it will shift the timespans so that
         the first timespan on this bundle is the continuation of the last
-        timespan of the previouz value.
+        timespan of the previous value.
 
         Note that this shifting will occur until a dataevent 1 or 5 is found.
 
@@ -1000,7 +1001,12 @@ class BedmasterReader(h5py.File, Reader):
         data = data.astype(dtype)
         return data
 
-    def get_vs(self, signal_name: str) -> Optional[BedmasterSignal]:
+    def get_vs(
+        self,
+        signal_name: str,
+        left_t: Optional[float] = None,
+        right_t: Optional[float] = None,
+    ) -> Optional[BedmasterSignal]:
         """
         Get the corrected vs signal from the.mat file.
 
@@ -1016,8 +1022,26 @@ class BedmasterReader(h5py.File, Reader):
                 "was not found.",
             )
 
-        # Get values and time
-        values = self["vs"][signal_name][()]
+        # Get time and indices for cutoff
+        time = self["vs_time_corrected"][signal_name]["res_vs"][:, 0]
+        left_idx = 0
+        if left_t is not None:
+            if len(after_left := np.where(time >= left_t)[0]) == 0:
+                # if there are no time points after the left cutoff, no signal
+                return None
+            else:
+                left_idx = after_left[0]
+        right_idx = -1
+        if right_t is not None:
+            if len(before_right := np.where(time <= right_t)[0]) == 0:
+                # if there are no time points before the right cutoff, no signal
+                return None
+            else:
+                right_idx = before_right[-1] + 1
+        time = time[left_idx:right_idx]
+
+        # Get value
+        values = self["vs"][signal_name][left_idx:right_idx]
 
         if values.ndim == 2:
             values = self.format_data(values)
@@ -1037,14 +1061,12 @@ class BedmasterReader(h5py.File, Reader):
                 f"won't be written.",
             )
 
-        time = np.transpose(self["vs_time_corrected"][signal_name]["res_vs"][:])[0]
-
         # Get the occurrence of event 1 and 5
-        de_1 = self["vs_time_corrected"][signal_name]["data_event_1"]
-        de_5 = self["vs_time_corrected"][signal_name]["data_event_5"]
-        events = (de_1[:] | de_5[:]).astype(np.bool)
+        e1 = self["vs_time_corrected"][signal_name]["data_event_1"][left_idx:right_idx]
+        e5 = self["vs_time_corrected"][signal_name]["data_event_5"][left_idx:right_idx]
+        events = e1 | e5.astype(np.bool)
 
-        # Get scaling factor and units
+        # Get scale factor and units
         if signal_name in self.scaling_and_units:
             scaling_factor = self.scaling_and_units[signal_name]["scaling_factor"]
             units = self.scaling_and_units[signal_name]["units"]
@@ -1052,7 +1074,7 @@ class BedmasterReader(h5py.File, Reader):
             scaling_factor = 1
             units = "UNKNOWN"
 
-        # Samples per timespan
+        # Samples per timestamp for vital signs are always 1
         samples_per_ts = np.array([1] * len(time))
 
         signal = BedmasterSignal(
@@ -1131,7 +1153,9 @@ class BedmasterReader(h5py.File, Reader):
     def get_wv(
         self,
         channel_n: str,
-        signal_name: str = None,
+        signal_name: Optional[str] = None,
+        left_t: Optional[float] = None,
+        right_t: Optional[float] = None,
     ) -> Optional[BedmasterSignal]:
         """
         Get the corrected wv signal from the.mat file.
@@ -1155,41 +1179,65 @@ class BedmasterReader(h5py.File, Reader):
             if not signal_name:
                 signal_name = "?"
 
-        values = np.array(np.transpose(self["wv"][channel_n][:])[0])
-        if values.ndim == 2:
-            values = self.format_data(values)
+        # Get time and indices for cutoff
+        time = self["wv_time_corrected"][channel_n]["res_wv"][:, 0]
+        left_idx = 0
+        if left_t is not None:
+            if len(after_left := np.where(time >= left_t)[0]) == 0:
+                # if there are no time points after the left cutoff, no signal
+                return None
+            else:
+                left_idx = after_left[0]
+        right_idx = -1
+        if right_t is not None:
+            if len(before_right := np.where(time <= right_t)[0]) == 0:
+                # if there are no time points before the right cutoff, no signal
+                return None
+            else:
+                right_idx = before_right[-1] + 1
+        time = time[left_idx:right_idx]
 
-        if values.ndim >= 2:
+        # Get samples per timespan
+        samples_per_ts = self["wv_time_original"][channel_n]["Samples"][:]
+        if samples_per_ts.ndim == 2:
+            samples_per_ts = self.format_data(samples_per_ts)
+
+        left_vidx = sum(samples_per_ts[:left_idx])
+        right_vidx = sum(samples_per_ts[:right_idx])
+        samples_per_ts = samples_per_ts[left_idx:right_idx]
+
+        value = self["wv"][channel_n][left_vidx:right_vidx, 0]
+        if value.ndim == 2:
+            value = self.format_data(value)
+
+        if value.ndim >= 2:
             raise ValueError(
                 f"Something went wrong with signal {signal_name} "
                 f"on file: {self.filename}. Dimension of values "
                 f"formatted values is higher than expected (>1).",
             )
 
-        time = np.transpose(self["wv_time_corrected"][channel_n]["res_wv"][:])[0]
-
         # Get scaling factor and units
         scaling_factor, units = self.get_scaling_and_units(channel_n, signal_name)
 
         # Get the occurrence of event 1 and 5
-        de_1 = self["wv_time_corrected"][channel_n]["data_event_1"]
-        de_5 = self["wv_time_corrected"][channel_n]["data_event_5"]
-        time_reset_events = de_1[:] | de_5[:].astype(np.bool)
+        de_1 = self["wv_time_corrected"][channel_n]["data_event_1"][left_idx:right_idx]
+        de_5 = self["wv_time_corrected"][channel_n]["data_event_5"][left_idx:right_idx]
+        time_reset_events = de_1 | de_5.astype(np.bool)
 
         # Get sample frequency
-        sample_freq = self.get_sample_freq_from_channel(channel_n)
-
-        # Get samples per timespan
-        samples_per_ts = self["wv_time_original"][channel_n]["Samples"][()]
-        if samples_per_ts.ndim == 2:
-            samples_per_ts = self.format_data(samples_per_ts)
+        sample_freq = self.get_sample_freq_from_channel(
+            channel_n,
+            first_idx=left_idx,
+            last_idx=right_idx,
+        )
 
         signal = BedmasterSignal(
             name=signal_name,
             source="waveform",
             channel=channel_n,
-            value=values[:],
-            time=time[:],
+            value=value,
+            time=time,
             units=units,
             sample_freq=sample_freq,
             scale_factor=scaling_factor,
@@ -1216,9 +1264,9 @@ class BedmasterReader(h5py.File, Reader):
 
         # Add the rest of events and compress the array
         tc_len = len(signal.time_corr_arr)
-        de_2 = self["wv_time_corrected"][channel_n]["data_event_2"]
-        de_3 = self["wv_time_corrected"][channel_n]["data_event_3"]
-        de_4 = self["wv_time_corrected"][channel_n]["data_event_4"]
+        de_2 = self["wv_time_corrected"][channel_n]["data_event_2"][left_idx:right_idx]
+        de_3 = self["wv_time_corrected"][channel_n]["data_event_3"][left_idx:right_idx]
+        de_4 = self["wv_time_corrected"][channel_n]["data_event_4"][left_idx:right_idx]
 
         events = signal.time_corr_arr | de_2[-tc_len:] | de_3[-tc_len:] | de_4[-tc_len:]
         events = np.packbits(np.transpose(events)[0])
@@ -1300,8 +1348,13 @@ class BedmasterReader(h5py.File, Reader):
         name = "".join([chr(letter) for letter in signals])
         return name
 
-    def get_sample_freq_from_channel(self, channel: str, first_idx=0):
-        sf_arr = self["wv_time_original"][channel]["SampleRate"][first_idx:].T[0]
+    def get_sample_freq_from_channel(
+        self,
+        channel: str,
+        first_idx: int = 0,
+        last_idx: int = -1,
+    ):
+        sf_arr = self["wv_time_original"][channel]["SampleRate"][first_idx:last_idx, 0]
         if sf_arr.shape[0] <= 0:
             logging.info(
                 f"The signal on channel {channel} on file {self.filename} has an "
@@ -1505,6 +1558,14 @@ class BedmasterAlarmsReader(Reader):
         return unix_timestamp
 
 
+def _dl():
+    return defaultdict(list)
+
+
+def _dd():
+    return defaultdict(_dl)
+
+
 class CrossReferencer:
     """
     Class that cross-references Bedmaster and EDW data.
@@ -1525,7 +1586,10 @@ class CrossReferencer:
         self.xref_file = xref_file
         self.adt = adt
         self.bedmaster_index = bedmaster_index
-        self.crossref: Dict[str, Dict[str, List[str]]] = {}
+        self.crossref: Dict[
+            str,
+            Dict[str, Dict[Tuple[float, float], List[str]]],
+        ] = defaultdict(_dd)
 
     def get_xref_files(
         self,
@@ -1536,17 +1600,22 @@ class CrossReferencer:
         n_patients: int = None,
         tensors: str = None,
         allow_one_source: bool = False,
-    ) -> Dict[str, Dict[str, List[str]]]:
+    ) -> Dict[str, Dict[str, Dict[Tuple[float, float], List[str]]]]:
         """
         Get the cross-referenced Bedmaster files and EDW files.
 
         The output dictionary will have the format:
 
-        {"MRN1": {"visitID":[bedmaster_files],
-                  "visitID2": ...,
-                  ...
-                  }
-         "MRN2: ...}
+        {
+            "MRN1": {
+                "visitID": {
+                    (xfer_in, xfer_out): [bedmaster_files],
+                    (xfer_in2, xfer_out2): ...,
+                },
+                "visitID2": ...,
+            },
+            "MRN2: ...,
+         }
 
         :param mrns: <List[str]> list with the MRNs.
                     If None, it take all the existing ones
@@ -1564,7 +1633,7 @@ class CrossReferencer:
                                 just one type of data will be tensorized or not.
         :return: <dict> a dictionary with the MRNs, visit ID and Bedmaster files.
         """
-        self.crossref = {}
+        self.crossref = defaultdict(_dd)
         if not os.path.exists(self.xref_file):
             if self.bedmaster_index is None or not os.path.exists(self.bedmaster_index):
                 raise ValueError(
@@ -1656,18 +1725,18 @@ class CrossReferencer:
             except ValueError:
                 csn = str(row["PatientEncounterID"])
             bedmaster_path = os.path.join(self.bedmaster_dir, row["Path"])
-            if mrn not in self.crossref:
-                self.crossref[mrn] = {csn: [bedmaster_path]}
-            elif csn not in self.crossref[mrn]:
-                self.crossref[mrn][csn] = [bedmaster_path]
-            else:
-                self.crossref[mrn][csn].append(bedmaster_path)
+            xfer_in, xfer_out = row["TransferInDTS"], row["TransferOutDTS"]
+            self.crossref[mrn][csn][(xfer_in, xfer_out)].append(bedmaster_path)
 
         for _mrn, visits in self.crossref.items():
-            for _csn, bedmaster_files in visits.items():
-                bedmaster_files.sort(
-                    key=lambda x: (int(re.split("[_-]", x)[-3]), int(x.split("_")[-2])),
-                )
+            for _csn, beds in visits.items():
+                for _, bedmaster_files in beds.items():
+                    bedmaster_files.sort(
+                        key=lambda x: (
+                            int(re.split("[_-]", x)[-3]),
+                            int(x.split("_")[-2]),
+                        ),
+                    )
 
     def add_edw_elements(self, edw_mrns):
         # Add elements from EDW folders
@@ -1677,14 +1746,8 @@ class CrossReferencer:
                 for csn in os.listdir(os.path.join(self.edw_dir, mrn))
                 if os.path.isdir(os.path.join(self.edw_dir, mrn, csn))
             ]
-            if mrn not in self.crossref:
-                self.crossref[mrn] = {}
-                for csn in csns:
-                    self.crossref[mrn][csn] = []
-            else:
-                for csn in csns:
-                    if csn not in self.crossref[mrn]:
-                        self.crossref[mrn][csn] = []
+            for csn in csns:
+                _ = self.crossref[mrn][csn]  # this populates the defaultdict
 
     def assess_coverage(self):
         for mrn in self.crossref:
@@ -1701,10 +1764,6 @@ class CrossReferencer:
                     logging.warning(f"No EDW data for MRN: {mrn}, CSN: {csn}.")
 
     def stats(self):
-        """
-        :param crossref: <dict> a dictionary with the MRNs, visit ID and Bedmaster
-                         files.
-        """
         edw_mrns_set = {
             mrn
             for mrn in os.listdir(self.edw_dir)
@@ -1733,10 +1792,11 @@ class CrossReferencer:
         crossref_csns_set = set()
         crossref_bedmaster_files_set = set()
         for _, visits in self.crossref.items():
-            for visit_id, bedmaster_files in visits.items():
+            for visit_id, xfers in visits.items():
                 crossref_csns_set.add(visit_id)
-                for bedmaster_file in bedmaster_files:
-                    crossref_bedmaster_files_set.add(bedmaster_file)
+                for _, bedmaster_files in xfers.items():
+                    for bedmaster_file in bedmaster_files:
+                        crossref_bedmaster_files_set.add(bedmaster_file)
         logging.info(
             f"MRNs in {self.edw_dir}: {len(edw_mrns_set)}\n"
             f"MRNs in {self.xref_file}: {len(xref_mrns_set)}\n"
