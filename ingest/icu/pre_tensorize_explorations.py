@@ -10,8 +10,9 @@ import pandas as pd
 # Imports: first party
 from definitions.edw import EDW_FILES
 from definitions.icu import BEDMASTER_EXT
-from ingest.icu.utils import get_files_in_directory
-from ingest.icu.readers import EDWReader, BedmasterReader
+from tensorize.utils import get_files_in_directory
+from tensorize.edw.readers import EDWReader
+from tensorize.bedmaster.readers import BedmasterReader
 from tensorize.bedmaster.bedmaster_stats import BedmasterStats
 
 EXPECTED_FILES = []
