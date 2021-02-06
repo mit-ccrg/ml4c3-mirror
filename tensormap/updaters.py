@@ -147,6 +147,10 @@ def update_tmaps_window(
         ecg_2500_365_days_pre_echo
         ecg_2500_365_days_pre_sts_newest
         av_peak_gradient_30_days_post_echo
+    or
+        [base_tmap_name]_[N]_to_[N]_days_[pre/post]_[other_data_source]
+    e.g.
+        ecg_2500_30_to_90_days_pre_sts
 
     Additionally, a special tensor map can be created to get the days between
     cross referenced events by the following format:
@@ -155,26 +159,30 @@ def update_tmaps_window(
         ecg_180_days_pre_echo_days_between_matched_events
     """
 
-    pattern = (
-        fr"(.*)_(\d+)_days_(pre|post)_({'|'.join(CROSS_REFERENCE_SOURCES)})"
+    pattern_string = (
+        fr"(.*?)_(\d+_to_)?(\d+)_days_(pre|post)_({'|'.join(CROSS_REFERENCE_SOURCES)})"
         fr"(_days_between_matched_events)?"
     )
-    match = re.match(pattern, tmap_name)
+    pattern = re.compile(pattern_string)
+    match = pattern.match(tmap_name)
     if match is None:
         return tmaps
 
     # fmt: off
-    # ecg_2500_std_180_days_pre_echo
+    # ecg_2500_std_30_to_180_days_pre_echo
     source_name = match[1]         # ecg_2500_std
-    offset_days = int(match[2])    # 180
-    pre_or_post = match[3]         # pre
-    reference_name = match[4]      # echo
-    days_between = match[5] or ""  # (empty string)
+    if match[2] is not None:       # "30_to_"
+        offset_start = int(match[2].replace("_to_", ""))
+    else:
+        offset_start = ""
+    offset_end = int(match[3])     # 180
+    pre_or_post = match[4]         # pre
+    reference_name = match[5]      # echo
+    days_between = match[6] or ""  # (empty string)
     # fmt: on
 
-    new_name = (
-        f"{source_name}_{offset_days}_days_{pre_or_post}_{reference_name}{days_between}"
-    )
+    offset_start_str = "" if offset_start == "" else f"{offset_start}_to_"
+    new_name = f"{source_name}_{offset_start_str}{offset_end}_days_{pre_or_post}_{reference_name}{days_between}"
 
     # If the tmap should return the number of days between matched events,
     # source_name is the name of a source dataset
@@ -251,11 +259,25 @@ def update_tmaps_window(
 
         # Set start and end dates relative to an event
         if pre_or_post == "pre":
-            start_dates = reference_dates + datetime.timedelta(days=offset_days * -1)
-            end_dates = reference_dates
+            # e.g. 30_days_pre_echo
+            if offset_start == "":
+                start_dates = reference_dates + datetime.timedelta(days=offset_end * -1)
+                end_dates = reference_dates
+            # e.g. 60_to_30_days_pre_echo
+            else:
+                start_dates = reference_dates + datetime.timedelta(
+                    days=offset_start * -1,
+                )
+                end_dates = reference_dates + datetime.timedelta(days=offset_end * -1)
         else:
-            start_dates = reference_dates
-            end_dates = reference_dates + datetime.timedelta(days=offset_days)
+            # e.g. 30_days_post_echo
+            if offset_start == "":
+                start_dates = reference_dates
+                end_dates = reference_dates + datetime.timedelta(days=offset_end)
+            # e.g. 30_to_60_days_post_echo
+            else:
+                start_dates = reference_dates + datetime.timedelta(days=offset_start)
+                end_dates = reference_dates + datetime.timedelta(days=offset_end)
 
         dates = pd.Series(dtype=object)
         day_differences = pd.Series(dtype=object)
@@ -312,10 +334,10 @@ def update_sts_ecg_cross_reference(
 
     # ecg_2500_zscore_pop_180_days_pre_sts
     base_name = match[1]  # ecg_2500_zscore_pop
-    offset_days = int(match[2])  # 180
+    offset_end = int(match[2])  # 180
     relative_event = match[3]  # pre_sts
 
-    new_name = f"{base_name}_{offset_days}_days_{relative_event}"
+    new_name = f"{base_name}_{offset_end}_days_{relative_event}"
 
     if base_name not in tmaps:
         raise ValueError(
@@ -337,7 +359,7 @@ def update_sts_ecg_cross_reference(
         idx_map = {v: k for k, v in surgery_dates.to_dict().items()}
 
         edges = pd.concat([left_edge, surgery_dates])
-        offset = datetime.timedelta(days=offset_days * -1)
+        offset = datetime.timedelta(days=offset_end * -1)
 
         surgery_dates = pd.to_datetime(pd.cut(ecg_dates, edges, labels=surgery_dates))
         mask = ecg_dates.between(surgery_dates + offset, surgery_dates)
