@@ -60,7 +60,7 @@ class TestRecipes:
 
         csv_path = os.path.join(
             default_arguments_explore.output_folder,
-            "tensors_union.csv",
+            "tensors-union.csv",
         )
         explore_result = pd.read_csv(csv_path)
 
