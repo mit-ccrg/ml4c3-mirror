@@ -519,7 +519,7 @@ def explore(
                     df_stats = pd.DataFrame(data=stats_all, index=[stats_keys])
                     fpath = os.path.join(
                         args.output_folder,
-                        f"stats_{interpretation}_{window}_{union_or_intersect}.csv",
+                        f"stats-{interpretation}-{window}-{union_or_intersect}.csv",
                     )
                     df_stats.round(3).to_csv(fpath)
                     logging.info(
@@ -528,7 +528,7 @@ def explore(
                     )
 
     # Save tensors, including column with window name
-    fpath = os.path.join(args.output_folder, "tensors_union.csv")
+    fpath = os.path.join(args.output_folder, "tensors-union.csv")
 
     # Time-windowed
     if use_time:
@@ -550,7 +550,7 @@ def explore(
         logging.info(f"Saved tensors to {fpath}")
 
     # Save cohort counts to CSV
-    fpath = os.path.join(args.output_folder, "cohort_counts.csv")
+    fpath = os.path.join(args.output_folder, "cohort-counts.csv")
     df_cohort_counts = pd.DataFrame.from_dict(
         cohort_counts,
         orient="index",
